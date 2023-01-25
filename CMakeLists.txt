@@ -53,7 +53,7 @@ IF(WITH_NET)
         FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${PROJECT_SOURCE_DIR}/contrib/winpthreads/include/lib/x64/" REQUIRED)
         file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}/event.lib" DESTINATION "${PROJECT_SOURCE_DIR}")
         ###
-        FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${CMAKE_PREFIX_PATH}")
+        FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${CMAKE_PREFIX_PATH}" "${PROJECT_SOURCE_DIR}")
         #FIND_LIBRARY(LIBEVENT_PTHREADS event_pthreads REQUIRED)
         FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${CMAKE_PREFIX_PATH};${CMAKE_PREFIX_PATH}/contrib/winpthreads/include/lib/x64/")
     ELSE()
