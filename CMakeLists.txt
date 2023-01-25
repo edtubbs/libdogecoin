@@ -34,8 +34,8 @@ IF(WITH_NET)
         # build libevent
         execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/src/libevent/build)
         execute_process(COMMAND cmake .. 
-            -DEVENT__DISABLE_OPENSSL=ON 
-            -DEVENT__DISABLE_SAMPLES=ON 
+            -DEVENT__DISABLE_OPENSSL=ON
+            -DEVENT__DISABLE_SAMPLES=ON
             -DEVENT__LIBRARY_TYPE=STATIC 
             -DEVENT__DISABLE_TESTS=ON 
             -DEVENT__DISABLE_THREAD_SUPPORT=OFF 
@@ -51,6 +51,11 @@ IF(WITH_NET)
         find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         FIND_LIBRARY(LIBEVENT NAMES event event_core event_extras event_pthreads HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
         FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${PROJECT_SOURCE_DIR}/contrib/winpthreads/include/lib/x64/" REQUIRED)
+        file(COPY "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}/event.lib" DESTINATION "${PROJECT_SOURCE_DIR}")
+        ###
+        FIND_LIBRARY(LIBEVENT NAMES event libevent HINTS "${CMAKE_PREFIX_PATH}")
+        #FIND_LIBRARY(LIBEVENT_PTHREADS event_pthreads REQUIRED)
+        FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${CMAKE_PREFIX_PATH};${CMAKE_PREFIX_PATH}/contrib/winpthreads/include/lib/x64/")
     ELSE()
         FIND_LIBRARY(LIBEVENT event REQUIRED)
         FIND_LIBRARY(LIBUNISTRING unistring REQUIRED)
