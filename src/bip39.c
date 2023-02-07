@@ -251,7 +251,7 @@ int get_root_seed(const char *pass, const char *passphrase, uint8_t seed[64]) {
         DWORD error = GetLastError();
         FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
         NULL, error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&message, 0, NULL);
-        fprintf(stderr, "Error getting length of normalized passphrase: %s\n", message);
+        fprintf(stderr, "Error getting length of normalized passphrase: %s\n", (char*) message);
         LocalFree(message);
         dogecoin_free(salt);
         dogecoin_free(pass_w);

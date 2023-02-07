@@ -38,7 +38,7 @@
 #include <dogecoin/mem.h>
 #include <dogecoin/utils.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 
 #ifdef _MSC_VER
 #pragma warning(disable : 4786)

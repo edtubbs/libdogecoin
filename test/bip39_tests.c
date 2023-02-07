@@ -195,44 +195,44 @@ void test_bip39()
     u_assert_mem_eq(words, "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about", length);
     debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
 
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
     dogecoin_generate_mnemonic ("160", "eng", " ", "0000000000000000000000000000000000000000", NULL, &length, words);
     u_assert_mem_eq(words, "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon address", length); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
     dogecoin_generate_mnemonic ("192", "eng", " ", "000000000000000000000000000000000000000000000000", NULL, &length, words);
     u_assert_mem_eq(words, "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon agent", length); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
     dogecoin_generate_mnemonic ("224", "eng", " ", "00000000000000000000000000000000000000000000000000000000", NULL, &length, words);
     u_assert_mem_eq(words, "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon admit", length); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
     dogecoin_generate_mnemonic ("256", "eng", " ", "0000000000000000000000000000000000000000000000000000000000000000", NULL, &length, words);
     u_assert_mem_eq(words, "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art", length); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
 
     dogecoin_generate_mnemonic ("128", "jpn", "　", "00000000000000000000000000000000", NULL, &length, words);
     u_assert_mem_eq(words, "あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あいこくしん　あおぞら", length); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
 
     dogecoin_generate_mnemonic ("128", "jpn", "　", "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f", NULL, &length, words);
     u_assert_mem_eq(words, "そつう　れきだい　ほんやく　わかす　りくつ　ばいか　ろせん　やちん　そつう　れきだい　ほんやく　わかめ", length); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
 
     dogecoin_generate_mnemonic ("256", "jpn", "　", "15da872c95a13dd738fbf50e427583ad61f18fd99f628c417a61cf8343c90419", NULL, &length, words);
     u_assert_mem_eq(words, "うちゅう　ふそく　ひしょ　がちょう　うけもつ　めいそう　みかん　そざい　いばる　うけとる　さんま　さこつ　おうさま　ぱんつ　しひょう　めした　たはつ　いちぶ　つうじょう　てさぎょう　きつね　みすえる　いりぐち　かめれおん", length); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
 
     /* Tests with local entropy (random) */
     debug_print ("%s", "\nTests with local (random) entropy\n");
     dogecoin_generate_mnemonic ("128", "eng", " ", entropy, NULL, &length, words); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
     dogecoin_generate_mnemonic ("160", "eng", " ", entropy, NULL, &length, words); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
     dogecoin_generate_mnemonic ("192", "eng", " ", entropy, NULL, &length, words); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
     dogecoin_generate_mnemonic ("224", "eng", " ", entropy, NULL, &length, words); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
     dogecoin_generate_mnemonic ("256", "eng", " ", entropy, NULL, &length, words); debug_print("%s \n", words); u_assert_int_eq(length, strlen(words)); free(words); words = malloc(sizeof(char) * MAX_MNEMONIC_LENGTH); memset(words, '\0', MAX_MNEMONIC_LENGTH);
-    debug_print ("%lu bytes \n", length);
+    debug_print ("%zu bytes \n", length);
 
     /* test custom word lists (random) */
     debug_print ("%s", "\nTests with custom word lists\n");
