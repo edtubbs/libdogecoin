@@ -43,6 +43,7 @@
 #include <dogecoin/base58.h>
 #include <dogecoin/blockchain.h>
 #include <dogecoin/common.h>
+#include <dogecoin/constants.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/wallet.h>
 #include <dogecoin/utils.h>
@@ -53,6 +54,8 @@ uint8_t WALLET_DB_REC_TYPE_MASTERPUBKEY = 0;
 uint8_t WALLET_DB_REC_TYPE_PUBKEYCACHE = 1;
 uint8_t WALLET_DB_REC_TYPE_ADDR = 1;
 uint8_t WALLET_DB_REC_TYPE_TX = 2;
+
+#define WALLET_DB_REC_TYPE_LEN 20+1+4
 
 static const unsigned char file_hdr_magic[4] = {0xA8, 0xF0, 0x11, 0xC5}; /* header magic */
 static const unsigned char file_rec_magic[4] = {0xC8, 0xF2, 0x69, 0x1E}; /* record magic */
@@ -422,10 +425,10 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 dogecoin_hdnode_deserialize(strbuf, wallet->chain, wallet->masterkey);
             } else if (rectype == WALLET_DB_REC_TYPE_ADDR) {
                 dogecoin_wallet_addr *waddr= dogecoin_wallet_addr_new();
-                size_t reclen = 20+1+4;
-                unsigned char buf[reclen];
-                struct const_buffer cbuf = {buf, reclen};
-                if (fread(buf, reclen, 1, wallet->dbfile) != 1) {
+
+                unsigned char buf[WALLET_DB_REC_TYPE_LEN];
+                struct const_buffer cbuf = {buf, WALLET_DB_REC_TYPE_LEN};
+                if (fread(buf, WALLET_DB_REC_TYPE_LEN, 1, wallet->dbfile) != 1) {
                     dogecoin_wallet_addr_free(waddr);
                     return false;
                 }
@@ -436,16 +439,16 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 vector_add(wallet->waddr_vector, waddr);
                 wallet->next_childindex = waddr->childindex+1;
             } else if (rectype == WALLET_DB_REC_TYPE_TX) {
-                unsigned char buf[reclen];
-                struct const_buffer cbuf = {buf, reclen};
-                if (fread(buf, reclen, 1, wallet->dbfile) != 1) {
+                unsigned char buf[WALLET_DB_REC_TYPE_LEN];
+                struct const_buffer cbuf = {buf, WALLET_DB_REC_TYPE_LEN};
+                if (fread(buf, WALLET_DB_REC_TYPE_LEN, 1, wallet->dbfile) != 1) {
                     return false;
                 }
                 dogecoin_wtx *wtx = dogecoin_wallet_wtx_new();
                 dogecoin_wallet_wtx_deserialize(wtx, &cbuf);
                 dogecoin_wallet_add_wtx_intern_move(wallet, wtx); // hands memory management over to the binary tree
             } else {
-                fseek(wallet->dbfile , reclen, SEEK_CUR);
+                fseek(wallet->dbfile , WALLET_DB_REC_TYPE_LEN, SEEK_CUR);
             }
         }
     }
@@ -560,7 +563,7 @@ dogecoin_wallet_addr* dogecoin_wallet_find_waddr_byaddr(dogecoin_wallet* wallet,
         return NULL;
 
 
-    uint8_t hashdata[strlen(search_addr)];
+    uint8_t hashdata[P2PKH_ADDR_STRINGLEN];
     dogecoin_mem_zero(hashdata, sizeof(uint160));
     int outlen = dogecoin_base58_decode_check(search_addr, hashdata, strlen(search_addr));
 
