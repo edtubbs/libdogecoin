@@ -66,6 +66,7 @@ static struct option long_options[] = {
         {"ips", no_argument, NULL, 'i'},
         {"debug", no_argument, NULL, 'd'},
         {"maxnodes", no_argument, NULL, 'm'},
+        {"mnemonic", no_argument, NULL, 'n'},
         {"dbfile", no_argument, NULL, 'f'},
         {"continuous", no_argument, NULL, 'c'},
         {NULL, 0, NULL, 0} };
@@ -151,6 +152,7 @@ int main(int argc, char* argv[]) {
     int maxnodes = 10;
     char* dbfile = 0;
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
+    char* mnemonic_in = 0;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -160,7 +162,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:f:", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -182,6 +184,9 @@ int main(int argc, char* argv[]) {
                     break;
                 case 'm':
                     maxnodes = (int)strtol(optarg, (char**)NULL, 10); // value stored is never read
+                    break;
+                case 'n':
+                    mnemonic_in = optarg;
                     break;
                 case 'f':
                     dbfile = optarg;
@@ -218,6 +223,10 @@ int main(int argc, char* argv[]) {
             if (!res) {
                 fprintf(stdout, "Generating random bytes failed\n");
                 exit(EXIT_FAILURE);
+            }
+            if (mnemonic_in) {
+                // generate seed from mnemonic
+                dogecoin_seed_from_mnemonic(mnemonic_in, NULL, seed);
             }
             dogecoin_hdnode_from_seed(seed, sizeof(seed), &node);
             dogecoin_wallet_set_master_key_copy(wallet, &node);
