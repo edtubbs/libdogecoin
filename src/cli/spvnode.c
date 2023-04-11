@@ -48,6 +48,7 @@
 #include <dogecoin/chainparams.h>
 #include <dogecoin/constants.h>
 #include <dogecoin/base58.h>
+#include <dogecoin/bip39.h>
 #include <dogecoin/ecc.h>
 #include <dogecoin/net.h>
 #include <dogecoin/spv.h>
@@ -138,6 +139,7 @@ void spv_sync_completed(dogecoin_spv_client* client) {
         dogecoin_node_group_shutdown(client->nodegroup);
     } else {
         printf("Waiting for new blocks or relevant transactions...\n");
+        printf("Wallet balance: %ld\n", dogecoin_wallet_get_balance(client->sync_transaction_ctx));
     }
 }
 
@@ -153,6 +155,7 @@ int main(int argc, char* argv[]) {
     char* dbfile = 0;
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
     char* mnemonic_in = 0;
+    dogecoin_bool balance = false;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -164,6 +167,9 @@ int main(int argc, char* argv[]) {
     /* get arguments */
     while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:", long_options, &long_index)) != -1) {
         switch (opt) {
+                case 'b':
+                    balance = true;
+                    break;
                 case 'c':
                     quit_when_synced = false;
                     break;
@@ -218,7 +224,7 @@ int main(int argc, char* argv[]) {
         if (created) {
             // create a new key
             dogecoin_hdnode node;
-            uint8_t seed[32];
+            SEED seed;
             res = dogecoin_random_bytes(seed, sizeof(seed), true);
             if (!res) {
                 fprintf(stdout, "Generating random bytes failed\n");
