@@ -106,6 +106,7 @@ INSTALL(FILES
     include/dogecoin/random.h
     include/dogecoin/rmd160.h
     include/dogecoin/script.h
+    include/dogecoin/seal.h
     include/dogecoin/serialize.h
     include/dogecoin/sha2.h
     include/dogecoin/sign.h
@@ -156,6 +157,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/random.c
     src/rmd160.c
     src/script.c
+    src/seal.c
     src/serialize.c
     src/sha2.c
     src/sign.c
@@ -237,7 +239,7 @@ IF(USE_TESTS)
         test/utils_tests.c
         test/vector_tests.c
 )
-    TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME} ${LIBUNISTRING} tbs)
+    TARGET_LINK_LIBRARIES(tests ${LIBDOGECOIN_NAME} ${LIBUNISTRING} tbs ncrypt)
     ADD_TEST(NAME ${LIBDOGECOIN_NAME}_tests COMMAND tests)
     # move test/wordlist to build
     FILE(GLOB_RECURSE WORDLISTS "${PROJECT_SOURCE_DIR}/test/wordlist/*.txt")
@@ -277,7 +279,7 @@ IF(WITH_TOOLS)
 
     ADD_EXECUTABLE(such src/cli/such.c)
     INSTALL(TARGETS such RUNTIME)
-    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME} ${LIBUNISTRING})
+    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME} ${LIBUNISTRING} ncrypt)
 
     TARGET_INCLUDE_DIRECTORIES(such PRIVATE src)
 
