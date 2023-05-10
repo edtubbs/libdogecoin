@@ -58,6 +58,7 @@
 #include <dogecoin/ecc.h>
 #include <dogecoin/koinu.h>
 #include <dogecoin/net.h>
+#include <dogecoin/seal.h>
 #include <dogecoin/spv.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/random.h>
@@ -175,6 +176,7 @@ static struct option long_options[] = {
         {"address", no_argument, NULL, 'a'},
         {"full_sync", no_argument, NULL, 'b'},
         {"checkpoint", no_argument, NULL, 'p'},
+        {"object_slot", required_argument, NULL, 'y'},
         {"daemon", no_argument, NULL, 'z'},
         {NULL, 0, NULL, 0} };
 
@@ -248,7 +250,7 @@ void spv_sync_completed(dogecoin_spv_client* client) {
     }
 }
 
-dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* address, char* mnemonic_in) {
+dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* address, char* mnemonic_in, dogecoin_bool tpm, int object_slot) {
     dogecoin_wallet* wallet = dogecoin_wallet_new(chain);
     int error;
     dogecoin_bool created;
@@ -273,7 +275,16 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
         if (mnemonic_in) {
             // generate seed from mnemonic
             dogecoin_seed_from_mnemonic(mnemonic_in, NULL, seed);
-        } else {
+        }
+        else if (tpm) {
+            // export mnemonic from TPM
+            MNEMONIC mnemonic = {0};
+            exportEnglishMnemonicTPM (object_slot, mnemonic);
+
+            // generate seed from mnemonic
+            dogecoin_seed_from_mnemonic(mnemonic, NULL, seed);
+        }
+        else {
             res = dogecoin_random_bytes(seed, sizeof(seed), true);
             if (!res) {
                 showError("Generating random bytes failed\n");
@@ -368,6 +379,8 @@ int main(int argc, char* argv[]) {
     char* mnemonic_in = 0;
     dogecoin_bool full_sync = false;
     dogecoin_bool have_decl_daemon = false;
+    dogecoin_bool tpm = false;
+    int slot = NO_SLOT;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -377,7 +390,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:a:bpz:", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:y:a:bpz:", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -409,6 +422,10 @@ int main(int argc, char* argv[]) {
                 case 'p':
                     use_checkpoint = true;
                     break;
+                case 'y':
+                    tpm = true;
+                    slot = (int)strtol(optarg, (char**)NULL, 10);
+                    break;
                 case 'z':
                     have_decl_daemon = true;
                     break;
@@ -429,7 +446,7 @@ int main(int argc, char* argv[]) {
         client->sync_completed = spv_sync_completed;
 
 #if WITH_WALLET
-        dogecoin_wallet* wallet = dogecoin_wallet_init(chain, address, mnemonic_in);
+        dogecoin_wallet* wallet = dogecoin_wallet_init(chain, address, mnemonic_in, tpm, slot);
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
 #endif
