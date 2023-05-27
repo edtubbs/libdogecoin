@@ -171,12 +171,14 @@ static struct option long_options[] = {
         {"debug", no_argument, NULL, 'd'},
         {"maxnodes", no_argument, NULL, 'm'},
         {"mnemonic", no_argument, NULL, 'n'},
+        {"pass_phrase", required_argument, NULL, 'h'},
         {"dbfile", no_argument, NULL, 'f'},
         {"continuous", no_argument, NULL, 'c'},
-        {"address", no_argument, NULL, 'a'},
+        {"address", no_argument, NULL, 's'},
         {"full_sync", no_argument, NULL, 'b'},
         {"checkpoint", no_argument, NULL, 'p'},
-        {"object_slot", required_argument, NULL, 'y'},
+        {"tpm", no_argument, NULL, 'y'},
+        {"wallet_file", required_argument, NULL, 'w'},
         {"daemon", no_argument, NULL, 'z'},
         {NULL, 0, NULL, 0} };
 
@@ -192,7 +194,8 @@ static void print_version() {
  */
 static void print_usage() {
     print_version();
-    printf("Usage: spvnode (-c|continuous) (-i|-ips <ip,ip,...]>) (-m[--maxpeers] <int>) (-t[--testnet]) (-f <headersfile|0 for in mem only>) (-r[--regtest]) (-d[--debug]) (-s[--timeout] <secs>) <command>\n");
+    printf("Usage: spvnode (-c|continuous) (-i|-ips <ip,ip,...]>) (-m[--maxpeers] <int>) (-t[--testnet]) (-f <headersfile|0 for in mem only>) \
+(-n|-mnemonic <seed_phrase>) (-h|-pass_phrase <pass_phrase>) (-y|-tpm <slot>) (-w|-wallet_file <filename>) (-r[--regtest]) (-d[--debug]) (-s[--timeout] <secs>) <command>\n");
     printf("Supported commands:\n");
     printf("        scan      (scan blocks up to the tip, creates header.db file)\n");
     printf("\nExamples: \n");
@@ -202,6 +205,14 @@ static void print_usage() {
     printf("> spvnode -d scan\n\n");
     printf("Sync up, show debug info, don't store headers in file (only in memory), wait for new blocks:\n");
     printf("> spvnode -d -f 0 -c scan\n\n");
+    printf("Sync up, with tpm slot 0, show debug info, don't store headers in file, wait for new blocks:\n");
+    printf("> spvnode -d -f 0 -c -y 0 scan\n\n");
+    printf("Sync up, with tpm slot 0, pass phrase 'test', show debug info, don't store headers in file, wait for new blocks:\n");
+    printf("> spvnode -d -f 0 -c -y 0 -h \"test\" scan\n\n");
+    printf("Sync up, with mnemonic 'test', pass phrase 'test', show debug info, don't store headers in file, wait for new blocks:\n");
+    printf("> spvnode -d -f 0 -c -n \"test\" -h \"test\" scan\n\n");
+    printf("Sync up, with a wallet file (ex. mnemonic_wallet.db), show debug info, don't store headers in file, wait for new blocks:\n");
+    printf("> spvnode -d -f 0 -c -w \"mnemonic_wallet.db\" scan\n\n");
     }
 
 /**
@@ -250,42 +261,81 @@ void spv_sync_completed(dogecoin_spv_client* client) {
     }
 }
 
-dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* address, char* mnemonic_in, dogecoin_bool tpm, int object_slot) {
+dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* address, char* name, const MNEMONIC mnemonic_in, const PASSPHRASE pass, const dogecoin_bool tpm, const int slot) {
     dogecoin_wallet* wallet = dogecoin_wallet_new(chain);
     int error;
     dogecoin_bool created;
-    // prefix chain to wallet file name:
-    char* wallet_suffix = "_wallet.db";
-    char* wallet_prefix = (char*)chain->chainname;
-    char* walletfile = concat(wallet_prefix, wallet_suffix);
-    dogecoin_bool res = dogecoin_wallet_load(wallet, walletfile, &error, &created);
-    dogecoin_free(walletfile);
-    if (!res) {
-        showError("Loading wallet failed\n");
-        exit(EXIT_FAILURE);
+
+    // if tpm is set, use tpm slot as prefix for wallet file name:
+    if (tpm) {
+        const char* wallet_suffix = "_wallet.db";
+        const char* wallet_prefix = "tpm";
+        char slot_str[4];
+        sprintf(slot_str, "%03d", slot);
+        char* walletfile = concat(wallet_prefix, slot_str);
+        walletfile = concat(walletfile, wallet_suffix);
+        dogecoin_bool res = dogecoin_wallet_load(wallet, walletfile, &error, &created);
+        dogecoin_free(walletfile);
+        if (!res) {
+            showError("Loading wallet failed\n");
+            exit(EXIT_FAILURE);
         }
+    }
+    // else if mnemonic is set, use 'mnemonic' as prefix for wallet file name:
+    else if (mnemonic_in) {
+        const char* wallet_suffix = "_wallet.db";
+        const char* wallet_prefix = "mnemonic";
+        char* walletfile = concat(wallet_prefix, wallet_suffix);
+        dogecoin_bool res = dogecoin_wallet_load(wallet, walletfile, &error, &created);
+        dogecoin_free(walletfile);
+        if (!res) {
+            showError("Loading wallet failed\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    // else if name is set, use name for wallet file name:
+    else if (name) {
+        dogecoin_bool res = dogecoin_wallet_load(wallet, name, &error, &created);
+        if (!res) {
+            showError("Loading wallet failed\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    else {
+        // prefix chain to wallet file name:
+        char* wallet_suffix = "_wallet.db";
+        char* wallet_prefix = (char*)chain->chainname;
+        char* walletfile = concat(wallet_prefix, wallet_suffix);
+        dogecoin_bool res = dogecoin_wallet_load(wallet, walletfile, &error, &created);
+        dogecoin_free(walletfile);
+        if (!res) {
+            showError("Loading wallet failed\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
     if (created) {
         // create a new key
         dogecoin_hdnode node;
 #ifdef WITH_UNISTRING
         SEED seed;
 #else
-        uint8_t seed[64];    
+        uint8_t seed[64];
 #endif
         if (mnemonic_in) {
             // generate seed from mnemonic
-            dogecoin_seed_from_mnemonic(mnemonic_in, NULL, seed);
+            dogecoin_seed_from_mnemonic(mnemonic_in, pass, seed);
         }
         else if (tpm) {
             // export mnemonic from TPM
             MNEMONIC mnemonic = {0};
-            exportEnglishMnemonicTPM (object_slot, mnemonic);
+            exportEnglishMnemonicTPM (slot, mnemonic);
 
             // generate seed from mnemonic
-            dogecoin_seed_from_mnemonic(mnemonic, NULL, seed);
+            dogecoin_seed_from_mnemonic(mnemonic, pass, seed);
         }
         else {
-            res = dogecoin_random_bytes(seed, sizeof(seed), true);
+            dogecoin_bool res = dogecoin_random_bytes(seed, sizeof(seed), true);
             if (!res) {
                 showError("Generating random bytes failed\n");
                 exit(EXIT_FAILURE);
@@ -313,8 +363,8 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, char* a
             }
             ptr = strtok(NULL, delim);
         }
-    } 
-#ifdef USE_UNISTRING  
+    }
+#ifdef USE_UNISTRING
     else if (wallet->waddr_vector->len == 0) {
         int i=0;
         for(;i<20;i++) {
@@ -376,11 +426,14 @@ int main(int argc, char* argv[]) {
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
     char* address = NULL;
     dogecoin_bool use_checkpoint = false;
+    char* pass = 0;
     char* mnemonic_in = 0;
+    char* name = 0;
     dogecoin_bool full_sync = false;
     dogecoin_bool have_decl_daemon = false;
     dogecoin_bool tpm = false;
     int slot = NO_SLOT;
+    char* wallet_name = NULL;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -390,7 +443,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:f:y:a:bpz:", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrds:m:n:h:f:y:a:bpz:", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -407,13 +460,16 @@ int main(int argc, char* argv[]) {
                 case 'i':
                     ips = optarg;
                     break;
+                case 'h':
+                    pass = optarg;
+                    break;
                 case 'n':
                     mnemonic_in = optarg;
                     break;
                 case 'f':
                     dbfile = optarg;
                     break;
-                case 'a':
+                case 's':
                     address = optarg;
                     break;
                 case 'b':
@@ -425,6 +481,9 @@ int main(int argc, char* argv[]) {
                 case 'y':
                     tpm = true;
                     slot = (int)strtol(optarg, (char**)NULL, 10);
+                    break;
+                case 'w':
+                    name = optarg;
                     break;
                 case 'z':
                     have_decl_daemon = true;
@@ -446,7 +505,7 @@ int main(int argc, char* argv[]) {
         client->sync_completed = spv_sync_completed;
 
 #if WITH_WALLET
-        dogecoin_wallet* wallet = dogecoin_wallet_init(chain, address, mnemonic_in, tpm, slot);
+        dogecoin_wallet* wallet = dogecoin_wallet_init(chain, address, name, mnemonic_in, pass, tpm, slot);
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
 #endif
