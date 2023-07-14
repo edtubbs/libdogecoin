@@ -661,7 +661,7 @@ dogecoin_bool dogecoin_wallet_create(dogecoin_wallet* wallet, const char* file_p
     return true;
 }
 
-dogecoin_bool dogecoin_load_wallet_masterpubkey(dogecoin_wallet* wallet, void (*rw)(void *)) {
+dogecoin_bool dogecoin_wallet_load_masterpubkey(dogecoin_wallet* wallet, void (*rw)(void *)) {
     if (!wallet) return false;
     uint32_t len;
     char strbuf[196];
@@ -756,7 +756,7 @@ dogecoin_bool dogecoin_wallet_replace(
         if (fread(&rectype, 1, 1, wallet->dbfile) != 1) return false;
 
         if (rectype == WALLET_DB_REC_TYPE_MASTERPUBKEY) {
-            if (!dogecoin_load_wallet_masterpubkey(wallet, NULL)) return false;
+            if (!dogecoin_wallet_load_masterpubkey(wallet, NULL)) return false;
         } else if (rectype == WALLET_DB_REC_TYPE_ADDR) {
             if (!dogecoin_wallet_load_address(wallet, NULL)) return false;
         } else if (rectype == WALLET_DB_REC_TYPE_TX) {
@@ -821,7 +821,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
             if (fread(&rectype, 1, 1, wallet->dbfile) != 1) return false;
 
             if (rectype == WALLET_DB_REC_TYPE_MASTERPUBKEY) {
-                if (!dogecoin_load_wallet_masterpubkey(wallet, NULL)) return false;
+                if (!dogecoin_wallet_load_masterpubkey(wallet, NULL)) return false;
             } else if (rectype == WALLET_DB_REC_TYPE_ADDR) {
                 if (!dogecoin_wallet_load_address(wallet, NULL)) return false;
             } else if (rectype == WALLET_DB_REC_TYPE_TX) {
