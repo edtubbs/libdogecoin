@@ -720,7 +720,8 @@ dogecoin_bool dogecoin_wallet_replace(
     const char* file_path, 
     cstring* record, 
     uint8_t record_type, 
-    int *error)
+    int *error,
+    void (*rw)(void *))
 {
     if (!wallet) return false;
 
