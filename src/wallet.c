@@ -716,10 +716,10 @@ dogecoin_bool dogecoin_wallet_load_transaction(dogecoin_wallet* wallet, uint32_t
 }
 
 dogecoin_bool dogecoin_wallet_replace(
-    dogecoin_wallet* wallet, 
-    const char* file_path, 
-    cstring* record, 
-    uint8_t record_type, 
+    dogecoin_wallet* wallet,
+    const char* file_path,
+    cstring* record,
+    uint8_t record_type,
     int *error,
     void (*rw)(void *))
 {
@@ -1495,6 +1495,7 @@ int dogecoin_unregister_watch_address_with_node(char* address) {
             }
 
             dogecoin_wallet_flush(wallet);
+            _fcloseall();
             dogecoin_wallet_free(wallet);
             // dogecoin_wallet_flush(wallet_new);
             dogecoin_free(wallet_new);
@@ -1502,9 +1503,14 @@ int dogecoin_unregister_watch_address_with_node(char* address) {
                 /* Attempt to rename file: */
 #ifdef WIN32
 #include <winbase.h>
-                int result = DeleteFile(oldname);
-                if (result != 0) printf("DeleteFile failed: %d\n", result);
-                result = MoveFile(oldname, newname);
+                LPVOID message;
+                int result = DeleteFile(newname);
+                if (!result) {
+                    error = GetLastError();
+                    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&message, 0, NULL);
+                    printf("ERROR: %s\n", message);
+                }
+                result = rename( oldname, newname );
 #else
                 int result = rename( oldname, newname );
 #endif
