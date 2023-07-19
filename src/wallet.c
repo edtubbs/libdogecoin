@@ -1496,7 +1496,7 @@ int dogecoin_unregister_watch_address_with_node(char* address) {
 
             dogecoin_wallet_flush(wallet);
             dogecoin_wallet_free(wallet);
-            dogecoin_wallet_flush(wallet_new);
+            // dogecoin_wallet_flush(wallet_new);
             dogecoin_free(wallet_new);
             if (found) {
                 /* Attempt to rename file: */
