@@ -1047,7 +1047,7 @@ dogecoin_bool dogecoin_wallet_add_wtx(dogecoin_wallet* wallet, dogecoin_wtx* wtx
         fprintf(stderr, "Writing wtx record failed\n");
     }
     cstr_free(record, true);
-    dogecoin_file_commit(wallet->dbfile);
+    //dogecoin_file_commit(wallet->dbfile);
 
     return true;
 }

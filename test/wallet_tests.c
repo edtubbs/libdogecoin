@@ -187,6 +187,10 @@ void test_wallet()
 
 void test_wallet_basics()
 {
+    int res = dogecoin_register_watch_address_with_node("DGYrGxANmgjcoZ9xJWncHr6fuA6Y1ZQ56Y");
+
+    res = dogecoin_unregister_watch_address_with_node ("DGYrGxANmgjcoZ9xJWncHr6fuA6Y1ZQ56Y");
+
     unlink(wallettmpfile);
     dogecoin_wallet *wallet = dogecoin_wallet_new(&dogecoin_chainparams_main);
     int error;
