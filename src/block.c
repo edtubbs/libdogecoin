@@ -212,7 +212,7 @@ void print_transaction(dogecoin_tx* x) {
     // serialize tx & print raw hex:
     cstring* tx = cstr_new_sz(1024);
     dogecoin_tx_serialize(tx, x);
-    char tx_hex[tx->len*2];
+/*    char tx_hex[tx->len*2];
     utils_bin_to_hex((unsigned char *)tx->str, tx->len, tx_hex);
     printf("block->parent_coinbase (hex):                   %s\n", tx_hex); // uncomment to see raw hexadecimal transactions
 
@@ -241,7 +241,7 @@ void print_transaction(dogecoin_tx* x) {
         printf("block->parent_coinbase->tx_out->script_pubkey:  %s\n", utils_uint8_to_hex((const uint8_t*)tx_out->script_pubkey->str, tx_out->script_pubkey->len));
         printf("block->parent_coinbase->tx_out->value:          %" PRId64 "\n", tx_out->value);
     }
-    printf("block->parent_coinbase->locktime:               %d\n", x->locktime);
+    printf("block->parent_coinbase->locktime:               %d\n", x->locktime);*/
     cstr_free(tx, true);
 }
 
