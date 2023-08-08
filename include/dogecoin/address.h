@@ -1,6 +1,6 @@
 /*
  The MIT License (MIT)
- 
+
  Copyright (c) 2022 bluezr
  Copyright (c) 2023 edtubbs
  Copyright (c) 2023 The Dogecoin Foundation
@@ -70,54 +70,41 @@ LIBDOGECOIN_API int generateHDMasterPubKeypairFromMnemonic(char* wif_privkey_mas
 /* verify that a HD master key and a dogecoin address matches a mnemonic */
 LIBDOGECOIN_API int verifyHDMasterPubKeypairFromMnemonic(const char* wif_privkey_master, const char* p2pkh_pubkey_master, const MNEMONIC mnemonic, const PASSPHRASE pass, const dogecoin_bool is_testnet);
 
-/* generates a new dogecoin address from a sealed seed and a slip44 key path */
-LIBDOGECOIN_API int getDerivedHDAddressFromSealedSeed(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, char* p2pkh_pubkey, const dogecoin_bool is_testnet);
+/* generates a new dogecoin address from an encrypted seed and a slip44 key path */
+LIBDOGECOIN_API int getDerivedHDAddressFromEncryptedSeed(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, char* p2pkh_pubkey, const dogecoin_bool is_testnet, const int file);
 
-/* generates a new dogecoin address from a sealed seed and with a more flexible derived path */
-LIBDOGECOIN_API int getDerivedHDAddressFromSealedSeedByPath(const char* derived_path, char* p2pkh_pubkey, const dogecoin_bool is_testnet);
+/* generates a new dogecoin address from an encrypted seed and with a more flexible derived path */
+LIBDOGECOIN_API int getDerivedHDAddressFromEncryptedSeedByPath(const char* derived_path, char* p2pkh_pubkey, const dogecoin_bool is_testnet, const int file);
 
-/* generates a HD master key and p2pkh ready-to-use corresponding dogecoin address from a sealed seed */
-LIBDOGECOIN_API int generateHDMasterPubKeypairFromSealedSeed(char* wif_privkey_master, char* p2pkh_pubkey_master, const dogecoin_bool is_testnet);
+/* generates a HD master key and p2pkh ready-to-use corresponding dogecoin address from an encrypted seed */
+LIBDOGECOIN_API int generateHDMasterPubKeypairFromEncryptedSeed(char* wif_privkey_master, char* p2pkh_pubkey_master, const dogecoin_bool is_testnet, const int file);
 
-/* verify that a HD master key and a dogecoin address matches a sealed seed */
-LIBDOGECOIN_API int verifyHDMasterPubKeypairFromSealedSeed(const char* wif_privkey_master, const char* p2pkh_pubkey_master, const dogecoin_bool is_testnet);
+/* verify that a HD master key and a dogecoin address matches an encrypted seed */
+LIBDOGECOIN_API int verifyHDMasterPubKeypairFromEncryptedSeed(const char* wif_privkey_master, const char* p2pkh_pubkey_master, const dogecoin_bool is_testnet, const int file);
 
-/* generates a new dogecoin address from a TPM mnemonic and a slip44 key path */
-LIBDOGECOIN_API int getDerivedHDAddressFromTpmMnemonic(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, const PASSPHRASE pass, char* p2pkh_pubkey, const bool is_testnet);
+/* generates a new dogecoin address from an encrypted mnemonic and a slip44 key path */
+LIBDOGECOIN_API int getDerivedHDAddressFromEncryptedMnemonic(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, const PASSPHRASE pass, char* p2pkh_pubkey, const bool is_testnet, const int file);
 
-/* generates a new dogecoin address from a TPM mnemonic and with a more flexible derived path */
-LIBDOGECOIN_API int getDerivedHDAddressFromTpmMnemonicByPath(const char* derived_path, const PASSPHRASE pass, char* p2pkh_pubkey, const bool is_testnet);
+/* generates a new dogecoin address from a encrypted mnemonic and with a more flexible derived path */
+LIBDOGECOIN_API int getDerivedHDAddressFromEncryptedMnemonicByPath(const char* derived_path, const PASSPHRASE pass, char* p2pkh_pubkey, const bool is_testnet, const int file);
 
-/* generates a HD master key and p2pkh ready-to-use corresponding dogecoin address from a TPM mnemonic */
-LIBDOGECOIN_API int generateHDMasterPubKeypairFromTpmMnemonic(char* wif_privkey_master, char* p2pkh_pubkey_master, const PASSPHRASE pass, const bool is_testnet);
+/* generates a HD master key and p2pkh ready-to-use corresponding dogecoin address from a encrypted mnemonic */
+LIBDOGECOIN_API int generateHDMasterPubKeypairFromEncryptedMnemonic(char* wif_privkey_master, char* p2pkh_pubkey_master, const PASSPHRASE pass, const bool is_testnet, const int file);
 
-/* verify that a HD master key and a dogecoin address matches a TPM mnemonic */
-LIBDOGECOIN_API int verifyHDMasterPubKeypairFromTpmMnemonic(const char* wif_privkey_master, const char* p2pkh_pubkey_master, const PASSPHRASE pass, const bool is_testnet);
+/* verify that a HD master key and a dogecoin address matches a encrypted mnemonic */
+LIBDOGECOIN_API int verifyHDMasterPubKeypairFromEncryptedMnemonic(const char* wif_privkey_master, const char* p2pkh_pubkey_master, const PASSPHRASE pass, const bool is_testnet, const int file);
 
-/* generates a new dogecoin address from a TPM sealed seed and a slip44 key path */
-LIBDOGECOIN_API int getDerivedHDAddressFromTpmHDNode(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, char* p2pkh_pubkey, const bool is_testnet);
+/* generates a new dogecoin address from a encrypted master (HD) key and a slip44 key path */
+LIBDOGECOIN_API int getDerivedHDAddressFromEncryptedHDNode(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, char* p2pkh_pubkey, const bool is_testnet, const int file);
 
-/* generates a new dogecoin address from a TPM sealed seed and with a more flexible derived path */
-LIBDOGECOIN_API int getDerivedHDAddressFromTpmHDNodeByPath(const char* derived_path, char* p2pkh_pubkey, const bool is_testnet);
+/* generates a new dogecoin address from a encrypted master (HD) key and with a more flexible derived path */
+LIBDOGECOIN_API int getDerivedHDAddressFromEncryptedHDNodeByPath(const char* derived_path, char* p2pkh_pubkey, const bool is_testnet, const int file);
 
-/* generates a HD master key and p2pkh ready-to-use corresponding dogecoin address from a TPM sealed seed */
-LIBDOGECOIN_API int generateHDMasterPubKeypairFromTpmHDNode(char* wif_privkey_master, char* p2pkh_pubkey_master, const bool is_testnet);
+/* generates a HD master key and p2pkh ready-to-use corresponding dogecoin address from a encrypted master (HD) key */
+LIBDOGECOIN_API int generateHDMasterPubKeypairFromEncryptedHDNode(char* wif_privkey_master, char* p2pkh_pubkey_master, const bool is_testnet, const int file);
 
-/* verify that a HD master key and a dogecoin address matches a TPM sealed seed */
-LIBDOGECOIN_API int verifyHDMasterPubKeypairFromTpmHDNode(const char* wif_privkey_master, const char* p2pkh_pubkey_master, const bool is_testnet);
-
-/* generates a new dogecoin address from a TPM sealed seed and a slip44 key path */
-LIBDOGECOIN_API int getDerivedHDAddressFromTpmSealedSeed(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, char* p2pkh_pubkey, const bool is_testnet);
-
-/* generates a new dogecoin address from a TPM sealed seed and with a more flexible derived path */
-LIBDOGECOIN_API int getDerivedHDAddressFromTpmSealedSeedByPath(const char* derived_path, char* p2pkh_pubkey, const bool is_testnet);
-
-/* generates a HD master key and p2pkh ready-to-use corresponding dogecoin address from a TPM sealed seed */
-LIBDOGECOIN_API int generateHDMasterPubKeypairFromTpmSealedSeed(char* wif_privkey_master, char* p2pkh_pubkey_master, const bool is_testnet);
-
-/* verify that a HD master key and a dogecoin address matches a TPM sealed seed */
-LIBDOGECOIN_API int verifyHDMasterPubKeypairFromTpmSealedSeed(const char* wif_privkey_master, const char* p2pkh_pubkey_master, const bool is_testnet);
-
+/* verify that a HD master key and a dogecoin address matches a encrypted master (HD) key */
+LIBDOGECOIN_API int verifyHDMasterPubKeypairFromEncryptedHDNode(const char* wif_privkey_master, const char* p2pkh_pubkey_master, const bool is_testnet, const int file);
 
 
 LIBDOGECOIN_END_DECL

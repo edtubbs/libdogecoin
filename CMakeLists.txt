@@ -36,15 +36,15 @@ IF(WITH_NET)
     IF(WIN32)
         # build libevent
         execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/src/libevent/build)
-        execute_process(COMMAND cmake .. 
-            -DEVENT__DISABLE_OPENSSL=ON 
-            -DEVENT__DISABLE_SAMPLES=ON 
-            -DEVENT__LIBRARY_TYPE=STATIC 
-            -DEVENT__DISABLE_TESTS=ON 
-            -DEVENT__DISABLE_THREAD_SUPPORT=OFF 
-            -DEVENT__DISABLE_MM_REPLACEMENT=ON 
-            -DEVENT__DISABLE_REGRESS=ON 
-            -DEVENT__DISABLE_BENCHMARK=ON 
+        execute_process(COMMAND cmake ..
+            -DEVENT__DISABLE_OPENSSL=ON
+            -DEVENT__DISABLE_SAMPLES=ON
+            -DEVENT__LIBRARY_TYPE=STATIC
+            -DEVENT__DISABLE_TESTS=ON
+            -DEVENT__DISABLE_THREAD_SUPPORT=OFF
+            -DEVENT__DISABLE_MM_REPLACEMENT=ON
+            -DEVENT__DISABLE_REGRESS=ON
+            -DEVENT__DISABLE_BENCHMARK=ON
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
         execute_process(COMMAND cmake --build .
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
@@ -53,7 +53,7 @@ IF(WITH_NET)
         find_path(LIBEVENT_INCLUDE_DIR event.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         FIND_LIBRARY(LIBEVENT NAMES event event_core event_extras event_pthreads HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
-        FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${PROJECT_SOURCE_DIR}/contrib/winpthreads/include/lib/x64/" REQUIRED)        
+        FIND_LIBRARY(WINPTHREADS NAMES pthreadVC2 pthreadwin32 pthreads pthread HINTS "${PROJECT_SOURCE_DIR}/contrib/winpthreads/include/lib/x64/" REQUIRED)
     ELSE()
         FIND_LIBRARY(LIBEVENT event REQUIRED)
         FIND_LIBRARY(LIBUNISTRING unistring REQUIRED)
@@ -289,7 +289,7 @@ IF(WITH_TOOLS)
 
     ADD_EXECUTABLE(such src/cli/such.c)
     INSTALL(TARGETS such RUNTIME)
-    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME} ${LIBUNISTRING} ncrypt)
+    TARGET_LINK_LIBRARIES(such ${LIBDOGECOIN_NAME} ${LIBUNISTRING} tbs ncrypt)
 
     TARGET_INCLUDE_DIRECTORIES(such PRIVATE src)
 
@@ -300,7 +300,7 @@ IF(WITH_TOOLS)
         TARGET_INCLUDE_DIRECTORIES(sendtx PRIVATE src)
         ADD_EXECUTABLE(spvnode src/cli/spvnode.c)
         INSTALL(TARGETS spvnode RUNTIME)
-        TARGET_LINK_LIBRARIES(spvnode ${LIBDOGECOIN_NAME} ncrypt)
-        TARGET_INCLUDE_DIRECTORIES(spvnode PRIVATE src)        
+        TARGET_LINK_LIBRARIES(spvnode ${LIBDOGECOIN_NAME} tbs ncrypt)
+        TARGET_INCLUDE_DIRECTORIES(spvnode PRIVATE src)
     ENDIF()
 ENDIF()
