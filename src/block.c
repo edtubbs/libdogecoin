@@ -94,8 +94,9 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
         bool needle_found = true;
         size_t header_idx = 0;
         for (; header_idx < 4; header_idx++) {
-            const int haystack_char = tx_in->script_sig->str[idx + header_idx];
-            const int needle_character = pch_merged_mining_header[header_idx];
+            const char haystack_char = tx_in->script_sig->str[idx + header_idx];
+            const char needle_character = pch_merged_mining_header[header_idx];
+
             if (haystack_char == needle_character) {
                 continue;
             } else {
@@ -132,7 +133,7 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
         }
     }
 
-    return count<=(uint32_t)1;
+    return count=(uint32_t)1;
 }
 
 /**
@@ -292,7 +293,7 @@ int dogecoin_block_header_deserialize(dogecoin_block_header* header, struct cons
             printf("%d:%s\n", __LINE__, __func__);
             return false;
         }
-        }
+    }
     dogecoin_auxpow_block_free(block);
     return true;
     }
