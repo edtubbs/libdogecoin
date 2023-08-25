@@ -63,7 +63,6 @@ pattern_match* init_pattern_match(size_t length) {
 
 dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainparams* params) {
     dogecoin_auxpow_block* block = (dogecoin_auxpow_block*)ctx;
-    // print_block(block);
 
     if (block->parent_merkle_index != 0) {
         printf("Auxpow is not a generate\n");
@@ -80,6 +79,11 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
     size_t p = 0;
     for (; p < block->parent_merkle_count; p++) {
         vector_add(parent_merkle, block->parent_coinbase_merkle[p]);
+    }
+
+    if (parent_merkle->len > 30) {
+        printf("Aux POW chain merkle branch too long\n");
+        return false;
     }
 
     // Check that the chain merkle root is in the coinbase
@@ -107,33 +111,19 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
 
         if (needle_found) {
             count++;
-            if (memcmp(utils_hex_to_uint8((const char*)vch_roothash), (uint8_t*)&tx_in->script_sig->str[idx + 4], 32) != 0) {
+            if (strncmp((const char*)vch_roothash, utils_uint8_to_hex((uint8_t*)&tx_in->script_sig->str[idx + header_idx], 32), 32) != 0) {
                 printf("vch_roothash is not after merge mining header!\n");
-                return false;
-            }
-
-            uint32_t nSize;
-            memcpy(&nSize, &tx_in->script_sig->str[idx + 4 + 32], 4);
-            utils_uint8_to_hex((uint8_t*)&nSize, 4);
-            nSize = le32toh(nSize);
-            const unsigned int merkleHeight = strlen((const char*)vch_roothash);
-            if ((nSize * 256) != (1u << merkleHeight)) {
-                printf("Aux POW merkle branch size does not match parent coinbase\n");
-                return false;
-            }
-
-            uint32_t nNonce;
-            memcpy(&nNonce, &tx_in->script_sig->str[idx + 4 + 32 + 4], 4);
-            nNonce = le32toh(nNonce);
-            uint32_t expected_index = get_expected_index(nNonce, chainid, merkleHeight);
-            if (56 != expected_index) {
-                printf("Aux POW wrong index\n");
                 return false;
             }
         }
     }
 
-    return count=(uint32_t)1;
+    if (count > (uint32_t)1) {
+        printf("Multiple merged mining headers in coinbase\n");
+        return false;
+    }
+
+    return true;
 }
 
 /**
@@ -383,10 +373,13 @@ int deserialize_dogecoin_auxpow_block(dogecoin_auxpow_block* block, struct const
         printf("%d:%s\n", __LINE__, __func__);
         return false;
     }
-    // print_block(block);
-    if (!check_auxpow(*block, (dogecoin_chainparams*)params)) {
-        printf("check_auxpow failed!\n");
-        return false;
+
+    if (block->header->auxpow->is) {
+        // print_block(block);
+        if (!check_auxpow(*block, (dogecoin_chainparams*)params)) {
+            printf("check_auxpow failed!\n");
+            return false;
+        }
     }
 
     return true;

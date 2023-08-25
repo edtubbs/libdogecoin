@@ -113,7 +113,7 @@ int get_expected_index (uint32_t nNonce, int nChainId, unsigned h)
 uint256* check_merkle_branch(uint256 hash, const vector* parent_coinbase_merkle, unsigned int n_index) {
     if (n_index == (unsigned int)-1) return dogecoin_uint256_vla(1);
     unsigned int i = n_index;
-    for (; i < n_index; i++) {
+    for (; i < parent_coinbase_merkle->len; ++i) {
         uint256 pcm;
         memcpy(pcm, vector_idx(parent_coinbase_merkle, i), 32);
         if (i & 1)
