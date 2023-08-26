@@ -115,6 +115,24 @@ dogecoin_bool check(void *ctx, uint256* hash, uint32_t chainid, dogecoin_chainpa
                 printf("vch_roothash is not after merge mining header!\n");
                 return false;
             }
+
+            uint32_t nSize;
+            memcpy(&nSize, &tx_in->script_sig->str[idx + 4 + 32], 4);
+            nSize = le32toh(nSize);
+            const unsigned int merkleHeight = block->aux_merkle_count;
+            if (nSize != (1u << merkleHeight)) {
+                printf("Aux POW merkle branch size does not match parent coinbase\n");
+                return false;
+            }
+
+            uint32_t nNonce;
+            memcpy(&nNonce, &tx_in->script_sig->str[idx + 4 + 32 + 4], 4);
+            nNonce = le32toh(nNonce);
+            uint32_t expected_index = get_expected_index(nNonce, chainid, merkleHeight);
+            if (block->aux_merkle_index != expected_index) {
+                printf("Aux POW wrong index\n");
+                return false;
+            }
         }
     }
 
