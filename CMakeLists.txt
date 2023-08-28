@@ -48,15 +48,15 @@ IF(WITH_NET)
     IF(WIN32)
         # build libevent
         execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_SOURCE_DIR}/src/libevent/build)
-        execute_process(COMMAND cmake .. 
-            -DEVENT__DISABLE_OPENSSL=ON 
-            -DEVENT__DISABLE_SAMPLES=ON 
-            -DEVENT__LIBRARY_TYPE=STATIC 
-            -DEVENT__DISABLE_TESTS=ON 
-            -DEVENT__DISABLE_THREAD_SUPPORT=OFF 
-            -DEVENT__DISABLE_MM_REPLACEMENT=ON 
-            -DEVENT__DISABLE_REGRESS=ON 
-            -DEVENT__DISABLE_BENCHMARK=ON 
+        execute_process(COMMAND cmake ..
+            -DEVENT__DISABLE_OPENSSL=ON
+            -DEVENT__DISABLE_SAMPLES=ON
+            -DEVENT__LIBRARY_TYPE=STATIC
+            -DEVENT__DISABLE_TESTS=ON
+            -DEVENT__DISABLE_THREAD_SUPPORT=OFF
+            -DEVENT__DISABLE_MM_REPLACEMENT=ON
+            -DEVENT__DISABLE_REGRESS=ON
+            -DEVENT__DISABLE_BENCHMARK=ON
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
         execute_process(COMMAND cmake --build .
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/src/libevent/build)
@@ -137,6 +137,8 @@ INSTALL(FILES
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/address.c
     src/aes.c
+    src/arith_uint256.c
+    src/auxpow.c
     src/base58.c
     src/bip32.c
     src/bip39.c
@@ -155,6 +157,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/qr.c
     src/qrengine.c
     src/png.c
+    src/pow.c
     src/jpeg.c
     src/random.c
     src/rmd160.c
@@ -167,6 +170,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/transaction.c
     src/tx.c
     src/utils.c
+    src/validation.c
     src/vector.c
 )
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PUBLIC
@@ -224,7 +228,7 @@ INCLUDE_DIRECTORIES(
 
 IF(USE_TESTS)
     ADD_EXECUTABLE(tests)
-    TARGET_SOURCES(tests ${visibility} 
+    TARGET_SOURCES(tests ${visibility}
         test/address_tests.c
         test/aes_tests.c
         test/base58_tests.c
