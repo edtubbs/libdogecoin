@@ -40,6 +40,10 @@
 #define WINVER 0x0600
 #endif
 
+#if defined (__linux__) && defined (USE_TSS2)
+#include <tss2/tss2_esys.h>
+#endif
+
 /*
  * Defines
  */
@@ -78,7 +82,68 @@ dogecoin_bool fileValid (const int file_num)
  */
 LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm (const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite)
 {
-#if defined (_WIN64) && !defined(__MINGW64__)
+#if defined(__linux__) && defined (USE_TSS2)
+
+    ESYS_CONTEXT* context = NULL;
+    ESYS_TR parentHandle = ESYS_TR_RH_OWNER;
+
+    // Initialize TPM context
+    TSS2_RC result = Esys_Initialize(&context, NULL, NULL);
+    if (result != TSS2_RC_SUCCESS) {
+        return false;
+    }
+
+    result = Esys_Startup(context, TPM2_SU_STATE);
+    if (result != TPM2_RC_SUCCESS && result != TPM2_RC_INITIALIZE) {
+        return false;
+    }
+
+    // Create RSA key pair
+    ESYS_TR keyHandle;
+    result = Esys_CreatePrimary(context, parentHandle, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE,
+                                 NULL, NULL, NULL, NULL, NULL, &keyHandle, NULL, NULL, NULL);
+    if (result != TSS2_RC_SUCCESS) {
+        Esys_Finalize(&context);
+        return false;
+    }
+
+    // Declare variables for encrypted data
+    uint8_t encrypted_seed[256];  // Adjust the size according to your needs
+    size_t encrypted_size = sizeof(encrypted_seed);
+
+    // Declare variables for encrypted data
+    TPM2B_PUBLIC_KEY_RSA rsa_key;
+    TPM2B_PUBLIC_KEY_RSA encrypted_rsa_key;
+    TPM2B_PUBLIC_KEY_RSA label = { .size = 0 };  // No label in this case
+
+    // Perform RSA encryption using TPM
+    result = Esys_RSA_Encrypt(context, keyHandle, ESYS_TR_NONE, ESYS_TR_NONE,
+                              ESYS_TR_NONE, &rsa_key, NULL, &label, &encrypted_rsa_key);
+    if (result != TSS2_RC_SUCCESS) {
+        Esys_FlushContext(context, keyHandle);
+        Esys_Finalize(&context);
+        return false;
+    }
+
+    // Store encrypted data in a file
+    char filename[50];
+    sprintf(filename, "encrypted_seed_%d", file_num);
+
+    FILE* fp = fopen(filename, overwrite ? "wb+" : "wb");
+    if (!fp) {
+        Esys_FlushContext(context, keyHandle);
+        Esys_Finalize(&context);
+        return false;
+    }
+
+    size_t bytes_written = fwrite(encrypted_seed, 1, encrypted_size, fp);
+    fclose(fp);
+
+    // Clean up
+    Esys_FlushContext(context, keyHandle);
+    Esys_Finalize(&context);
+
+#elif defined (_WIN64) && !defined(__MINGW64__)
 
     // Validate the input parameters
     if (seed == NULL)

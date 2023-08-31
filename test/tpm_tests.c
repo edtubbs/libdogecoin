@@ -25,7 +25,17 @@
 
 void test_tpm()
 {
-#if defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
+#if defined (__linux__) && defined(USE_TSS2)
+
+    // Define a random seed and a decrypted seed
+    SEED seed = {0};
+    SEED decrypted_seed = {0};
+
+    // Encrypt a random seed with the TPM2
+    u_assert_true (dogecoin_encrypt_seed_with_tpm (seed, sizeof(SEED), TEST_FILE, true));
+    debug_print ("Seed: %s\n", utils_uint8_to_hex (seed, sizeof (SEED)));
+
+#elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
 
     // Create TBS context (TPM2)
     TBS_HCONTEXT hContext = 0;

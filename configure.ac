@@ -128,6 +128,12 @@ AC_ARG_ENABLE([unistring],
   [with_unistring=$enableval],
   [with_unistring=yes])
 
+AC_ARG_ENABLE([tss2],
+  [AS_HELP_STRING([--enable-tss2],
+  [enable tss2 functions])],
+  [with_tss2=$enableval],
+  [with_tss2=no])
+
 AC_ARG_ENABLE(tests,
   AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
   [use_tests=$enableval],
@@ -195,6 +201,12 @@ if test "x$with_unistring" = xyes; then
   AC_DEFINE(USE_UNISTRING, 1, [Define this symbol if libunistring works])
 fi
 
+if test "x$with_tss2" = xyes; then
+  AC_CHECK_LIB([tss2-esys],[main],LIBTSS2=-ltss2-esys,AC_MSG_ERROR(libtss2 missing))
+  LIBS="$LIBS $LIBTSS2"
+  AC_DEFINE(USE_TSS2, 1, [Define this symbol if libtss2 works])
+fi
+
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
@@ -202,6 +214,7 @@ AC_SUBST(BUILD_EXEEXT)
 AC_SUBST(EVENT_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(LIBUNISTRING)
+AC_SUBST(LIBTSS2)
 AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
 AM_CONDITIONAL([WITH_TOOLS], [test "x$with_tools" = "xyes"])
 AM_CONDITIONAL([WITH_NET], [test "x$with_net" = "xyes"])
@@ -225,6 +238,7 @@ echo "  with net        = $with_net"
 echo "  with logdb      = $with_logdb"
 echo "  with wallet     = $with_wallet"
 echo "  with unistring  = $with_unistring"
+echo "  with TSS2       = $with_tss2"
 echo
 echo "  SSE2 Scrypt     = $use_scrypt_sse2"
 echo
@@ -236,4 +250,5 @@ echo "  CFLAGS          = $CFLAGS"
 echo "  CXX             = $CXX"
 echo "  CXXFLAGS        = $CXXFLAGS"
 echo "  LDFLAGS         = $LDFLAGS"
+echo "  LIBS            = $LIBS"
 echo 
