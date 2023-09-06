@@ -28,7 +28,7 @@
 arith_uint256 init_arith_uint256() {
     arith_uint256 x;
     x.WIDTH = 8;
-    dogecoin_mem_zero(x.pn, x.WIDTH);
+    dogecoin_mem_zero(x.pn, sizeof(x.pn));
     return x;
 }
 
@@ -37,10 +37,10 @@ arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *p
     uint32_t word = compact & 0x007fffff;
     if (size <= 3) {
         word >>= 8 * (3 - size);
-        memcpy_safe(&hash, &word, sizeof word);
+        memcpy_safe(hash.pn, &word, sizeof word);
     } else {
         word <<= 8 * (size - 3);
-        memcpy_safe(&hash, &word, sizeof word);
+        memcpy_safe(hash.pn, &word, sizeof word);
     }
     if (pf_negative) *pf_negative = word != 0 && (compact & 0x00800000) != 0;
     if (pf_overflow) *pf_overflow = word != 0 && ((size > 34) ||
@@ -70,4 +70,13 @@ uint256* arith_to_uint256(const arith_uint256 a) {
 uint64_t get_low64(arith_uint256 a) {
     assert(a.WIDTH >= 2);
     return a.pn[0] | (uint64_t)a.pn[1] << 32;
+}
+
+dogecoin_bool arith_uint256_cmp(const arith_uint256 *a, const arith_uint256 *b) {
+    for (int i = 0; i <= 7; i++) {
+        if (a->pn[i] != b->pn[i]) {
+            return (a->pn[i] > b->pn[i]) ? 1 : -1;
+        }
+    }
+    return false;
 }

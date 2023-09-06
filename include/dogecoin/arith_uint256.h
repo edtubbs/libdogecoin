@@ -57,6 +57,7 @@ arith_uint256 set_compact(arith_uint256 hash, uint32_t compact, dogecoin_bool *p
 uint256* arith_to_uint256(const arith_uint256 a);
 arith_uint256 uint_to_arith(const uint256* a);
 uint64_t get_low64(arith_uint256 pn);
+dogecoin_bool arith_uint256_cmp(const arith_uint256 *a, const arith_uint256 *b);
 
 LIBDOGECOIN_END_DECL
 

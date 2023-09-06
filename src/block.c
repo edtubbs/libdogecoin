@@ -187,7 +187,7 @@ void print_transaction(dogecoin_tx* x) {
     // serialize tx & print raw hex:
     cstring* tx = cstr_new_sz(1024);
     dogecoin_tx_serialize(tx, x);
-    char tx_hex[tx->len*2];
+    char tx_hex[2048];
     utils_bin_to_hex((unsigned char *)tx->str, tx->len, tx_hex);
     printf("block->parent_coinbase (hex):                   %s\n", tx_hex); // uncomment to see raw hexadecimal transactions
 

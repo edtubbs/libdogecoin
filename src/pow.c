@@ -35,14 +35,15 @@ dogecoin_bool check_pow(uint256* hash, unsigned int nbits, const dogecoin_chainp
     target = set_compact(target, nbits, &f_negative, &f_overflow);
     arith_uint256 h = init_arith_uint256();
     h = uint_to_arith((const uint256*)hash);
-    char* hash_str = utils_uint8_to_hex((const uint8_t*)&h.pn[0], 32);
+    char* rtn_str = utils_uint8_to_hex((const uint8_t*)&h.pn[0], 32);
+    char hash_str[65] = "";
+    strncpy(hash_str, rtn_str, 64);
     char* target_str = utils_uint8_to_hex((const uint8_t*)&target.pn[0], 32);
+    printf("hash: %s\n target: %s\n\n", hash_str, target_str);
     if (f_negative || (const uint8_t*)&target.pn[0] == 0 || f_overflow || memcmp(&target.pn[0], &params->pow_limit, 32) > 0) {
-        printf("%d:%s: f_negative: %d target == 0: %d f_overflow: %d memcmp target powlimit: %d\n", 
+        printf("%d:%s: f_negative: %d target == 0: %d f_overflow: %d memcmp target powlimit: %d\n",
         __LINE__, __func__, f_negative, (const uint8_t*)&target.pn == 0, f_overflow, memcmp(&target.pn[0], &params->pow_limit, 32) > 0);
         return false;
     }
-    if (strcmp(hash_str, target_str) > 0)
-        return false;
-    return true;
+    return arith_uint256_cmp(&h, &target);
 }
