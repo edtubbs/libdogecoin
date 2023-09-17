@@ -133,9 +133,19 @@ jobs:
           sudo dpkg --add-architecture ${{ matrix.arch }}
 
       - name: Pre install
-        if: ${{ matrix.preinstall }}
-        run: ${{ matrix.preinstall }}
+        run: |
+          echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main' | sudo tee /etc/apt/sources.list.d/intel-sgx.list
+          wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | sudo apt-key add -
 
+          echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-11 main" | sudo tee /etc/apt/sources.list.d/llvm-toolchain-focal-11.list
+          wget -qO - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+
+          echo "deb [arch=amd64] https://packages.microsoft.com/ubuntu/20.04/prod focal main" | sudo tee /etc/apt/sources.list.d/msprod.list
+          wget -qO - https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+
+          sudo apt update
+
+          sudo apt -y install libssl-dev gdb libsgx-enclave-common libsgx-quote-ex libprotobuf17 libsgx-dcap-ql libsgx-dcap-ql-dev az-dcap-client open-enclave
       - name: install packages
         run: |
           if ([ "${{ matrix.name }}" == "x86_64-macos" ] || [ "${{ matrix.name }}" == "arm64-macos" ]); then
@@ -236,6 +246,14 @@ jobs:
               "x86_64-linux-dbg") 
               make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
               python3 tooltests.py
+              sudo make install
+              cat /opt/openenclave/share/openenclave/openenclaverc
+              . /opt/openenclave/share/openenclave/openenclaverc
+              cd src/openenclave
+              mkdir build
+              cd build
+              cmake ..
+              make simulate
               ;;
               *) 
               make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
