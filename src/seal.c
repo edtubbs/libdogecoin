@@ -41,6 +41,8 @@
 #endif
 
 #if defined (__linux__) && defined (USE_TSS2)
+#include <unistd.h>
+#include <wchar.h>
 #include <tss2/tss2_esys.h>
 #endif
 
@@ -93,19 +95,172 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm (const SEED seed, c
         return false;
     }
 
-    result = Esys_Startup(context, TPM2_SU_STATE);
-    if (result != TPM2_RC_SUCCESS && result != TPM2_RC_INITIALIZE) {
+    result = Esys_Startup(context, TPM2_SU_CLEAR);
+    if (result != TPM2_RC_SUCCESS) {
         return false;
     }
 
-    // Create RSA key pair
-    ESYS_TR keyHandle;
-    result = Esys_CreatePrimary(context, parentHandle, ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE,
-                                 NULL, NULL, NULL, NULL, NULL, &keyHandle, NULL, NULL, NULL);
-    if (result != TSS2_RC_SUCCESS) {
+    // Get the password
+    char* password = getpass("Enter password for seed encryption: ");
+    if (strlen(password) == 0) {
+        fprintf(stderr, "Error: Password cannot be empty.\n");
         Esys_Finalize(&context);
         return false;
     }
+
+    // Confirm the password
+    char* confirm_password = getpass("Confirm password: ");
+    if (strcmp(password, confirm_password) != 0) {
+        fprintf(stderr, "Error: Passwords do not match.\n");
+        Esys_Finalize(&context);
+        return false;
+    }
+
+    // Format the name of the encrypted seed object
+    wchar_t* name = SEED_OBJECT_NAME_FORMAT;
+    swprintf(name, (wcslen(name) + 1) * sizeof(wchar_t), SEED_OBJECT_NAME_FORMAT, file_num);
+
+    // Now, create the primary key
+    ESYS_TR keyHandle = ESYS_TR_NONE;
+
+    TPM2B_PUBLIC *outPublic = NULL;
+    TPM2B_CREATION_DATA *creationData = NULL;
+    TPM2B_DIGEST *creationHash = NULL;
+    TPMT_TK_CREATION *creationTicket = NULL;
+    TPM2B_PUBLIC_KEY_RSA *cipher = NULL;
+    TPM2B_DATA * null_data = NULL;
+
+    TPM2B_AUTH authValuePrimary;
+    authValuePrimary.size = strlen(password);
+    if (authValuePrimary.size > sizeof(authValuePrimary.buffer)) {
+        fprintf(stderr, "Error: Password is too long.\n");
+        Esys_Finalize(&context);
+        return false;
+    }
+    memcpy(authValuePrimary.buffer, password, authValuePrimary.size);
+
+    TPM2B_SENSITIVE_CREATE inSensitivePrimary = {
+        .size = 0,
+        .sensitive = {
+            .userAuth = {
+                 .size = 0,
+                 .buffer = {0},
+             },
+            .data = {
+                 .size = 0,
+                 .buffer = {0},
+             },
+        },
+    };
+
+    memcpy(inSensitivePrimary.sensitive.userAuth.buffer, password, authValuePrimary.size);
+    inSensitivePrimary.sensitive.userAuth.size = authValuePrimary.size;
+
+    TPM2B_PUBLIC inPublic = {
+        .size = 0,
+        .publicArea = {
+            .type = TPM2_ALG_RSA,
+            .nameAlg = TPM2_ALG_SHA256,
+            .objectAttributes = (TPMA_OBJECT_USERWITHAUTH |
+                                 TPMA_OBJECT_DECRYPT |
+                                 TPMA_OBJECT_FIXEDTPM |
+                                 TPMA_OBJECT_FIXEDPARENT |
+                                 TPMA_OBJECT_SENSITIVEDATAORIGIN),
+            .authPolicy = {
+                 .size = 0,
+             },
+            .parameters.rsaDetail = {
+                 .symmetric = {
+                     .algorithm = TPM2_ALG_NULL},
+                 .scheme = { .scheme = TPM2_ALG_RSAES },
+                 .keyBits = 2048,
+                 .exponent = 0,
+             },
+            .unique.rsa = {
+                 .size = 0,
+                 .buffer = {},
+             },
+        },
+    };
+
+    // Create the RSA key
+
+    TPM2B_DATA outsideInfo = {
+        .size = 0,
+        .buffer = {},
+    };
+
+    // Copy name into outsideInfo
+    memcpy(outsideInfo.buffer, name, wcslen(name) * sizeof(wchar_t));
+    outsideInfo.size = wcslen(name) * sizeof(wchar_t);
+
+    TPML_PCR_SELECTION creationPCR = {
+        .count = 0,
+    };
+
+    TPM2B_AUTH authValue = {
+        .size = 0,
+        .buffer = {}
+    };
+
+    result = Esys_TR_SetAuth(context, ESYS_TR_RH_OWNER, &authValue);
+    if (result != TSS2_RC_SUCCESS) {
+        // Handle any errors during finishing here
+        Esys_Finalize(&context);
+        return false;
+    }
+
+    result = Esys_CreatePrimary(context,
+                                ESYS_TR_RH_OWNER,
+                                ESYS_TR_PASSWORD,
+                                ESYS_TR_NONE,
+                                ESYS_TR_NONE,
+                                &inSensitivePrimary,
+                                &inPublic,
+                                &outsideInfo,
+                                &creationPCR,
+                                &keyHandle,
+                                &outPublic,
+                                &creationData,
+                                &creationHash,
+                                &creationTicket);
+
+    if (result != TSS2_RC_SUCCESS) {
+        Esys_Free(outPublic);
+        Esys_Free(creationData);
+        Esys_Free(creationHash);
+        Esys_Free(creationTicket);
+
+        Esys_Finalize(&context);
+        return false;
+    }
+
+    result = Esys_TR_SetAuth(context,
+                             keyHandle,
+                             &authValuePrimary);
+    if (result != TSS2_RC_SUCCESS) {
+        Esys_Free(outPublic);
+        Esys_Free(creationData);
+        Esys_Free(creationHash);
+        Esys_Free(creationTicket);
+
+        Esys_Finalize(&context);
+        return false;
+    }
+
+    size_t plain_size = size;
+    TPM2B_PUBLIC_KEY_RSA plain;
+    if (plain_size > sizeof(plain.buffer)) {
+        fprintf(stderr, "Error: Seed size too large.\n");
+        Esys_Finalize(&context);
+        return false;
+    }
+    plain.size = plain_size;
+    memcpy(plain.buffer, seed, plain_size);
+
+    TPMT_RSA_DECRYPT scheme = {
+        .scheme = TPM2_ALG_RSAES
+    };
 
     // Declare variables for encrypted data
     uint8_t encrypted_seed[256];  // Adjust the size according to your needs
@@ -113,12 +268,20 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm (const SEED seed, c
 
     // Declare variables for encrypted data
     TPM2B_PUBLIC_KEY_RSA rsa_key;
-    TPM2B_PUBLIC_KEY_RSA encrypted_rsa_key;
-    TPM2B_PUBLIC_KEY_RSA label = { .size = 0 };  // No label in this case
+    TPM2B_PUBLIC_KEY_RSA* encrypted_rsa_key;
+    TPM2B_DATA label = { .size = 0 };  // No label in this case
 
     // Perform RSA encryption using TPM
-    result = Esys_RSA_Encrypt(context, keyHandle, ESYS_TR_NONE, ESYS_TR_NONE,
-                              ESYS_TR_NONE, &rsa_key, NULL, &label, &encrypted_rsa_key);
+    result = Esys_RSA_Encrypt(context,
+                              keyHandle,
+                              ESYS_TR_NONE,
+                              ESYS_TR_NONE,
+                              ESYS_TR_NONE,
+                              &plain,
+                              &scheme,
+                              &label,
+                              &encrypted_rsa_key);
+
     if (result != TSS2_RC_SUCCESS) {
         Esys_FlushContext(context, keyHandle);
         Esys_Finalize(&context);
@@ -136,12 +299,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm (const SEED seed, c
         return false;
     }
 
-    size_t bytes_written = fwrite(encrypted_seed, 1, encrypted_size, fp);
+    size_t bytes_written = fwrite(encrypted_rsa_key->buffer, 1, encrypted_rsa_key->size, fp);
     fclose(fp);
 
     // Clean up
     Esys_FlushContext(context, keyHandle);
     Esys_Finalize(&context);
+
+    return true;
 
 #elif defined (_WIN64) && !defined(__MINGW64__)
 

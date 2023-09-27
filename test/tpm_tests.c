@@ -23,13 +23,44 @@
 #define WINVER 0x0600
 #endif
 
+#if defined (__linux__) && defined (USE_TSS2)
+#include <tss2/tss2_esys.h>
+#endif
+
 void test_tpm()
 {
 #if defined (__linux__) && defined(USE_TSS2)
 
+    ESYS_CONTEXT* context = NULL;
+    ESYS_TR parentHandle = ESYS_TR_RH_OWNER;
+
+    // Initialize TPM context
+    TSS2_RC result = Esys_Initialize(&context, NULL, NULL);
+    u_assert_uint32_eq(result, TSS2_RC_SUCCESS);
+
+    result = Esys_Startup(context, TPM2_SU_CLEAR);
+    u_assert_uint32_eq(result, TSS2_RC_SUCCESS);
+
+    /* Get random data */
+    TPM2B_DIGEST *random_bytes;
+    result = Esys_GetRandom(context,
+                            ESYS_TR_NONE,
+                            ESYS_TR_NONE,
+                            ESYS_TR_NONE,
+                            32,
+                            &random_bytes);
+    u_assert_uint32_eq(result, TSS2_RC_SUCCESS);
+
+    char* rand_hex;
+    rand_hex = utils_uint8_to_hex((uint8_t*) random_bytes->buffer, random_bytes->size);
+    debug_print ("Esys_GetRandom: %s\n", rand_hex);
+
     // Define a random seed and a decrypted seed
     SEED seed = {0};
     SEED decrypted_seed = {0};
+
+    // Copy random_bytes to seed
+    memcpy(seed, random_bytes->buffer, random_bytes->size);
 
     // Encrypt a random seed with the TPM2
     u_assert_true (dogecoin_encrypt_seed_with_tpm (seed, sizeof(SEED), TEST_FILE, true));
