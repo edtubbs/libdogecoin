@@ -117,9 +117,28 @@ void dogecoin_headers_db_free(dogecoin_headers_db* db) {
     }
 
     if (db->tree_root) {
-        dogecoin_btree_tdestroy(db->tree_root, dogecoin_free);
+        dogecoin_btree_tdestroy(db->tree_root, NULL);
         db->tree_root = NULL;
     }
+
+    // Free all blockindex structures starting from chaintip to chainbottom
+    if (db->chaintip) {
+        dogecoin_blockindex *scan_tip = db->chaintip;
+        while (scan_tip) {
+            dogecoin_blockindex *prev = scan_tip->prev;
+            if (prev == db->chainbottom) {
+                dogecoin_free(db->chainbottom);
+                db->chainbottom = NULL;
+            }
+            if (scan_tip != db->chainbottom) {
+                dogecoin_free(scan_tip);
+            }
+            scan_tip = prev;
+        }
+    }
+
+    db->chaintip = NULL;
+    db->chainbottom = NULL;
 
     dogecoin_free(db);
 }
