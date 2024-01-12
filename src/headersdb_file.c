@@ -169,8 +169,30 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
 
     struct stat buffer;
     dogecoin_bool create = true;
-    if (stat(file_path_local, &buffer) == 0)
-        create = false;
+    if (stat(file_path_local, &buffer) == 0) {
+        printf("\nLoad %s? ", file_path_local);
+        char response[MAX_LEN];
+        if (!fgets(response, MAX_LEN, stdin)) {
+            printf("Error reading input.\n");
+            return false;
+        }
+        if (response[0] == 'o' || response[0] == 'O') {
+            printf("Are you sure? (y/n): \n");
+            char confirm[MAX_LEN];
+            if (!fgets(confirm, MAX_LEN, stdin)) {
+                printf("Error reading input.\n");
+                return false;
+            }
+            if (confirm[0] == 'y' || confirm[0] == 'Y') {
+                remove(file_path_local); // remove the existing file
+                create = true;
+            } else {
+                create = false;
+            }
+        } else {
+            create = false;
+        }
+    }
 
     db->headers_tree_file = fopen(file_path_local, create ? "a+b" : "r+b");
     cstr_free(path_ret, true);
