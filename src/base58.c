@@ -221,9 +221,12 @@ size_t dogecoin_base58_encode_check(const uint8_t* data, size_t datalen, char* s
 
 size_t dogecoin_base58_decode_check(const char* str, uint8_t* data, size_t datalen)
 {
-    size_t ret, i;
-    for (i = 0; str[i] && i < 1024; i++){};
-    size_t strl = i;
+    size_t ret;
+    size_t strl = strlen(str);
+    if (strl > 1024) {
+        fprintf(stderr, "ERROR: input string too long\n");
+        return 0;
+    }
     /* buffer needs to be at least the strsize, will be used
        for the whole decoding */
     if (strl > 128 || datalen < strl) {

@@ -124,8 +124,8 @@ int get_mnemonic(const int entropysize, const char* entropy, const char* wordlis
     }
 
     /* Convert local entropy and copy to entropy parameter if allocated */
-    if (entropy_out != NULL) {
-        strcpy(entropy_out, utils_uint8_to_hex(local_entropy, entBytes));
+    if (entropy_out != NULL && strlen(entropy_out) >= entBytes * HEX_CHARS_PER_BYTE + 1) {
+        strncpy(entropy_out, utils_uint8_to_hex(local_entropy, entBytes), entBytes * HEX_CHARS_PER_BYTE + 1);
         utils_clear_buffers();
     }
 
@@ -211,7 +211,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
     }
     *salt = '\0';
 
-    if (strcat(salt, "mnemonic") == NULL || strcat(salt, passphrase) == NULL) {
+    if (strcat(salt, "mnemonic") == NULL || strncat(salt, passphrase, strlen(passphrase) + 1) == NULL) {
         fprintf(stderr, "ERROR: Failed to concatenate salt\n");
         dogecoin_free(salt);
         return -1;
@@ -489,7 +489,7 @@ int get_custom_words(const char *filepath, char* wordlist[]) {
             fclose(fp);
             return -1;
         }
-        strcpy(wordlist[i], word);
+        strncpy(wordlist[i], word, strlen(word) + 1);
         i++;
     }
 
@@ -675,14 +675,14 @@ int produce_mnemonic_sentence(const int segSize, const int checksumBits, const c
             }
             else {
                 /* Concatenate the word from the wordlist to the mnemonic */
-                strcat(mnemonic, word);
+                strncat(mnemonic, word, strlen(word) + 1);
 
                 /* update mnemonic_size with the length of the mnemonic */
                 *mnemonic_size += strlen(word);
 
                 /* Concatenate a space to the mnemonic only if it's not the last word */
                 if (i < segSize - 1) {
-                    strcat(mnemonic, space);
+                    strncat(mnemonic, space, strlen(space) + 1);
                     *mnemonic_size += strlen(space);
                 }
             }

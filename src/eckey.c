@@ -48,7 +48,7 @@ eckey* new_eckey(dogecoin_bool is_testnet) {
     dogecoin_pubkey_init(&key->public_key);
     dogecoin_pubkey_from_key(&key->private_key, &key->public_key);
     assert(dogecoin_pubkey_is_valid(&key->public_key) == 1);
-    strcpy(key->public_key_hex, utils_uint8_to_hex((const uint8_t *)&key->public_key, 33));
+    strncpy(key->public_key_hex, utils_uint8_to_hex((const uint8_t *)&key->public_key, 33), PUBKEYHEXLEN);
     uint8_t pkeybase58c[34];
     const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
     pkeybase58c[0] = chain->b58prefix_secret_address;
@@ -75,7 +75,7 @@ eckey* new_eckey_from_privkey(char* private_key) {
     dogecoin_pubkey_init(&key->public_key);
     dogecoin_pubkey_from_key(&key->private_key, &key->public_key);
     assert(dogecoin_pubkey_is_valid(&key->public_key) == 1);
-    strcpy(key->public_key_hex, utils_uint8_to_hex((const uint8_t *)&key->public_key, 33));
+    strncpy(key->public_key_hex, utils_uint8_to_hex((const uint8_t *)&key->public_key, 33), PUBKEYHEXLEN);
     uint8_t pkeybase58c[34];
     pkeybase58c[0] = chain->b58prefix_secret_address;
     pkeybase58c[33] = 1; /* always use compressed keys */
