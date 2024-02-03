@@ -302,7 +302,7 @@ jobs:
             esac
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: libdogecoin-${{ github.sha }}-${{ matrix.name }}
           path: |
@@ -313,9 +313,6 @@ jobs:
     runs-on: windows-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
       - name: Download artifacts
         uses: actions/download-artifact@v2
         with:
@@ -328,6 +325,7 @@ jobs:
           [IO.File]::WriteAllBytes("./mycert.pfx", $certBytes)
           $password = ConvertTo-SecureString -String "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}" -Force -AsPlainText
           Import-PfxCertificate -FilePath ./mycert.pfx -CertStoreLocation Cert:\LocalMachine\Root -Password $password
+          Remove-Item ./mycert.pfx
         shell: pwsh
 
       - name: Sign spvnode.exe (x86_64-win)
@@ -352,19 +350,23 @@ jobs:
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Upload artifacts (x86_64-win)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-signed
-          path: .
+          path: |
+            bin/**
+            docs/**
+            examples/**
+            include/**
+            lib/**
+            test/**
+            LICENSE
 
   sign-x86_64-win-native:
     needs: build
     runs-on: windows-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
       - name: Download artifacts
         uses: actions/download-artifact@v2
         with:
@@ -377,6 +379,7 @@ jobs:
           [IO.File]::WriteAllBytes("./mycert.pfx", $certBytes)
           $password = ConvertTo-SecureString -String "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}" -Force -AsPlainText
           Import-PfxCertificate -FilePath ./mycert.pfx -CertStoreLocation Cert:\LocalMachine\Root -Password $password
+          Remove-Item ./mycert.pfx
         shell: pwsh
 
       - name: Sign spvnode.exe (x86_64-win-native)
@@ -401,19 +404,18 @@ jobs:
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Upload artifacts (x86_64-win-native)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: libdogecoin-${{ github.sha }}-x86_64-win-native-signed
-          path: .
+          path: |
+            Debug/**
+            test/**
 
   sign-i686-win:
     needs: build
     runs-on: windows-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
       - name: Download artifacts
         uses: actions/download-artifact@v2
         with:
@@ -426,6 +428,7 @@ jobs:
           [IO.File]::WriteAllBytes("./mycert.pfx", $certBytes)
           $password = ConvertTo-SecureString -String "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}" -Force -AsPlainText
           Import-PfxCertificate -FilePath ./mycert.pfx -CertStoreLocation Cert:\LocalMachine\Root -Password $password
+          Remove-Item ./mycert.pfx
         shell: pwsh
 
       - name: Sign spvnode.exe (i686-win)
@@ -450,19 +453,23 @@ jobs:
           certificate-password: ${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}
 
       - name: Upload artifacts (i686-win)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: libdogecoin-${{ github.sha }}-i686-win-signed
-          path: .
+          path: |
+            bin/**
+            docs/**
+            examples/**
+            include/**
+            lib/**
+            test/**
+            LICENSE
 
   sign-x86_64-macos:
     needs: build
     runs-on: macos-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
       - name: Download artifacts
         uses: actions/download-artifact@v2
         with:
@@ -502,7 +509,14 @@ jobs:
           /usr/bin/codesign --force --keychain ~/Library/Keychains/build.keychain -s $MACOS_CODE_CERT_TEAM_ID --deep --options=runtime "$MACOS_EXECUTABLE_PATH"
 
       - name: Upload artifacts (i686-win)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: libdogecoin-${{ github.sha }}-i686-win-signed
-          path: .
+          path: |
+            bin/**
+            docs/**
+            examples/**
+            include/**
+            lib/**
+            test/**
+            LICENSE
