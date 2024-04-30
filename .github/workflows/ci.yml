@@ -85,7 +85,7 @@ jobs:
             run-tests: true
             dep-opts: "SPEED=slow V=1"
             config-opts: "--enable-static --disable-shared --enable-test-passwd"
-            packages: cmake zlib xorriso
+            packages: cmake zlib xorriso libtool
             goal: install
             mac-sdk: 12.2
             mac-sdk-build: 12B45b
