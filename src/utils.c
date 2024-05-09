@@ -89,6 +89,29 @@
 #include <unistd.h>
 #endif
 
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
+
+#if defined(__aarch64__) && (defined(__linux__) || defined(__ANDROID__)) && !defined(USE_OPTEE)
+#include <sys/auxv.h>
+#include <asm/hwcap.h>
+#endif
+
+#if defined(__aarch64__)
+static uint64_t dogecoin_arm64_read_dit(void)
+{
+    uint64_t dit_state = 0;
+    __asm__ volatile("mrs %0, S3_3_C4_C2_5" : "=r"(dit_state));
+    return dit_state;
+}
+
+static void dogecoin_arm64_write_dit(uint64_t dit_state)
+{
+    __asm__ volatile("msr S3_3_C4_C2_5, %0" : : "r"(dit_state));
+}
+#endif
+
 static uint8_t buffer_hex_to_uint8[TO_UINT8_HEX_BUF_LEN];
 static char buffer_uint8_to_hex[TO_UINT8_HEX_BUF_LEN];
 
@@ -955,4 +978,62 @@ unsigned int base64_decode(const unsigned char* in, unsigned int in_len, unsigne
     out[k] = '\0';
 
 	return k;
+}
+
+dogecoin_bool is_DIT_supported(void)
+{
+#if defined(__aarch64__) && defined(__APPLE__)
+    static int has_DIT = -1;
+    if (has_DIT == -1)
+    {
+        size_t has_DIT_size = sizeof(has_DIT);
+        if (sysctlbyname("hw.optional.arm.FEAT_DIT", &has_DIT, &has_DIT_size, NULL, 0) == -1)
+        {
+            has_DIT = 0;
+        }
+    }
+    return has_DIT;
+#elif defined(__aarch64__) && (defined(__linux__) || defined(__ANDROID__))
+    static int has_DIT = -1;
+    if (has_DIT == -1)
+    {
+#if defined(USE_OPTEE)
+        has_DIT = 0;
+#elif defined(HWCAP_DIT)
+        unsigned long hwcap = getauxval(AT_HWCAP);
+        has_DIT = (hwcap != 0) && ((hwcap & HWCAP_DIT) != 0);
+#else
+        has_DIT = 0;
+#endif
+    }
+    return has_DIT;
+#else
+    return false;
+#endif
+}
+
+dogecoin_bool enable_DIT(void)
+{
+#if defined(__aarch64__)
+    if (!is_DIT_supported())
+    {
+        return false;
+    }
+    uint64_t dit_state = dogecoin_arm64_read_dit();
+    dogecoin_arm64_write_dit(1);
+    /* DIT architectural state is represented in PSTATE.DIT (bit 24). */
+    return (dit_state >> 24) & 1;
+#else
+    return false;
+#endif
+}
+
+void disable_DIT(void)
+{
+#if defined(__aarch64__)
+    if (is_DIT_supported())
+    {
+        dogecoin_arm64_write_dit(0);
+    }
+#endif
 }

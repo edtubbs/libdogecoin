@@ -25,6 +25,9 @@ dogecoin_bool dogecoin_ecc_start(void)
     ret = secp256k1_context_randomize(secp256k1_ctx, seed);
     if (!ret)
         return false;
+
+    enable_DIT();
+
     return true;
 }
 
@@ -34,6 +37,8 @@ void dogecoin_ecc_stop(void)
     secp256k1_ctx = NULL;
     if (ctx)
         secp256k1_context_destroy(ctx);
+
+    disable_DIT();
 }
 
 void dogecoin_ecc_get_pubkey(const uint8_t* private_key, uint8_t* public_key, size_t* in_outlen, dogecoin_bool compressed)

@@ -55,7 +55,7 @@ jobs:
             os: ubuntu-22.04
             packages: g++-aarch64-linux-gnu qemu-user-static qemu-user
             dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
-            config-opts: "LIBS='-levent_pthreads' --enable-static --disable-shared --enable-test-passwd --with-armv8-crypto --with-armv82-crypto"
+            config-opts: "LIBS='-levent_pthreads' --enable-static --disable-shared --enable-test-passwd --enable-dit --with-armv8-crypto --with-armv82-crypto"
             run-tests: true
             goal: install
           - name: aarch64-linux-optee

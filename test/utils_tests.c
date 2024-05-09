@@ -68,3 +68,16 @@ void test_base64() {
         dogecoin_free(dec_output);
     }
 }
+
+void test_dit_noop_or_supported()
+{
+    if (is_DIT_supported()) {
+        (void)enable_DIT();
+        disable_DIT();
+        (void)enable_DIT();
+        disable_DIT();
+    } else {
+        u_assert_int_eq(enable_DIT(), false);
+        disable_DIT();
+    }
+}

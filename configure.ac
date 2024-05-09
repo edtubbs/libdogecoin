@@ -99,6 +99,12 @@ AC_ARG_WITH([armv82-crypto],
   [armv82_crypto=$withval],
   [armv82_crypto=no])
 
+AC_ARG_ENABLE([dit],
+  [AS_HELP_STRING([--enable-dit],
+  [Build with Data Independent Timing support on supported architectures (default is no)])],
+  [use_dit=$enableval],
+  [use_dit=no])
+
 AC_ARG_ENABLE([intel-avx2],
   [AS_HELP_STRING([--enable-intel-avx2],
   [Build with Intel AVX2 implementation (default is no)])],
@@ -241,6 +247,10 @@ if test x$armv82_crypto = xyes; then
                    CFLAGS+="-march=armv8-a+crypto"])
 fi
 
+if test x$use_dit = xyes; then
+  AC_DEFINE(USE_DIT, 1, [Define this symbol if DIT support is enabled])
+fi
+
 if test "x$with_bench" = xyes; then
   AC_DEFINE_UNQUOTED([WITH_BENCH],[1],[Define to 1 to enable bench compilation])
 fi
@@ -322,6 +332,7 @@ AM_CONDITIONAL([USE_OPTEE], [test "x$use_optee" = "xyes"])
 AM_CONDITIONAL([USE_YUBIKEY], [test "x$use_yubikey" = "xyes"])
 AM_CONDITIONAL([USE_ARMV8], [test "x$armv8_crypto" = "xyes"])
 AM_CONDITIONAL([USE_ARMV82], [test "x$armv82_crypto" = "xyes"])
+AM_CONDITIONAL([USE_DIT], [test "x$use_dit" = "xyes"])
 AC_SUBST(LIB_VERSION_CURRENT, _LIB_VERSION_CURRENT)
 AC_SUBST(LIB_VERSION_REVISION, _LIB_VERSION_REVISION)
 AC_SUBST(LIB_VERSION_AGE, _LIB_VERSION_AGE)
@@ -345,6 +356,7 @@ echo "  Intel SSE       = $use_intel_sse"
 echo "  SSE2 Scrypt     = $use_scrypt_sse2"
 echo "  ARMv8 crypto    = $armv8_crypto"
 echo "  ARMv8.2 crypto  = $armv82_crypto"
+echo "  DIT             = $use_dit"
 echo
 echo "  test password   = $test_passwd"
 if test "x$test_passwd" = xyes; then
