@@ -89,6 +89,10 @@
 #include <unistd.h>
 #endif
 
+#ifdef __linux__
+#include <sys/sysctl.h>
+#endif
+
 static uint8_t buffer_hex_to_uint8[TO_UINT8_HEX_BUF_LEN];
 static char buffer_uint8_to_hex[TO_UINT8_HEX_BUF_LEN];
 
@@ -806,7 +810,7 @@ int file_copy(char src [], char dest [])
 {
     int   c;
     FILE *stream_read;
-    FILE *stream_write; 
+    FILE *stream_write;
 
     stream_read = fopen (src, "r");
     if (stream_read == NULL)
@@ -816,7 +820,7 @@ int file_copy(char src [], char dest [])
      {
         fclose (stream_read);
         return -2;
-     }    
+     }
     while ((c = fgetc(stream_read)) != EOF)
         fputc (c, stream_write);
     fclose (stream_read);
@@ -926,3 +930,37 @@ unsigned int base64_decode(const unsigned char* in, unsigned int in_len, unsigne
 
 	return k;
 }
+
+#ifdef __APPLE__
+
+dogecoin_bool is_DIT_supported(void)
+{
+    static int has_DIT = -1;
+    if (has_DIT == -1)
+    {
+        size_t has_DIT_size = sizeof(has_DIT);
+        if (sysctlbyname("hw.optional.arm.FEAT_DIT", &has_DIT, &has_DIT_size, NULL, 0) == -1)
+        {
+            has_DIT = 0;
+        }
+    }
+    return has_DIT;
+}
+
+dogecoin_bool enable_DIT(void)
+{
+    if (!is_DIT_supported())
+    {
+        return false;
+    }
+    uint64_t dit_state = __builtin_arm_rsr64("dit");
+    __builtin_arm_wsr64("dit", 1);
+    return (dit_state >> 24) & 1;
+}
+
+void disable_DIT(void)
+{
+    __builtin_arm_wsr64("dit", 0);
+}
+
+#endif
