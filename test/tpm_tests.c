@@ -66,6 +66,10 @@ void test_tpm()
     u_assert_true (dogecoin_encrypt_seed_with_tpm (seed, sizeof(SEED), TEST_FILE, true));
     debug_print ("Seed: %s\n", utils_uint8_to_hex (seed, sizeof (SEED)));
 
+    // Decrypt the seed with the TPM2
+    u_assert_true (dogecoin_decrypt_seed_with_tpm (decrypted_seed, TEST_FILE));
+    debug_print ("Decrypted seed: %s\n", utils_uint8_to_hex (decrypted_seed, sizeof (SEED)));
+
 #elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
 
     // Create TBS context (TPM2)

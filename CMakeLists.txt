@@ -27,7 +27,7 @@ SET(WITH_UNISTRING TRUE CACHE BOOL "enable unistring functions")
 SET(WITH_WALLET TRUE CACHE BOOL "enable wallet")
 SET(USE_SSE2 FALSE CACHE BOOL "enable scrypt sse2")
 SET(USE_TPM2 FALSE CACHE BOOL "enable tpm_tests")
-SET(USE_TSS2 FALSE CACHE BOOL "enable tss2 functions")
+SET(USE_TSS2 TRUE CACHE BOOL "enable tss2 functions")
 SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random data from")
 
 # Set a default build type if none was specified
