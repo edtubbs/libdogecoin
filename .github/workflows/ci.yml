@@ -374,7 +374,6 @@ jobs:
                     # Set up the environment and build the OP-TEE SDK
                     set -e && \
                     apt update && \
-                    apt -y upgrade && \
                     apt -y install netcat libusb-1.0-0-dev swig python2 python3-dev python3-setuptools e2tools && \
                     curl https://storage.googleapis.com/git-repo-downloads/repo > /bin/repo && chmod a+x /bin/repo && \
                     mkdir -p optee && \
@@ -387,7 +386,8 @@ jobs:
                     patch /src/optee/linux/arch/arm64/boot/dts/rockchip/rk3588-nanopi6-common.dtsi < /src/src/optee/rk3588-nanopi6-common.dtsi.patch && \
                     patch /src/optee/u-boot/include/configs/nanopi6.h < /src/src/optee/nanopi6.h.patch && \
                     cd build && \
-                    make toolchains -j\"$(getconf _NPROCESSORS_ONLN)\" && \
+                    make toolchains VERBOSE=1 && \
+                    export FORCE_UNSAFE_CONFIGURE=1 && \
                     export CFG_TEE_CORE_LOG_LEVEL=0 && \
                     export CFG_ATTESTATION_PTA=y && \
                     export CFG_ATTESTATION_PTA_KEY_SIZE=1024 && \
@@ -429,7 +429,7 @@ jobs:
                         --subkey-version 1 && \
 
                     # Build and test the OP-TEE OS and client
-                    make -j\"$(getconf _NPROCESSORS_ONLN)\" && \
+                    make V=1 && \
                     cd /src && \
                     git clone https://github.com/OP-TEE/optee_client.git && \
                     cd optee_client && \
