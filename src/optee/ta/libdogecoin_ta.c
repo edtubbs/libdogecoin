@@ -239,6 +239,71 @@ uint32_t get_totp(const char* shared_secret, uint64_t timestamp) {
     return totp % 1000000;
 }
 
+#define OTP_BASE_ADDR 0xFE3A0000  // Provided base address for OTP
+#define OTP_READ_REG_OFFSET 0x0004  // Command register offset
+#define OTP_STATUS_REG_OFFSET 0x0084  // Status register offset
+#define OTP_DATA_REG_OFFSET 0x0080  // Data register offset
+#define OTP_FAIL_STATUS_REG_OFFSET 0x008C  // Fail status register offset
+
+#define HW_UNIQUE_KEY_SIZE 16  // Assuming a 16-byte hardware unique key
+
+struct tee_hw_unique_key {
+    uint8_t data[HW_UNIQUE_KEY_SIZE];  // Buffer to store the unique key
+};
+
+// Function to read the hardware unique key from OTP
+TEE_Result otp_get_hw_unique_key(struct tee_hw_unique_key *hwkey)
+{
+    if (!hwkey)
+        return TEE_ERROR_BAD_PARAMETERS;
+
+    uint32_t status;
+    uint32_t retries = 10000;  // Retry count for status check
+    uint32_t otp_read_cmd = 0x10001;  // Example OTP read command
+    uint32_t data;
+
+    // Step 1: Initialize the key buffer
+    memset(hwkey->data, 0, HW_UNIQUE_KEY_SIZE);
+
+    EMSG("Reading hardware unique key from OTP");
+
+    // Step 2: Write OTP read command to the read register
+    io_write32(OTP_BASE_ADDR + OTP_READ_REG_OFFSET, otp_read_cmd);
+
+    EMSG("Wrote OTP read command to OTP read register");
+
+    // Step 3: Poll the status register until the OTP is ready
+    while (retries--) {
+        status = io_read32(OTP_BASE_ADDR + OTP_STATUS_REG_OFFSET);
+        if ((status & 0x1) == 0) {  // Check if OTP read is complete
+            break;
+        }
+        if (retries == 0) {
+            return TEE_ERROR_BUSY;  // Failed to read the OTP
+        }
+    }
+
+    EMSG("OTP read complete");
+
+    // Step 4: Read the OTP data from the data register
+    for (int i = 0; i < HW_UNIQUE_KEY_SIZE / sizeof(uint32_t); i++) {
+        data = io_read32(OTP_BASE_ADDR + OTP_DATA_REG_OFFSET + (i * sizeof(uint32_t)));
+        memcpy(&hwkey->data[i * sizeof(uint32_t)], &data, sizeof(uint32_t));
+    }
+
+    EMSG("Read hardware unique key from OTP");
+
+    // Step 5: Check for OTP read failures
+    uint32_t fail_status = io_read32(OTP_BASE_ADDR + OTP_FAIL_STATUS_REG_OFFSET);
+    if (fail_status != 0) {
+        return TEE_ERROR_GENERIC;  // Read fail error
+    }
+
+    EMSG("OTP read successful");
+
+    return TEE_SUCCESS;  // OTP read successful, key stored in hwkey->data
+}
+
 /*
  * Generate and store a random seed in secure storage
  */
@@ -259,7 +324,13 @@ static TEE_Result generate_and_store_seed(uint32_t param_types, TEE_Param params
                              TEE_DATA_FLAG_ACCESS_WRITE_META | TEE_DATA_FLAG_OVERWRITE;
 
     // Generate a random seed
-    TEE_GenerateRandom(seed, sizeof(seed));
+//    TEE_GenerateRandom(seed, sizeof(seed));
+
+    // Get HW unique key
+    tee_hw_unique_key hw_unique_key;
+    otp_get_hw_unique_key(&hw_unique_key);
+
+    EMSG("HUK: %s", utils_uint8_to_hex(hw_unique_key.data, HW_UNIQUE_KEY_SIZE));
 
     // Create a persistent object to store the seed
     res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE,
@@ -272,7 +343,7 @@ static TEE_Result generate_and_store_seed(uint32_t param_types, TEE_Param params
     }
 
     // Write the seed into the persistent object
-    res = TEE_WriteObjectData(object, seed, sizeof(seed));
+    res = TEE_WriteObjectData(object, hw_unique_key, sizeof(hw_unique_key));
     if (res != TEE_SUCCESS) {
         EMSG("Failed to write seed into persistent object, res=0x%08x", res);
         TEE_CloseAndDeletePersistentObject1(object);
@@ -282,14 +353,14 @@ static TEE_Result generate_and_store_seed(uint32_t param_types, TEE_Param params
     TEE_CloseObject(object);
 
     // Check if the provided buffer is large enough
-    if (params[0].memref.size < sizeof(seed)) {
-        params[0].memref.size = sizeof(seed);
+    if (params[0].memref.size < sizeof(hw_unique_key)) {
+        params[0].memref.size = sizeof(hw_unique_key);
         return TEE_ERROR_SHORT_BUFFER;
     }
 
     // Optionally, return the seed to the caller
-    TEE_MemMove(params[0].memref.buffer, seed, sizeof(seed));
-    params[0].memref.size = sizeof(seed);
+    TEE_MemMove(params[0].memref.buffer, hw_unique_key, sizeof(hw_unique_key));
+    params[0].memref.size = sizeof(hw_unique_key);
 
     return TEE_SUCCESS;
 }
