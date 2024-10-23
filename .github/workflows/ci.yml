@@ -61,7 +61,7 @@ jobs:
             run-tests: true
             run-container: true
             packages: g++-aarch64-linux-gnu qemu-user-static qemu-user
-            dep-opts: "CROSS_COMPILE='yes' SPEED=slow V=1"
+            dep-opts: "CROSS_COMPILE='yes' SPEED=slow OPTEE=yes V=1"
             config-opts: "LIBS=-levent_pthreads --enable-static --disable-shared --enable-test-passwd --enable-optee CFLAGS=-U_FORTIFY_SOURCE"
             goal: install
           - name: aarch64-android
@@ -97,7 +97,7 @@ jobs:
             run-tests: true
             run-container: true
             packages: python3-dev python3-dbg python
-            dep-opts: "DEBUG=1 SPEED=slow V=1"
+            dep-opts: "DEBUG=1 SPEED=slow OE=yes V=1"
             config-opts: "--enable-openenclave --enable-test-passwd CFLAGS=-U_FORTIFY_SOURCE"
             goal: install
           - name: x86_64-macos
@@ -379,13 +379,11 @@ jobs:
                     curl https://storage.googleapis.com/git-repo-downloads/repo > /bin/repo && chmod a+x /bin/repo && \
                     mkdir -p optee && \
                     cd optee && \
-                    repo init -u https://github.com/edtubbs/manifest.git -m nanopc-t6.xml -b nanopc-t6 && \
+                    repo init -u https://github.com/OP-TEE/manifest.git -m qemu_v8.xml -b 4.0.0 && \
                     export FORCE_UNSAFE_CONFIGURE=1 && \
                     repo sync -j\"$(getconf _NPROCESSORS_ONLN)\" && \
                     patch -F 4 /src/optee/build/common.mk < /src/src/optee/common.mk.patch && \
                     patch /src/optee/build/kconfigs/qemu.conf < /src/src/optee/qemu.conf.patch && \
-                    patch /src/optee/linux/arch/arm64/boot/dts/rockchip/rk3588-nanopi6-common.dtsi < /src/src/optee/rk3588-nanopi6-common.dtsi.patch && \
-                    patch /src/optee/u-boot/include/configs/nanopi6.h < /src/src/optee/nanopi6.h.patch && \
                     cd build && \
                     make toolchains -j\"$(getconf _NPROCESSORS_ONLN)\" && \
                     export CFG_TEE_CORE_LOG_LEVEL=0 && \
@@ -429,7 +427,7 @@ jobs:
                         --subkey-version 1 && \
 
                     # Build and test the OP-TEE OS and client
-                    make -j\"$(getconf _NPROCESSORS_ONLN)\" && \
+                    make -j\"$(getconf _NPROCESSORS_ONLN)\" check && \
                     cd /src && \
                     git clone https://github.com/OP-TEE/optee_client.git && \
                     cd optee_client && \
