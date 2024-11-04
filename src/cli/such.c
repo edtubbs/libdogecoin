@@ -622,6 +622,7 @@ static struct option long_options[] =
         {"address_index", required_argument, NULL, 'i'},
         {"encrypted_file", required_argument, NULL, 'y'},
         {"use_tpm", no_argument, NULL, 'j'},
+        {"use_keyring", no_argument, NULL, 'u'},
         {"command", required_argument, NULL, 'c'},
         {"silent", no_argument, NULL, 'b'},
         {"overwrite", no_argument, NULL, 'w'},
@@ -641,17 +642,18 @@ static void print_usage()
     printf("Usage: such -c <cmd> (-m|-derived_path <bip_derived_path>) (-k|-pubkey <publickey>) (-p|-privkey <privatekey>) (-h|-sighash <sighash type>) \
 (-s|-script <script pubkey>) (-i|-input_index <input index>) (-x|-raw_tx <raw hex tx>) (-o|-account_int <account_int>) (-g|-change_level <change_level>) \
 (-e|-entropy <hex_entropy>) (-n|-mnemonic <seed_phrase>) (-a|-pass_phrase) (-y|-encrypted_file <file_num 0-999>) (-w[--overwrite]) (-b[--silent]) \
-(-j[--use_tpm]) (-t[--testnet]) (-r[--regtest])\n");
+(-j[--use_tpm]) (-u[--use_keyring]) (-t[--testnet]) (-r[--regtest])\n");
     printf("Available commands:\n");
     printf("generate_public_key (requires -p <wif>),\n");
     printf("p2pkh (requires -k <public key hex>),\n");
     printf("generate_private_key,\n");
     printf("bip32_extended_master_key (-y <file_num>, -j (use_tpm), -w (overwrite) and -b (silent), all optional),\n");
     printf("generate_mnemonic (-e <hex_entropy> or -y <file_num>, -j (use_tpm), -w (overwrite) and -b (silent), all optional),\n");
+    printf("list_keys_in_keyring,\n");
     printf("list_encryption_keys_in_tpm,\n");
     printf("decrypt_master_key (requires -y <file_num>, -j (use_tpm) optional),\n");
     printf("decrypt_mnemonic (requires -y <file_num>, -j (use_tpm) optional),\n");
-    printf("seed_to_master_key (-y <file_num>, -j (use_tpm) optional),\n");
+    printf("seed_to_master_key (requires -y <file_num>, -j (use_tpm) or -u (use_keyring) all optional),\n");
     printf("mnemonic_to_key (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
     printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
     printf("print_keys (requires -p <private key hex>),\n");
@@ -691,6 +693,7 @@ int main(int argc, char* argv[])
     MNEMONIC mnemonic = {0};
     SEED seed = {0};
     dogecoin_bool tpm = false;
+    dogecoin_bool keyring = false;
     dogecoin_bool encrypted = false;
     dogecoin_bool overwrite = false;
     dogecoin_bool silent = false;
@@ -704,7 +707,7 @@ int main(int argc, char* argv[])
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:m:o:g:e:n:y:c:atrvbwj", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:m:o:g:e:n:y:c:atrvbwju", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'p':
                     pkey = optarg;
@@ -767,6 +770,9 @@ int main(int argc, char* argv[])
                     if (!encrypted)
                         return showError("TPM can only be used with encrypted files");
                     tpm = true;
+                    break;
+                case 'u':
+                    keyring = true;
                     break;
                 case 'x':
                     txhex = optarg;
@@ -1180,6 +1186,26 @@ int main(int argc, char* argv[])
             printf("%s\n", mnemonic);
             }
         }
+    else if (strcmp(cmd, "list_keys_in_keyring") == 0) {
+
+        /* list keys in keyring */
+        char* names[MAX_FILES] = {0};
+        size_t count = 0;
+
+        if (dogecoin_list_keys_in_keyring(names, &count) == false) {
+            return showError("failed to list keys in keyring\n");
+            }
+
+        /* display key names */
+        for (size_t i = 0; i < count; i++) {
+            printf("%s\n", names[i]);
+            }
+
+        /* free memory */
+        for (size_t i = 0; i < count; i++) {
+            dogecoin_free(names[i]);
+            }
+        }
     else if (strcmp(cmd, "list_encryption_keys_in_tpm") == 0) {
 
         /* list encryption keys in TPM */
@@ -1317,6 +1343,14 @@ int main(int argc, char* argv[])
                 if (!dogecoin_decrypt_seed_with_tpm (seed, file_num)) {
                     printf("seed_to_master_key (requires -y <file_num>, -j (use_tpm) optional),\n");
                     return showError("failed to decrypt seed with tpm\n");
+                    }
+                }
+
+            else if (keyring) {
+                /* get seed from keyring */
+                if (!dogecoin_decrypt_seed_with_keyring (seed, file_num)) {
+                    printf("seed_to_master_key (requires -y <file_num>, -j (use_tpm) optional),\n");
+                    return showError("failed to decrypt seed with keyring\n");
                     }
                 }
 

@@ -154,6 +154,12 @@ AC_ARG_ENABLE([openenclave],
   [use_openenclave=$enableval],
   [use_openenclave=no])
 
+AC_ARG_ENABLE([keyring],
+  [AS_HELP_STRING([--enable-keyring],
+  [Build with keyring (default is no)])],
+  [use_keyring=$enableval],
+  [use_keyring=no])
+
 AC_ARG_ENABLE(tests,
   AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
   [use_tests=$enableval],
@@ -256,6 +262,11 @@ if test "x$use_openenclave" = xyes; then
   AC_DEFINE(USE_OPENENCLAVE, 1, [Define this symbol if openenclave works])
 fi
 
+if test "x$use_keyring" = xyes; then
+  AC_DEFINE(USE_KEYRING, 1, [Define this symbol if keyring works])
+  LIBS="$LIBS -lkeyutils"
+fi
+
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
@@ -294,6 +305,7 @@ echo "  with net        = $with_net"
 echo "  with logdb      = $with_logdb"
 echo "  with wallet     = $with_wallet"
 echo "  with unistring  = $with_unistring"
+echo "  with keyring    = $use_keyring"
 echo
 echo "  Intel AVX2      = $use_intel_avx2"
 echo "  Intel SSE       = $use_intel_sse"

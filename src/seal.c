@@ -59,6 +59,11 @@
 #define WINVER 0x0600
 #endif
 
+#if defined(__linux__) && defined(USE_KEYRING)
+#include <sys/uio.h>
+#include <keyutils.h>
+#endif
+
 /*
  * Defines
  */
@@ -133,6 +138,168 @@ dogecoin_bool fileValid (const int file_num)
     }
     return true;
 
+}
+
+/**
+ * @brief Encrypts a seed using the Linux Keyring
+ *
+ * Encrypts a seed using the persistent user keyring.
+ *
+ * @param[in] seed The seed to encrypt
+ * @param[in] size The size of the seed
+ * @param[in] file_num The file number to encrypt the seed for
+ * @param[in] overwrite Whether or not to overwrite an existing seed
+ * @return true if the seed was encrypted successfully, false otherwise.
+ */
+dogecoin_bool dogecoin_encrypt_seed_with_keyring(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite)
+{
+#if defined(__linux__) && defined(USE_KEYRING)
+    if (!seed || size == 0)
+    {
+        fprintf(stderr, "ERROR: Invalid parameters\n");
+        return false;
+    }
+
+    // Validate the file number
+    if (!fileValid(file_num))
+    {
+        fprintf(stderr, "ERROR: Invalid file number\n");
+        return false;
+    }
+
+    // Format the key name based on file_num
+    char keyname[NAME_MAX_LEN] = {0};
+    snprintf(keyname, sizeof(keyname), BASE_NAME_SEED FILE_NUM_FORMAT, file_num);
+
+    // Check if the key already exists
+    key_serial_t keyring = keyctl_get_keyring_ID(KEY_SPEC_USER_KEYRING, 0);
+    if (keyring == -1)
+    {
+        perror("ERROR: Failed to get user keyring");
+        return false;
+    }
+
+    key_serial_t existing_key = keyctl_search(keyring, "encrypted", keyname, 0);
+    if (existing_key != -1 && !overwrite)
+    {
+        fprintf(stderr, "ERROR: Key '%s' already exists. Use overwrite flag to replace it.\n", keyname);
+        return false;
+    }
+    else if (existing_key != -1 && overwrite)
+    {
+        // Unlink the existing key
+        if (keyctl_unlink(existing_key, keyring) == -1)
+        {
+            perror("ERROR: Failed to unlink existing key");
+            return false;
+        }
+    }
+
+    // Prepare the payload for the new encrypted key
+    char payload[NAME_MAX_LEN] = {0};
+    snprintf(payload, sizeof(payload), "new user:%s %zu", keyname, size);
+
+    // Add the encrypted key
+    key_serial_t key = add_key("encrypted", keyname, payload, strlen(payload), keyring);
+    if (key == -1)
+    {
+        perror("ERROR: Failed to add encrypted key");
+        return false;
+    }
+
+    // Instantiate the encrypted key with the seed data
+    // Note: Normally, the kernel generates the key material internally,
+    // but we can use keyctl_instantiate to set the key data.
+
+    struct iovec iov;
+    iov.iov_base = (void *)seed;
+    iov.iov_len = size;
+
+    if (keyctl_instantiate_iov(key, &iov, 1, 0) == -1)
+    {
+        perror("ERROR: Failed to instantiate encrypted key");
+        keyctl_unlink(key, keyring);
+        return false;
+    }
+
+    return true;
+#else
+    (void)seed;
+    (void)size;
+    (void)file_num;
+    (void)overwrite;
+    fprintf(stderr, "ERROR: Linux Keyring is not supported on this platform\n");
+    return false;
+#endif
+}
+
+/**
+ * @brief Decrypts a seed using the Linux Keyring
+ *
+ * Decrypts a seed using the persistent user keyring.
+ *
+ * @param[out] seed The buffer where the decrypted seed will be stored
+ * @param[in] file_num The file number to decrypt the seed for
+ * @return true if the seed was decrypted successfully, false otherwise.
+ */
+dogecoin_bool dogecoin_decrypt_seed_with_keyring(SEED seed, const int file_num)
+{
+#if defined(__linux__) && defined(USE_KEYRING)
+    if (!seed)
+    {
+        fprintf(stderr, "ERROR: Invalid parameters\n");
+        return false;
+    }
+
+    // Validate the file number
+    if (!fileValid(file_num))
+    {
+        fprintf(stderr, "ERROR: Invalid file number\n");
+        return false;
+    }
+
+    // Format the key name based on file_num
+    char keyname[NAME_MAX_LEN] = {0};
+    snprintf(keyname, sizeof(keyname), BASE_NAME_SEED FILE_NUM_FORMAT, file_num);
+
+    // Get the keyring
+    key_serial_t keyring = keyctl_get_keyring_ID(KEY_SPEC_USER_KEYRING, 0);
+    if (keyring == -1)
+    {
+        perror("ERROR: Failed to get user keyring");
+        return false;
+    }
+
+    // Search for the encrypted key
+    key_serial_t key = keyctl_search(keyring, "encrypted", keyname, 0);
+    if (key == -1)
+    {
+        fprintf(stderr, "ERROR: Key '%s' not found in keyring\n", keyname);
+        return false;
+    }
+
+    // Read the decrypted key data
+    ssize_t key_size = keyctl_read(key, (char *)seed, sizeof(SEED));
+    if (key_size == -1)
+    {
+        perror("ERROR: Failed to read key data");
+        return false;
+    }
+
+    // Ensure the seed buffer is large enough
+    if (key_size > (ssize_t)sizeof(SEED))
+    {
+        fprintf(stderr, "ERROR: Key data is larger than SEED buffer\n");
+        return false;
+    }
+
+    return true;
+#else
+    (void)seed;
+    (void)file_num;
+    fprintf(stderr, "ERROR: Linux Keyring is not supported on this platform\n");
+    return false;
+#endif
 }
 
 /**
@@ -2266,6 +2433,69 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw(MNEMONIC mnemoni
     }
 
     return true;
+}
+
+/**
+ * @brief Lists user keys in the persistent keyring.
+ *
+ * This function lists keys in the persistent user keyring and stores their descriptions.
+ *
+ * @param[out] names An array of strings where each element will be a key name.
+ * @param[out] count A pointer to the count of keys found.
+ * @return true if keys were successfully listed, false otherwise.
+ */
+LIBDOGECOIN_API dogecoin_bool dogecoin_list_keys_in_keyring(char* names[], size_t* count) {
+#if defined(__linux__) && defined(USE_KEYRING)
+    uid_t uid = getuid();
+    key_serial_t persistent_keyring = keyctl_get_persistent(uid, KEY_SPEC_USER_KEYRING);
+    if (persistent_keyring < 0) {
+        perror("ERROR: Failed to get persistent keyring");
+        return false;
+    }
+
+    // Initialize key count
+    *count = 0;
+
+    key_serial_t key = -1;
+    ssize_t desc_len;
+    char *desc = NULL;
+
+    // Iterate through encrypted keys in the keyring
+    while ((key = keyctl_search(persistent_keyring, "encrypted", NULL, key)) >= 0) {
+        desc_len = keyctl_describe_alloc(key, &desc);
+        if (desc_len < 0) {
+            perror("ERROR: Failed to describe key");
+            continue;  // Skip this key and continue with the next one
+        }
+
+        // Allocate memory and copy key description
+        names[*count] = malloc(desc_len + 1);
+        if (!names[*count]) {
+            perror("ERROR: Memory allocation failed");
+            free(desc);
+            return false;
+        }
+        strncpy(names[*count], desc, desc_len + 1);
+        free(desc);
+        desc = NULL;
+
+        (*count)++;
+        if (*count >= MAX_FILES) {
+            break;
+        }
+    }
+
+    if (desc) {
+        free(desc);
+    }
+
+    return true;
+#else
+    (void) names;
+    (void) count;
+    fprintf(stderr, "ERROR: Keyring support not available on this platform\n");
+    return false;
+#endif
 }
 
 /**

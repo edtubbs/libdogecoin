@@ -36,6 +36,21 @@ void test_tpm()
     SEED decrypted_seed = {0};
     sha512_raw(&random[0], 32, seed);
 
+#if defined (__linux__) && defined(USE_KEYRING)
+
+    // Encrypt a random seed with the Linux Keyring
+    u_assert_true (dogecoin_encrypt_seed_with_keyring (seed, sizeof(SEED), TEST_FILE, true));
+    debug_print ("Seed: %s\n", utils_uint8_to_hex (seed, sizeof (SEED)));
+
+    // Decrypt the seed with the Linux Keyring
+    u_assert_true (dogecoin_decrypt_seed_with_keyring (decrypted_seed, TEST_FILE));
+    debug_print ("Decrypted seed: %s\n", utils_uint8_to_hex (decrypted_seed, sizeof (SEED)));
+
+    // Compare the seed and the decrypted seed
+    u_assert_mem_eq (seed, decrypted_seed, sizeof (SEED));
+
+#endif
+
     // Define a test password
 #ifdef TEST_PASSWD
     char* test_password = PASSWD_STR;

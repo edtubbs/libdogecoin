@@ -33,6 +33,12 @@ LIBDOGECOIN_API
 /* define test file number */
 #define TEST_FILE 999
 
+/* Encrypt a BIP32 seed with the Linux Keyring */
+LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_keyring (const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite);
+
+/* Decrypt a BIP32 seed with the Linux Keyring */
+LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_keyring (SEED seed, const int file_num);
+
 /* Encrypt a BIP32 seed with the TPM */
 LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm (const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite);
 
@@ -68,6 +74,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw(dogecoin_
 
 /* Decrypt a BIP32 HD node object with software */
 LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* out, const int file_num, const char* test_password);
+
+/* List all the keys in the keyring */
+LIBDOGECOIN_API dogecoin_bool dogecoin_list_keys_in_keyring(char* names[], size_t* count);
 
 /* List all encryption keys in the TPM */
 LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* names[], size_t* count);
