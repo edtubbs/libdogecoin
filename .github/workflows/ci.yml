@@ -383,16 +383,13 @@ jobs:
                     curl https://storage.googleapis.com/git-repo-downloads/repo > /bin/repo && chmod a+x /bin/repo && \
                     mkdir -p optee && \
                     cd optee && \
-                    repo init -u https://github.com/edtubbs/manifest.git -m nanopc-t6.xml -b nanopc-t6 && \
+                    repo init -u https://github.com/OP-TEE/manifest.git -m nanopc-t6.xml -b master && \
                     export FORCE_UNSAFE_CONFIGURE=1 && \
                     repo sync -j\"$(getconf _NPROCESSORS_ONLN)\" && \
                     if [[ "${{ github.ref }}" == refs/tags/* ]]; then \
                       mv /src/rsa_private.pem /src/optee/optee_os/keys/default_ta.pem; \
                     fi && \
                     patch -F 4 /src/optee/build/common.mk < /src/src/optee/common.mk.patch && \
-                    patch /src/optee/build/kconfigs/qemu.conf < /src/src/optee/qemu.conf.patch && \
-                    patch /src/optee/linux/arch/arm64/boot/dts/rockchip/rk3588-nanopi6-common.dtsi < /src/src/optee/rk3588-nanopi6-common.dtsi.patch && \
-                    patch /src/optee/u-boot/include/configs/nanopi6.h < /src/src/optee/nanopi6.h.patch && \
                     cd build && \
                     make toolchains -j\"$(getconf _NPROCESSORS_ONLN)\" && \
                     export CFG_TEE_CORE_LOG_LEVEL=0 && \

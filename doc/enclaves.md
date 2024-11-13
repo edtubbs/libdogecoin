@@ -192,7 +192,7 @@ The SDK has several components and requires over 10GB of disk space to build. Th
 
 ### Building OP-TEE SDK and Client (NanoPC-T6)
 
-This command builds the latest SDK and client for NanoPC-T6 (nanopc-t6.xml).  When complete, the image will be located in `/doge/libdogecoin/optee/out/nanopc-t6.img`. Burn this image to an SD card to boot the NanoPC-T6. Connect an Ethernet cable to the NanoPC-T6 and power it on. The default IP address is `192.168.1.1`. Login as root via ssh (e.g. `ssh root@192.168.1.1`).
+This command builds the latest SDK and client for NanoPC-T6 (nanopc-t6.xml).  When complete, the image will be located in `/doge/libdogecoin/optee/out/nanopc-t6.img`. Burn this image to an SD card to boot the NanoPC-T6. Connect an Ethernet cable, USB keyboard and HDMI to the NanoPC-T6 and power it on. The default IP address is configured using DHCP. Login as root via ssh (e.g. `ssh root@192.168.137.19`) or using the HDMI console.
 
 ```sh
 docker pull jforissier/optee_os_ci:qemu_check
@@ -205,14 +205,10 @@ docker run -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash 
     curl https://storage.googleapis.com/git-repo-downloads/repo > /bin/repo && chmod a+x /bin/repo && \
     mkdir -p optee && \
     cd optee && \
-    # repo init -u https://github.com/OP-TEE/manifest.git -m qemu_v8.xml -b 4.0.0
-    repo init -u https://github.com/edtubbs/manifest.git -m nanopc-t6.xml -b nanopc-t6 && \
+    # repo init -u https://github.com/OP-TEE/manifest.git -m qemu_v8.xml -b master
+    repo init -u https://github.com/OP-TEE/manifest.git -m nanopc-t6.xml -b master && \
     export FORCE_UNSAFE_CONFIGURE=1 && \
-    repo sync -j 4 && \
-    patch -F 4 /src/optee/build/common.mk < /src/src/optee/common.mk.patch && \
-    patch /src/optee/build/kconfigs/qemu.conf < /src/src/optee/qemu.conf.patch && \
-    patch /src/optee/linux/arch/arm64/boot/dts/rockchip/rk3588-nanopi6-common.dtsi < /src/src/optee/rk3588-nanopi6-common.dtsi.patch && \
-    patch /src/optee/u-boot/include/configs/nanopi6.h < /src/src/optee/nanopi6.h.patch && \
+    repo sync -j 4 --force-sync && \
     cd build && \
     make toolchains -j 4 && \
     export CFG_TEE_CORE_LOG_LEVEL=0 && \
@@ -263,7 +259,7 @@ docker run -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash 
     # make -j 4 check
     make -j 4 && \
     cd /src && \
-    git clone https://github.com/OP-TEE/optee_client.git && \
+    [ ! -d optee_client ] && git clone https://github.com/OP-TEE/optee_client.git && \
     cd optee_client && \
     mkdir -p build && \
     cd build && \
@@ -291,11 +287,10 @@ docker run -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash 
     curl https://storage.googleapis.com/git-repo-downloads/repo > /bin/repo && chmod a+x /bin/repo && \
     mkdir -p optee && \
     cd optee && \
-    repo init -u https://github.com/OP-TEE/manifest.git -m qemu_v8.xml -b 4.0.0
+    repo init -u https://github.com/OP-TEE/manifest.git -m qemu_v8.xml -b master
     export FORCE_UNSAFE_CONFIGURE=1 && \
-    repo sync -j 4 && \
-    patch -F 4 /src/optee/build/common.mk < /src/src/optee/common.mk.patch && \
-    patch /src/optee/build/kconfigs/qemu.conf < /src/src/optee/qemu.conf.patch && \
+    repo sync -j 4 --force-sync && \
+    patch -N -F 4 /src/optee/build/common.mk < /src/src/optee/common.mk.patch && \
     cd build && \
     make toolchains -j 4 && \
     export CFG_TEE_CORE_LOG_LEVEL=0 && \
@@ -358,13 +353,14 @@ docker run -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash 
 
 ### Building OP-TEE Libdogecoin Key Manager Enclave (QEMU ARMv8 or NanoPC-T6)
 
+This command builds the OP-TEE Libdogecoin Key Manager Enclave for QEMU ARMv8 or NanoPC-T6. The enclave is built using the OP-TEE SDK and client. The enclave binary is located in `/doge/libdogecoin/optee/out/bin/libdogecoin.img`.
+
 ```sh
 docker run --privileged -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash -c "\
     # Set up the environment and build libdogecoin
     apt-get update && \
     apt-get install -y autoconf automake libtool-bin build-essential curl python3 valgrind g++-aarch64-linux-gnu qemu-user-static qemu-user && \
 
-    make clean && \
     make -j 4 -C depends HOST=aarch64-linux-gnu && \
     ./autogen.sh && \
     ./configure --prefix=/src/depends/aarch64-linux-gnu LIBS=-levent_pthreads --enable-static --disable-shared --enable-test-passwd --enable-optee CFLAGS=-U_FORTIFY_SOURCE HOST=aarch64-linux-gnu && \
@@ -420,7 +416,7 @@ docker run --privileged -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_che
 
 ### Running OP-TEE Libdogecoin Key Manager Enclave (on NanoPC-T6)
 
-Use scp to copy the /doge/libdogecoin/optee/out/bin/libdogecoin.img to the NanoPC-T6 (e.g. `scp /doge/libdogecoin/optee/out/bin/libdogecoin.img root@192.168.1.1:/root/`). Then, SSH into the NanoPC-T6 and run the following commands:
+Use scp to copy the /doge/libdogecoin/optee/out/bin/libdogecoin.img to the NanoPC-T6 (e.g. `scp /doge/libdogecoin/optee/out/bin/libdogecoin.img root@192.168.137.19:/root/`). Then, SSH into the NanoPC-T6 and run the following commands:
 
 ```sh
 mkdir /media/libdogecoin
@@ -433,7 +429,7 @@ cp /media/libdogecoin/62d95dc0-7fc2-4cb3-a7f3-c13ae4e633c4.ta /lib/optee_armtz/
 ### Running OP-TEE Libdogecoin Key Manager Enclave (in QEMU ARMv8)
 
 ```sh
-docker run --device=/dev/bus/usb/001/003 -it -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash -c "\
+docker run --privileged -v /dev/bus/usb:/dev/bus/usb -it -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash -c "\
   chmod 777 /src/optee/qemu/build/aarch64-softmmu/qemu-system-aarch64 && \
   cd /src/optee/out/bin && \
   /src/optee/qemu/build/aarch64-softmmu/qemu-system-aarch64 \
@@ -459,7 +455,7 @@ docker run --device=/dev/bus/usb/001/003 -it -v "$(pwd):/src" -w /src jforissier
     -device usb-host,vendorid=0x1050,productid=0x0407"
 ```
 
-`--device=/dev/bus/usb/001/003` is used to pass the YubiKey device to the container. Replace the device path with the appropriate path for your system.
+`-v /dev/bus/usb:/dev/bus/usb` is used to pass the USB bus and YubiKey device to the container. The `-device usb-host,vendorid=0x1050,productid=0x0407` flag is used to pass the YubiKey to the QEMU VM. Replace `0x1050` and `0x0407` with the YubiKey's vendor and product IDs.
 
 The QEMU ARMv8 emulator will boot the OP-TEE OS and Trusted Firmware, and the libdogecoin TA will be loaded into the enclave. The host application can then interact with the enclave to perform key management operations.
 
@@ -510,14 +506,13 @@ cd libdogecoin
 This command uses package installs for the OpenEnclave SDK and Docker to build the OpenEnclave Libdogecoin Key Manager Enclave. Docker is used to build the enclave in a clean environment. Refer to the [OpenEnclave documentation](https://github.com/openenclave/openenclave/blob/master/docs/GettingStartedDocs/Contributors/BuildingInADockerContainer.md) for more information.
 
 ```sh
-docker run -v $PWD:/src -w /src ubuntu:20.04 bash -c "\
+docker run --device /dev/sgx_enclave:/dev/sgx_enclave --device /dev/sgx_provision:/dev/sgx_provision -it -v $PWD:/src -w /src ubuntu:20.04 bash -c "\
   # Set up the environment and build libdogecoin
   export DEBIAN_FRONTEND=noninteractive && \
   apt-get update && \
   apt-get install -y autoconf automake libtool-bin build-essential curl python3 valgrind python3-dev python3-dbg pkg-config && \
   cd /src && \
   make -j 4 -C depends HOST=x86_64-pc-linux-gnu && \
-  make clean && \
   ./autogen.sh && \
   ./configure --prefix=/src/depends/x86_64-pc-linux-gnu --enable-openenclave --enable-test-passwd CFLAGS=-U_FORTIFY_SOURCE && \
   make && \
@@ -525,7 +520,6 @@ docker run -v $PWD:/src -w /src ubuntu:20.04 bash -c "\
 
   # Set up the OpenEnclave environment and build the enclave
   apt-get install -y wget gnupg2 cmake && \
-  cd /src/src/openenclave && \
   echo 'deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu focal main' | tee /etc/apt/sources.list.d/intel-sgx.list && \
   wget -qO - https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key | apt-key add - && \
   echo 'deb http://apt.llvm.org/focal/ llvm-toolchain-focal-11 main' | tee /etc/apt/sources.list.d/llvm-toolchain-focal-11.list && \
@@ -536,8 +530,12 @@ docker run -v $PWD:/src -w /src ubuntu:20.04 bash -c "\
   apt -y install clang-11 libssl-dev gdb libsgx-enclave-common libsgx-quote-ex libprotobuf17 libsgx-dcap-ql libsgx-dcap-ql-dev az-dcap-client open-enclave && \
   apt -y install dkms && \
   source /opt/openenclave/share/openenclave/openenclaverc && \
-  mkdir -p build && cd build && cmake .. && make && make simulate"
+  mkdir -p /src/src/openenclave/build && cd /src/src/openenclave/build && \
+  cmake .. && make && make run && \
+  exec bash"
 ```
+
+Once the build is complete, see the OpenEnclave Host Command Line Tutorial below for instructions on running the OpenEnclave Libdogecoin Key Manager Enclave.
 
 ## Host Command Line Tutorials
 
@@ -553,12 +551,12 @@ Before proceeding, ensure you have successfully built and set up the OP-TEE and 
 
 Generate a mnemonic seedphrase for backup and recovery purposes. This is the first step in creating a new wallet. It will only be displayed once, so make sure to back it up.
 
-Enter the shared secret for TOTP when prompted. The shared secret must be 40 hex characters (*e.g., `f38243e0e3e97a5c8aa5cc481a815add6c119648`*).  The shared secret will be set on the YubiKey (if present) by the host application, and the mnemonic will be generated and displayed. If OTP Slot 1 is already programmed, the host application will prompt you to overwrite it.
+This command will generate a mnemonic seedphrase and display it on the screen. Either a shared secret for TOTP or a password must be provided. All other flags are optional, and the user will be prompted for input if not provided.
 
-This command will generate a mnemonic seedphrase and display it on the screen. All flags are optional, and the user will be prompted for input if not provided.
+Enter the shared secret for TOTP when prompted if enabled. The shared secret must be 40 hex characters (*e.g., `f38243e0e3e97a5c8aa5cc481a815add6c119648`*).  If no shared secret is provided, a random one will be generated. The shared secret will be set on the YubiKey (if present) by the host application, and the mnemonic will be generated and displayed. If OTP Slot 1 is already programmed, the host application will prompt you to overwrite it.
 
 ```sh
-optee_libdogecoin -c generate_mnemonic -n <mnemonic_input> -s <shared_secret> -e <entropy_size> -p <password> or -u <for prompt> -f <flags>
+optee_libdogecoin -c generate_mnemonic -n <mnemonic_input> -s <shared_secret> -e <entropy_size> -p <password> -f <flags> -z
 ```
 
 The `-n` flag is used to provide the mnemonic input for recovery purposes if needed. Replace `<mnemonic_input>` with the mnemonic seedphrase you want to use for recovery. If no mnemonic input is provided, the enclave will generate a random mnemonic seedphrase.
@@ -569,20 +567,28 @@ The `-e` flag is used to provide the entropy size for the mnemonic seedphrase. R
 
 The `-p` flag is used to provide the password for the mnemonic seedphrase. Replace `<password>` with the password you want to use for the mnemonic seedphrase.
 
-The `-u` flag is used to prompt the user for input. If the `-u` flag is provided, the user will be prompted for a password.
-
 The `-f` flag is used to provide additional flags for the mnemonic seedphrase. Replace `<flags>` with the desired flags for the mnemonic seedphrase. The `"delegate"` flag is used to delegate account keys to a third party.
+
+The `-z` flag is used to enable YubiKey authentication. If the YubiKey is present, the shared secret will be set on the YubiKey.
 
 #### Generating an Extended Public Key
 
 Generate an extended public key using the account and change level. The change level can be set to 0 for external addresses and 1 for internal addresses. The account number is the BIP-44 account. The public key will be derived from the seedphrase stored within the enclave.
 
-The TOTP code will be retrieved from the YubiKey (if present) and used as the authentication token for this operation.
+The `-o` flag is used to provide the account number for the extended public key. Replace `<account_number>` with the desired account number.
+
+The `-l` flag is used to provide the change level for the extended public key. Replace `<change_level>` with the desired change level.
+
+The `-h` flag is used to provide a custom path for the extended public key. Replace `<custom_path>` with the desired path for the extended public key.
 
 The `-a` flag is used to provide the auth token if a Yubikey is not present. Use a tool like `oathtool` to generate TOTP (*e.g., `oathtool --totp "f38243e0e3e97a5c8aa5cc481a815add6c119648"`).
 
+The `-p` flag is used to provide the password for the mnemonic seedphrase.
+
+The `-z` flag is used to enable YubiKey authentication. If the YubiKey is present, the TOTP code will be retrieved from the YubiKey and used as the authentication token.
+
 ```sh
-optee_libdogecoin -c generate_extended_public_key -o <account_number> -l <change_level> -a <auth_token> -p <password> or -u <for prompt>
+optee_libdogecoin -c generate_extended_public_key -o <account_number> -l <change_level> -h <custom_path> -a <auth_token> or -p <password> -z
 ```
 
 #### Generating an Address
@@ -590,27 +596,27 @@ optee_libdogecoin -c generate_extended_public_key -o <account_number> -l <change
 Generate a Dogecoin address using the account, address index, and change level.
 
 ```sh
-optee_libdogecoin -c generate_address -o <account_number> -l <change_level> -i <address_index> -a <auth_token> -p <password> or -u <for prompt>
+optee_libdogecoin -c generate_address -o <account_number> -l <change_level> -i <address_index> -h <custom_path> -a <auth_token> or -p <password> -z
 ```
 
 Replace `<account_number>`, `<address_index>`, and `<change_level>` with appropriate values. The change level can be set to 0 for external addresses and 1 for internal addresses. The account number is the BIP-44 account. The address index is the index of the address within the account. The address will be derived from the seedphrase stored within the enclave.
 
 #### Signing a Message
 
-Sign a message using the private key stored within the enclave. The message will be signed using the private key derived from the seedphrase stored within the enclave.
+Sign a message using the private key stored within the enclave. The message will be signed using the private key derived from the seedphrase stored within the enclave. If no message is provided, an example message will be signed for demonstration purposes.
 
 ```sh
-optee_libdogecoin -c sign_message -o <account_number> -l <change_level> -i <address_index> -m <message> -a <auth_token> -p <password> or -u <for prompt>
+optee_libdogecoin -c sign_message -o <account_number> -l <change_level> -i <address_index> -m <message> -h <custom_path> -a <auth_token> or -p <password> -z
 ```
 
 Replace `<message>` with the message you want to sign.
 
 #### Signing a Transaction
 
-Sign a raw transaction using the private key stored within the enclave. A raw transaction is a hexadecimal string representing the transaction data. Currently, if no transaction data is provided, an example transaction will be signed for demonstration purposes. The private key will be derived from the seedphrase stored within the enclave.
+Sign a raw transaction using the private key stored within the enclave. The transaction will be signed using the private key derived from the seedphrase stored within the enclave. A raw transaction is a hexadecimal string representing the transaction data. Currently, if no transaction data is provided, an example transaction will be signed for demonstration purposes.
 
 ```sh
-optee_libdogecoin -c sign_transaction -o <account_number> -l <change_level> -i <address_index> -t <raw_transaction> -a <auth_token> -p <password> or -u <for prompt>
+optee_libdogecoin -c sign_transaction -o <account_number> -l <change_level> -i <address_index> -t <raw_transaction> -h <custom_path> -a <auth_token> or -p <password> -z
 ```
 
 Replace `<raw_transaction>` with the raw transaction data.
@@ -620,7 +626,7 @@ Replace `<raw_transaction>` with the raw transaction data.
 Delegate account keys to a third party. This operation allows a third party to manage the keys for a specific account. The third party will be able to export the account keys on behalf of the user using the delegate password.
 
 ```sh
-optee_libdogecoin -c delegate_key -o <account_number> -d <delegate_password> or -u <for prompt> -a <auth_token> -p <password>
+optee_libdogecoin -c delegate_key -o <account_number> -d <delegate_password> -h <custom_path> -a <auth_token> or -p <password> -z
 ```
 
 Replace `<delegate_password>` with the password for the delegate account.
@@ -630,7 +636,7 @@ Replace `<delegate_password>` with the password for the delegate account.
 Export the delegated account keys using the delegate password. This operation allows the third party to export the account keys on behalf of the user.
 
 ```sh
-optee_libdogecoin -c export_delegate_key -o <account_number> -d <delegate_password> or -u <for prompt>
+optee_libdogecoin -c export_delegate_key -o <account_number> -d <delegate_password>
 ```
 
 Replace `<delegate_password>` with the password for the delegate account.
@@ -643,13 +649,23 @@ Note: In OpenEnclave, `--simulate` is used to run the enclave in simulation mode
 
 Generate a mnemonic seedphrase for backup and recovery purposes. This is the first step in creating a new wallet. It will only be displayed once, so make sure to back it up.
 
-Enter the shared secret for TOTP when prompted. The shared secret must be 40 hex characters (*e.g., `f38243e0e3e97a5c8aa5cc481a815add6c119648`*).  The shared secret will be set on the YubiKey (if present) by the host application, and the mnemonic will be generated and displayed. If OTP Slot 1 is already programmed, the host application will prompt you to overwrite it.
+This command will generate a mnemonic seedphrase and display it on the screen. Either a shared secret for TOTP or a password must be provided. All other flags are optional, and the user will be prompted for input if not provided.
 
-This command will generate a mnemonic seedphrase and display it on the screen. All flags are optional, and the user will be prompted for input if not provided.
+Enter the shared secret for TOTP when prompted if enabled. The shared secret must be 40 hex characters (*e.g., `f38243e0e3e97a5c8aa5cc481a815add6c119648`*).  If no shared secret is provided, a random one will be generated. The shared secret will be set on the YubiKey (if present) by the host application, and the mnemonic will be generated and displayed. If OTP Slot 1 is already programmed, the host application will prompt you to overwrite it.
 
 ```sh
-/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c generate_mnemonic -n <mnemonic_input> -s <shared_secret> -e <entropy_size>
+/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c generate_mnemonic -n <mnemonic_input> -s <shared_secret> -e <entropy_size> -p <password> -z
 ```
+
+The `-n` flag is used to provide the mnemonic input for recovery purposes if needed. Replace `<mnemonic_input>` with the mnemonic seedphrase you want to use for recovery. If no mnemonic input is provided, the enclave will generate a random mnemonic seedphrase.
+
+The `-s` flag is used to provide the shared secret for TOTP authentication from command line instead of prompting the user. Replace `<shared_secret>` with the shared secret you want to use for TOTP authentication.
+
+The `-e` flag is used to provide the entropy size for the mnemonic seedphrase. Replace `<entropy_size>` with the desired entropy size in bits. If no entropy size is provided, the default value of `"256"` bits (24 words) will be used.
+
+The `-p` flag is used to provide the password for the mnemonic seedphrase. Replace `<password>` with the password you want to use for the mnemonic seedphrase.
+
+The `-z` flag is used to enable YubiKey authentication. If the YubiKey is present, the shared secret will be set on the YubiKey.
 
 #### Generating an Extended Public Key
 
@@ -657,39 +673,49 @@ Generate an extended public key using the account and change level. The change l
 
 The TOTP code will be retrieved from the YubiKey (if present) and used as the authentication token for this operation.
 
+```sh
+/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c generate_extended_public_key -o <account_number> -l <change_level> -h <custom_path> -a <auth_token> or -p <password> -z
+```
+
+The `-o` flag is used to provide the account number for the extended public key. Replace `<account_number>` with the desired account number.
+
+The `-l` flag is used to provide the change level for the extended public key. Replace `<change_level>` with the desired change level.
+
+The `-h` flag is used to provide a custom path for the extended public key. Replace `<custom_path>` with the desired path for the extended public key.
+
 The `-a` flag is used to provide the auth token if a Yubikey is not present. Use a tool like `oathtool` to generate TOTP (*e.g., `oathtool --totp "f38243e0e3e97a5c8aa5cc481a815add6c119648"`).
 
-```sh
-/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c generate_extended_public_key -o <account_number> -l <change_level>
-```
+The `-p` flag is used to provide the password for the mnemonic seedphrase.
+
+The `-z` flag is used to enable YubiKey authentication. If the YubiKey is present, the TOTP code will be retrieved from the YubiKey and used as the authentication token.
 
 #### Generating an Address
 
 Generate a Dogecoin address using the account, address index, and change level.
 
 ```sh
-/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c generate_address -o <account_number> -l <change_level> -i <address_index>
+/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c generate_address -o <account_number> -l <change_level> -i <address_index> -h <custom_path> -a <auth_token> or -p <password> -z
 ```
 
 Replace `<account_number>`, `<address_index>`, and `<change_level>` with appropriate values.
 
 #### Signing a Message
 
-Sign a message using the private key stored within the enclave.
+Sign a message using the private key stored within the enclave. If no message is provided, an example message will be signed for demonstration purposes.
 
 ```sh
-/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c sign_message -o <account_number> -l <change_level> -i <address_index> -m "This is just a test message"
+/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c sign_message -o <account_number> -l <change_level> -i <address_index> -m "This is just a test message" -h <custom_path> -a <auth_token> or -p <password> -z
 ```
+
+Replace `"This is just a test message"` with the message you want to sign.
 
 #### Signing a Transaction
 
-Sign a raw transaction using the private key stored within the enclave. A raw transaction is a hexadecimal string representing the transaction data. Currently, if no transaction data is provided, an example transaction will be signed for demonstration purposes.
+Sign a raw transaction using the private key stored within the enclave. The transaction will be signed using the private key derived from the seedphrase stored within the enclave. A raw transaction is a hexadecimal string representing the transaction data. Currently, if no transaction data is provided, an example transaction will be signed for demonstration purposes.
 
 ```sh
-/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c sign_transaction -o <account_number> -l <change_level> -i <address_index> -t <raw_transaction>
+/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c sign_transaction -o <account_number> -l <change_level> -i <address_index> -t <raw_transaction> -h <custom_path> -a <auth_token> or -p <password> -z
 ```
-
-Replace `<account_number>`, `<address_index>`, and `<change_level>` with appropriate values. The change level can be set to 0 for external addresses and 1 for internal addresses. The account number is the BIP-44 account. The address index is the index of the address within the account.
 
 Replace `<raw_transaction>` with the raw transaction data.
 
