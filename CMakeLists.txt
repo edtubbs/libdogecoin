@@ -305,6 +305,7 @@ IF(USE_TESTS)
         test/address_tests.c
         test/aes_tests.c
         test/arith_uint256_tests.c
+        test/auxpow_tests.c
         test/base58_tests.c
         test/bip32_tests.c
         test/bip39_tests.c
