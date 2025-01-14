@@ -4,11 +4,23 @@
 
 This document discusses our research on enhancing the security of **libdogecoin** key management operations using **Intel SGX** and **ARM TrustZone** as secure enclaves. By performing key management within secure enclaves, we significantly reduce the risk of key exposure, thereby increasing the overall security of Dogecoin transactions. This document includes an overview of the research, build instructions for the key management enclaves, and a step-by-step tutorial on using the host command line interface to interact with the enclaves in both **OP-TEE** and **OpenEnclave** environments. Additionally, we outline critical vulnerabilities in Trusted Execution Environments (TEEs) and provide recommendations for mitigating these risks.
 
-The integration of secure enclaves in key management operations presents an innovative security solution, but it also introduces technical complexity and performance trade-offs that should be carefully considered.
-
 ## What are Secure Enclaves?
 
 Secure enclaves are isolated environments that provide a secure space for sensitive operations. These enclaves are isolated from the rest of the system, ensuring that sensitive data and operations are protected from unauthorized access. **Secure enclaves** within a processor can be implemented using different technologies such as **TEEs**, hardware security modules (**HSMs**), and virtualization-based solutions. To ensure a robust defense, secure enclaves must guarantee **confidentiality**, **integrity**, and **availability** for sensitive operations. However, enclaves are not a silver bullet and must be integrated within a broader security strategy.
+
+## Why Use Secure Enclaves?
+
+Secure enclaves offer several advantages for key management operations:
+
+- **Isolation**: Enclaves provide a secure environment that is isolated from the rest of the system, protecting sensitive data and operations.
+- **Confidentiality**: Enclaves ensure that sensitive data is encrypted and protected from unauthorized access.
+- **Integrity**: Enclaves guarantee the integrity of sensitive operations, ensuring that they have not been tampered with.
+- **Remote Attestation**: Enclaves can be remotely attested to verify their integrity and authenticity to external parties.
+- **Key Management**: Enclaves can securely generate, store, and manage cryptographic keys, protecting them from unauthorized access.
+
+By performing key operations within secure enclaves, developers can enhance the security of their applications and protect sensitive data from unauthorized access.
+
+## Secure Enclaves in libdogecoin
 
 ### Key Concepts
 
@@ -25,7 +37,7 @@ By performing key operations such as **seedphrase generation**, **public key der
 
 ## What are Trusted Execution Environments (TEEs)?
 
-TEEs are secure environments within a processor that provide a trusted execution domain for sensitive operations. TEEs ensure that sensitive data and operations are protected from unauthorized access and tampering. TEEs can be implemented using hardware-based security technologies such as **Intel SGX**, **ARM TrustZone**, or other vendor-specific technologies. While TEEs offer significant advantages in terms of isolating critical operations, they also come with their own set of challenges, particularly in terms of addressing vulnerabilities and maintaining performance.
+TEEs are secure environments within a processor that provide a trusted execution domain for sensitive operations. They ensure that sensitive data and operations are protected from unauthorized access and tampering. TEEs can be implemented using hardware-based security technologies such as **Intel SGX**, **ARM TrustZone**, or other vendor-specific technologies. While they offer significant advantages in terms of isolating critical operations, TEEs also come with their own set of challenges, particularly in terms of addressing vulnerabilities and maintaining performance.
 
 ### Contrast Between Intel SGX and ARM TrustZone
 
@@ -105,19 +117,25 @@ The secure enclave handles the following operations:
 
 While secure enclaves provide powerful protection, they are **not infallible**. The **Foreshadow** vulnerability is a good example of how attackers can bypass enclave protections. Furthermore, the security model assumes that the host environment is insecure, relying entirely on the enclave for protection. Developers should adopt a **defense-in-depth** strategy, using **secure coding practices** and **regular security audits** to complement enclave security.
 
+### Performance trade-offs
+
+Secure enclaves introduce performance overhead due to the encryption and isolation mechanisms they employ. For example, **Intel SGX** enclaves have higher performance overhead compared to **ARM TrustZone** enclaves, especially for I/O and large memory use. **ARM TrustZone** enclaves are better suited for embedded and mobile devices due to their lower performance impact. However key management operations are typically not performance-critical, making secure enclave protection a worthwhile trade-off for the increased security it provides.
+
 ### Secure Storage
 
 Mnemonic seedphrases are securely encrypted by the enclave to prevent unauthorized access. Encrypted data should still be backed up using the **rule of three**: store copies in three distinct locations to ensure recovery.
 
 ### Time-Based One-Time Password (TOTP) Authentication
 
-TOTP authentication using a **YubiKey** further enhances security by ensuring that access to sensitive enclave operations is restricted to authorized users. This two-factor authentication approach increases security during enclave operations, preventing unauthorized key usage even if the host environment is compromised.
+TOTP authentication using a **YubiKey** further enhances security by ensuring that access to sensitive enclave operations is restricted to authorized users. When combined with password-based authentication, TOTP provides an additional layer of security. This two-factor authentication approach increases security during enclave operations, preventing unauthorized key usage even if the host environment is compromised.
 
 ## Future Research
 
-To further improve the security and functionality of Dogecoin’s ecosystem, we recommend exploring **Remote Attestation** to validate the integrity of enclaves in distributed systems. Integrating **proof-of-work (PoW)** operations within secure enclaves could also allow for **private mempools** or **payment channels**, enhancing the Dogecoin network's security and efficiency.
+To further improve the security and functionality of Dogecoin’s ecosystem, we recommend exploring **Remote Attestation** to validate the integrity of enclaves in distributed systems. This would allow external parties to verify the authenticity of enclaves, ensuring that they have not been tampered with. Intel SGX supports remote attestation, while ARM TrustZone can be extended to include this feature.
 
-Additionally, alternative secure technologies like **AMD SEV** and **RISC-V** should be explored to broaden the options available for TEE-based applications.
+Performance optimizations for secure enclaves are another area of interest, as reducing overhead can make enclaves more practical for a wider range of applications. Additonal analysis is needed to evaluate the performance impact of secure enclaves on key management operations at scale.
+
+Additionally, alternative secure technologies like **AMD SEV** and **RISC-V** should be explored to broaden the options available for TEE-based applications. These technologies offer different security models and performance characteristics that may be better suited to specific use cases.
 
 ## References
 
@@ -190,7 +208,7 @@ cd libdogecoin
 
 The SDK has several components and requires over 10GB of disk space to build. The build process can take over 30 minutes on a modern machine. Docker is used to build the SDK and client in a clean environment.
 
-### Building OP-TEE SDK and Client (NanoPC-T6)
+### Step 1 (NanoPC): Building OP-TEE SDK and Client
 
 This command builds the latest SDK and client for NanoPC-T6 (nanopc-t6.xml).  When complete, the image will be located in `/doge/libdogecoin/optee/out/nanopc-t6.img`. Burn this image to an SD card to boot the NanoPC-T6. Connect an Ethernet cable, USB keyboard and HDMI to the NanoPC-T6 and power it on. The default IP address is configured using DHCP. Login as root via ssh (e.g. `ssh root@192.168.137.19`) or using the HDMI console.
 
@@ -270,9 +288,9 @@ docker run -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash 
     make install"
 ```
 
-### Building OP-TEE SDK and Client (QEMU ARMv8)
+### Step 1 (QEMU): Building OP-TEE SDK and Client
 
-This command builds the SDK (version 3.22.0) and client for ARMv8 QEMU emulation (qemu_v8.xml). For other platforms, change the manifest file in the `repo init` command accordingly. Replace `3.22.0` with the desired version and `qemu_v8.xml` with the desired platform. Refer to the [OP-TEE documentation](https://optee.readthedocs.io/en/latest/building/index.html) for more information.
+This command builds the SDK (version 4.2.0) and client for ARMv8 QEMU emulation (qemu_v8.xml). For other platforms, change the manifest file in the `repo init` command accordingly. Replace `4.2.0` with the desired version and `qemu_v8.xml` with the desired platform. Refer to the [OP-TEE documentation](https://optee.readthedocs.io/en/latest/building/index.html) for more information.
 
 An RSA private key is generated and overwrites the default Trusted Application (TA) key. This key is used to sign the enclave binaries during development. In the Continuous Integration (CI) environment, an Actions secret is used. Subkeys are generated for testing purposes but are not used to sign the enclave binaries.
 
@@ -287,7 +305,7 @@ docker run -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash 
     curl https://storage.googleapis.com/git-repo-downloads/repo > /bin/repo && chmod a+x /bin/repo && \
     mkdir -p optee && \
     cd optee && \
-    repo init -u https://github.com/OP-TEE/manifest.git -m qemu_v8.xml -b master
+    repo init -u https://github.com/OP-TEE/manifest.git -m qemu_v8.xml -b 4.2.0
     export FORCE_UNSAFE_CONFIGURE=1 && \
     repo sync -j 4 --force-sync && \
     patch -N -F 4 /src/optee/build/common.mk < /src/src/optee/common.mk.patch && \
@@ -340,7 +358,7 @@ docker run -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash 
     # Build and test the OP-TEE OS and client
     make -j 4 check
     cd /src && \
-    git clone https://github.com/OP-TEE/optee_client.git && \
+    [ ! -d optee_client ] && git clone https://github.com/OP-TEE/optee_client.git && \
     cd optee_client && \
     mkdir -p build && \
     cd build && \
@@ -351,7 +369,7 @@ docker run -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash 
     make install"
 ```
 
-### Building OP-TEE Libdogecoin Key Manager Enclave (QEMU ARMv8 or NanoPC-T6)
+### Step 2 (QEMU or NanoPC): Building OP-TEE Libdogecoin Key Manager Enclave
 
 This command builds the OP-TEE Libdogecoin Key Manager Enclave for QEMU ARMv8 or NanoPC-T6. The enclave is built using the OP-TEE SDK and client. The enclave binary is located in `/doge/libdogecoin/optee/out/bin/libdogecoin.img`.
 
@@ -361,9 +379,10 @@ docker run --privileged -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_che
     apt-get update && \
     apt-get install -y autoconf automake libtool-bin build-essential curl python3 valgrind g++-aarch64-linux-gnu qemu-user-static qemu-user && \
 
+    # Build libdogecoin for Host
     make -j 4 -C depends HOST=aarch64-linux-gnu && \
     ./autogen.sh && \
-    ./configure --prefix=/src/depends/aarch64-linux-gnu LIBS=-levent_pthreads --enable-static --disable-shared --enable-test-passwd --enable-optee CFLAGS=-U_FORTIFY_SOURCE HOST=aarch64-linux-gnu && \
+    ./configure --prefix=/src/depends/aarch64-linux-gnu LIBS=-levent_pthreads --enable-static --disable-shared --enable-test-passwd HOST=aarch64-linux-gnu && \
     make -j 4 && \
     make install && \
 
@@ -377,8 +396,14 @@ docker run --privileged -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_che
       LDFLAGS=\"-L/src/optee/toolchains/aarch64/lib -L/src/depends/aarch64-linux-gnu/lib -ldogecoin -lunistring\" \
       CFLAGS=\"-I/src/optee/toolchains/aarch64/include -I/src/src/optee/ta/include -I/src/depends/aarch64-linux-gnu/include -I/src/depends/aarch64-linux-gnu/include/ykpers-1 -I/src/depends/aarch64-linux-gnu/include/dogecoin\" && \
 
+    # Build libdogecoin for OP-TEE
+    cd /src/ && \
+    ./configure --prefix=/src/depends/aarch64-linux-gnu LIBS=-levent_pthreads --enable-static --disable-shared --enable-test-passwd --enable-optee CFLAGS=-U_FORTIFY_SOURCE HOST=aarch64-linux-gnu && \
+    make -j 4 && \
+    make install && \
+
     # Build the Enclave
-    cd ../ta && \
+    cd /src/src/optee/ta && \
     make -j 4 \
       CROSS_COMPILE=aarch64-linux-gnu- \
       LDFLAGS=\"-L/src/depends/aarch64-linux-gnu/lib -ldogecoin -lunistring\" \
@@ -414,7 +439,7 @@ docker run --privileged -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_che
     exit"
 ```
 
-### Running OP-TEE Libdogecoin Key Manager Enclave (on NanoPC-T6)
+### Step 3 (NanoPC): Running OP-TEE Libdogecoin Key Manager Enclave
 
 Use scp to copy the /doge/libdogecoin/optee/out/bin/libdogecoin.img to the NanoPC-T6 (e.g. `scp /doge/libdogecoin/optee/out/bin/libdogecoin.img root@192.168.137.19:/root/`). Then, SSH into the NanoPC-T6 and run the following commands:
 
@@ -426,7 +451,7 @@ cp /media/libdogecoin/62d95dc0-7fc2-4cb3-a7f3-c13ae4e633c4.ta /lib/optee_armtz/
 ./optee_libdogecoin -c generate_mnemonic
 ```
 
-### Running OP-TEE Libdogecoin Key Manager Enclave (in QEMU ARMv8)
+### Step 3 (QEMU): Running OP-TEE Libdogecoin Key Manager Enclave
 
 ```sh
 docker run --privileged -v /dev/bus/usb:/dev/bus/usb -it -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_check /bin/bash -c "\
@@ -513,8 +538,13 @@ docker run --device /dev/sgx_enclave:/dev/sgx_enclave --device /dev/sgx_provisio
   apt-get install -y autoconf automake libtool-bin build-essential curl python3 valgrind python3-dev python3-dbg pkg-config && \
   cd /src && \
   make -j 4 -C depends HOST=x86_64-pc-linux-gnu && \
+  make -j 4 -C depends HOST=x86_64-pc-linux-gnu/host && \
   ./autogen.sh && \
   ./configure --prefix=/src/depends/x86_64-pc-linux-gnu --enable-openenclave --enable-test-passwd CFLAGS=-U_FORTIFY_SOURCE && \
+  make && \
+  make install && \
+
+  ./configure --prefix=/src/depends/x86_64-pc-linux-gnu/host --enable-test-passwd && \
   make && \
   make install && \
 

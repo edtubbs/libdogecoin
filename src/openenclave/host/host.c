@@ -458,6 +458,12 @@ int main(int argc, char* argv[])
                 fprintf(stderr, "Password cannot be empty\n");
                 goto exit;
             }
+            printf("\n");
+            if (strcmp (password, getpass("Confirm password: ")) != 0) {
+                fprintf(stderr, "Password mismatch\n");
+                goto exit;
+            }
+            printf("\n");
         }
 
         MNEMONIC mnemonic = {0};
