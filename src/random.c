@@ -221,10 +221,10 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
     }
 #endif
 
-void random_seed(struct fast_random_context* this) 
+void random_seed(struct fast_random_context* this)
 {
     dogecoin_random_init();
-    uint256 seed;
+    uint256_t seed;
     dogecoin_mem_zero(seed, 32);
     dogecoin_random_bytes(seed, 32, 0);
     this->rng->setkey(this->rng, seed, 32);
@@ -240,19 +240,19 @@ void fill_byte_buffer(struct fast_random_context* this)
     this->bytebuf_size = sizeof(this->bytebuf);
 }
 
-uint256* rand256(struct fast_random_context* this) 
+uint256_t* rand256(struct fast_random_context* this)
 {
     if (this->bytebuf_size < 32) {
         fill_byte_buffer(this);
     }
-    uint256* ret = dogecoin_uint256_vla(1);
+    uint256_t* ret = dogecoin_uint256_vla(1);
     memcpy(ret, this->bytebuf + 64 - this->bytebuf_size, 32);
     this->bytebuf_size -= 32;
     return ret;
 }
 
 /** Generate a random 64-bit integer. */
-uint64_t rand64(struct fast_random_context* this) 
+uint64_t rand64(struct fast_random_context* this)
 {
     if (this->requires_seed) random_seed(this);
     unsigned char buf[8];
@@ -300,7 +300,7 @@ uint32_t rand32(struct fast_random_context* this) { return randbits(this, 32); }
 /** Generate a random boolean. */
 dogecoin_bool randbool(struct fast_random_context* this) { return randbits(this, 1); }
 
-struct fast_random_context* init_fast_random_context(dogecoin_bool f_deterministic, const uint256* seed) {
+struct fast_random_context* init_fast_random_context(dogecoin_bool f_deterministic, const uint256_t* seed) {
     struct fast_random_context* this = dogecoin_calloc(1, sizeof(*this));
     this->requires_seed = false;
     this->random_seed = random_seed;
