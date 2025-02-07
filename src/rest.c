@@ -223,6 +223,16 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         evbuffer_add_printf(evb, "Block size: %lu\n", size);
         evbuffer_add_printf(evb, "Tx count: %lu\n", tx_count);
         evbuffer_add_printf(evb, "Total tx size: %lu\n", total_tx_size);
+    } else if (strcmp(path, "/getTotals") == 0) {
+        uint64_t num_tx = client->total_num_tx;
+        uint64_t blockchain_size = client->total_blockchain_size;
+        uint64_t num_inputs = client->total_num_inputs;
+        uint64_t num_outputs = client->total_num_outputs;
+
+        evbuffer_add_printf(evb, "Total number of transactions: %lu\n", num_tx);
+        evbuffer_add_printf(evb, "Total blockchain size: %lu\n", blockchain_size);
+        evbuffer_add_printf(evb, "Total number of inputs: %lu\n", num_inputs);
+        evbuffer_add_printf(evb, "Total number of outputs: %lu\n", num_outputs);
     } else {
         evhttp_send_error(req, HTTP_NOTFOUND, "Not Found");
         evbuffer_free(evb);

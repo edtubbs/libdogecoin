@@ -586,6 +586,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             client->last_block_tx_count = amount_of_txs;
             client->last_block_size = hdr->data_len;
 
+            // update totals for the client
+            client->total_num_tx += amount_of_txs;
+            client->total_blockchain_size += hdr->data_len;
+
             uint64_t total_tx_size = 0;
 
             size_t consumedlength = 0;
@@ -606,6 +610,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 deser_skip(buf, consumedlength);
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
                 total_tx_size += consumedlength;
+
+                // update totals for the client
+                client->total_num_inputs += tx->vin->len;
+                client->total_num_outputs += tx->vout->len;
                 dogecoin_tx_free(tx);
             }
             client->last_block_total_tx_size = total_tx_size;
