@@ -401,6 +401,7 @@ docker run --privileged -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_che
 
     # Build libdogecoin for OP-TEE
     cd /src/ && \
+    make -j 4 -C depends CFLAGS=-U_FORTIFY_SOURCE HOST=aarch64-linux-gnu && \
     ./configure --prefix=/src/depends/aarch64-linux-gnu LIBS=-levent_pthreads --enable-static --disable-shared --enable-test-passwd --enable-optee CFLAGS=-U_FORTIFY_SOURCE HOST=aarch64-linux-gnu && \
     make -j 4 && \
     make install && \

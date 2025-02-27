@@ -452,6 +452,7 @@ jobs:
                     cd /src/src/optee/ta && \
                     make -j"$(getconf _NPROCESSORS_ONLN)" \
                       CROSS_COMPILE=aarch64-linux-gnu- \
+                      LIBDIR=/src/depends/aarch64-linux-gnu/lib \
                       LDFLAGS=\"-L/src/depends/aarch64-linux-gnu/lib -ldogecoin -lunistring\" \
                       CFLAGS=\"-I/src/depends/aarch64-linux-gnu/include -I/src/depends/aarch64-linux-gnu/include/dogecoin\" \
                       PLATFORM=vexpress-qemu_armv8a \
@@ -584,12 +585,19 @@ jobs:
 
       - name: Import certificate (x86_64-win)
         run: |
+          $rootData = "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_ROOT_DATA }}"
+          $rootBytes = [Convert]::FromBase64String($rootData)
+          [IO.File]::WriteAllBytes("./dogecoin_root.cer", $rootBytes)
+          Import-Certificate -FilePath ./dogecoin_root.cer -CertStoreLocation Cert:\LocalMachine\Root
+
           $certData = "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}"
           $certBytes = [Convert]::FromBase64String($certData)
           [IO.File]::WriteAllBytes("./mycert.pfx", $certBytes)
           $password = ConvertTo-SecureString -String "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}" -Force -AsPlainText
-          Import-PfxCertificate -FilePath ./mycert.pfx -CertStoreLocation Cert:\LocalMachine\Root -Password $password
+          Import-PfxCertificate -FilePath ./mycert.pfx -CertStoreLocation Cert:\LocalMachine\My -Password $password
+
           Remove-Item ./mycert.pfx
+          Remove-Item ./dogecoin_root.cer
         shell: pwsh
 
       - name: Sign spvnode.exe (x86_64-win)
@@ -638,12 +646,16 @@ jobs:
 
       - name: Import certificate (x86_64-win)
         run: |
+          $rootData = "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_ROOT_DATA }}"
+          $rootBytes = [Convert]::FromBase64String($rootData)
+          [IO.File]::WriteAllBytes("./dogecoin_root.cer", $rootBytes)
+          Import-Certificate -FilePath ./dogecoin_root.cer -CertStoreLocation Cert:\LocalMachine\Root
+
           $certData = "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}"
           $certBytes = [Convert]::FromBase64String($certData)
           [IO.File]::WriteAllBytes("./mycert.pfx", $certBytes)
           $password = ConvertTo-SecureString -String "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}" -Force -AsPlainText
-          Import-PfxCertificate -FilePath ./mycert.pfx -CertStoreLocation Cert:\LocalMachine\Root -Password $password
-          Remove-Item ./mycert.pfx
+          Import-PfxCertificate -FilePath ./mycert.pfx -CertStoreLocation Cert:\LocalMachine\My -Password $password
         shell: pwsh
 
       - name: Sign spvnode.exe (x86_64-win-native)
@@ -687,12 +699,16 @@ jobs:
 
       - name: Import certificate (i686-win)
         run: |
+          $rootData = "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_ROOT_DATA }}"
+          $rootBytes = [Convert]::FromBase64String($rootData)
+          [IO.File]::WriteAllBytes("./dogecoin_root.cer", $rootBytes)
+          Import-Certificate -FilePath ./dogecoin_root.cer -CertStoreLocation Cert:\LocalMachine\Root
+
           $certData = "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_DATA }}"
           $certBytes = [Convert]::FromBase64String($certData)
           [IO.File]::WriteAllBytes("./mycert.pfx", $certBytes)
           $password = ConvertTo-SecureString -String "${{ secrets.LIBDOGECOIN_DEV_WINDOWS_CERT_PASSWORD }}" -Force -AsPlainText
-          Import-PfxCertificate -FilePath ./mycert.pfx -CertStoreLocation Cert:\LocalMachine\Root -Password $password
-          Remove-Item ./mycert.pfx
+          Import-PfxCertificate -FilePath ./mycert.pfx -CertStoreLocation Cert:\LocalMachine\My -Password $password
         shell: pwsh
 
       - name: Sign spvnode.exe (i686-win)
