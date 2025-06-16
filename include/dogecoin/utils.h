@@ -39,7 +39,7 @@
 #include <dogecoin/mem.h>
 #include <dogecoin/vector.h>
 
-#define TO_UINT8_HEX_BUF_LEN 2048
+#define TO_UINT8_HEX_BUF_LEN 0x200001
 #define VARINT_LEN 20
 #define MAX_LEN 128
 
