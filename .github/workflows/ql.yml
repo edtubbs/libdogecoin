@@ -4,12 +4,12 @@ name: CodeQL
 on:
   push:
     branches:
-      - '*-dev-*'
+      - '*-dev*'
       - 'main'
   pull_request:
     # The branches below must be a subset of the branches above
     branches:
-      - '*-dev-*'
+      - '*-dev*'
     paths-ignore:
       - '**/*.md'
       - '**/*.txt'
