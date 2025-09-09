@@ -35,12 +35,24 @@
 #include <dogecoin/net.h>
 #include <dogecoin/tx.h>
 
+#define SPV_STATS_RING 4096
+
 LIBDOGECOIN_BEGIN_DECL
 
 enum SPV_CLIENT_STATE {
     SPV_HEADER_SYNC_FLAG        = (1 << 0),
     SPV_FULLBLOCK_SYNC_FLAG	    = (1 << 1),
 };
+
+typedef struct spv_block_sample_
+{
+    uint32_t ts;        // block timestamp
+    uint32_t txs;       // number of transactions
+    uint32_t outputs;   // number of outputs
+    uint64_t out_value; // total output value
+    uint32_t size;      // block size
+    uint64_t fees;      // total fees
+} spv_block_sample;
 
 typedef struct dogecoin_spv_client_
 {
@@ -57,6 +69,15 @@ typedef struct dogecoin_spv_client_
     uint64_t last_block_size;
     uint64_t last_block_tx_count;
     uint64_t last_block_total_tx_size;
+    spv_block_sample stats_ring[SPV_STATS_RING];
+    int stats_ring_len;
+    int stats_ring_head;
+    uint64_t stats_blocks_total;
+    uint64_t stats_txs_total;
+    uint64_t stats_outputs_total;
+    uint64_t stats_out_value_total;
+    uint64_t stats_fees_total;
+    uint64_t stats_block_bytes_total;
 
     /* callbacks */
     /* ========= */
