@@ -35,10 +35,18 @@
 
 #define TIMESTAMP_MAX_LEN 32
 
+#include <stdlib.h>   // qsort
+#include <stdint.h>   // uint64_t
+
+static int cmp_u64(const void *a, const void *b) {
+    uint64_t va = *(const uint64_t*)a, vb = *(const uint64_t*)b;
+    return (va > vb) - (va < vb);
+}
+
 /**
  * This function is called when an http request is received
  * It handles the request and sends a response
- *
+2w *
  * @param req the request
  * @param arg the client
  *
@@ -226,6 +234,139 @@ void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
         evbuffer_add_printf(evb, "Block size: %lu\n", size);
         evbuffer_add_printf(evb, "Tx count: %lu\n", tx_count);
         evbuffer_add_printf(evb, "Total tx size: %lu\n", total_tx_size);
+    } else if (strcmp(path, "/stats24h") == 0 || strncmp(path, "/stats", 6) == 0) {
+    // params: secs=N (default 86400), blocks=M (optional: use last M blocks instead of time)
+    uint32_t window = 86400;
+    uint32_t limit_blocks = 0;
+    const char* q = evhttp_uri_get_query(uri);
+    if (q) {
+        const char* p = strstr(q, "secs=");
+        if (p) {
+            p += 5;
+            window = (uint32_t)atoi(p);
+            if (window == 0) window = 86400;
+        }
+        const char* b = strstr(q, "blocks=");
+        if (b) {
+            b += 7;
+            limit_blocks = (uint32_t)atoi(b);
+        }
+    }
+
+    dogecoin_blockindex* tip = client->headers_db->getchaintip(client->headers_db_ctx);
+    uint32_t tip_ts = tip ? tip->header.timestamp : (uint32_t)time(NULL);
+    uint32_t cutoff = tip_ts > window ? (tip_ts - window) : 0;
+
+    // if stats ring is empty/short and we're headers-only, nudge block sync to backfill recent blocks
+    if ((client->stats_ring_len < (limit_blocks ? (int)limit_blocks : 11)) &&
+        ((client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == 0))
+    {
+        client->stateflags &= ~SPV_HEADER_SYNC_FLAG;
+        client->stateflags |=  SPV_FULLBLOCK_SYNC_FLAG;
+        client->oldest_item_of_interest = cutoff;        // aim for the requested window
+        dogecoin_net_spv_request_headers(client);        // kick the downloader
+    }
+
+    // aggregate from ring, newest -> older until cutoff or block limit hit
+    uint64_t sum_txs = 0, sum_outputs = 0, sum_out_value = 0, sum_fees = 0, sum_size = 0;
+    uint32_t blocks = 0;
+    uint64_t fees_buf[SPV_STATS_RING];
+    size_t fees_n = 0;
+
+    for (int i = 0; i < client->stats_ring_len; i++) {
+        int idx = (client->stats_ring_head - 1 - i + SPV_STATS_RING) % SPV_STATS_RING;
+        spv_block_sample *s = &client->stats_ring[idx];
+        if (!limit_blocks) {
+            if (s->ts < cutoff) break;                  // time window mode
+        } else {
+            if (blocks >= limit_blocks) break;          // last-N-blocks mode
+        }
+        blocks++;
+        sum_txs      += s->txs;
+        sum_outputs  += s->outputs;
+        sum_out_value+= s->out_value;
+        sum_fees     += s->fees;
+        sum_size     += s->size;
+        if (fees_n < SPV_STATS_RING) fees_buf[fees_n++] = s->fees;
+    }
+
+    double tps = window ? ((double)sum_txs / (double)window) : 0.0;
+
+    // median/avg fee per block (in koinu)
+    uint64_t median_fee = 0;
+    if (fees_n) {
+        qsort(fees_buf, fees_n, sizeof(uint64_t), cmp_u64);
+        median_fee = (fees_n & 1) ? fees_buf[fees_n/2]
+                                  : (fees_buf[fees_n/2 - 1] + fees_buf[fees_n/2]) / 2;
+    }
+    uint64_t avg_fee = fees_n ? (sum_fees / fees_n) : 0;
+
+    // stringify (zero-init to avoid garbage)
+    char vol_str[32]      = {0};
+    char med_fee_str[32]  = {0};
+    char avg_fee_str[32]  = {0};
+    koinu_to_coins_str(sum_out_value, vol_str);
+    koinu_to_coins_str(median_fee,    med_fee_str);
+    koinu_to_coins_str(avg_fee,       avg_fee_str);
+
+    evbuffer_add_printf(evb, "=== Stats (window=%u s) ===\n", window);
+    evbuffer_add_printf(evb, "blocks: %u\n", blocks);
+    evbuffer_add_printf(evb, "transactions: %llu\n", (unsigned long long)sum_txs);
+    evbuffer_add_printf(evb, "tps: %.4f\n", tps);
+    evbuffer_add_printf(evb, "volume: %s\n", vol_str);
+    evbuffer_add_printf(evb, "volume_koinu: %llu\n", (unsigned long long)sum_out_value);
+    evbuffer_add_printf(evb, "median_fee_per_block: %s\n", med_fee_str);
+    evbuffer_add_printf(evb, "avg_fee_per_block: %s\n", avg_fee_str);
+    evbuffer_add_printf(evb, "outputs: %llu\n", (unsigned long long)sum_outputs);
+    evbuffer_add_printf(evb, "bytes: %llu\n", (unsigned long long)sum_size);
+    if (tip) {
+        evbuffer_add_printf(evb, "tip_height: %d\n", tip->height);
+        evbuffer_add_printf(evb, "tip_bits: 0x%08x\n", (unsigned int)tip->header.bits);
+    }
+    } else if (strcmp(path, "/chainStats") == 0) {
+        dogecoin_blockindex* tip = client->headers_db->getchaintip(client->headers_db_ctx);
+
+        // headers file size if available
+        long headers_bytes = 0;
+        {
+            dogecoin_headers_db* hdb = (dogecoin_headers_db*)client->headers_db_ctx;
+            FILE* hf = hdb ? hdb->headers_tree_file : NULL;
+            if (hf) {
+                long cur = ftell(hf);
+                fseek(hf, 0, SEEK_END);
+                headers_bytes = ftell(hf);
+                if (cur >= 0) fseek(hf, cur, SEEK_SET);
+            }
+        }
+
+        char total_out_str[32], total_fees_str[32];
+        koinu_to_coins_str(client->stats_out_value_total, total_out_str);
+        koinu_to_coins_str(client->stats_fees_total, total_fees_str);
+
+        evbuffer_add_printf(evb, "=== Chain Stats (SPV session) ===\n");
+        if (tip) {
+            char ts[32] = {0};
+            time_t t = tip->header.timestamp;
+            struct tm *p = localtime(&t);
+            if (p) strftime(ts, sizeof(ts), "%F %T", p);
+            evbuffer_add_printf(evb, "tip_height: %d\n", tip->height);
+            evbuffer_add_printf(evb, "tip_time: %s\n", ts[0]?ts:"unknown");
+            evbuffer_add_printf(evb, "tip_bits: 0x%08x\n", (unsigned int)tip->header.bits);
+        }
+        evbuffer_add_printf(evb, "headers_bytes: %ld\n", headers_bytes);
+
+        // totals reflect blocks we actually parsed this run
+        evbuffer_add_printf(evb, "blocks_total: %llu\n", (unsigned long long)client->stats_blocks_total);
+        evbuffer_add_printf(evb, "transactions_total: %llu\n", (unsigned long long)client->stats_txs_total);
+        evbuffer_add_printf(evb, "outputs_total: %llu\n", (unsigned long long)client->stats_outputs_total);
+        evbuffer_add_printf(evb, "output_value_total: %s\n", total_out_str);
+        evbuffer_add_printf(evb, "fees_total: %s\n", total_fees_str);
+        evbuffer_add_printf(evb, "block_bytes_total: %llu\n", (unsigned long long)client->stats_block_bytes_total);
+
+        // simple approximate on-disk 'size' visible to SPV
+        unsigned long long approx_chain_bytes =
+            (unsigned long long)headers_bytes + (unsigned long long)client->stats_block_bytes_total;
+        evbuffer_add_printf(evb, "approx_chain_bytes: %llu\n", approx_chain_bytes);
     } else {
         evhttp_send_error(req, HTTP_NOTFOUND, "Not Found");
         evbuffer_free(evb);
