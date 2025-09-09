@@ -14,6 +14,8 @@
     - [GET /getChaintip](#get-getchaintip)
     - [GET /getTimestamp](#get-gettimestamp)
     - [GET /getLastBlockInfo](#get-getlastblockinfo)
+    - [GET /stats](#get-stats)
+    - [GET /chainStats](#get-chainstats)
 
 ## Abstract
 
@@ -365,6 +367,102 @@ curl http://localhost:<port>/getLastBlockInfo
 Block size: 4130
 Tx count: 11
 Total tx size: 3355
+```
+
+---
+
+### GET **/stats**
+
+Aggregates recent on-chain activity seen by the SPV session.
+
+#### **Request**
+
+* **Method:** `GET`
+* **URL:** `/stats`
+* **Query params (optional):**
+
+  * `secs=<N>` time window in seconds (default `86400`)
+  * `blocks=<M>` use last M blocks instead of a time window (overrides `secs` if provided)
+  * Alias: `/stats24h` (equivalent to `/stats?secs=86400`)
+
+#### **Response**
+
+* **Content-Type:** `text/plain`
+* **Body (key: value per line):**
+
+  ```
+  === Stats (window=<secs> s) ===
+  blocks: <uint>
+  transactions: <uint64>
+  tps: <float>
+  volume: <DOGE-string>
+  volume_koinu: <uint64>
+  median_fee_per_block: <DOGE-string>
+  avg_fee_per_block: <DOGE-string>
+  outputs: <uint64>
+  bytes: <uint64>
+  tip_height: <int>
+  tip_bits: 0x<hex>
+  ```
+
+#### **Example**
+
+```bash
+curl "http://localhost:<port>/stats?blocks=11&secs=86400"
+```
+
+#### **Sample Response**
+
+```
+=== Stats (window=86400 s) ===
+blocks: 11
+transactions: 368
+tps: 0.0043
+volume: 115806761.13803503
+volume_koinu: 11580676113803503
+median_fee_per_block: 4.08844296
+avg_fee_per_block: 10.61592847
+outputs: 791
+bytes: 325765
+tip_height: 5870150
+tip_bits: 0x196beff5
+```
+
+---
+
+### GET **/chainStats**
+
+Session totals and on-disk sizes observed by the SPV node for this run.
+
+#### **Request**
+
+* **Method:** `GET`
+* **URL:** `/chainStats`
+
+#### **Response**
+
+* **ontent-Type:** `text/plain`
+* **Body (key: value per line):**
+
+  ```
+  === Chain Stats (SPV session) ===
+  tip_height: <int>
+  tip_time: <YYYY-MM-DD HH:MM:SS|unknown>
+  tip_bits: 0x<hex>
+  headers_bytes: <uint64>
+  blocks_total: <uint64>
+  transactions_total: <uint64>
+  outputs_total: <uint64>
+  output_value_total: <DOGE-string>
+  fees_total: <DOGE-string>
+  block_bytes_total: <uint64>
+  approx_chain_bytes: <uint64>
+  ```
+
+#### **Example**
+
+```bash
+curl "http://localhost:<port>/chainStats"
 ```
 
 ---

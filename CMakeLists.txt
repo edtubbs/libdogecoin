@@ -296,6 +296,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/cli/tool.c
     src/transaction.c
     src/tx.c
+    src/utf8proc.c
     src/utils.c
     src/validation.c
     src/vector.c
