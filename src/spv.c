@@ -44,6 +44,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <math.h>
 
 #include <dogecoin/block.h>
 #include <dogecoin/blockchain.h>
@@ -56,6 +57,10 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <event2/event.h>
+
+#define DOGECOIN_KOINU_PER_COIN 100000000ULL
+/* Dogecoin block subsidy has been 10,000 DOGE for years; good for 24h stats */
+#define DOGECOIN_CURRENT_SUBSIDY_KOINU (10000ULL * DOGECOIN_KOINU_PER_COIN)
 
 static const unsigned int HEADERS_MAX_RESPONSE_TIME = 120;
 static const unsigned int MIN_TIME_DELTA_FOR_STATE_CHECK = 5;
@@ -171,6 +176,15 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
         client->nodegroup->log_write_cb("HTTP server initialized\n");
         free(http_server_copy);
     }
+
+    client->stats_ring_len = 0;
+    client->stats_ring_head = 0;
+    client->stats_blocks_total = 0;
+    client->stats_txs_total = 0;
+    client->stats_outputs_total = 0;
+    client->stats_out_value_total = 0;
+    client->stats_fees_total = 0;
+    client->stats_block_bytes_total = 0;
 
     return client;
 }
@@ -598,6 +612,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
             uint64_t total_tx_size = 0;
 
+            // per-block accumulation for stats
+            uint64_t block_outputs_value = 0;
+            uint32_t block_outputs_count = 0;
+            uint64_t coinbase_value = 0;
+
             size_t consumedlength = 0;
             unsigned int i;
             for (i = 0; i < amount_of_txs; i++)
@@ -616,9 +635,52 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 deser_skip(buf, consumedlength);
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
                 total_tx_size += consumedlength;
+
+                // accumulate outputs for this tx
+                uint64_t tx_out_sum = 0;
+                unsigned int oi;
+                for (oi = 0; oi < tx->vout->len; oi++)
+                {
+                    dogecoin_tx_out *txout = vector_idx(tx->vout, oi);
+                    tx_out_sum += txout->value;
+                    block_outputs_value += txout->value;
+                    block_outputs_count++;
+                }
+                if (i == 0 && dogecoin_tx_is_coinbase(tx)) {
+                    coinbase_value = tx_out_sum; // coinbase tx is always the first tx in a block
+                }
                 dogecoin_tx_free(tx);
             }
             client->last_block_total_tx_size = total_tx_size;
+
+            // approximate fees (OK for recent blocks where subsidy is 10k0 DOGE)
+            uint64_t block_fees = 0;
+            if (coinbase_value > DOGECOIN_CURRENT_SUBSIDY_KOINU) {
+                block_fees = coinbase_value - DOGECOIN_CURRENT_SUBSIDY_KOINU;
+            }
+
+            // session totals
+            client->stats_blocks_total++;
+            client->stats_txs_total += amount_of_txs;
+            client->stats_outputs_total += block_outputs_count;
+            client->stats_out_value_total += block_outputs_value;
+            client->stats_fees_total += block_fees;
+            client->stats_block_bytes_total += hdr->data_len;
+
+            // ring insert (latest)
+            spv_block_sample *smp = &client->stats_ring[client->stats_ring_head];
+            smp->ts = pindex->header.timestamp;
+            smp->txs = amount_of_txs;
+            smp->outputs = block_outputs_count;
+            smp->out_value = block_outputs_value;
+            smp->size = hdr->data_len;
+            smp->fees = block_fees;
+
+            client->stats_ring_head = (client->stats_ring_head + 1) % SPV_STATS_RING;
+            if (client->stats_ring_len < SPV_STATS_RING) {
+                client->stats_ring_len++;
+            }
+
             client->nodegroup->log_write_cb("done (took %lld secs)\n", (unsigned long long)(time(NULL) - start));
         }
         else
