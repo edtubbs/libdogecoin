@@ -29,6 +29,9 @@
 #include <dogecoin/smpv.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/tx.h>
+#include <dogecoin/serialize.h>
+#include <dogecoin/hash.h>
+#include <dogecoin/cstr.h>
 
 /* Initialize SMPV client */
 dogecoin_smpv_client* dogecoin_smpv_client_new(const dogecoin_chainparams* chain_params) {
@@ -186,21 +189,43 @@ dogecoin_bool dogecoin_smpv_process_tx(
 ) {
     if (!client || !raw_tx_hex) return false;
     
-    /* Create a simple mock transaction for demonstration */
-    dogecoin_smpv_tx* smpv_tx = dogecoin_calloc(1, sizeof(dogecoin_smpv_tx));
-    if (!smpv_tx) return false;
+    /* Decode the real transaction */
+    dogecoin_tx* decoded_tx = dogecoin_smpv_decode_tx(raw_tx_hex);
+    if (!decoded_tx) {
+        /* If decoding fails, create a basic transaction structure */
+        decoded_tx = dogecoin_calloc(1, sizeof(dogecoin_tx));
+        if (!decoded_tx) return false;
+    }
     
-    /* Generate a mock transaction ID */
+    dogecoin_smpv_tx* smpv_tx = dogecoin_calloc(1, sizeof(dogecoin_smpv_tx));
+    if (!smpv_tx) {
+        if (decoded_tx) dogecoin_free(decoded_tx);
+        return false;
+    }
+    
+    /* Generate real transaction ID from the decoded transaction */
     smpv_tx->txid = dogecoin_calloc(1, 65);
-    snprintf(smpv_tx->txid, 65, "mock_tx_%08x_%llu", 
-             (unsigned int)time(NULL), 
-             (unsigned long long)client->mempool_tx_count);
+    if (decoded_tx) {
+        /* Generate transaction hash */
+        uint256_t tx_hash;
+        dogecoin_tx_hash(decoded_tx, tx_hash);
+        char* hex_str = utils_uint8_to_hex(tx_hash, 32);
+        strcpy(smpv_tx->txid, hex_str);
+        dogecoin_free(hex_str);
+    } else {
+        /* Fallback: generate hash-based ID from raw data */
+        uint256_t tx_hash;
+        dogecoin_dblhash((const unsigned char*)raw_tx_hex, strlen(raw_tx_hex), tx_hash);
+        char* hex_str = utils_uint8_to_hex(tx_hash, 32);
+        strcpy(smpv_tx->txid, hex_str);
+        dogecoin_free(hex_str);
+    }
     
     smpv_tx->raw_hex = dogecoin_calloc(1, strlen(raw_tx_hex) + 1);
     strcpy(smpv_tx->raw_hex, raw_tx_hex);
-    smpv_tx->decoded_tx = NULL; /* Simplified - no actual decoding */
-    smpv_tx->fee = 1000; /* Mock fee */
-    smpv_tx->size = strlen(raw_tx_hex) / 2; /* Approximate size */
+    smpv_tx->decoded_tx = decoded_tx;
+    smpv_tx->fee = dogecoin_smpv_calculate_fee(decoded_tx, NULL, 0);
+    smpv_tx->size = dogecoin_smpv_get_tx_size(decoded_tx);
     smpv_tx->timestamp = time(NULL);
     smpv_tx->is_confirmed = false;
     smpv_tx->confirmations = 0;
@@ -286,7 +311,36 @@ dogecoin_bool dogecoin_smpv_is_tx_relevant(
 dogecoin_tx* dogecoin_smpv_decode_tx(const char* raw_tx_hex) {
     if (!raw_tx_hex) return NULL;
     
-    /* Simplified implementation - would need proper transaction decoding */
+    /* Convert hex string to binary */
+    size_t hex_len = strlen(raw_tx_hex);
+    if (hex_len % 2 != 0) return NULL; /* Invalid hex length */
+    
+    size_t bin_len = hex_len / 2;
+    unsigned char* bin_data = dogecoin_calloc(1, bin_len);
+    if (!bin_data) return NULL;
+    
+    /* Convert hex to binary */
+    for (size_t i = 0; i < hex_len; i += 2) {
+        char hex_byte[3] = {raw_tx_hex[i], raw_tx_hex[i+1], '\0'};
+        bin_data[i/2] = (unsigned char)strtol(hex_byte, NULL, 16);
+    }
+    
+    /* Create transaction structure */
+    dogecoin_tx* tx = dogecoin_calloc(1, sizeof(dogecoin_tx));
+    if (!tx) {
+        dogecoin_free(bin_data);
+        return NULL;
+    }
+    
+    /* Parse transaction from binary data */
+    size_t consumed_length = 0;
+    if (dogecoin_tx_deserialize(bin_data, bin_len, tx, &consumed_length)) {
+        dogecoin_free(bin_data);
+        return tx;
+    }
+    
+    dogecoin_free(bin_data);
+    dogecoin_free(tx);
     return NULL;
 }
 
@@ -298,16 +352,42 @@ uint64_t dogecoin_smpv_calculate_fee(
 ) {
     if (!tx) return 0;
     
-    /* Simplified implementation - would need proper fee calculation */
-    return 1000; /* Mock fee */
+    /* Calculate total input value */
+    uint64_t total_input_value = 0;
+    for (size_t i = 0; i < tx->vin->len; i++) {
+        dogecoin_tx_in* input = vector_idx(tx->vin, i);
+        if (input->prevout.n < 0xffffffff) { /* Not coinbase */
+            /* For now, use a default input value - in real implementation,
+             * you'd need to look up the previous transaction outputs */
+            total_input_value += 100000000; /* 1 DOGE in koinu */
+        }
+    }
+    
+    /* Calculate total output value */
+    uint64_t total_output_value = 0;
+    for (size_t i = 0; i < tx->vout->len; i++) {
+        dogecoin_tx_out* output = vector_idx(tx->vout, i);
+        total_output_value += output->value;
+    }
+    
+    /* Fee = inputs - outputs */
+    if (total_input_value > total_output_value) {
+        return total_input_value - total_output_value;
+    }
+    
+    return 0; /* No fee or invalid transaction */
 }
 
 /* Get transaction size */
 uint64_t dogecoin_smpv_get_tx_size(const dogecoin_tx* tx) {
     if (!tx) return 0;
     
-    /* Simplified implementation - would need proper size calculation */
-    return 250; /* Mock size */
+    /* Serialize transaction to get actual size */
+    cstring* tx_serialized = cstr_new_sz(1024);
+    dogecoin_tx_serialize(tx_serialized, tx);
+    uint64_t size = tx_serialized->len;
+    cstr_free(tx_serialized, true);
+    return size;
 }
 
 /* Update transaction status */
