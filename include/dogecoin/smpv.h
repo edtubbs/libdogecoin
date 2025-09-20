@@ -137,7 +137,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_is_tx_relevant(
 /* Decode raw transaction hex */
 LIBDOGECOIN_API dogecoin_tx* dogecoin_smpv_decode_tx(const char* raw_tx_hex);
 
-/* Calculate transaction fee */
+/* Calculate transaction fee (estimated - mempool can't access previous outputs) */
 LIBDOGECOIN_API uint64_t dogecoin_smpv_calculate_fee(
     const dogecoin_tx* tx,
     const dogecoin_smpv_tx* prev_txs,
