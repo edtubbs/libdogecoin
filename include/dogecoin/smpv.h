@@ -39,7 +39,6 @@ typedef struct {
     char* txid;                    /* Transaction ID (hex string) */
     char* raw_hex;                 /* Raw transaction hex */
     dogecoin_tx* decoded_tx;       /* Decoded transaction */
-    uint64_t fee;                  /* Transaction fee in koinu */
     uint64_t size;                 /* Transaction size in bytes */
     uint64_t timestamp;            /* When transaction was first seen */
     dogecoin_bool is_confirmed;    /* Whether transaction is confirmed */
@@ -137,12 +136,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_is_tx_relevant(
 /* Decode raw transaction hex */
 LIBDOGECOIN_API dogecoin_tx* dogecoin_smpv_decode_tx(const char* raw_tx_hex);
 
-/* Calculate transaction fee (estimated - mempool can't access previous outputs) */
-LIBDOGECOIN_API uint64_t dogecoin_smpv_calculate_fee(
-    const dogecoin_tx* tx,
-    const dogecoin_smpv_tx* prev_txs,
-    size_t prev_tx_count
-);
+/* Note: Fee calculation removed - mempool doesn't track fees */
 
 /* Get transaction size */
 LIBDOGECOIN_API uint64_t dogecoin_smpv_get_tx_size(const dogecoin_tx* tx);
@@ -160,8 +154,7 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
 LIBDOGECOIN_API void dogecoin_smpv_get_stats(
     const dogecoin_smpv_client* client,
     uint32_t* total_txs,
-    uint32_t* watched_addresses,
-    uint64_t* total_fees
+    uint32_t* watched_addresses
 );
 
 /* Free SMPV transaction */
