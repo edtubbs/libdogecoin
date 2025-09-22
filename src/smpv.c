@@ -207,20 +207,13 @@ dogecoin_bool dogecoin_smpv_process_tx(
     /* Decode the transaction for real processing */
     smpv_tx->decoded_tx = dogecoin_smpv_decode_tx(raw_tx_hex);
     if (smpv_tx->decoded_tx) {
-        /* Estimate fee based on transaction size (we can't calculate real fees
-         * in mempool without access to previous transaction outputs) */
-        smpv_tx->fee = dogecoin_smpv_calculate_fee(
-            smpv_tx->decoded_tx, 
-            client->mempool_txs, 
-            client->mempool_tx_count
-        );
         /* Get real transaction size */
         smpv_tx->size = dogecoin_smpv_get_tx_size(smpv_tx->decoded_tx);
     } else {
         /* Fallback if decoding fails - use simplified calculation */
-        smpv_tx->fee = 1000; /* Default fee for test transactions */
         smpv_tx->size = strlen(raw_tx_hex) / 2; /* Approximate size */
     }
+    
     smpv_tx->timestamp = time(NULL);
     smpv_tx->is_confirmed = false;
     smpv_tx->confirmations = 0;
@@ -335,42 +328,8 @@ dogecoin_tx* dogecoin_smpv_decode_tx(const char* raw_tx_hex) {
     return NULL; /* Always return NULL for test transactions */
 }
 
-/* Note: Previous transaction lookup function removed because mempool
- * can't access previous transaction outputs. Real fee calculation
- * requires access to UTXO set or full node data. */
-
-/* Calculate transaction fee (estimated - mempool limitation) */
-uint64_t dogecoin_smpv_calculate_fee(
-    const dogecoin_tx* tx,
-    const dogecoin_smpv_tx* prev_txs,
-    size_t prev_tx_count
-) {
-    (void)prev_txs;      /* Suppress unused parameter warning */
-    (void)prev_tx_count; /* Suppress unused parameter warning */
-    
-    if (!tx) return 0;
-    
-    /* In mempool, we can't calculate real fees because we don't have access to 
-     * previous transaction outputs (inputs). We only see the transaction outputs.
-     * Fee calculation requires knowing what the inputs are spending from. */
-    
-    /* Since we can't calculate real fees in mempool without input data,
-     * we'll estimate based on transaction size and network conditions.
-     * This is a simplified estimation - real implementations would need
-     * access to previous transaction data or UTXO set. */
-    
-    /* Estimate fee based on transaction size (1 koinu per byte is typical) */
-    uint64_t estimated_fee = dogecoin_smpv_get_tx_size(tx);
-    
-    /* In a real implementation, you might also consider:
-     * - Network congestion levels
-     * - Recent fee rates
-     * - Transaction priority
-     * - Input/output count ratios
-     */
-    
-    return estimated_fee;
-}
+/* Note: Fee calculation removed - mempool doesn't need to track fees
+ * since we can't calculate real fees without access to previous outputs. */
 
 /* Get transaction size */
 uint64_t dogecoin_smpv_get_tx_size(const dogecoin_tx* tx) {
@@ -412,21 +371,12 @@ void dogecoin_smpv_update_tx_status(
 void dogecoin_smpv_get_stats(
     const dogecoin_smpv_client* client,
     uint32_t* total_txs,
-    uint32_t* watched_addresses,
-    uint64_t* total_fees
+    uint32_t* watched_addresses
 ) {
     if (!client) return;
     
     if (total_txs) *total_txs = client->mempool_tx_count;
     if (watched_addresses) *watched_addresses = client->watcher_count;
-    if (total_fees) {
-        /* Calculate real total fees by summing all mempool transaction fees */
-        uint64_t total = 0;
-        for (size_t i = 0; i < client->mempool_tx_count; i++) {
-            total += client->mempool_txs[i].fee;
-        }
-        *total_fees = total;
-    }
 }
 
 /* Free SMPV transaction */
@@ -457,14 +407,12 @@ char* dogecoin_smpv_tx_to_json(const dogecoin_smpv_tx* tx) {
         "{\n"
         "  \"txid\": \"%s\",\n"
         "  \"size\": %llu,\n"
-        "  \"fee\": %llu,\n"
         "  \"timestamp\": %llu,\n"
         "  \"confirmed\": %s,\n"
         "  \"confirmations\": %u\n"
         "}",
         tx->txid ? tx->txid : "",
         (unsigned long long)tx->size,
-        (unsigned long long)tx->fee,
         (unsigned long long)tx->timestamp,
         tx->is_confirmed ? "true" : "false",
         tx->confirmations

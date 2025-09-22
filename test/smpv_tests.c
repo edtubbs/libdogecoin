@@ -361,9 +361,8 @@ void test_statistics_and_utils() {
     
     /* Test statistics */
     uint32_t total_txs, watched_addresses;
-    uint64_t total_fees;
     
-    dogecoin_smpv_get_stats(client, &total_txs, &watched_addresses, &total_fees);
+    dogecoin_smpv_get_stats(client, &total_txs, &watched_addresses);
     if (watched_addresses != 2) {
         printf("  ❌ Wrong watched addresses count\n");
         dogecoin_smpv_client_free(client);
@@ -379,7 +378,6 @@ void test_statistics_and_utils() {
     printf("  ✓ Statistics retrieved successfully\n");
     printf("    Watched addresses: %u\n", watched_addresses);
     printf("    Total transactions: %u\n", total_txs);
-    printf("    Total fees: %llu koinu\n", (unsigned long long)total_fees);
     
     /* Test JSON output */
     dogecoin_smpv_watcher* watcher = dogecoin_smpv_get_watcher(client, TEST_ADDRESS_1);
@@ -443,7 +441,7 @@ void test_error_handling() {
     }
     
     dogecoin_smpv_update_tx_status(NULL, "test", true, "block", 1);
-    dogecoin_smpv_get_stats(NULL, NULL, NULL, NULL);
+    dogecoin_smpv_get_stats(NULL, NULL, NULL);
     
     printf("  ✓ NULL client operations handled gracefully\n");
     
