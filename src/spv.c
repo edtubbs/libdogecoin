@@ -862,12 +862,18 @@ static void smpv_tx_cb(const dogecoin_smpv_tx* tx, const char* addr, void* user)
 {
     dogecoin_spv_client* client = (dogecoin_spv_client*)user;
     if (!client || !client->nodegroup || !client->nodegroup->log_write_cb || !tx) return;
+
     client->nodegroup->log_write_cb(
-        "[smpv] tx for %s: txid=%s size=%llu confirmed=%d\n",
-        addr ? addr : "(unknown)",
+        "[smpv] tx=%s size=%lluB vin=%u vout=%u coinbase=%d "
+        "outval=%llu koinu types{p2pk=%u,p2pkh=%u,p2sh=%u,multi=%u,opret=%u,nonstd=%u}%s%s\n",
         tx->txid ? tx->txid : "(null)",
         (unsigned long long)tx->size,
-        tx->is_confirmed ? 1 : 0
+        tx->vin_count, tx->vout_count,
+        tx->is_coinbase ? 1 : 0,
+        (unsigned long long)tx->total_output_value,
+        tx->pubkey_out, tx->p2pkh_out, tx->p2sh_out,
+        tx->multisig_out, tx->opreturn_out, tx->nonstandard_out,
+        addr ? " addr=" : "", addr ? addr : ""
     );
 }
 
