@@ -45,6 +45,18 @@ typedef struct {
     uint32_t confirmations;        /* Number of confirmations */
     char* block_hash;              /* Block hash if confirmed */
     uint32_t block_height;         /* Block height if confirmed */
+
+    /* --- per-tx stats (lightweight) --- */
+    uint32_t vin_count;            /* number of inputs */
+    uint32_t vout_count;           /* number of outputs */
+    uint32_t p2pkh_out;            /* #outputs classified as P2PKH */
+    uint32_t p2sh_out;             /* #outputs classified as P2SH */
+    uint32_t pubkey_out;           /* #outputs classified as P2PK */
+    uint32_t multisig_out;         /* #outputs classified as MULTISIG */
+    uint32_t opreturn_out;         /* #outputs starting with OP_RETURN */
+    uint32_t nonstandard_out;      /* #outputs classified as NONSTANDARD */
+    uint64_t total_output_value;   /* sum of vout values (koinu) */
+    dogecoin_bool is_coinbase;     /* tx is coinbase */
 } dogecoin_smpv_tx;
 
 /* SMPV address watcher structure */
@@ -66,6 +78,12 @@ typedef struct {
     uint32_t mempool_tx_count;
     dogecoin_bool is_running;
     uint64_t last_update_time;
+
+    /* lightweight running totals (not exposed via new APIs) */
+    uint64_t total_bytes;
+    uint32_t confirmed_count;
+    uint32_t unconfirmed_count;
+    uint64_t last_seen_ts;
 } dogecoin_smpv_client;
 
 /* Callback function type for transaction notifications */
