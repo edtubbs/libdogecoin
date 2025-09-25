@@ -16,6 +16,8 @@
     - [GET /getLastBlockInfo](#get-getlastblockinfo)
     - [GET /stats](#get-stats)
     - [GET /chainStats](#get-chainstats)
+    - [GET /smpvStats](#get-smpvstats)
+    - [GET /smpvTx](#get-smpvtx)
 
 ## Abstract
 
@@ -492,3 +494,110 @@ curl "http://localhost:<port>/chainStats"
 
 - **Concurrency:** The SPV node should handle multiple concurrent requests gracefully. However, ensure that shared resources like the wallet and UTXO set are managed in a thread-safe manner.
 
+---
+
+### GET `/smpvStats`
+
+Lightweight status and counters for the SMPV (Simplified Mempool Payment Verification) tracker.
+SMPV must be enabled with the CLI flag `-x` (e.g., `spvnode -x ...`).
+
+**Request**
+
+* Method: `GET`
+* URL: `/smpvStats`
+
+**Response**
+
+* Content-Type: `text/plain`
+* Body (key: value per line):
+
+```
+=== SMPV ===
+enabled: <0|1>
+mempool_txs: <uint32>
+watchers: <uint32>
+confirmed: <uint32>
+unconfirmed: <uint32>
+total_bytes: <uint64>
+last_seen_ts: <unix-epoch>
+last_seen_age_sec: <uint>
+types_p2pk: <uint64>
+types_p2pkh: <uint64>
+types_p2sh: <uint64>
+types_multisig: <uint64>
+types_op_return: <uint64>
+types_nonstandard: <uint64>
+types_vout_total: <uint64>
+coinbase_txs: <uint64>   # usually 0 in mempool
+```
+
+**Example**
+
+```bash
+curl "http://localhost:<port>/smpvStats"
+```
+
+**Sample Response**
+
+```
+=== SMPV ===
+enabled: 1
+mempool_txs: 37
+watchers: 2
+confirmed: 0
+unconfirmed: 37
+total_bytes: 118764
+last_seen_ts: 1727190021
+last_seen_age_sec: 3
+types_p2pk: 4
+types_p2pkh: 55
+types_p2sh: 2
+types_multisig: 0
+types_op_return: 1
+types_nonstandard: 0
+types_vout_total: 62
+coinbase_txs: 0
+```
+
+---
+
+### GET `/smpvTx`
+
+Return a single mempool transaction as JSON (when tracked by SMPV).
+
+**Request**
+
+* Method: `GET`
+* URL: `/smpvTx?id=<txid>`
+
+**Response**
+
+* Content-Type: `application/json`
+* Body: SMPV transaction object (fields as defined in `dogecoin_smpv_tx_to_json()`, see `doc/smpv.md`).
+
+**Example**
+
+```bash
+curl "http://localhost:<port>/smpvTx?id=a65792df3f399a3436fc7c088ae9ef5fc81530010dc02a216731c971ac25dead"
+```
+
+**Sample Response**
+
+```json
+{
+  "txid": "a65792df3f399a3436fc7c088ae9ef5fc81530010dc02a216731c971ac25dead",
+  "size": 1677,
+  "vin": 1,
+  "vout": 1,
+  "coinbase": false,
+  "outval": 123328000,
+  "types": {
+    "p2pk": 0,
+    "p2pkh": 1,
+    "p2sh": 0,
+    "multisig": 0,
+    "op_return": 0,
+    "nonstandard": 0
+  }
+}
+```
