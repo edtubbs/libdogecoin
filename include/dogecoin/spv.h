@@ -78,6 +78,7 @@ typedef struct dogecoin_spv_client_
     uint64_t stats_out_value_total;
     uint64_t stats_fees_total;
     uint64_t stats_block_bytes_total;
+    uint64_t start_ts;
 
     void* smpv_ctx;
     dogecoin_bool smpv_enabled;

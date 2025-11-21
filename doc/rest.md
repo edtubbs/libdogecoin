@@ -401,10 +401,10 @@ Aggregates recent on-chain activity seen by the SPV session.
   volume_koinu: <uint64>
   median_fee_per_block: <DOGE-string>
   avg_fee_per_block: <DOGE-string>
+  median_fee_per_kb: <DOGE-string>
+  avg_fee_per_kb: <DOGE-string>
   outputs: <uint64>
   bytes: <uint64>
-  tip_height: <int>
-  tip_bits: 0x<hex>
   ```
 
 #### **Example**
@@ -424,10 +424,10 @@ volume: 115806761.13803503
 volume_koinu: 11580676113803503
 median_fee_per_block: 4.08844296
 avg_fee_per_block: 10.61592847
+median_fee_per_kb: 0.00122113
+avg_fee_per_kb: 0.00317245
 outputs: 791
 bytes: 325765
-tip_height: 5870150
-tip_bits: 0x196beff5
 ```
 
 ---
@@ -459,12 +459,31 @@ Session totals and on-disk sizes observed by the SPV node for this run.
   fees_total: <DOGE-string>
   block_bytes_total: <uint64>
   approx_chain_bytes: <uint64>
+  uptime_sec: <uint64>
   ```
 
 #### **Example**
 
 ```bash
 curl "http://localhost:<port>/chainStats"
+```
+
+#### **Sample Response**
+
+```
+=== Chain Stats (SPV session) ===
+tip_height: 5870150
+tip_time: 2024-10-26 15:30:00
+tip_bits: 0x196beff5
+headers_bytes: 34567890
+blocks_total: 123456
+transactions_total: 7890123
+outputs_total: 4567890
+output_value_total: 123456789.12345678
+fees_total: 12345.67890123
+block_bytes_total: 234567890
+approx_chain_bytes: 345678901
+uptime_sec: 3600
 ```
 
 ---
