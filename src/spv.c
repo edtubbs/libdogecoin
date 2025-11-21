@@ -187,6 +187,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->stats_out_value_total = 0;
     client->stats_fees_total = 0;
     client->stats_block_bytes_total = 0;
+    client->start_ts = (uint64_t)time(NULL);
 
     // SMPV default off
     client->smpv_ctx = NULL;

@@ -210,7 +210,7 @@ static void print_usage() {
     printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m[--maxpeers] <int>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
 (-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
-(-u|--http_server <ip:port>) (-t[--testnet]) (-r[--regtest]) (-d[--debug]) <command>\n");
+(-u|--http_server <ip:port>) (-x|--smpv) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
     printf("Supported commands:\n");
     printf("        scan      (scan blocks up to the tip, creates header.db file)\n");
     printf("\nExamples: \n");
