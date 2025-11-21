@@ -31,6 +31,7 @@ unset FAKETIME
 
 # Require Automake 1.11.2 for AM_PROG_AR
 AM_INIT_AUTOMAKE([1.11.2 no-define foreign subdir-objects])
+LT_INIT
 
 AM_MAINTAINER_MODE([enable])
 
