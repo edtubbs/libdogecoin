@@ -520,6 +520,15 @@ TEEC_Result export_delegate_key_ta(struct test_ctx *ctx, const char* custom_path
 
 #define TOTP_SECRET_HEX_SIZE    41 // hex, 40 characters + null
 
+#ifndef _GETOPT_EXT_H
+struct option {
+    const char *name;
+    int has_arg;
+    int *flag;
+    int val;
+};
+#endif
+
 static struct option long_options[] = {
     {"command", required_argument, NULL, 'c'},
     {"account", required_argument, NULL, 'o'},
