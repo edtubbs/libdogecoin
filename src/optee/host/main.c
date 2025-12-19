@@ -28,7 +28,6 @@
 #include <ykpers-1/ykpers.h>
 #include <ykpers-1/ykdef.h>
 #include <unistd.h>
-#include <getopt.h>
 
 /* OP-TEE TEE client API (built by optee_client) */
 #include <tee_client_api.h>
@@ -37,8 +36,6 @@
 #include <libdogecoin_ta.h>
 
 #include <libdogecoin.h>
-
-#include <sys/time.h>
 
 /* TEE resources */
 struct test_ctx {
@@ -520,30 +517,11 @@ TEEC_Result export_delegate_key_ta(struct test_ctx *ctx, const char* custom_path
 
 #define TOTP_SECRET_HEX_SIZE    41 // hex, 40 characters + null
 
-static struct option long_options[] = {
-    {"command", required_argument, NULL, 'c'},
-    {"account", required_argument, NULL, 'o'},
-    {"change_level", required_argument, NULL, 'l'},
-    {"address_index", required_argument, NULL, 'i'},
-    {"message", required_argument, NULL, 'm'},
-    {"transaction", required_argument, NULL, 't'},
-    {"mnemonic_input", required_argument, NULL, 'n'},
-    {"shared_secret", required_argument, NULL, 's'},
-    {"entropy_size", required_argument, NULL, 'e'},
-    {"password", required_argument, NULL, 'p'},
-    {"delegate_password", required_argument, NULL, 'd'},
-    {"auth_token", required_argument, NULL, 'a'},
-    {"flags", required_argument, NULL, 'f'},
-    {"custom_path", required_argument, NULL, 'h'},
-    {"yubikey", no_argument, NULL, 'z'},
-    {NULL, 0, NULL, 0}
-};
-
 static void print_usage()
 {
-    printf("Usage: optee_libdogecoin -c <cmd> (-o|-account_int <account_int>) (-i|-input_index <input index>) (-l|-change_level <change level>) \
-(-m|-message <message>) (-t|-transaction <transaction>) (-n|-mnemonic_input <mnemonic input>) (-s|-shared_secret <shared secret>) \
-(-e|-entropy_size <entropy size>) (-a|-auth_token <auth token>) (-p|-password <password>) (-d|-delegate_password <delegate password>) \
+    printf("Usage: optee_libdogecoin -c <cmd> (-o <account_int>) (-i <input index>) (-l| <change level>) \
+(-m <message>) (-t <transaction>) (-n <mnemonic input>) (-s <shared secret>) \
+(-e <entropy size>) (-a <auth token>) (-p <password>) (-d <delegate password>) \
 (-h|custom_path <custom_path>) (-f|flags <flags>) (-z|yubikey)\n");
     printf("Available commands:\n");
     printf("  generate_mnemonic (optional -n <mnemonic_input> -s <shared_secret> -e <entropy_size> -p <password> -f <flags>)\n");
@@ -652,11 +630,10 @@ uint32_t get_totp_from_yubikey(YK_KEY *yk, uint8_t yk_cmd) {
     return bin_code % 1000000;
 }
 
-int main(int argc, const char* argv[])
+int main(int argc, char* argv[])
 {
     struct test_ctx ctx;
     int opt = 0;
-    int long_index = 0;
     char* cmd = 0;
     uint32_t auth_token = 0;
     const char* custom_path = NULL;
@@ -673,7 +650,7 @@ int main(int argc, const char* argv[])
     dogecoin_bool yubikey = false;
     char* flags = "";
 
-    while ((opt = getopt_long_only(argc, (char *const *)argv, "c:o:l:i:m:t:n:s:e:p:d:a:f:h:z", long_options, &long_index)) != -1) {
+    while ((opt = getopt(argc, argv, "c:o:l:i:m:t:n:s:e:p:d:a:f:h:z")) != -1) {
         switch (opt) {
             case 'c':
                 cmd = optarg;
