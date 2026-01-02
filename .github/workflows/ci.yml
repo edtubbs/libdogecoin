@@ -295,7 +295,7 @@ jobs:
           cache-name: ccache
         with:
           path: ~/.ccache
-          key: ${{ matrix.name }}-${{ env.cache-name }}-${{ hashFiles('**/configure.ac') }}
+          key: ${{ matrix.name }}-${{ env.cache-name }}-${{ hashFiles('configure.ac') }}
 
       - name: configure libdogecoin
         run: |
