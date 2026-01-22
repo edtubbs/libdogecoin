@@ -170,6 +170,74 @@ become_daemon(int flags)
 }
 #endif
 
+/* Minimal local bloom filter implementation - fixed size to avoid <math.h>/log() */
+typedef struct {
+    uint8_t* data;
+    size_t data_len;     // bytes, fixed max 36000
+    uint32_t n_hash_funcs; // fixed max 50
+    uint32_t n_tweak;
+    uint8_t n_flags;
+} local_bloom_filter;
+
+static uint32_t local_murmur3(const uint8_t* key, size_t len, uint32_t seed) {
+    uint32_t h = seed;
+    size_t i = 0;
+    for (; i + 4 <= len; i += 4) {
+        uint32_t k = key[i] | (key[i+1] << 8) | (key[i+2] << 16) | (key[i+3] << 24);
+        k *= 0xcc9e2d51u;
+        k = (k << 15) | (k >> 17);
+        k *= 0x1b873593u;
+        h ^= k;
+        h = (h << 13) | (h >> 19);
+        h = h * 5 + 0xe6546b64u;
+    }
+    uint32_t k = 0;
+    switch (len - i) {
+        case 3: k ^= key[i+2] << 16; break;
+        case 2: k ^= key[i+1] << 8; break;
+        case 1: k ^= key[i]; break;
+    }
+    if (len - i > 0) {
+        k *= 0xcc9e2d51u;
+        k = (k << 15) | (k >> 17);
+        k *= 0x1b873593u;
+        h ^= k;
+    }
+    h ^= (uint32_t)len;
+    h ^= h >> 16;
+    h *= 0x85ebca6bu;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35u;
+    h ^= h >> 16;
+    return h;
+}
+
+static local_bloom_filter* local_bloom_new(uint32_t tweak, uint8_t flags) {
+    local_bloom_filter* filter = dogecoin_calloc(1, sizeof(local_bloom_filter));
+    filter->data_len = 36000; /* BIP37 max */
+    filter->data = dogecoin_calloc(filter->data_len, 1);
+    filter->n_hash_funcs = 50; /* BIP37 max */
+    filter->n_tweak = tweak ? tweak : (uint32_t)rand();
+    filter->n_flags = flags;
+    return filter;
+}
+
+static void local_bloom_add(local_bloom_filter* filter, const uint8_t* data, size_t data_len) {
+    for (uint32_t i = 0; i < filter->n_hash_funcs; i++) {
+        uint32_t seed = i * 0xfba4c795u + filter->n_tweak;
+        uint32_t idx = local_murmur3(data, data_len, seed) % (filter->data_len * 8);
+        filter->data[idx / 8] |= (1 << (idx % 8));
+    }
+}
+
+static void local_bloom_free(local_bloom_filter* filter) {
+    if (!filter) return;
+    if (filter->data) dogecoin_free(filter->data);
+    dogecoin_free(filter);
+}
+
+/* End of local bloom implementation */
+
 /* This is a list of all the options that can be used with the program. */
 static struct option long_options[] = {
         {"testnet", no_argument, NULL, 't'},
@@ -459,6 +527,44 @@ int main(int argc, char* argv[]) {
             dogecoin_free(pass);
             }
         print_utxos(wallet);
+
+        /* Initial BIP37 filter setup using filterload with fixed-size bloom */
+        if (wallet->waddr_vector->len > 0 || HASH_COUNT(wallet->utxos) > 0) {
+            local_bloom_filter* filter = local_bloom_new(0, 1); /* random tweak, UPDATE_ALL */
+
+            unsigned int i;
+            for (i = 0; i < wallet->waddr_vector->len; i++) {
+                dogecoin_wallet_addr* waddr = vector_idx(wallet->waddr_vector, i);
+                if (waddr->ignore) continue;
+                local_bloom_add(filter, waddr->pubkeyhash, sizeof(uint160_t));
+            }
+
+            dogecoin_utxo* utxo;
+            dogecoin_utxo* tmp;
+            HASH_ITER(hh, wallet->utxos, utxo, tmp) {
+                uint8_t outpoint[36];
+                memcpy(outpoint, utxo->txid, 32);
+                uint32_t vout_le = htole32(utxo->vout);
+                memcpy(outpoint + 32, &vout_le, 4);
+                local_bloom_add(filter, outpoint, 36);
+            }
+
+            dogecoin_bool loaded = dogecoin_spv_client_filterload(client,
+                                                                 filter->data,
+                                                                 filter->data_len,
+                                                                 filter->n_hash_funcs,
+                                                                 filter->n_tweak,
+                                                                 filter->n_flags);
+            if (loaded) {
+                printf("[spv] Initial filterload sent (fixed max size, %u hash funcs)\n", filter->n_hash_funcs);
+            } else {
+                printf("[spv] Failed to send initial filterload\n");
+            }
+            local_bloom_free(filter);
+        } else {
+            printf("[spv] Empty wallet - no BIP37 filter set\n");
+        }
+
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
 #endif
