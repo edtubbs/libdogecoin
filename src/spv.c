@@ -649,6 +649,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             unsigned int i;
             for (i = 0; i < amount_of_txs; i++)
             {
+                const unsigned char* tx_raw = (const unsigned char*)buf->p;
+
                 dogecoin_tx* tx = dogecoin_tx_new();
                 if (!dogecoin_tx_deserialize(buf->p, buf->len, tx, &consumedlength)) {
                     client->nodegroup->log_write_cb("Error deserializing transaction\n");
@@ -660,7 +662,25 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     node->nodegroup->node_connection_state_changed_cb(node);
                     return;
                 }
+
                 deser_skip(buf, consumedlength);
+
+                if (client->smpv_enabled && client->smpv_ctx) {
+                    uint256_t h;
+                    dogecoin_dblhash(tx_raw, consumedlength, h);
+                    char* txid_hex = utils_uint8_to_hex((const uint8_t*)h, 32);
+                    if (txid_hex) {
+                        utils_reverse_hex(txid_hex, 64);
+                        dogecoin_smpv_update_tx_status(
+                            (dogecoin_smpv_client*)client->smpv_ctx,
+                            txid_hex,
+                            true,
+                            hash_to_string(pindex->hash),
+                            (uint32_t)pindex->height
+                        );
+                    }
+                }
+
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
                 total_tx_size += consumedlength;
 
@@ -680,6 +700,17 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 dogecoin_tx_free(tx);
             }
             client->last_block_total_tx_size = total_tx_size;
+
+            /* SMPV tip tick so confirmations increment after each new block */
+            if (client->smpv_enabled && client->smpv_ctx) {
+                dogecoin_smpv_update_tx_status(
+                    (dogecoin_smpv_client*)client->smpv_ctx,
+                    NULL,
+                    true,
+                    NULL,
+                    (uint32_t)pindex->height
+                );
+            }
 
             // approximate fees (OK for recent blocks where subsidy is 10k0 DOGE)
             uint64_t block_fees = 0;

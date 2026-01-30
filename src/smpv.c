@@ -33,6 +33,82 @@
 #include <dogecoin/hash.h>
 #include <dogecoin/cstr.h>
 
+/* keep confirmed stubs bounded so we do not grow forever on full blocks */
+#ifndef SMPV_CONFIRMED_STUB_LIMIT
+#define SMPV_CONFIRMED_STUB_LIMIT 4096
+#endif
+
+static void dogecoin_smpv_tx_cleanup_entry(dogecoin_smpv_tx* tx)
+{
+    if (!tx) return;
+
+    if (tx->txid) { dogecoin_free(tx->txid); tx->txid = NULL; }
+    if (tx->raw_hex) { dogecoin_free(tx->raw_hex); tx->raw_hex = NULL; }
+    if (tx->decoded_tx) { dogecoin_tx_free(tx->decoded_tx); tx->decoded_tx = NULL; }
+    if (tx->block_hash) { dogecoin_free(tx->block_hash); tx->block_hash = NULL; }
+
+    /* clear scalars for safety */
+    tx->size = 0;
+    tx->timestamp = 0;
+    tx->is_confirmed = false;
+    tx->confirmations = 0;
+    tx->block_height = 0;
+
+    tx->vin_count = 0;
+    tx->vout_count = 0;
+    tx->p2pkh_out = 0;
+    tx->p2sh_out = 0;
+    tx->pubkey_out = 0;
+    tx->multisig_out = 0;
+    tx->opreturn_out = 0;
+    tx->nonstandard_out = 0;
+    tx->total_output_value = 0;
+    tx->is_coinbase = false;
+}
+
+static dogecoin_smpv_tx* smpv_append_confirmed_stub(
+    dogecoin_smpv_client* client,
+    const char* txid,
+    const char* block_hash,
+    uint32_t block_height
+) {
+    if (!client || !txid) return NULL;
+
+    if (client->confirmed_count >= SMPV_CONFIRMED_STUB_LIMIT) {
+        return NULL;
+    }
+
+    dogecoin_smpv_tx* grown = (dogecoin_smpv_tx*)realloc(
+        client->mempool_txs,
+        (client->mempool_tx_count + 1) * sizeof(dogecoin_smpv_tx)
+    );
+    if (!grown) return NULL;
+    client->mempool_txs = grown;
+
+    dogecoin_smpv_tx* t = &client->mempool_txs[client->mempool_tx_count];
+    memset(t, 0, sizeof(*t));
+
+    t->txid = (char*)dogecoin_calloc(1, strlen(txid) + 1);
+    if (!t->txid) return NULL;
+    strcpy(t->txid, txid);
+
+    if (block_hash) {
+        t->block_hash = (char*)dogecoin_calloc(1, strlen(block_hash) + 1);
+        if (t->block_hash) strcpy(t->block_hash, block_hash);
+    }
+
+    t->timestamp     = time(NULL);
+    t->is_confirmed  = true;
+    t->block_height  = block_height;
+    t->confirmations = 1;
+
+    client->mempool_tx_count++;
+    if (client->confirmed_count < UINT32_MAX) client->confirmed_count++;
+
+    client->last_update_time = time(NULL);
+    return t;
+}
+
 /* Initialize SMPV client */
 dogecoin_smpv_client* dogecoin_smpv_client_new(const dogecoin_chainparams* chain_params) {
     if (!chain_params) return NULL;
@@ -59,7 +135,7 @@ dogecoin_smpv_client* dogecoin_smpv_client_new(const dogecoin_chainparams* chain
 /* Free SMPV client */
 void dogecoin_smpv_client_free(dogecoin_smpv_client* client) {
     if (!client) return;
-    
+
     /* Free watchers */
     for (uint32_t i = 0; i < client->watcher_count; i++) {
         if (client->watchers[i].address) {
@@ -69,7 +145,7 @@ void dogecoin_smpv_client_free(dogecoin_smpv_client* client) {
     if (client->watchers) {
         dogecoin_free(client->watchers);
     }
-    
+
     /* Free transactions */
     for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
         if (client->mempool_txs[i].txid) {
@@ -79,7 +155,7 @@ void dogecoin_smpv_client_free(dogecoin_smpv_client* client) {
             dogecoin_free(client->mempool_txs[i].raw_hex);
         }
         if (client->mempool_txs[i].decoded_tx) {
-            dogecoin_free(client->mempool_txs[i].decoded_tx);
+            dogecoin_tx_free(client->mempool_txs[i].decoded_tx);
         }
         if (client->mempool_txs[i].block_hash) {
             dogecoin_free(client->mempool_txs[i].block_hash);
@@ -88,7 +164,7 @@ void dogecoin_smpv_client_free(dogecoin_smpv_client* client) {
     if (client->mempool_txs) {
         dogecoin_free(client->mempool_txs);
     }
-    
+
     dogecoin_free(client);
 }
 
@@ -98,19 +174,19 @@ dogecoin_bool dogecoin_smpv_add_watcher(
     const char* address
 ) {
     if (!client || !address) return false;
-    
+
     /* Check if address is already being watched */
     for (uint32_t i = 0; i < client->watcher_count; i++) {
         if (strcmp(client->watchers[i].address, address) == 0) {
             return true; /* Already watching */
         }
     }
-    
+
     /* Resize watchers array */
-    client->watchers = realloc(client->watchers, 
+    client->watchers = realloc(client->watchers,
                               (client->watcher_count + 1) * sizeof(dogecoin_smpv_watcher));
     if (!client->watchers) return false;
-    
+
     /* Initialize new watcher */
     dogecoin_smpv_watcher* watcher = &client->watchers[client->watcher_count];
     watcher->address = dogecoin_calloc(1, strlen(address) + 1);
@@ -121,7 +197,7 @@ dogecoin_bool dogecoin_smpv_add_watcher(
     watcher->balance = 0;
     watcher->tx_count = 0;
     watcher->is_active = true;
-    
+
     client->watcher_count++;
     return true;
 }
@@ -132,24 +208,24 @@ dogecoin_bool dogecoin_smpv_remove_watcher(
     const char* address
 ) {
     if (!client || !address) return false;
-    
+
     for (uint32_t i = 0; i < client->watcher_count; i++) {
         if (strcmp(client->watchers[i].address, address) == 0) {
             /* Free the watcher */
             if (client->watchers[i].address) {
                 dogecoin_free(client->watchers[i].address);
             }
-            
+
             /* Move remaining watchers */
             for (uint32_t j = i; j < client->watcher_count - 1; j++) {
                 client->watchers[j] = client->watchers[j + 1];
             }
-            
+
             client->watcher_count--;
             return true;
         }
     }
-    
+
     return false;
 }
 
@@ -159,20 +235,20 @@ dogecoin_smpv_watcher* dogecoin_smpv_get_watcher(
     const char* address
 ) {
     if (!client || !address) return NULL;
-    
+
     for (uint32_t i = 0; i < client->watcher_count; i++) {
         if (strcmp(client->watchers[i].address, address) == 0) {
             return &client->watchers[i];
         }
     }
-    
+
     return NULL;
 }
 
 /* Start SMPV monitoring */
 dogecoin_bool dogecoin_smpv_start(dogecoin_smpv_client* client) {
     if (!client) return false;
-    
+
     client->is_running = true;
     client->last_update_time = time(NULL);
     return true;
@@ -181,7 +257,7 @@ dogecoin_bool dogecoin_smpv_start(dogecoin_smpv_client* client) {
 /* Stop SMPV monitoring */
 void dogecoin_smpv_stop(dogecoin_smpv_client* client) {
     if (!client) return;
-    
+
     client->is_running = false;
 }
 
@@ -228,6 +304,16 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_process_tx(
     smpv_tx->confirmations = 0;
     smpv_tx->block_hash    = NULL;
     smpv_tx->block_height  = 0;
+
+    /* if we already have this tx in mempool, skip re-processing (can happen if multiple nodes send us the same tx)
+     * note: this is a simple linear search, but mempool sizes are expected to be small and this is just a best-effort deduplication
+     */
+    if (dogecoin_smpv_get_tx(client, smpv_tx->txid) != NULL) {
+        client->last_seen_ts = client->last_update_time = time(NULL);
+        dogecoin_free(bin);
+        dogecoin_smpv_tx_free(smpv_tx);
+        return true;
+    }
 
     /* init per-tx stats */
     smpv_tx->vin_count = smpv_tx->vout_count = 0;
@@ -331,13 +417,13 @@ dogecoin_smpv_tx* dogecoin_smpv_get_tx(
     const char* txid
 ) {
     if (!client || !txid) return NULL;
-    
+
     for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
         if (strcmp(client->mempool_txs[i].txid, txid) == 0) {
             return &client->mempool_txs[i];
         }
     }
-    
+
     return NULL;
 }
 
@@ -348,7 +434,7 @@ dogecoin_smpv_tx** dogecoin_smpv_get_address_txs(
     size_t* tx_count
 ) {
     if (!client || !address || !tx_count) return NULL;
-    
+
     *tx_count = 0;
     /* Simplified implementation - would need proper address matching */
     return NULL;
@@ -361,7 +447,7 @@ dogecoin_bool dogecoin_smpv_is_tx_relevant(
     char** relevant_address
 ) {
     if (!client || !tx || !relevant_address) return false;
-    
+
     /* Simplified implementation - would need proper address matching */
     *relevant_address = NULL;
     return false;
@@ -389,13 +475,10 @@ LIBDOGECOIN_API dogecoin_tx* dogecoin_smpv_decode_tx(const char* raw_tx_hex) {
     return tx;
 }
 
-/* Note: Fee calculation removed - mempool doesn't need to track fees
- * since we can't calculate real fees without access to previous outputs. */
-
 /* Get transaction size */
 uint64_t dogecoin_smpv_get_tx_size(const dogecoin_tx* tx) {
     if (!tx) return 0;
-    
+
     /* Serialize transaction to get actual size */
     cstring* tx_serialized = cstr_new_sz(1024);
     dogecoin_tx_serialize(tx_serialized, tx);
@@ -412,12 +495,42 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
     const char* block_hash,
     uint32_t block_height
 ) {
-    if (!client || !txid) return;
+    if (!client) return;
 
-    dogecoin_smpv_tx* tx = dogecoin_smpv_get_tx(client, txid);
-    if (!tx) return;
+    /* if txid is NULL, this is a "tip tick" to update confirmations for all confirmed transactions at the new tip height */
+    if (!txid) {
+        uint32_t tip = block_height;
+        for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
+            dogecoin_smpv_tx* t = &client->mempool_txs[i];
+            if (!t->is_confirmed || t->block_height == 0) continue;
+            if (tip >= t->block_height) {
+                t->confirmations = (uint32_t)(tip - t->block_height + 1);
+            } else {
+                t->confirmations = 0;
+            }
+        }
+        client->last_update_time = time(NULL);
+        return;
+    }
 
-    /* adjust internal counters only on transition */
+    /* find tx */
+    dogecoin_smpv_tx* tx = NULL;
+    for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
+        if (client->mempool_txs[i].txid && strcmp(client->mempool_txs[i].txid, txid) == 0) {
+            tx = &client->mempool_txs[i];
+            break;
+        }
+    }
+
+    /* minimal: if a block confirms a tx we never saw, add a bounded confirmed stub */
+    if (!tx) {
+        if (confirmed) {
+            (void)smpv_append_confirmed_stub(client, txid, block_hash, block_height);
+        }
+        return;
+    }
+
+    /* transition counters */
     if (!tx->is_confirmed && confirmed) {
         if (client->confirmed_count < UINT32_MAX) client->confirmed_count++;
         if (client->unconfirmed_count > 0) client->unconfirmed_count--;
@@ -426,16 +539,37 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
         if (client->unconfirmed_count < UINT32_MAX) client->unconfirmed_count++;
     }
 
-    tx->is_confirmed = confirmed;
     if (confirmed) {
-        tx->confirmations = 1;
-        if (block_hash) {
-            if (tx->block_hash) dogecoin_free(tx->block_hash);
-            tx->block_hash = dogecoin_calloc(1, strlen(block_hash) + 1);
-            strcpy(tx->block_hash, block_hash);
-        }
+        /* confirmed */
+        tx->is_confirmed = true;
         tx->block_height = block_height;
+        tx->confirmations = 1;
+
+        if (tx->block_hash) {
+            dogecoin_free(tx->block_hash);
+            tx->block_hash = NULL;
+        }
+        if (block_hash) {
+            size_t blen = strlen(block_hash);
+            tx->block_hash = (char*)dogecoin_calloc(1, blen + 1);
+            if (tx->block_hash) strcpy(tx->block_hash, block_hash);
+        }
+
+        client->last_update_time = time(NULL);
+        return;
     }
+
+    /* unconfirmed */
+    tx->is_confirmed = false;
+    tx->confirmations = 0;
+    tx->block_height = 0;
+
+    if (tx->block_hash) {
+        dogecoin_free(tx->block_hash);
+        tx->block_hash = NULL;
+    }
+
+    client->last_update_time = time(NULL);
 }
 
 /* Get mempool statistics */
@@ -445,7 +579,7 @@ void dogecoin_smpv_get_stats(
     uint32_t* watched_addresses
 ) {
     if (!client) return;
-    
+
     if (total_txs) *total_txs = client->mempool_tx_count;
     if (watched_addresses) *watched_addresses = client->watcher_count;
 }
@@ -453,10 +587,10 @@ void dogecoin_smpv_get_stats(
 /* Free SMPV transaction */
 void dogecoin_smpv_tx_free(dogecoin_smpv_tx* tx) {
     if (!tx) return;
-    
+
     if (tx->txid) dogecoin_free(tx->txid);
     if (tx->raw_hex) dogecoin_free(tx->raw_hex);
-    if (tx->decoded_tx) dogecoin_free(tx->decoded_tx);
+    if (tx->decoded_tx) dogecoin_tx_free(tx->decoded_tx);
     if (tx->block_hash) dogecoin_free(tx->block_hash);
     dogecoin_free(tx);
 }
@@ -464,7 +598,7 @@ void dogecoin_smpv_tx_free(dogecoin_smpv_tx* tx) {
 /* Free SMPV watcher */
 void dogecoin_smpv_watcher_free(dogecoin_smpv_watcher* watcher) {
     if (!watcher) return;
-    
+
     if (watcher->address) dogecoin_free(watcher->address);
     dogecoin_free(watcher);
 }
@@ -481,6 +615,8 @@ LIBDOGECOIN_API char* dogecoin_smpv_tx_to_json(const dogecoin_smpv_tx* tx) {
         "  \"timestamp\": %llu,\n"
         "  \"confirmed\": %s,\n"
         "  \"confirmations\": %u,\n"
+        "  \"block_hash\": \"%s\",\n"
+        "  \"block_height\": %u,\n"
         "  \"vin_count\": %u,\n"
         "  \"vout_count\": %u,\n"
         "  \"is_coinbase\": %s,\n"
@@ -499,6 +635,8 @@ LIBDOGECOIN_API char* dogecoin_smpv_tx_to_json(const dogecoin_smpv_tx* tx) {
         (unsigned long long)tx->timestamp,
         tx->is_confirmed ? "true" : "false",
         tx->confirmations,
+        tx->block_hash ? tx->block_hash : "",
+        tx->block_height,
         tx->vin_count,
         tx->vout_count,
         tx->is_coinbase ? "true" : "false",
@@ -515,7 +653,7 @@ LIBDOGECOIN_API char* dogecoin_smpv_tx_to_json(const dogecoin_smpv_tx* tx) {
 
 char* dogecoin_smpv_watcher_to_json(const dogecoin_smpv_watcher* watcher) {
     if (!watcher) return NULL;
-    
+
     char* json = dogecoin_calloc(1, 512);
     snprintf(json, 512,
         "{\n"
@@ -531,4 +669,3 @@ char* dogecoin_smpv_watcher_to_json(const dogecoin_smpv_watcher* watcher) {
     );
     return json;
 }
-
