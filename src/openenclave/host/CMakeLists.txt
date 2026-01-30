@@ -23,4 +23,4 @@ target_include_directories(
 # Add search paths to find the enclave libraries.
 target_link_directories(host PRIVATE ${CMAKE_SOURCE_DIR}../../ ${CMAKE_SOURCE_DIR}/../../src/libevent/build/lib ${CMAKE_SOURCE_DIR}/../../depends/x86_64-pc-linux-gnu/host/lib)
 
-target_link_libraries(host openenclave::oehost "libdogecoin.a" "libevent.a" "libunistring.a" "libykpers-1.so" "libyubikey.so" "libusb-1.0.so")
+target_link_libraries(host openenclave::oehost "libdogecoin.a" "libevent.a" "libykpers-1.so" "libyubikey.so" "libusb-1.0.so")

@@ -65,6 +65,7 @@ extern void test_sha_256();
 extern void test_sha_512();
 extern void test_sha_hmac();
 extern void test_signmsg();
+extern void test_smpv();
 extern void test_signmsg_ext();
 extern void test_tpm();
 extern void test_transaction();
@@ -91,6 +92,7 @@ extern void test_examples();
 #ifdef WITH_WALLET
 extern void test_wallet_basics();
 extern void test_wallet();
+extern void test_wallet_reorg_utxo_update();
 #endif
 
 #ifdef WITH_TOOLS
@@ -123,10 +125,8 @@ int main()
     u_run_test(test_base58);
     u_run_test(test_base64);
     u_run_test(test_bip32);
-#if WIN32 || USE_UNISTRING
     u_run_test(test_bip39);
     u_run_test(test_bip44);
-#endif
     u_run_test(test_block_header);
     u_run_test(test_buffer);
     u_run_test(test_chacha20);
@@ -149,6 +149,7 @@ int main()
     u_run_test(test_sha_hmac);
     u_run_test(test_signmsg);
     u_run_test(test_signmsg_ext);
+    u_run_test(test_smpv);
 #ifndef USE_OPTEE // TPM is not supported in OPTEE
     u_run_test(test_tpm);
 #endif
@@ -176,6 +177,7 @@ int main()
 #ifdef WITH_WALLET
     u_run_test(test_wallet_basics);
     u_run_test(test_wallet);
+    u_run_test(test_wallet_reorg_utxo_update);
 #endif
 
 #ifdef WITH_TOOLS

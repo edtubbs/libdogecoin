@@ -313,7 +313,6 @@ void test_address()
     dogecoin_free(privkeywif);
     dogecoin_hdnode_free (hdnode);
 
-#if WIN32 || USE_UNISTRING
     // mnemonic to HD keys and addresses
     MNEMONIC seedphrase = "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo vote";
     res = generateHDMasterPubKeypairFromMnemonic (extout, p2pkh_pubkey_test, seedphrase, NULL, true);
@@ -324,7 +323,6 @@ void test_address()
     u_assert_str_eq(p2pkh_pubkey_test, "naTzLkBZLpUVXykb3sSP1Wzzz9GzzM4BVU");
     res = getDerivedHDAddressFromMnemonic(0, 0, BIP44_CHANGE_EXTERNAL, seedphrase, NULL, p2pkh_pubkey_main, false);
     u_assert_str_eq(p2pkh_pubkey_main, "DTdKu8YgcxoXyjFCDtCeKimaZzsK27rcwT");
-#endif
 
     /*free up VLAs*/
     free(masterkey_main);

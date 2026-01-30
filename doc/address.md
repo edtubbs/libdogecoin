@@ -80,11 +80,9 @@ These steps can be very confusing, so Libdogecoin does all of them for you when 
 
 These functions implement the core functionality of Libdogecoin for address generation and validation, and are described in depth below. You can access them through a C program, by including the `libdogecoin.h` header in the source code and including the `libdogecoin.a` library at compile time.
 
-When using functions from either the Essential or Advanced Address API, include the -lunistring flag during the linking process. This is because the Advanced Address API uses the GNU libunistring library for Unicode string manipulation. To include the -lunistring flag during linking, simply add it to the linker command when building your project:
+When using functions from either the Essential or Advanced Address API, include the -ldogecoin flag during the linking process. To include the -ldogecoin flag during linking, simply add it to the linker command when building your project:
 
-`gcc -o example example.c -ldogecoin -lunistring`
-
-Ensure that the `libunistring` library is installed on your system before linking.
+`gcc -o example example.c -ldogecoin`
 
 ---
 

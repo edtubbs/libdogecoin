@@ -154,12 +154,6 @@ AC_ARG_ENABLE([wallet],
   [with_wallet=$enableval],
   [with_wallet=yes])
 
-AC_ARG_ENABLE([unistring],
-  [AS_HELP_STRING([--disable-unistring],
-  [disable unistring functions])],
-  [with_unistring=$enableval],
-  [with_unistring=yes])
-
 AC_ARG_ENABLE([openenclave],
   [AS_HELP_STRING([--enable-openenclave],
   [Build with openenclave (default is no)])],
@@ -290,12 +284,6 @@ if test "x$with_logdb" = xyes; then
   AC_DEFINE_UNQUOTED([WITH_LOGDB],[1],[Define to 1 to enable logdb compilation])
 fi
 
-if test "x$with_unistring" = xyes; then
-  AC_CHECK_LIB([unistring],[main],LIBUNISTRING=-lunistring,AC_MSG_ERROR(libunistring missing))
-  LIBS="$LIBS $LIBUNISTRING"
-  AC_DEFINE(USE_UNISTRING, 1, [Define this symbol if libunistring works])
-fi
-
 if test "x$use_openenclave" = xyes; then
   AC_DEFINE(USE_OPENENCLAVE, 1, [Define this symbol if openenclave works])
 fi
@@ -318,7 +306,6 @@ AC_SUBST(EVENT_LIBS)
 AC_SUBST(EVENT_CORE_LIBS)
 AC_SUBST(EVENT_EXTRA_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
-AC_SUBST(LIBUNISTRING)
 AC_SUBST(LIBYKPIV)
 AC_SUBST(NASMFLAGS)
 AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
@@ -352,7 +339,6 @@ echo "  with tools      = $with_tools"
 echo "  with net        = $with_net"
 echo "  with logdb      = $with_logdb"
 echo "  with wallet     = $with_wallet"
-echo "  with unistring  = $with_unistring"
 echo
 echo "  Intel AVX2      = $use_intel_avx2"
 echo "  Intel SSE       = $use_intel_sse"

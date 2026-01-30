@@ -1,4 +1,4 @@
-packages:=libevent libunistring
+packages:=libevent
 native_packages := native_ccache
 
 wallet_packages=
@@ -18,6 +18,3 @@ endif
 
 endif
 
-ifneq ($(host_os),mingw32)
-packages+=libunistring
-endif

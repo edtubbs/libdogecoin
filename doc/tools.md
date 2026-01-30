@@ -43,6 +43,7 @@ Most of these commands require a flag following them to denote things like exist
 | -k, --pubkey  | public_key          | yes | p2pkh -k <public_key> |
 | -m, --derived_path | derived_path        | yes | derive_child_key -p <extended_private_key> -m <derived_path> |
 | -e, --entropy  | hex_entropy | yes | generate_mnemonic -e <hex_entropy> |
+| -z, --entropy_size  | entropy_size | yes | generate_mnemonic -z <entropy_size> |
 | -n, --mnemonic  | seed_phrase | yes | mnemonic_to_key or mnemonic_to_addresses -n <seed_phrase> |
 | -a, --pass_phrase  | pass_phrase | no | mnemonic_to_key or mnemonic_to_addresses -n <seed_phrase> -a |
 | -o, --account_int  | account_int | yes | mnemonic_to_key or mnemonic_to_addresses -n <seed_phrase> -o <account_int> |
@@ -193,6 +194,14 @@ The `such` tool provides functionality to securely manage your encrypted mnemoni
 To generate a new mnemonic, which is a 24-word seed phrase, you can use the following command:
 
     ./such -c generate_mnemonic
+
+The `z` flag can be used to specify the size of the entropy used to generate the mnemonic. The default size is 256 bits, which generates a 24-word mnemonic. For example, to generate a mnemonic with 128 bits of entropy, you can use the following command:
+
+    ./such -c generate_mnemonic -z 128
+
+You can also use the `e` flag to provide your own hex-encoded entropy to generate the mnemonic. For example:
+
+    ./such -c generate_mnemonic -e FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 
 This will output a new mnemonic that you can use to generate keys and addresses. If you want to encrypt this mnemonic to keep it safe, you can use the following command:
 
@@ -384,6 +393,8 @@ To utilize checkpoints for faster initial sync, apply the -p flag:
 | `-j`, `--use_tpm` | Use TPM | No | Utilize TPM for decryption: `./spvnode -j scan` |
 | `-k`, `--master_key` | Master Key | No | Use master key decryption: `./spvnode -k scan` |
 | `-z`, `--daemon` | Daemon Mode | No | Run as a daemon: `./spvnode -z scan` |
+| `-u`, `--http_server` | Enable HTTP | No | Enabled HTTP: `./spvnode -u 127.0.0.1:8080 scan` |
+| `-x`, `--smpv` | Enable SMPV | No | Enabled SMPV: `./spvnode -x scan` |
 
 ### Commands
 

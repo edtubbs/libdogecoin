@@ -44,6 +44,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <math.h>
 
 #include <dogecoin/block.h>
 #include <dogecoin/blockchain.h>
@@ -53,8 +54,15 @@
 #include <dogecoin/protocol.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/spv.h>
+#include <dogecoin/smpv.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/vector.h>
+#include <event2/event.h>
+
+#define DOGECOIN_KOINU_PER_COIN 100000000ULL
+/* Dogecoin block subsidy has been 10,000 DOGE for years; good for 24h stats */
+#define DOGECOIN_CURRENT_SUBSIDY_KOINU (10000ULL * DOGECOIN_KOINU_PER_COIN)
 
 static const unsigned int HEADERS_MAX_RESPONSE_TIME = 120;
 static const unsigned int MIN_TIME_DELTA_FOR_STATE_CHECK = 5;
@@ -171,6 +179,20 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
         free(http_server_copy);
     }
 
+    client->stats_ring_len = 0;
+    client->stats_ring_head = 0;
+    client->stats_blocks_total = 0;
+    client->stats_txs_total = 0;
+    client->stats_outputs_total = 0;
+    client->stats_out_value_total = 0;
+    client->stats_fees_total = 0;
+    client->stats_block_bytes_total = 0;
+    client->start_ts = (uint64_t)time(NULL);
+
+    // SMPV default off
+    client->smpv_ctx = NULL;
+    client->smpv_enabled = false;
+
     return client;
 }
 
@@ -214,6 +236,22 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
 {
     if (!client)
         return;
+
+#ifndef _WIN32
+    // set stdin to back to blocking
+    int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
+    if (stdin_flags != -1 && (stdin_flags & O_NONBLOCK))
+    {
+        fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
+    }
+#endif
+
+    if (client->smpv_enabled && client->smpv_ctx) {
+        dogecoin_smpv_stop((dogecoin_smpv_client*)client->smpv_ctx);
+        dogecoin_smpv_client_free((dogecoin_smpv_client*)client->smpv_ctx);
+        client->smpv_ctx = NULL;
+        client->smpv_enabled = false;
+    }
 
     if (client->headers_db)
     {
@@ -519,6 +557,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         uint32_t varlen;
         deser_varlen(&varlen, buf);
         dogecoin_bool contains_block = false;
+        dogecoin_bool contains_tx = false;
 
         client->nodegroup->log_write_cb("Get inv request with %d items\n", varlen);
 
@@ -530,6 +569,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             if (type == DOGECOIN_INV_TYPE_BLOCK && ((varlen >= 500) || (client->headers_db->getchaintip(client->headers_db_ctx)->height > node->bestknownheight - 1440))) {
                 contains_block = true;
                 deser_u256(node->last_requested_inv, buf);
+           } else if (type == DOGECOIN_INV_TYPE_TX) {
+                contains_tx = true;
+                deser_skip(buf, 32);
             } else {
                 deser_skip(buf, 32);
             }
@@ -539,6 +581,16 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             node->time_last_request = time(NULL);
             client->nodegroup->log_write_cb("Requesting %d blocks\n", varlen);
             cstring *p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, original_inv.p, original_inv.len);
+            dogecoin_node_send(node, p2p_msg);
+            cstr_free(p2p_msg, true);
+        }
+
+        if (contains_tx && client->smpv_enabled) {
+            client->nodegroup->log_write_cb("Requesting %d tx (mempool INV)\n", varlen);
+            cstring *p2p_msg = dogecoin_p2p_message_new(
+                node->nodegroup->chainparams->netmagic,
+                DOGECOIN_MSG_GETDATA,
+                original_inv.p, original_inv.len);
             dogecoin_node_send(node, p2p_msg);
             cstr_free(p2p_msg, true);
         }
@@ -588,6 +640,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
             uint64_t total_tx_size = 0;
 
+            // per-block accumulation for stats
+            uint64_t block_outputs_value = 0;
+            uint32_t block_outputs_count = 0;
+            uint64_t coinbase_value = 0;
+
             size_t consumedlength = 0;
             unsigned int i;
             for (i = 0; i < amount_of_txs; i++)
@@ -606,9 +663,52 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 deser_skip(buf, consumedlength);
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
                 total_tx_size += consumedlength;
+
+                // accumulate outputs for this tx
+                uint64_t tx_out_sum = 0;
+                unsigned int oi;
+                for (oi = 0; oi < tx->vout->len; oi++)
+                {
+                    dogecoin_tx_out *txout = vector_idx(tx->vout, oi);
+                    tx_out_sum += txout->value;
+                    block_outputs_value += txout->value;
+                    block_outputs_count++;
+                }
+                if (i == 0 && dogecoin_tx_is_coinbase(tx)) {
+                    coinbase_value = tx_out_sum; // coinbase tx is always the first tx in a block
+                }
                 dogecoin_tx_free(tx);
             }
             client->last_block_total_tx_size = total_tx_size;
+
+            // approximate fees (OK for recent blocks where subsidy is 10k0 DOGE)
+            uint64_t block_fees = 0;
+            if (coinbase_value > DOGECOIN_CURRENT_SUBSIDY_KOINU) {
+                block_fees = coinbase_value - DOGECOIN_CURRENT_SUBSIDY_KOINU;
+            }
+
+            // session totals
+            client->stats_blocks_total++;
+            client->stats_txs_total += amount_of_txs;
+            client->stats_outputs_total += block_outputs_count;
+            client->stats_out_value_total += block_outputs_value;
+            client->stats_fees_total += block_fees;
+            client->stats_block_bytes_total += hdr->data_len;
+
+            // ring insert (latest)
+            spv_block_sample *smp = &client->stats_ring[client->stats_ring_head];
+            smp->ts = pindex->header.timestamp;
+            smp->txs = amount_of_txs;
+            smp->outputs = block_outputs_count;
+            smp->out_value = block_outputs_value;
+            smp->size = hdr->data_len;
+            smp->fees = block_fees;
+
+            client->stats_ring_head = (client->stats_ring_head + 1) % SPV_STATS_RING;
+            if (client->stats_ring_len < SPV_STATS_RING) {
+                client->stats_ring_len++;
+            }
+
             client->nodegroup->log_write_cb("done (took %lld secs)\n", (unsigned long long)(time(NULL) - start));
         }
         else
@@ -626,7 +726,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             // we check if the height is greater than or equal to the node's bestknown height minus 5 minutes
             if (client->headers_db->getchaintip(client->headers_db_ctx)->height >= node->bestknownheight - 5) {
                 // last requested block reached, consider stop syncing
-                if (!client->called_sync_completed && client->sync_completed) { client->sync_completed(client); client->called_sync_completed = true; }
+                if (!client->called_sync_completed && client->sync_completed) {
+                    // enable mempool requests if smpv is enabled
+                    if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
+                    client->sync_completed(client);
+                    client->called_sync_completed = true;
+                }
             } else if (client->headers_db->getchaintip(client->headers_db_ctx)->height < node->bestknownheight - 1440) {
                 node->time_last_request = time(NULL);
                 dogecoin_net_spv_node_request_headers_or_blocks(node, true);
@@ -695,6 +800,35 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         }
     }
 
+    if (strcmp(hdr->command, DOGECOIN_MSG_TX) == 0) {
+        if (client && client->smpv_enabled && client->smpv_ctx) {
+            // allocate hex buffer (2 chars per byte + NUL)
+            size_t hex_len = ((size_t)hdr->data_len * 2) + 1;
+            char* hex = (char*)dogecoin_calloc(1, hex_len);
+            if (hex) {
+                // convert raw bytes to hex using utils.c
+                utils_bin_to_hex((unsigned char*)buf->p, (size_t)hdr->data_len, hex);
+
+                dogecoin_bool ok = dogecoin_spv_handle_mempool_tx_hex(client, hex);
+
+                if (client->nodegroup && client->nodegroup->log_write_cb) {
+                    client->nodegroup->log_write_cb(
+                        "[smpv] mempool tx seen len=%u dispatched=%s\n",
+                        hdr->data_len, ok ? "true" : "false"
+                    );
+                }
+                dogecoin_free(hex);
+            } else {
+                if (client->nodegroup && client->nodegroup->log_write_cb) {
+                    client->nodegroup->log_write_cb(
+                        "[smpv] hex alloc failed for len=%u\n",
+                        hdr->data_len
+                    );
+                }
+            }
+        }
+    }
+
     // Check for a 'Q' or 'q' on stdin, to quit.
 #ifdef _WIN32
     if (_kbhit()) {
@@ -702,6 +836,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (c == 'Q' || c == 'q') {
             printf("Disconnecting...\n");
             dogecoin_node_group_shutdown(client->nodegroup);
+
+        // exit the event loop immediately
+        if (client->nodegroup && client->nodegroup->event_base)
+            event_base_loopbreak(client->nodegroup->event_base);
         }
     }
 #else
@@ -713,6 +851,103 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
         printf("Disconnecting...\n");
         dogecoin_node_group_shutdown(client->nodegroup);
+
+        // exit the event loop immediately
+        if (client->nodegroup && client->nodegroup->event_base)
+            event_base_loopbreak(client->nodegroup->event_base);
     }
 #endif
+}
+
+static void smpv_tx_cb(const dogecoin_smpv_tx* tx, const char* addr, void* user)
+{
+    dogecoin_spv_client* client = (dogecoin_spv_client*)user;
+    if (!client || !client->nodegroup || !client->nodegroup->log_write_cb || !tx) return;
+
+    client->nodegroup->log_write_cb(
+        "[smpv] tx=%s size=%lluB vin=%u vout=%u coinbase=%d "
+        "outval=%llu koinu types{p2pk=%u,p2pkh=%u,p2sh=%u,multi=%u,opret=%u,nonstd=%u}%s%s\n",
+        tx->txid ? tx->txid : "(null)",
+        (unsigned long long)tx->size,
+        tx->vin_count, tx->vout_count,
+        tx->is_coinbase ? 1 : 0,
+        (unsigned long long)tx->total_output_value,
+        tx->pubkey_out, tx->p2pkh_out, tx->p2sh_out,
+        tx->multisig_out, tx->opreturn_out, tx->nonstandard_out,
+        addr ? " addr=" : "", addr ? addr : ""
+    );
+}
+
+LIBDOGECOIN_API void dogecoin_spv_enable_smpv(dogecoin_spv_client* client, dogecoin_bool enable)
+{
+    if (!client) return;
+
+    if (enable && !client->smpv_enabled) {
+        client->smpv_ctx = dogecoin_smpv_client_new(client->chainparams);
+        if (client->smpv_ctx && dogecoin_smpv_start((dogecoin_smpv_client*)client->smpv_ctx)) {
+            client->smpv_enabled = true;
+            if (client->nodegroup && client->nodegroup->log_write_cb)
+                client->nodegroup->log_write_cb("[smpv] enabled\n");
+        } else {
+            if (client->nodegroup && client->nodegroup->log_write_cb)
+                client->nodegroup->log_write_cb("[smpv] failed to enable (alloc/start)\n");
+            if (client->smpv_ctx) {
+                dogecoin_smpv_client_free((dogecoin_smpv_client*)client->smpv_ctx);
+                client->smpv_ctx = NULL;
+            }
+        }
+        return;
+    }
+
+    if (!enable && client->smpv_enabled) {
+        if (client->nodegroup && client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb("[smpv] disabling\n");
+        dogecoin_smpv_stop((dogecoin_smpv_client*)client->smpv_ctx);
+        dogecoin_smpv_client_free((dogecoin_smpv_client*)client->smpv_ctx);
+        client->smpv_ctx = NULL;
+        client->smpv_enabled = false;
+    }
+}
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_spv_handle_mempool_tx_hex(dogecoin_spv_client* client, const char* raw_tx_hex)
+{
+    if (!client || !client->smpv_enabled || !client->smpv_ctx || !raw_tx_hex) return false;
+    return dogecoin_smpv_process_tx(
+        (dogecoin_smpv_client*)client->smpv_ctx,
+        raw_tx_hex,
+        smpv_tx_cb,
+        client
+    );
+}
+
+LIBDOGECOIN_API void dogecoin_spv_get_smpv_stats(dogecoin_spv_client* client, uint32_t* total_txs, uint32_t* watched_addrs)
+{
+    if (total_txs) *total_txs = 0;
+    if (watched_addrs) *watched_addrs = 0;
+    if (!client || !client->smpv_enabled || !client->smpv_ctx) return;
+    dogecoin_smpv_get_stats(
+        (dogecoin_smpv_client*)client->smpv_ctx,
+        total_txs, watched_addrs);
+}
+
+LIBDOGECOIN_API void dogecoin_net_spv_request_mempool(dogecoin_spv_client *client)
+{
+    if (!client || !client->nodegroup || !client->nodegroup->nodes) return;
+    vector_t* nodes = client->nodegroup->nodes;
+    for (unsigned int i = 0; i < (unsigned int)nodes->len; i++) {
+        dogecoin_node* n = (dogecoin_node*)vector_idx(nodes, i);
+        if (!n) continue;
+        cstring* payload = cstr_new_sz(0);
+        cstring* msg = dogecoin_p2p_message_new(
+            n->nodegroup->chainparams->netmagic,
+            DOGECOIN_MSG_MEMPOOL,
+            payload->str,
+            payload->len
+        );
+        cstr_free(payload, true);
+        dogecoin_node_send(n, msg);
+        cstr_free(msg, true);
+    }
+    if (client->nodegroup && client->nodegroup->log_write_cb)
+        client->nodegroup->log_write_cb("[spv] sent 'mempool' to peers\n");
 }

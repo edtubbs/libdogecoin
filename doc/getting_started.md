@@ -15,14 +15,13 @@ For Ubuntu and Debian Linux, you will need to install the following dependencies
 - automake
 - libtool
 - libevent-dev
-- libunistring-dev
 - build-essential
 
 This can be done in the following commands using Linux CLI:
 
 ```c
 sudo apt-get update
-sudo apt-get install autoconf automake libtool libevent-dev libunistring-dev build-essential
+sudo apt-get install autoconf automake libtool libevent-dev build-essential
 ```
 
 For Windows, you will need to install the following dependencies before building:
@@ -176,12 +175,11 @@ The last step is to specify the libraries you will need to link into your projec
 
 - libdogecoin (of course!)
 - libevent_core
-- libunistring
 
 On the command line, your final compilation will look something like the command below, factoring in all of the steps previously mentioned. _Note: the prefix "lib" is excluded when specifying libraries to link._
 
 ```
-gcc main.c -L./path/to/library/file -I./path/to/header/file -ldogecoin -levent_core -lunistring -o myprojectname
+gcc main.c -L./path/to/library/file -I./path/to/header/file -ldogecoin -levent_core -o myprojectname
 ```
 
 Congratulations, you have just built an executable program that implements Libdogecoin!

@@ -399,7 +399,7 @@ docker run --privileged -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_che
     cd /src/src/optee/host && \
     make -j 4 \
       CROSS_COMPILE=aarch64-linux-gnu- \
-      LDFLAGS=\"-L/src/optee/toolchains/aarch64/lib -L/src/depends/aarch64-linux-gnu/lib -ldogecoin -lunistring\" \
+      LDFLAGS=\"-L/src/optee/toolchains/aarch64/lib -L/src/depends/aarch64-linux-gnu/lib -ldogecoin\" \
       CFLAGS=\"-I/src/optee/toolchains/aarch64/include -I/src/src/optee/ta/include -I/src/depends/aarch64-linux-gnu/include -I/src/depends/aarch64-linux-gnu/include/ykpers-1 -I/src/depends/aarch64-linux-gnu/include/dogecoin\" && \
 
     # Build libdogecoin for OP-TEE
@@ -414,7 +414,7 @@ docker run --privileged -v "$(pwd):/src" -w /src jforissier/optee_os_ci:qemu_che
     make -j 4 \
       CROSS_COMPILE=aarch64-linux-gnu- \
       LIBDIR=/src/depends/aarch64-linux-gnu/lib \
-      LDFLAGS=\"-L/src/depends/aarch64-linux-gnu/lib -ldogecoin -lunistring\" \
+      LDFLAGS=\"-L/src/depends/aarch64-linux-gnu/lib -ldogecoin\" \
       CFLAGS=\"-I/src/depends/aarch64-linux-gnu/include -I/src/depends/aarch64-linux-gnu/include/dogecoin\" \
       PLATFORM=vexpress-qemu_armv8a \
       TA_DEV_KIT_DIR=/src/optee/optee_os/out/arm/export-ta_arm64 && \

@@ -35,12 +35,24 @@
 #include <dogecoin/net.h>
 #include <dogecoin/tx.h>
 
+#define SPV_STATS_RING 4096
+
 LIBDOGECOIN_BEGIN_DECL
 
 enum SPV_CLIENT_STATE {
     SPV_HEADER_SYNC_FLAG        = (1 << 0),
-    SPV_FULLBLOCK_SYNC_FLAG	    = (1 << 1),
+    SPV_FULLBLOCK_SYNC_FLAG     = (1 << 1),
 };
+
+typedef struct spv_block_sample_
+{
+    uint32_t ts;        // block timestamp
+    uint32_t txs;       // number of transactions
+    uint32_t outputs;   // number of outputs
+    uint64_t out_value; // total output value
+    uint32_t size;      // block size
+    uint64_t fees;      // total fees
+} spv_block_sample;
 
 typedef struct dogecoin_spv_client_
 {
@@ -57,6 +69,19 @@ typedef struct dogecoin_spv_client_
     uint64_t last_block_size;
     uint64_t last_block_tx_count;
     uint64_t last_block_total_tx_size;
+    spv_block_sample stats_ring[SPV_STATS_RING];
+    int stats_ring_len;
+    int stats_ring_head;
+    uint64_t stats_blocks_total;
+    uint64_t stats_txs_total;
+    uint64_t stats_outputs_total;
+    uint64_t stats_out_value_total;
+    uint64_t stats_fees_total;
+    uint64_t stats_block_bytes_total;
+    uint64_t start_ts;
+
+    void* smpv_ctx;
+    dogecoin_bool smpv_enabled;
 
     /* callbacks */
     /* ========= */
@@ -74,6 +99,11 @@ LIBDOGECOIN_API void dogecoin_spv_client_discover_peers(dogecoin_spv_client *cli
 LIBDOGECOIN_API void dogecoin_spv_client_runloop(dogecoin_spv_client *client);
 LIBDOGECOIN_API dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client);
 LIBDOGECOIN_API void dogecoin_net_spv_node_request_headers_or_blocks(dogecoin_node *node, dogecoin_bool blocks);
+
+LIBDOGECOIN_API void dogecoin_spv_enable_smpv(dogecoin_spv_client* client, dogecoin_bool enable);
+LIBDOGECOIN_API dogecoin_bool dogecoin_spv_handle_mempool_tx_hex(dogecoin_spv_client* client, const char* raw_tx_hex);
+LIBDOGECOIN_API void dogecoin_spv_get_smpv_stats(dogecoin_spv_client* client, uint32_t* total_txs, uint32_t* watched_addrs);
+LIBDOGECOIN_API void dogecoin_net_spv_request_mempool(dogecoin_spv_client *client);
 
 LIBDOGECOIN_END_DECL
 

@@ -26,6 +26,8 @@ static const char *wallettmpfile = "/tmp/dummy";
 #include <dogecoin/base58.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/wallet.h>
+#include <dogecoin/script.h>
+#define is_spent(x) (((dogecoin_utxo*)x)->spendable == false)
 
 /* this are the tx_valid test vectors from Bitcoin Core 0.15, run through Bitcoin Core's SignatureHash function */
 static const char * wallet_txns[] = {
@@ -255,4 +257,67 @@ void test_wallet_basics()
 
     dogecoin_wallet_flush(wallet);
     dogecoin_wallet_free(wallet);
+}
+
+void test_wallet_reorg_utxo_update() {
+    const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
+
+    unlink(wallettmpfile);
+    dogecoin_wallet* wallet = dogecoin_wallet_new(chain);
+
+    int error;
+    dogecoin_bool created;
+    dogecoin_wallet_load(wallet, wallettmpfile, &error, &created, false);
+
+    dogecoin_hdnode* node = dogecoin_hdnode_new();
+    dogecoin_hdnode_deserialize("xpub6CUGWU4RiVtKr1jD7Ttd4p8nRBF8VPid9ntCLGviZG6h8hacj7k9cZxKyhT3bs9bPg9h9tK8rb6P2qfE3w8c3d5kJxr4K8xW6CnJgf2gYg", chain, node);
+    dogecoin_wallet_set_master_key_copy(wallet, node);
+
+    dogecoin_wallet_addr* waddr = dogecoin_wallet_next_addr(wallet);
+
+    char addr[P2PKHLEN];
+    dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, chain, addr, P2PKHLEN);
+
+    dogecoin_wtx* wtx = dogecoin_wallet_wtx_new();
+    wtx->height = 100;
+
+    dogecoin_tx* tx = wtx->tx;
+
+    dogecoin_tx_out* out = dogecoin_tx_out_new();
+    out->value = 100000000;
+
+    cstring* script = cstr_new_sz(25);
+    cstr_append_c(script, (unsigned char)OP_DUP);
+    cstr_append_c(script, (unsigned char)OP_HASH160);
+    cstr_append_c(script, 20);
+    cstr_append_buf(script, waddr->pubkeyhash, 20);
+    cstr_append_c(script, (unsigned char)OP_EQUALVERIFY);
+    cstr_append_c(script, (unsigned char)OP_CHECKSIG);
+    out->script_pubkey = script;
+    vector_add(tx->vout, out);
+
+    dogecoin_wallet_scrape_utxos(wallet, wtx);
+
+    dogecoin_utxo* u;
+    dogecoin_utxo* tmp;
+    HASH_ITER(hh, utxos, u, tmp) {
+        if (!is_spent(u)) {
+            u_assert_int_eq(u->height, 100);
+        }
+    }
+   dogecoin_wtx* wtx_new = dogecoin_wallet_wtx_new();
+   dogecoin_tx_copy(wtx_new->tx, tx);
+   wtx_new->height = 105;
+   dogecoin_wallet_scrape_utxos(wallet, wtx_new);
+   HASH_ITER(hh, utxos, u, tmp) {
+        if (!is_spent(u)) {
+            u_assert_int_eq(u->height, 105);
+        }
+    }
+
+    dogecoin_wallet_flush(wallet);
+    dogecoin_wallet_wtx_free(wtx_new);
+    dogecoin_wallet_free(wallet);
+    dogecoin_hdnode_free(node);
+    remove_all_utxos();
 }

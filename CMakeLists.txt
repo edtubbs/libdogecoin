@@ -24,7 +24,6 @@ SET(WITH_BENCH TRUE CACHE BOOL "enable bench")
 SET(WITH_TOOLS TRUE CACHE BOOL "enable dogecoin tool cli application")
 SET(WITH_NET TRUE CACHE BOOL "enable net functions")
 SET(WITH_LOGDB TRUE CACHE BOOL "enable logdb")
-SET(WITH_UNISTRING TRUE CACHE BOOL "enable unistring functions")
 SET(WITH_WALLET TRUE CACHE BOOL "enable wallet")
 SET(USE_AVX2 FALSE CACHE BOOL "enable intel avx2")
 SET(USE_SSE FALSE CACHE BOOL "enable intel sse")
@@ -97,7 +96,6 @@ IF(WITH_NET)
         find_path(LIBEVENT_INCLUDE_DIR event.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         FIND_LIBRARY(LIBEVENT NAMES event event_core event_extras event_pthreads HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
-        FIND_LIBRARY(LIBUNISTRING unistring REQUIRED)
     ENDIF()
 ENDIF()
 
@@ -159,9 +157,6 @@ IF(WITH_NET)
 ENDIF()
 IF(WITH_LOGDB)
     ADD_DEFINITIONS(-DWITH_LOGDB=1)
-ENDIF()
-IF(WITH_UNISTRING)
-    ADD_DEFINITIONS(-DUSE_UNISTRING=1)
 ENDIF()
 IF(WITH_WALLET)
     ADD_DEFINITIONS(-DWITH_WALLET=1)
@@ -228,7 +223,6 @@ MESSAGE(STATUS "  WITH_BENCH     = ${WITH_BENCH}")
 MESSAGE(STATUS "  WITH_TOOLS     = ${WITH_TOOLS}")
 MESSAGE(STATUS "  WITH_NET       = ${WITH_NET}")
 MESSAGE(STATUS "  WITH_LOGDB     = ${WITH_LOGDB}")
-MESSAGE(STATUS "  WITH_UNISTRING = ${WITH_UNISTRING}")
 MESSAGE(STATUS "  WITH_WALLET    = ${WITH_WALLET}")
 MESSAGE(STATUS "")
 MESSAGE(STATUS "  USE_AVX2       = ${USE_AVX2}")
@@ -299,9 +293,11 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/serialize.c
     src/sha2.c
     src/sign.c
+    src/smpv.c
     src/cli/tool.c
     src/transaction.c
     src/tx.c
+    src/utf8proc.c
     src/utils.c
     src/validation.c
     src/vector.c
@@ -388,6 +384,7 @@ IF(USE_TESTS)
         test/sha1_tests.c
         test/sha2_tests.c
         test/signmsg_tests.c
+        test/smpv_tests.c
         test/tpm_tests.c
         test/transaction_tests.c
         test/tx_tests.c
@@ -397,9 +394,9 @@ IF(USE_TESTS)
         test/vector_tests.c
 )
 IF (USE_YUBIKEY)
-    SET(LIBS ${LIBDOGECOIN_NAME} ${LIBUNISTRING} ${LIBYKPIV})
+    SET(LIBS ${LIBDOGECOIN_NAME} ${LIBYKPIV})
 ELSE()
-    SET(LIBS ${LIBDOGECOIN_NAME} ${LIBUNISTRING})
+    SET(LIBS ${LIBDOGECOIN_NAME})
 ENDIF()
 
 IF (WIN32 AND USE_TPM2)

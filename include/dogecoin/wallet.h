@@ -70,6 +70,17 @@ DISABLE_WARNING(-Wunused-variable)
 static dogecoin_utxo* utxos = NULL;
 DISABLE_WARNING_POP
 
+/** wallet init options */
+typedef struct dogecoin_wallet_opts_ {
+    const char* mnemonic_in;     // BIP39 mnemonic (optional)
+    const char* pass;            // BIP39 passphrase (optional)
+    dogecoin_bool encrypted;     // using encrypted storage?
+    dogecoin_bool tpm;           // use TPM-backed decrypt?
+    int file_num;                // encrypted slot/file id
+    dogecoin_bool master_key;    // encrypted material is master key vs mnemonic
+    dogecoin_bool prompt;        // interactive prompt/confirmations
+} dogecoin_wallet_opts;
+
 /** single key/value record */
 typedef struct dogecoin_wallet_ {
     const char filename[311]; // max path length
@@ -141,7 +152,7 @@ LIBDOGECOIN_API void dogecoin_wallet_output_free(dogecoin_output* output);
 /** ------------------------------------ */
 
 LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params);
-LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const char* address, const char* name, const char* mnemonic_in, const char* pass, const dogecoin_bool encrypted, const dogecoin_bool tpm, const int file_num, const dogecoin_bool master_key, const dogecoin_bool prompt);
+LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const char* address, const char* name, const dogecoin_wallet_opts* opts);
 LIBDOGECOIN_API void print_utxos(dogecoin_wallet* wallet);
 LIBDOGECOIN_API void dogecoin_wallet_free(dogecoin_wallet* wallet);
 
@@ -172,6 +183,9 @@ LIBDOGECOIN_API dogecoin_wallet_addr* dogecoin_wallet_find_waddr_byaddr(dogecoin
 
 /** adds transaction to the wallet (hands over memory management) */
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_add_wtx_move(dogecoin_wallet* wallet, dogecoin_wtx* wtx);
+
+/** copy a given transaction object */
+LIBDOGECOIN_API dogecoin_wtx* dogecoin_wallet_wtx_copy(dogecoin_wtx* wtx);
 
 /** gets credit from given transaction */
 LIBDOGECOIN_API int64_t dogecoin_wallet_get_balance(dogecoin_wallet* wallet);

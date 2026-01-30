@@ -31,14 +31,13 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/random.h>
 #include <dogecoin/sha2.h>
+#include <dogecoin/utf8proc.h>
 
 #ifdef _WIN32
 #ifndef WINVER
 #define WINVER 0x0600
 #endif
 #include <windows.h>
-#elif USE_UNISTRING
-#include <uninorm.h>
 #endif
 
 /*
@@ -415,42 +414,39 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
 
     return 0;
 
-#elif USE_UNISTRING
-    /* normalize the passphrase and salt */
-    size_t norm_pass_len, norm_salt_len;
-
-    uint8_t *norm_pass;
-    uint8_t *norm_salt;
-
-    norm_pass = u8_normalize(UNINORM_NFKD, (const uint8_t *) pass, strlen(pass), NULL, &norm_pass_len);
-    if (norm_pass == NULL) {
-        fprintf(stderr, "ERROR: normalizing passphrase\n");
+#else
+    /* normalise passphrase and salt (NFKD) */
+    uint8_t *norm_pass = (uint8_t *)utf8proc_NFKD(
+                             (const utf8proc_uint8_t *)pass);
+    if (!norm_pass) {
+        fprintf(stderr, "ERROR: normalising passphrase\n");
         dogecoin_free(salt);
         return -1;
     }
-    norm_salt = u8_normalize(UNINORM_NFKD, (const uint8_t *) salt, strlen(salt), NULL, &norm_salt_len);
-    if (norm_salt == NULL) {
-        fprintf(stderr, "ERROR: normalizing salt\n");
+
+    uint8_t *norm_salt = (uint8_t *)utf8proc_NFKD(
+                             (const utf8proc_uint8_t *)salt);
+    if (!norm_salt) {
+        fprintf(stderr, "ERROR: normalising salt\n");
         dogecoin_free(salt);
         dogecoin_free(norm_pass);
         return -1;
     }
 
-    /* we're done with salt */
+    /* done with the original salt buffer */
     dogecoin_free(salt);
 
-    /* pbkdf2 hmac sha512 */
-    pbkdf2_hmac_sha512((const unsigned char*) norm_pass, norm_pass_len, (const unsigned char*) norm_salt, norm_salt_len, ITERATIONS, seed);
+    size_t norm_pass_len = strlen((const char *)norm_pass);
+    size_t norm_salt_len = strlen((const char *)norm_salt);
+
+    /* PBKDF2-HMAC-SHA512 */
+    pbkdf2_hmac_sha512(norm_pass,  norm_pass_len,
+                       norm_salt,  norm_salt_len,
+                       ITERATIONS, seed);
 
     dogecoin_free(norm_pass);
     dogecoin_free(norm_salt);
-
     return 0;
-#else
-
-    fprintf(stderr, "ERROR: no normalizer\n");
-    dogecoin_free(salt);
-    return -1;
 #endif
 
 }

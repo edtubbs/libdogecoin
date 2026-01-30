@@ -615,6 +615,7 @@ static struct option long_options[] =
         {"input_index", required_argument, NULL, 'i'},
         {"raw_tx", required_argument, NULL, 'x'},
         {"entropy", required_argument, NULL, 'e'},
+        {"entropy_size", required_argument, NULL, 'z'},
         {"mnemonic", required_argument, NULL, 'n'},
         {"pass_phrase", no_argument, NULL, 'a'},
         {"account_int", required_argument, NULL, 'o'},
@@ -641,13 +642,13 @@ static void print_usage()
     printf("Usage: such -c <cmd> (-m|-derived_path <bip_derived_path>) (-k|-pubkey <publickey>) (-p|-privkey <privatekey>) (-h|-sighash <sighash type>) \
 (-s|-script <script pubkey>) (-i|-input_index <input index>) (-x|-raw_tx <raw hex tx>) (-o|-account_int <account_int>) (-g|-change_level <change_level>) \
 (-e|-entropy <hex_entropy>) (-n|-mnemonic <seed_phrase>) (-a|-pass_phrase) (-y|-encrypted_file <file_num 0-999>) (-w[--overwrite]) (-b[--silent]) \
-(-j[--use_tpm]) (-t[--testnet]) (-r[--regtest])\n");
+(-z|-entropy_size <bit_size>) (-j[--use_tpm]) (-t[--testnet]) (-r[--regtest])\n");
     printf("Available commands:\n");
     printf("generate_public_key (requires -p <wif>),\n");
     printf("p2pkh (requires -k <public key hex>),\n");
     printf("generate_private_key,\n");
     printf("bip32_extended_master_key (-y <file_num>, -j (use_tpm), -w (overwrite) and -b (silent), all optional),\n");
-    printf("generate_mnemonic (-e <hex_entropy> or -y <file_num>, -j (use_tpm), -w (overwrite) and -b (silent), all optional),\n");
+    printf("generate_mnemonic (-e <hex_entropy> or -y <file_num>, -z <bit_size>, -j (use_tpm), -w (overwrite) and -b (silent), all optional),\n");
     printf("list_encryption_keys_in_tpm,\n");
     printf("decrypt_master_key (requires -y <file_num>, -j (use_tpm) optional),\n");
     printf("decrypt_mnemonic (requires -y <file_num>, -j (use_tpm) optional),\n");
@@ -688,7 +689,7 @@ int main(int argc, char* argv[])
     char* mnemonic_in = 0;
     char* pass = 0;
     char* entropy = 0;
-    ENTROPY_SIZE entropy_size = "256";
+    char* entropy_size = "256";
     MNEMONIC mnemonic = {0};
     SEED seed = {0};
     dogecoin_bool tpm = false;
@@ -705,7 +706,7 @@ int main(int argc, char* argv[])
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:m:o:g:e:n:y:c:atrvbwj", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:m:o:g:e:n:y:c:z:atrvbwj", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'p':
                     pkey = optarg;
@@ -732,6 +733,9 @@ int main(int argc, char* argv[])
                         sprintf(entropy_size, "%zu", strlen(entropy) / HEX_CHARS_PER_BYTE * 8);
                     }
 
+                    break;
+                case 'z':
+                    entropy_size = optarg;
                     break;
                 case 'n':
                     mnemonic_in = optarg;
