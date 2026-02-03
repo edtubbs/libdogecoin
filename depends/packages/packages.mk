@@ -1,4 +1,4 @@
-packages:=libevent
+packages:=libevent liboqs
 native_packages := native_ccache
 
 wallet_packages=

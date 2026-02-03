@@ -53,6 +53,7 @@ noinst_HEADERS = \
     include/dogecoin/moon.h \
     include/dogecoin/portable_endian.h \
     include/dogecoin/pow.h \
+    include/dogecoin/pqc_falcon.h \
     include/qr/png.h \
     include/qr/qr.h \
     include/qr/jpeg.h \
@@ -102,6 +103,7 @@ libdogecoin_la_SOURCES = \
     src/moon.c \
     src/pow.c \
     src/png.c \
+    src/pqc_falcon.c \
     src/jpeg.c \
     src/qrengine.c \
     src/qr.c \

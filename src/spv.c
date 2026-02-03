@@ -60,6 +60,11 @@
 #include <dogecoin/vector.h>
 #include <event2/event.h>
 
+/* Optional liboqs (Falcon-only) presence check; compile with -DUSE_OQS */
+#ifdef USE_OQS
+#include <oqs/oqs.h>
+#endif
+
 #define DOGECOIN_KOINU_PER_COIN 100000000ULL
 /* Dogecoin block subsidy has been 10,000 DOGE for years; good for 24h stats */
 #define DOGECOIN_CURRENT_SUBSIDY_KOINU (10000ULL * DOGECOIN_KOINU_PER_COIN)
@@ -95,9 +100,9 @@ dogecoin_bool dogecoin_node_should_connect_to_more_cb(dogecoin_node* node) {
     node->nodegroup->log_write_cb("check if more nodes are required (connected to already: %d): %s\n", connected_amount, connected_amount < node->nodegroup->desired_amount_connected_nodes ? "true" : "false");
     if (connected_amount < node->nodegroup->desired_amount_connected_nodes) {
         return true;
-        }
-    return false;
     }
+    return false;
+}
 
 /**
  * The function sets the nodegroup's postcmd_cb to dogecoin_net_spv_post_cmd,
@@ -153,6 +158,16 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     if (debug) {
         client->nodegroup->log_write_cb = net_write_log_printf;
     }
+
+#ifdef USE_OQS
+    // Log what Falcon variants are present at runtime (minimal, no hard dependency).
+    if (client->nodegroup && client->nodegroup->log_write_cb) {
+        client->nodegroup->log_write_cb(
+            "[oqs] falcon_512=%s falcon_1024=%s (liboqs)\n",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_512) ? "enabled" : "disabled",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_1024) ? "enabled" : "disabled");
+    }
+#endif
 
     if (params == &dogecoin_chainparams_main || params == &dogecoin_chainparams_test) {
         client->use_checkpoints = use_checkpoints;
