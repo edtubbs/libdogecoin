@@ -1358,4 +1358,231 @@ void test_bip39()
                 64);
     u_assert_mem_eq(seed, seed_test, 64);
     debug_print("%s\n", utils_uint8_to_hex(seed, 64));
+
+    /*
+     * Electrum seed reference vectors
+     *
+     * v2+ (post-2.0):
+     * - Seed version: HMAC-SHA512("Seed version", prepared_seed)
+     * - Seed derivation: PBKDF2-HMAC-SHA512(
+     *       password = prepared_seed,
+     *       salt     = "electrum" + passphrase,
+     *       rounds   = 2048,
+     *       dkLen    = 64
+     *   )
+     *   Reference:
+     *   https://www.parazyd.org/git/electrum/file/electrum/mnemonic.py.html
+     *
+     * v1 (pre-2.0):
+     * - Seed derivation: stretched seed (32 bytes):
+     *     seed      = SHA256(mnemonic + (" " + passphrase if passphrase non-empty))
+     *     stretched = seed
+     *     repeat 100000 times: stretched = SHA256(stretched + seed)
+     * - NOTE: v1 is 32 bytes. We place it in seed[0..31] and zero seed[32..63].
+     *   Reference:
+     *   https://electrum.readthedocs.io/en/latest/seedphrase.html
+     */
+
+    /* Electrum v2+ (auto-detect) */
+    const char* emn = "yankee victor november foxtrot";
+    const char* epass = "";
+
+    uint32_t ver = 0;
+    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn, &ver), 1);
+    u_assert_int_eq((int)ver, 0x01);
+
+    memset(seed, 0, sizeof(seed));
+    u_assert_int_eq(dogecoin_seed_from_mnemonic(emn, epass, seed), 0);
+
+    /* Expected: PBKDF2-HMAC-SHA512(password=prepared_seed, salt="electrum", rounds=2048, dkLen=64) */
+    const char* expect_e2_hex =
+        "00e532806cdfe0b2cd9dfad2d7319ffd6fd40b4d221bbdbfddbc140cc76fa7be"
+        "f5691078017c4b214b630e76f1c70e5399168bdb3d9173ee56f2d476908d30e7";
+
+    char* got_e2_hex = utils_uint8_to_hex(seed, 64);
+    u_assert_str_eq(got_e2_hex, expect_e2_hex);
+    debug_print("%s\n", got_e2_hex);
+    utils_clear_buffers();
+
+    /* Electrum v1 (pre-v2) */
+    const char* v1_mn = "alpha bravo";
+    const char* v1_pass = "";
+
+    memset(seed, 0, sizeof(seed));
+    u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_mn, v1_pass, seed), 0);
+
+    const char* expect_v1_hex =
+        "d46b151636c4b8dfe628364198808d25e83c0ba21bc0bab094357094ef0b537d"
+        "0000000000000000000000000000000000000000000000000000000000000000";
+
+    char* got_v1_hex = utils_uint8_to_hex(seed, 64);
+    u_assert_str_eq(got_v1_hex, expect_v1_hex);
+    debug_print("%s\n", got_v1_hex);
+    utils_clear_buffers();
+
+    /* 
+     * Additional Electrum v2 test vectors with external verification
+     * 
+     * Reference Implementation: Official Electrum wallet
+     * Source: https://github.com/spesmilo/electrum/blob/master/electrum/mnemonic.py
+     * 
+     * Algorithm: PBKDF2-HMAC-SHA512 with:
+     *   - password: mnemonic (NFKD normalized)
+     *   - salt: "electrum" + passphrase (NFKD normalized)
+     *   - iterations: 2048
+     *   - dkLen: 64 bytes
+     * 
+     * VERIFICATION METHOD - Run this Python command to independently verify:
+     *   python3 -c "import hashlib; print(hashlib.pbkdf2_hmac('sha512', b'wild father tree among universe such mobile favorite target dynamic credit identify', b'electrum', 2048).hex())"
+     * 
+     * These test vectors use Python's standard hashlib.pbkdf2_hmac which implements
+     * the NIST PBKDF2 standard (RFC 2898), making them independently verifiable.
+     */
+    
+    /* Electrum v2 with version 0x100 (segwit) and passphrase 
+     * Test vector verified with Python hashlib.pbkdf2_hmac (NIST standard implementation)
+     * Verification command:
+     *   python3 -c "import hashlib; print(hashlib.pbkdf2_hmac('sha512', b'wild father tree among universe such mobile favorite target dynamic credit identify', b'electrummypassphrase', 2048).hex())"
+     */
+    const char* emn2 = "wild father tree among universe such mobile favorite target dynamic credit identify";
+    const char* epass2 = "mypassphrase";
+    
+    memset(seed, 0, sizeof(seed));
+    ver = 0;
+    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn2, &ver), 1);
+    u_assert_int_eq((int)ver, 0x100); /* segwit seed type */
+    u_assert_int_eq(dogecoin_seed_from_mnemonic(emn2, epass2, seed), 0);
+
+    /* Expected: PBKDF2-HMAC-SHA512(password=mnemonic, salt="electrum"+"mypassphrase", rounds=2048, dkLen=64)
+     * Verified with Python's standard hashlib.pbkdf2_hmac (NIST RFC 2898 implementation) */
+    const char* expect_e2_segwit_pass_hex =
+        "b1e4b6b2adff19b3f21553eac21937493be96732676b804b3784a1b79492dce7"
+        "157de526a2d7b1b34009ff55201c79ec6fc66e3e96dcdcecf22fa9a8d1eaef16";
+
+    char* got_e2_segwit_pass_hex = utils_uint8_to_hex(seed, 64);
+    u_assert_str_eq(got_e2_segwit_pass_hex, expect_e2_segwit_pass_hex);
+    debug_print("%s\n", got_e2_segwit_pass_hex);
+    utils_clear_buffers();
+
+    /* Electrum v2 with version 0x100 (segwit) without passphrase 
+     * Test vector verified with Python hashlib.pbkdf2_hmac (NIST standard)
+     * Verification command:
+     *   python3 -c "import hashlib; print(hashlib.pbkdf2_hmac('sha512', b'wild father tree among universe such mobile favorite target dynamic credit identify', b'electrum', 2048).hex())"
+     */
+    const char* emn3 = "wild father tree among universe such mobile favorite target dynamic credit identify";
+    const char* epass3 = "";
+    
+    memset(seed, 0, sizeof(seed));
+    ver = 0;
+    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn3, &ver), 1);
+    u_assert_int_eq((int)ver, 0x100); /* segwit seed type */
+    u_assert_int_eq(dogecoin_seed_from_mnemonic(emn3, epass3, seed), 0);
+
+    /* Expected: PBKDF2-HMAC-SHA512(password=mnemonic, salt="electrum", rounds=2048, dkLen=64)
+     * Verified with Python hashlib.pbkdf2_hmac - independently verifiable */
+    const char* expect_e2_segwit_hex =
+        "aac2a6302e48577ab4b46f23dbae0774e2e62c796f797d0a1b5faeb528301e30"
+        "64342dafb79069e7c4c6b8c38ae11d7a973bec0d4f70626f8cc5184a8d0b0756";
+
+    char* got_e2_segwit_hex = utils_uint8_to_hex(seed, 64);
+    u_assert_str_eq(got_e2_segwit_hex, expect_e2_segwit_hex);
+    debug_print("%s\n", got_e2_segwit_hex);
+    utils_clear_buffers();
+    
+    /* Additional Electrum v2 test vector from Electrum test suite
+     * Source: Official Electrum GitHub repository test suite
+     * https://github.com/spesmilo/electrum
+     * Mnemonic generates version 0x01 (standard seed)
+     * 
+     * Verification command:
+     *   python3 -c "import hashlib; print(hashlib.pbkdf2_hmac('sha512', b'cycle rocket west magnet parrot shuffle foot correct salt library feed song', b'electrum', 2048).hex())"
+     */
+    const char* emn4 = "cycle rocket west magnet parrot shuffle foot correct salt library feed song";
+    const char* epass4 = "";
+    
+    memset(seed, 0, sizeof(seed));
+    ver = 0;
+    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn4, &ver), 1);
+    u_assert_int_eq((int)ver, 0x01); /* standard seed type */
+    u_assert_int_eq(dogecoin_seed_from_mnemonic(emn4, epass4, seed), 0);
+
+    /* Expected seed verified with Python hashlib.pbkdf2_hmac (NIST standard) */
+    const char* expect_e2_standard_hex =
+        "00302d7db162de47e6cd5074221aee6bbcb6be93982af90c04d0e7710dd26013"
+        "aeb7848850a56a546e7955b360e561139d62805f2d5d3c940880b0dc91b60b29";
+
+    char* got_e2_standard_hex = utils_uint8_to_hex(seed, 64);
+    u_assert_str_eq(got_e2_standard_hex, expect_e2_standard_hex);
+    debug_print("%s\n", got_e2_standard_hex);
+    utils_clear_buffers();
+
+    /* 
+     * Electrum v1 test vectors with external verification
+     * 
+     * Reference: Electrum v1 (pre-2.0) non-standard seed derivation
+     * Source: Original Electrum v1 implementation and documentation
+     *   https://electrum.readthedocs.io/en/latest/seedphrase.html
+     * 
+     * Algorithm for v1 (non-standard, different from BIP39):
+     *   1. Attempt to decode 12-word mnemonic using base-1626 encoding (1626-word list)
+     *      - Each group of 3 words encodes 32 bits: x = w1 + N*(w2-w1 mod N) + N²*(w3-w2 mod N) where N=1626
+     *   2. If decoding succeeds: Convert 16-byte seed to hex string, hash it
+     *   3. If decoding fails: Use fallback SHA256(mnemonic + passphrase)
+     *   4. Stretch: repeat 100,000 times: stretched = SHA256(stretched + seed)
+     *   5. Result is 32 bytes (padded to 64 bytes with zeros for BIP32 compatibility)
+     * 
+     * VERIFICATION - "like just love..." is a VALID Electrum v1 mnemonic:
+     *   - All 12 words are at indices 0-11 in the Electrum v1 wordlist
+     *   - Decodes to 16-byte seed: 00285dfe00285e0100285e0400285e07
+     *   - Hex string "00285dfe00285e0100285e0400285e07" is hashed and stretched
+     *   - This produces: d11e7e95635e37239d6552824587675e7b0581414191dcc94bcc04c5b0e206ec
+     * 
+     * Note: This mnemonic uses the proper base-1626 decoding path, NOT the fallback.
+     */
+    const char* v1_twelve_word_mnemonic = "like just love know never want time out there make look eye";
+    const char* v1_pass2 = "";
+    
+    memset(seed, 0, sizeof(seed));
+    u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_twelve_word_mnemonic, v1_pass2, seed), 0);
+
+    /* Expected: Electrum v1 stretched seed (32 bytes + 32 zero bytes)
+     * Value verified by proper base-1626 decoding followed by SHA-256 stretching */
+    const char* expect_v1_12_hex =
+        "d11e7e95635e37239d6552824587675e7b0581414191dcc94bcc04c5b0e206ec"
+        "0000000000000000000000000000000000000000000000000000000000000000";
+
+    char* got_v1_12_hex = utils_uint8_to_hex(seed, 64);
+    u_assert_str_eq(got_v1_12_hex, expect_v1_12_hex);
+    debug_print("%s\n", got_v1_12_hex);
+    utils_clear_buffers();
+
+    /* 
+     * Electrum v1 with passphrase test
+     * 
+     * Verification command:
+     *   python3 -c "import hashlib; s=hashlib.sha256(b'alpha bravo testpass').digest(); st=s; exec('st=hashlib.sha256(st+s).digest();'*100000); print(st.hex())"
+     * 
+     * When passphrase is provided, it's appended with a space:
+     *   combined = mnemonic + " " + passphrase
+     *   seed = SHA256(combined)
+     *   stretched = 100,000 iterations of SHA256(stretched + seed)
+     * 
+     * Test vector verified with Python hashlib.sha256 (can be independently verified)
+     */
+    const char* v1_mn3 = "alpha bravo";
+    const char* v1_pass3 = "testpass";
+    
+    memset(seed, 0, sizeof(seed));
+    u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_mn3, v1_pass3, seed), 0);
+
+    /* Expected: Electrum v1 stretched seed with passphrase (32 bytes + 32 zero bytes)
+     * Verified with Python hashlib.sha256 stretching - independently verifiable */
+    const char* expect_v1_pass_hex =
+        "d51554cccc286493f510b8c2a4104e4132562518a5db4ec5e8a3325dff8234ee"
+        "0000000000000000000000000000000000000000000000000000000000000000";
+
+    char* got_v1_pass_hex = utils_uint8_to_hex(seed, 64);
+    u_assert_str_eq(got_v1_pass_hex, expect_v1_pass_hex);
+    debug_print("%s\n", got_v1_pass_hex);
+    utils_clear_buffers();
 }
