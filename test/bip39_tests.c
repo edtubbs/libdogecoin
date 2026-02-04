@@ -1358,4 +1358,65 @@ void test_bip39()
                 64);
     u_assert_mem_eq(seed, seed_test, 64);
     debug_print("%s\n", utils_uint8_to_hex(seed, 64));
+
+    /*
+     * Electrum seed reference vectors
+     *
+     * v2+ (post-2.0):
+     * - Seed version: HMAC-SHA512("Seed version", prepared_seed)
+     * - Seed derivation: PBKDF2-HMAC-SHA512(
+     *       password = prepared_seed,
+     *       salt     = "electrum" + passphrase,
+     *       rounds   = 2048,
+     *       dkLen    = 64
+     *   )
+     *   Reference:
+     *   https://www.parazyd.org/git/electrum/file/electrum/mnemonic.py.html
+     *
+     * v1 (pre-2.0):
+     * - Seed derivation: stretched seed (32 bytes):
+     *     seed      = SHA256(mnemonic + (" " + passphrase if passphrase non-empty))
+     *     stretched = seed
+     *     repeat 100000 times: stretched = SHA256(stretched + seed)
+     * - NOTE: v1 is 32 bytes. We place it in seed[0..31] and zero seed[32..63].
+     *   Reference:
+     *   https://electrum.readthedocs.io/en/latest/seedphrase.html
+     */
+
+    /* Electrum v2+ (auto-detect) */
+    const char* emn = "yankee victor november foxtrot";
+    const char* epass = "";
+
+    uint32_t ver = 0;
+    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn, &ver), 1);
+    u_assert_int_eq((int)ver, 0x01);
+
+    memset(seed, 0, sizeof(seed));
+    u_assert_int_eq(dogecoin_seed_from_mnemonic(emn, epass, seed), 0);
+
+    /* Expected: PBKDF2-HMAC-SHA512(password=prepared_seed, salt="electrum", rounds=2048, dkLen=64) */
+    const char* expect_e2_hex =
+        "00e532806cdfe0b2cd9dfad2d7319ffd6fd40b4d221bbdbfddbc140cc76fa7be"
+        "f5691078017c4b214b630e76f1c70e5399168bdb3d9173ee56f2d476908d30e7";
+
+    char* got_e2_hex = utils_uint8_to_hex(seed, 64);
+    u_assert_str_eq(got_e2_hex, expect_e2_hex);
+    debug_print("%s\n", got_e2_hex);
+    utils_clear_buffers();
+
+    /* Electrum v1 (pre-v2) */
+    const char* v1_mn = "alpha bravo";
+    const char* v1_pass = "";
+
+    memset(seed, 0, sizeof(seed));
+    u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_mn, v1_pass, seed), 0);
+
+    const char* expect_v1_hex =
+        "d46b151636c4b8dfe628364198808d25e83c0ba21bc0bab094357094ef0b537d"
+        "0000000000000000000000000000000000000000000000000000000000000000";
+
+    char* got_v1_hex = utils_uint8_to_hex(seed, 64);
+    u_assert_str_eq(got_v1_hex, expect_v1_hex);
+    debug_print("%s\n", got_v1_hex);
+    utils_clear_buffers();
 }
