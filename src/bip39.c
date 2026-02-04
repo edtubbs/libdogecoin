@@ -26,6 +26,10 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+
 #include <bip39/index.h>
 #include <dogecoin/bip39.h>
 #include <dogecoin/utils.h>
@@ -39,6 +43,317 @@
 #endif
 #include <windows.h>
 #endif
+
+#include <bip39/electrum.h>  // For wordlist_electrum[1626]
+
+/*
+ * Electrum seed support (minimal, additive)
+ *
+ * Electrum v2+:
+ * - seed version = int(prefix,16) where prefix comes from HMAC-SHA512("Seed version", prepared_seed)
+ * - seed bytes   = PBKDF2-HMAC-SHA512(password=prepared_seed, salt="electrum"+passphrase, rounds=2048, dklen=64)
+ *
+ * Electrum v1 (pre-v2):
+ * - 12 words from 1626-word list encode/decode a 16-byte (128-bit) seed
+ * - seed bytes   = stretched seed (32 bytes):
+ *     seed      = SHA256(mnemonic + (" " + passphrase if passphrase non-empty))
+ *     stretched = seed
+ *     repeat 100000 times: stretched = SHA256(stretched + seed)
+ * - NOTE: v1 is 32 bytes. We place it in seed[0..31] and zero seed[32..63].
+ */
+
+#define ELECTRUM_V1_WORDLIST_SIZE 1626
+#define ELECTRUM_V1_SEED_BYTES 16
+/* Electrum v1 requires exactly 12 words (4 groups of 3) encoding 16 bytes.
+ * Verified: bip-utils ElectrumV1MnemonicConst.MNEMONIC_WORD_NUM == [12] */
+#define ELECTRUM_V1_WORDS 12
+
+/* HMAC-SHA512(key, msg) -> hex string */
+static void electrum_hmac_sha512_hex(const unsigned char* key, size_t keylen,
+                                     const unsigned char* msg, size_t msglen,
+                                     char out_hex[129])
+{
+    unsigned char mac[SHA512_DIGEST_LENGTH];
+    dogecoin_mem_zero(mac, sizeof(mac));
+    dogecoin_mem_zero(out_hex, 129);
+
+    /* libdogecoin sha2 provides hmac_sha512 */
+    hmac_sha512(key, keylen, msg, msglen, mac);
+
+    for (size_t i = 0; i < SHA512_DIGEST_LENGTH; i++) {
+        sprintf(&out_hex[i * 2], "%02x", mac[i]);
+    }
+    out_hex[128] = '\0';
+    dogecoin_mem_zero(mac, sizeof(mac));
+}
+
+/* Check if mnemonic is an Electrum v2+ seed and optionally return its version. */
+/* mnemonic code words */
+/* pointer to receive version number (optional, may be NULL) */
+/* returns 0 (success), -1 (fail) */
+int dogecoin_mnemonic_is_electrum_seed(const char* mnemonic, uint32_t* out_version)
+{
+    if (!mnemonic) return -1;
+
+    /* NFKD + casefold in a single utf8proc_map call */
+    utf8proc_uint8_t *norm = NULL;
+    utf8proc_ssize_t norm_ret = utf8proc_map(
+        (const utf8proc_uint8_t *)mnemonic, 0, &norm,
+        (utf8proc_option_t)(UTF8PROC_NULLTERM | UTF8PROC_STABLE |
+                            UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT |
+                            UTF8PROC_CASEFOLD));
+    if (norm_ret < 0 || !norm) return -1;
+
+    size_t seed_len = (size_t)norm_ret;
+
+    char mac_hex[129];
+    electrum_hmac_sha512_hex((const unsigned char*)"Seed version", strlen("Seed version"),
+                             norm, seed_len,
+                             mac_hex);
+    dogecoin_free(norm);
+
+    /* prefix length = int(mac_hex[0],16) + 2 */
+    int nibble = 0;
+    if (mac_hex[0] >= '0' && mac_hex[0] <= '9') nibble = mac_hex[0] - '0';
+    else if (mac_hex[0] >= 'a' && mac_hex[0] <= 'f') nibble = mac_hex[0] - 'a' + 10;
+    else if (mac_hex[0] >= 'A' && mac_hex[0] <= 'F') nibble = mac_hex[0] - 'A' + 10;
+    else return -1;
+
+    int prefix_len = nibble + 2;
+    if (prefix_len < 2 || prefix_len > 8) return -1; /* sanity */
+
+    char prefix[9];
+    dogecoin_mem_zero(prefix, sizeof(prefix));
+    memcpy(prefix, mac_hex, (size_t)prefix_len);
+    prefix[prefix_len] = '\0';
+
+    uint32_t ver = (uint32_t)strtoul(prefix, NULL, 16);
+
+    /* known Electrum v2+ versions */
+    if (ver == 0x01 || ver == 0x100 || ver == 0x101) {
+        if (out_version) *out_version = ver;
+        return 0;
+    }
+
+    return -1;
+}
+
+/* Derive the 64-byte seed from an Electrum v2+ seed phrase and optional passphrase. */
+/* mnemonic code words */
+/* passphrase (optional) */
+/* 512-bit seed */
+/* returns 0 (success), -1 (fail) */
+int dogecoin_seed_from_electrum_mnemonic(const char* mnemonic, const char* passphrase, SEED seed)
+{
+    if (!mnemonic || !seed) {
+        fprintf(stderr, "ERROR: invalid input arguments\n");
+        return -1;
+    }
+
+    if (passphrase == NULL) {
+        passphrase = "";
+    }
+
+    /* NFKD + casefold in a single utf8proc_map call */
+    utf8proc_uint8_t *norm = NULL;
+    utf8proc_ssize_t norm_ret = utf8proc_map(
+        (const utf8proc_uint8_t *)mnemonic, 0, &norm,
+        (utf8proc_option_t)(UTF8PROC_NULLTERM | UTF8PROC_STABLE |
+                            UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT |
+                            UTF8PROC_CASEFOLD));
+    if (norm_ret < 0 || !norm) {
+        fprintf(stderr, "ERROR: failed to NFKD-normalize electrum mnemonic\n");
+        return -1;
+    }
+
+    size_t seed_len = (size_t)norm_ret;
+
+    size_t salt_len = strlen("electrum") + strlen(passphrase);
+    char* salt = malloc(salt_len + 1);
+    if (!salt) {
+        fprintf(stderr, "ERROR: Failed to allocate memory for electrum salt\n");
+        dogecoin_free(norm);
+        return -1;
+    }
+    salt[0] = '\0';
+    strcat(salt, "electrum");
+    strcat(salt, passphrase);
+
+    /* PBKDF2-HMAC-SHA512, rounds=2048, dkLen=64 */
+    memset(seed, 0, MAX_SEED_SIZE);
+    pbkdf2_hmac_sha512(norm, seed_len,
+                       (const unsigned char*)salt, strlen(salt),
+                       ITERATIONS, seed);
+
+    dogecoin_mem_zero(norm, seed_len);
+    dogecoin_free(norm);
+    dogecoin_mem_zero(salt, salt_len + 1);
+    dogecoin_free(salt);
+    return 0;
+}
+
+/*
+ * Electrum v1 (pre-v2) seed support (minimal, additive)
+ */
+
+/*
+ * Find word index in Electrum v1 wordlist.
+ * Returns index 0-1625, or -1 if not found.
+ */
+static int electrum_v1_find_word(const char* word)
+{
+    if (!word) return -1;
+
+    for (int i = 0; i < ELECTRUM_V1_WORDLIST_SIZE; i++) {
+        if (strcmp(word, wordlist_electrum[i]) == 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+/* Decode 12-word Electrum v1 mnemonic to 16-byte seed (old_mnemonic.mn_decode).
+ * Electrum v1 requires exactly 12 words — each group of 3 words encodes 32 bits
+ * via base-1626 arithmetic, yielding 4 × 4 = 16 bytes of entropy. */
+static int electrum_v1_decode_mnemonic(const char* mnemonic,
+                                       unsigned char seed16_out[ELECTRUM_V1_SEED_BYTES])
+{
+    if (!mnemonic || !seed16_out) return -1;
+
+    /* NFKD + casefold in a single utf8proc_map call */
+    utf8proc_uint8_t *norm = NULL;
+    utf8proc_ssize_t norm_ret = utf8proc_map(
+        (const utf8proc_uint8_t *)mnemonic, 0, &norm,
+        (utf8proc_option_t)(UTF8PROC_NULLTERM | UTF8PROC_STABLE |
+                            UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT |
+                            UTF8PROC_CASEFOLD));
+    if (norm_ret < 0 || !norm) return -1;
+
+    /* copy to mutable stack buffer for strtok_r */
+    char buf[MAX_MNEMONIC_STRING_SIZE];
+    dogecoin_mem_zero(buf, sizeof(buf));
+    if ((size_t)norm_ret >= sizeof(buf)) {
+        dogecoin_free(norm);
+        return -1;
+    }
+    memcpy(buf, norm, (size_t)norm_ret + 1);
+    dogecoin_free(norm);
+
+    /* parse 12 words */
+    uint16_t idx[ELECTRUM_V1_WORDS];
+    int wc = 0;
+    char* saveptr = NULL;
+
+    char* tok = strtok_r(buf, " ", &saveptr);
+    while (tok) {
+        if (wc >= ELECTRUM_V1_WORDS) return -1;
+        int w = electrum_v1_find_word(tok);
+        if (w < 0) return -1;
+        idx[wc++] = (uint16_t)w;
+        tok = strtok_r(NULL, " ", &saveptr);
+    }
+    if (wc != ELECTRUM_V1_WORDS) return -1;
+
+    const uint32_t N = ELECTRUM_V1_WORDLIST_SIZE;
+
+    /* each 3 words -> 32 bits */
+    for (int g = 0; g < 4; g++) {
+        uint32_t w1 = idx[g * 3 + 0];
+        uint32_t w2 = idx[g * 3 + 1];
+        uint32_t w3 = idx[g * 3 + 2];
+
+        uint32_t d12 = (w2 + N - w1) % N;
+        uint32_t d23 = (w3 + N - w2) % N;
+
+        uint64_t x64 = (uint64_t)w1
+                     + (uint64_t)N * (uint64_t)d12
+                     + (uint64_t)N * (uint64_t)N * (uint64_t)d23;
+
+        /* reject impossible triples (some word triples map above 2^32-1) */
+        if (x64 > 0xFFFFFFFFULL) return -1;
+
+        uint32_t x = (uint32_t)x64;
+
+        seed16_out[g * 4 + 0] = (unsigned char)(x >> 24);
+        seed16_out[g * 4 + 1] = (unsigned char)(x >> 16);
+        seed16_out[g * 4 + 2] = (unsigned char)(x >> 8);
+        seed16_out[g * 4 + 3] = (unsigned char)(x);
+    }
+
+    return 0;
+}
+
+/* Encode 16-byte seed to 12 Electrum v1 words (old_mnemonic.mn_encode). */
+static int electrum_v1_encode_mnemonic(const unsigned char seed16[ELECTRUM_V1_SEED_BYTES],
+                                       char* out, size_t outlen)
+{
+    if (!seed16 || !out || outlen == 0) return -1;
+
+    const uint32_t N = ELECTRUM_V1_WORDLIST_SIZE;
+    size_t pos = 0;
+    out[0] = '\0';
+
+    for (int g = 0; g < 4; g++) {
+        uint32_t x =
+            ((uint32_t)seed16[g * 4 + 0] << 24) |
+            ((uint32_t)seed16[g * 4 + 1] << 16) |
+            ((uint32_t)seed16[g * 4 + 2] << 8)  |
+            ((uint32_t)seed16[g * 4 + 3]);
+
+        uint32_t w1 = x % N;
+        uint32_t w2 = ((x / N) + w1) % N;
+        uint32_t w3 = ((x / (N * N)) + w2) % N;
+
+        const char* a = wordlist_electrum[w1];
+        const char* b = wordlist_electrum[w2];
+        const char* c = wordlist_electrum[w3];
+
+        const char* sp = (pos == 0) ? "" : " ";
+        int n = snprintf(out + pos, outlen - pos, "%s%s %s %s", sp, a, b, c);
+        if (n < 0 || (size_t)n >= outlen - pos) return -1;
+        pos += (size_t)n;
+    }
+
+    return 0;
+}
+
+
+/*
+ * Decode Electrum v1 seed from 12-word mnemonic.
+ *
+ * Decodes a valid 12-word Electrum v1 mnemonic (from the 1626-word list)
+ * to a 16-byte seed using base-1626. The raw decoded seed is stored in
+ * seed[0..15] and the remaining bytes are zeroed.
+ *
+ * In original Electrum v1, the seed is the raw decoded value (e.g.
+ * '8edad31a95e7d59f8837667510d75a4d'). The stretch_key() operation is
+ * applied later during key derivation, not during seed storage.
+ *
+ * Returns 0 on success, -1 if the mnemonic is not a valid Electrum v1 mnemonic.
+ */
+int dogecoin_seed_from_electrum_v1_mnemonic(const char* mnemonic, const char* passphrase, SEED seed)
+{
+    (void)passphrase; /* unused in Electrum v1 seed decoding */
+    memset(seed, 0, MAX_SEED_SIZE);
+
+    if (!mnemonic || !seed) {
+        return -1;
+    }
+
+    /* Decode 12-word mnemonic to 16-byte seed */
+    unsigned char seed16[ELECTRUM_V1_SEED_BYTES];
+    dogecoin_mem_zero(seed16, sizeof(seed16));
+
+    if (electrum_v1_decode_mnemonic(mnemonic, seed16) != 0) {
+        return -1; /* Not a valid Electrum v1 mnemonic */
+    }
+
+    /* Store the raw decoded 16-byte seed directly */
+    memcpy(seed, seed16, ELECTRUM_V1_SEED_BYTES);
+
+    dogecoin_mem_zero(seed16, sizeof(seed16));
+    return 0;
+}
 
 /*
  * This function implements the first part of the BIP-39 algorithm.
@@ -73,7 +388,6 @@ int get_mnemonic(const int entropysize, const char* entropy, const char* wordlis
         return -1;
     }
 
-
     int entBytes = entropysize / 8; // bytes instead of bits
     int csAdd = entropysize / 32; // portion in bits of a single byte
 
@@ -87,7 +401,6 @@ int get_mnemonic(const int entropysize, const char* entropy, const char* wordlis
     }
     entropyBits[0] = '\0';
     dogecoin_mem_zero(entropyBits, entropysize + 1);  // Initialize entropyBits to all zeros
-
 
     char binaryByte[9] = "";
 
@@ -275,7 +588,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         DWORD error = GetLastError();
         FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
         NULL, error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&message, 0, NULL);
-        fprintf(stderr, "ERROR: getting length of normalized passphrase: %s\n", message);
+        fprintf(stderr, "ERROR: getting length of normalized passphrase: %s\n", (char*)message);
         LocalFree(message);
         dogecoin_free(salt);
         dogecoin_free(pass_w);
@@ -331,10 +644,10 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
     }
 
     /* Convert normalized passphrase and salt to multi-byte characters */
-    int norm_pass_mb_len = WideCharToMultiByte(CP_UTF8, 0, norm_pass, norm_pass_len, NULL, 0, NULL, NULL);
-    int norm_salt_mb_len = WideCharToMultiByte(CP_UTF8, 0, norm_salt, norm_salt_len, NULL, 0, NULL, NULL);
+    int norm_pass_mb_len = WideCharToMultiByte(CP_UTF8, 0, norm_pass, (int)norm_pass_len, NULL, 0, NULL, NULL);
+    int norm_salt_mb_len = WideCharToMultiByte(CP_UTF8, 0, norm_salt, (int)norm_salt_len, NULL, 0, NULL, NULL);
 
-    if (norm_pass_len == 0) {
+    if (norm_pass_mb_len == 0) {
         fprintf(stderr, "ERROR: converting normalized passphrase to multi-byte characters\n");
         dogecoin_free(salt);
         dogecoin_free(pass_w);
@@ -343,8 +656,8 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         dogecoin_free(norm_salt);
         return -1;
     }
-    if (norm_salt_len == 0) {
-        fprintf(stderr, "ERROR: converting normalized seed to multi-byte characters\n");
+    if (norm_salt_mb_len == 0) {
+        fprintf(stderr, "ERROR: converting normalized salt to multi-byte characters\n");
         dogecoin_free(salt);
         dogecoin_free(pass_w);
         dogecoin_free(salt_w);
@@ -353,7 +666,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         return -1;
     }
 
-    char* norm_pass_mb = malloc(norm_pass_mb_len * sizeof(char));
+    char* norm_pass_mb = malloc((size_t)norm_pass_mb_len);
     if (norm_pass_mb == NULL) {
         fprintf(stderr, "ERROR: allocating memory for normalized passphrase multi-byte characters\n");
         dogecoin_free(salt);
@@ -363,7 +676,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         dogecoin_free(norm_salt);
         return -1;
     }
-    char* norm_salt_mb = malloc(norm_salt_mb_len * sizeof(char));
+    char* norm_salt_mb = malloc((size_t)norm_salt_mb_len);
     if (norm_salt_mb == NULL) {
         fprintf(stderr, "ERROR: allocating memory for normalized salt multi-byte characters\n");
         dogecoin_free(salt);
@@ -375,7 +688,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         return -1;
     }
 
-    if (WideCharToMultiByte(CP_UTF8, 0, norm_pass, norm_pass_len, norm_pass_mb, norm_pass_mb_len, NULL, NULL) == 0) {
+    if (WideCharToMultiByte(CP_UTF8, 0, norm_pass, (int)norm_pass_len, norm_pass_mb, norm_pass_mb_len, NULL, NULL) == 0) {
         fprintf(stderr, "ERROR: converting normalized passphrase to multi-byte characters\n");
         dogecoin_free(salt);
         dogecoin_free(pass_w);
@@ -387,8 +700,8 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
         return -1;
     }
 
-    if (WideCharToMultiByte(CP_UTF8, 0, norm_salt, norm_salt_len, norm_salt_mb, norm_salt_mb_len, NULL, NULL) == 0) {
-        fprintf(stderr, "ERROR: converting normalized passphrase to multi-byte characters\n");
+    if (WideCharToMultiByte(CP_UTF8, 0, norm_salt, (int)norm_salt_len, norm_salt_mb, norm_salt_mb_len, NULL, NULL) == 0) {
+        fprintf(stderr, "ERROR: converting normalized salt to multi-byte characters\n");
         dogecoin_free(salt);
         dogecoin_free(pass_w);
         dogecoin_free(salt_w);
@@ -407,7 +720,9 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
     dogecoin_free(norm_salt);
 
     /* pbkdf2 hmac sha512 */
-    pbkdf2_hmac_sha512((const unsigned char*) norm_pass_mb, norm_pass_mb_len, (const unsigned char*) norm_salt_mb, norm_salt_mb_len, ITERATIONS, seed);
+    pbkdf2_hmac_sha512((const unsigned char*) norm_pass_mb, (size_t)norm_pass_mb_len,
+                       (const unsigned char*) norm_salt_mb, (size_t)norm_salt_mb_len,
+                       ITERATIONS, seed);
 
     dogecoin_free(norm_pass_mb);
     dogecoin_free(norm_salt_mb);
@@ -633,8 +948,8 @@ int produce_mnemonic_sentence(const int segSize, const int checksumBits, const c
      * ensuring that the segment array does not overflow.
      */
 
-    strncat(segment, entropy, segSize - strlen(segment) - 1);
-    strncat(segment, csBits, segSize - strlen(segment) - 1);
+    strncat(segment, entropy, segSize - (int)strlen(segment) - 1);
+    strncat(segment, csBits, segSize - (int)strlen(segment) - 1);
 
     dogecoin_free (csBits);
 
@@ -750,7 +1065,7 @@ int verify_mnemonic_sentence(const char* mnemonic, const char* wordlist[], const
     }
 
     /* compute bit lengths */
-    int total_bits    = word_count * BITS_PER_WORD;
+    int total_bits    = (int)(word_count * BITS_PER_WORD);
     int checksum_bits = total_bits / 33;
     int entropy_bits  = total_bits - checksum_bits;
     int entropy_bytes = entropy_bits / 8;
@@ -804,12 +1119,12 @@ int verify_mnemonic_sentence(const char* mnemonic, const char* wordlist[], const
         dogecoin_free(buf);
         return -1;
     }
-    dogecoin_mem_zero(entropy, entropy_bytes);
+    dogecoin_mem_zero(entropy, (size_t)entropy_bytes);
     for (int i = 0; i < entropy_bytes; i++) {
         unsigned char byte = 0;
         for (int b = 0; b < 8; b++) {
             if (bitstr[i * 8 + b] == '1') {
-                byte |= (1 << (7 - b));
+                byte |= (unsigned char)(1 << (7 - b));
             }
         }
         entropy[i] = byte;
@@ -817,7 +1132,7 @@ int verify_mnemonic_sentence(const char* mnemonic, const char* wordlist[], const
 
     /* SHA-256 and compare checksum bits */
     unsigned char hash[SHA256_DIGEST_LENGTH];
-    sha256_raw(entropy, entropy_bytes, hash);
+    sha256_raw(entropy, (size_t)entropy_bytes, hash);
 
     for (int i = 0; i < checksum_bits; i++) {
         char expected = ((hash[0] >> (7 - i)) & 1) ? '1' : '0';
@@ -833,12 +1148,12 @@ int verify_mnemonic_sentence(const char* mnemonic, const char* wordlist[], const
 
     /* clean up */
     utils_clear_buffers();
-    dogecoin_mem_zero(entropy, entropy_bytes);
-    dogecoin_mem_zero(bitstr, total_bits);
+    dogecoin_mem_zero(entropy, (size_t)entropy_bytes);
+    dogecoin_mem_zero(bitstr, (size_t)total_bits);
     dogecoin_mem_zero(buf, mlen + 1);
     dogecoin_free(bitstr);
     dogecoin_free(entropy);
-    free(buf);
+    dogecoin_free(buf);
     return 0;
 }
 
@@ -864,7 +1179,7 @@ int dogecoin_generate_mnemonic (const ENTROPY_SIZE entropy_size, const char* lan
     if (entropy_size != NULL) {
 
         /* load custom word file into memory if path is valid */
-	    if (filepath != NULL) {
+        if (filepath != NULL) {
             if (get_custom_words (filepath, (char **) wordlist) == -1) {
 
                 /* Free memory for custom words */
@@ -890,11 +1205,11 @@ int dogecoin_generate_mnemonic (const ENTROPY_SIZE entropy_size, const char* lan
         if (entropy != NULL) {
 
             /* Calculate expected size of entropy hex string */
-            size_t expected_entropy_size = strtol(entropy_size, NULL, 10) / 8 * HEX_CHARS_PER_BYTE;
+            size_t expected_entropy_size = (size_t)strtol(entropy_size, NULL, 10) / 8 * HEX_CHARS_PER_BYTE;
 
             /* Verify size of the string equals the entropy_size specified */
             if (strlen(entropy) != expected_entropy_size) {
-                fprintf(stderr, "ERROR: invalid entropy string, expected %ld characters\n", expected_entropy_size);
+                fprintf(stderr, "ERROR: invalid entropy string, expected %ld characters\n", (long)expected_entropy_size);
 
                 /* Free memory for custom words */
                 if (filepath != NULL) {
@@ -907,7 +1222,7 @@ int dogecoin_generate_mnemonic (const ENTROPY_SIZE entropy_size, const char* lan
         }
 
         /* convert string value for entropy size to base 10 and get mnemonic */
-        if (get_mnemonic(strtol(entropy_size, NULL, 10), entropy, (const char **) wordlist, space, entropy_out, words, size) == -1) {
+        if (get_mnemonic((int)strtol(entropy_size, NULL, 10), entropy, (const char **) wordlist, space, entropy_out, words, size) == -1) {
             fprintf(stderr, "ERROR: Failed to get mnemonic\n");
 
             /* Free memory for custom words */
@@ -1002,7 +1317,15 @@ int dogecoin_seed_from_mnemonic (const char* mnemonic, const char* passphrase, S
         passphrase = "";
     }
 
-    /* get binary seed */
+    /* Electrum v2+ (post-v2) auto-detect */
+    if (dogecoin_mnemonic_is_electrum_seed(mnemonic, NULL) == 0) {
+        if (dogecoin_seed_from_electrum_mnemonic(mnemonic, passphrase, seed) == 0) {
+            return 0;
+        }
+        /* fall through to BIP39 if something failed */
+    }
+
+    /* BIP39 seed derivation */
     if (get_root_seed(mnemonic, passphrase, seed) == -1) {
         fprintf(stderr, "ERROR: Failed to get root seed\n");
         return -1;

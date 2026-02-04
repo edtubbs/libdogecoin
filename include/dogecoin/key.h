@@ -103,6 +103,13 @@ LIBDOGECOIN_API void getWifEncodedPrivKey(const uint8_t privkey[DOGECOIN_ECKEY_P
 // wrapper for wif decoding
 LIBDOGECOIN_API int getDecodedPrivKeyWif(const char privkey_wif[PRIVKEYWIFLEN], const dogecoin_bool is_testnet, uint8_t privkey[DOGECOIN_ECKEY_PKEY_LENGTH]);
 
+// Electrum v1 (pre-v2) deterministic key derivation.
+// Takes raw 16-byte v1 seed (in first 16 bytes), stretches it, and derives child key.
+LIBDOGECOIN_API int electrum_v1_derive_privkey32(const uint8_t v1_seed[32],
+                                       uint32_t n,
+                                       uint32_t for_change,
+                                       uint8_t out_priv32[32]);
+
 LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_KEY_H__

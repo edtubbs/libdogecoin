@@ -274,3 +274,133 @@ int getDecodedPrivKeyWif(const char privkey_wif[PRIVKEYWIFLEN], const dogecoin_b
     memcpy_safe(privkey, key.privkey, DOGECOIN_ECKEY_PKEY_LENGTH);
     return 1;
 }
+
+/*
+ * Electrum v1 (pre-v2) deterministic key derivation.
+ *
+ * Given raw Electrum v1 seed (16 bytes in v1_seed[0..15]) from
+ * dogecoin_seed_from_electrum_v1_mnemonic(), derives a child private key:
+ *
+ *   1. Convert 16-byte seed to hex string (32 ASCII chars)
+ *   2. stretch_key: repeat 100000 times: s = SHA256(s + oldseed) → master secret
+ *   3. mpk = uncompressed_pubkey(master_secret)[1..64] (raw 64 bytes)
+ *   4. tweak = double_SHA256( "<n>:<for_change>:" + mpk_raw )
+ *   5. priv_n = (master_secret + tweak) mod curve_order
+ *
+ * We map:
+ *   -i => n
+ *   -g => for_change (0 external, 1 internal)
+ *   -o ignored (no accounts in v1)
+ */
+int electrum_v1_derive_privkey32(const uint8_t v1_seed[32],
+                                 uint32_t n,
+                                 uint32_t for_change,
+                                 uint8_t out_priv32[32])
+{
+    if (!v1_seed || !out_priv32) return 0;
+
+    /* Step 1: Convert 16-byte seed to hex string (32 ASCII chars) */
+    char seed_hex[33];
+    dogecoin_mem_zero(seed_hex, sizeof(seed_hex));
+    for (int i = 0; i < 16; i++) {
+        sprintf(seed_hex + i * 2, "%02x", v1_seed[i]);
+    }
+    seed_hex[32] = '\0';
+
+    /* Step 2: stretch_key — Electrum v1 key stretching (100,000 SHA256 iterations) */
+    unsigned char master_secret[32];
+    {
+        unsigned char x[32];
+        memcpy(x, seed_hex, 32);
+        for (int i = 0; i < 100000; i++) {
+            unsigned char buf[64];
+            memcpy(buf, x, 32);
+            memcpy(buf + 32, seed_hex, 32);
+            sha256_raw(buf, sizeof(buf), x);
+            dogecoin_mem_zero(buf, sizeof(buf));
+        }
+        memcpy(master_secret, x, 32);
+        dogecoin_mem_zero(x, sizeof(x));
+    }
+
+    dogecoin_mem_zero(seed_hex, sizeof(seed_hex));
+
+    /* Step 3: mpk = uncompressed_pubkey(master_secret)[1..64] (x||y) */
+    uint8_t pubser[65];
+    size_t publen = sizeof(pubser);
+    dogecoin_mem_zero(pubser, sizeof(pubser));
+
+    dogecoin_ecc_get_pubkey(master_secret, pubser, &publen, /*compressed=*/false);
+
+    if (publen != 65 || pubser[0] != 0x04) {
+        dogecoin_mem_zero(pubser, sizeof(pubser));
+        dogecoin_mem_zero(master_secret, sizeof(master_secret));
+        return 0;
+    }
+
+    /* Step 4: tweak = double_SHA256( prefix + mpk_raw_bytes ) */
+    char prefix[32];
+    dogecoin_mem_zero(prefix, sizeof(prefix));
+    int prefix_len = snprintf(prefix, sizeof(prefix), "%u:%u:", n, for_change);
+    if (prefix_len <= 0 || prefix_len >= (int)sizeof(prefix)) {
+        dogecoin_mem_zero(pubser, sizeof(pubser));
+        dogecoin_mem_zero(master_secret, sizeof(master_secret));
+        return 0;
+    }
+
+    unsigned char msg[32 + 64];
+    dogecoin_mem_zero(msg, sizeof(msg));
+    memcpy(msg, prefix, (size_t)prefix_len);
+    memcpy(msg + prefix_len, pubser + 1, 64);
+
+    uint8_t hash1[32];
+    uint8_t tweak32[32];
+    dogecoin_mem_zero(hash1, sizeof(hash1));
+    dogecoin_mem_zero(tweak32, sizeof(tweak32));
+    sha256_raw(msg, (size_t)prefix_len + 64, hash1);
+    sha256_raw(hash1, sizeof(hash1), tweak32);
+
+    /* Step 5: out_priv = master_secret + tweak (mod curve_order) */
+    memcpy(out_priv32, master_secret, 32);
+
+    if (!dogecoin_ecc_verify_privatekey(out_priv32)) {
+        dogecoin_mem_zero(out_priv32, 32);
+        dogecoin_mem_zero(pubser, sizeof(pubser));
+        dogecoin_mem_zero(master_secret, sizeof(master_secret));
+        dogecoin_mem_zero(prefix, sizeof(prefix));
+        dogecoin_mem_zero(msg, sizeof(msg));
+        dogecoin_mem_zero(hash1, sizeof(hash1));
+        dogecoin_mem_zero(tweak32, sizeof(tweak32));
+        return 0;
+    }
+
+    if (!dogecoin_ecc_private_key_tweak_add(out_priv32, tweak32)) {
+        dogecoin_mem_zero(out_priv32, 32);
+        dogecoin_mem_zero(pubser, sizeof(pubser));
+        dogecoin_mem_zero(master_secret, sizeof(master_secret));
+        dogecoin_mem_zero(prefix, sizeof(prefix));
+        dogecoin_mem_zero(msg, sizeof(msg));
+        dogecoin_mem_zero(hash1, sizeof(hash1));
+        dogecoin_mem_zero(tweak32, sizeof(tweak32));
+        return 0;
+    }
+
+    if (!dogecoin_ecc_verify_privatekey(out_priv32)) {
+        dogecoin_mem_zero(out_priv32, 32);
+        dogecoin_mem_zero(pubser, sizeof(pubser));
+        dogecoin_mem_zero(master_secret, sizeof(master_secret));
+        dogecoin_mem_zero(prefix, sizeof(prefix));
+        dogecoin_mem_zero(msg, sizeof(msg));
+        dogecoin_mem_zero(hash1, sizeof(hash1));
+        dogecoin_mem_zero(tweak32, sizeof(tweak32));
+        return 0;
+    }
+
+    dogecoin_mem_zero(pubser, sizeof(pubser));
+    dogecoin_mem_zero(master_secret, sizeof(master_secret));
+    dogecoin_mem_zero(prefix, sizeof(prefix));
+    dogecoin_mem_zero(msg, sizeof(msg));
+    dogecoin_mem_zero(hash1, sizeof(hash1));
+    dogecoin_mem_zero(tweak32, sizeof(tweak32));
+    return 1;
+}

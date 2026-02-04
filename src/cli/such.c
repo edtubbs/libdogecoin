@@ -47,6 +47,7 @@
 #include <dogecoin/uthash.h>
 
 #include <dogecoin/address.h>
+#include <dogecoin/base58.h>
 #include <dogecoin/bip32.h>
 #include <dogecoin/bip39.h>
 #include <dogecoin/bip44.h>
@@ -54,6 +55,8 @@
 #include <dogecoin/chainparams.h>
 #include <dogecoin/ecc.h>
 #include <dogecoin/eckey.h>
+#include <dogecoin/key.h>
+#include <dogecoin/hash.h>
 #include <dogecoin/koinu.h>
 #include <dogecoin/seal.h>
 #include <dogecoin/serialize.h>
@@ -626,6 +629,7 @@ static struct option long_options[] =
         {"command", required_argument, NULL, 'c'},
         {"silent", no_argument, NULL, 'b'},
         {"overwrite", no_argument, NULL, 'w'},
+        {"electrum_v1", no_argument, NULL, 'l'},
         {"testnet", no_argument, NULL, 't'},
         {"regtest", no_argument, NULL, 'r'},
         {"version", no_argument, NULL, 'v'},
@@ -642,7 +646,7 @@ static void print_usage()
     printf("Usage: such -c <cmd> (-m|-derived_path <bip_derived_path>) (-k|-pubkey <publickey>) (-p|-privkey <privatekey>) (-h|-sighash <sighash type>) \
 (-s|-script <script pubkey>) (-i|-input_index <input index>) (-x|-raw_tx <raw hex tx>) (-o|-account_int <account_int>) (-g|-change_level <change_level>) \
 (-e|-entropy <hex_entropy>) (-n|-mnemonic <seed_phrase>) (-a|-pass_phrase) (-y|-encrypted_file <file_num 0-999>) (-w[--overwrite]) (-b[--silent]) \
-(-z|-entropy_size <bit_size>) (-j[--use_tpm]) (-t[--testnet]) (-r[--regtest])\n");
+(-z|-entropy_size <bit_size>) (-j[--use_tpm]) (-l[--electrum_v1]) (-t[--testnet]) (-r[--regtest])\n");
     printf("Available commands:\n");
     printf("generate_public_key (requires -p <wif>),\n");
     printf("p2pkh (requires -k <public key hex>),\n");
@@ -653,8 +657,8 @@ static void print_usage()
     printf("decrypt_master_key (requires -y <file_num>, -j (use_tpm) optional),\n");
     printf("decrypt_mnemonic (requires -y <file_num>, -j (use_tpm) optional),\n");
     printf("seed_to_master_key (-y <file_num>, -j (use_tpm) optional),\n");
-    printf("mnemonic_to_key (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
-    printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
+    printf("mnemonic_to_key (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -l (electrum_v1), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
+    printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -l (electrum_v1), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
@@ -689,13 +693,18 @@ int main(int argc, char* argv[])
     char* mnemonic_in = 0;
     char* pass = 0;
     char* entropy = 0;
-    char* entropy_size = "256";
+
+    /* entropy_size was a string literal before and got written to */
+    char entropy_size_buf[16] = "256";
+    char* entropy_size = entropy_size_buf;
+
     MNEMONIC mnemonic = {0};
     SEED seed = {0};
     dogecoin_bool tpm = false;
     dogecoin_bool encrypted = false;
     dogecoin_bool overwrite = false;
     dogecoin_bool silent = false;
+    dogecoin_bool electrum_v1 = false;
     int file_num = NO_FILE;
 
     char* txhex = 0;
@@ -706,7 +715,7 @@ int main(int argc, char* argv[])
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:m:o:g:e:n:y:c:z:atrvbwj", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:m:o:g:e:n:y:c:z:atrvbwjl", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'p':
                     pkey = optarg;
@@ -730,9 +739,9 @@ int main(int argc, char* argv[])
                         return showError("Parameter -e cannot be used with -y");
                     entropy = optarg;
                     if (entropy != NULL){
-                        sprintf(entropy_size, "%zu", strlen(entropy) / HEX_CHARS_PER_BYTE * 8);
+                        snprintf(entropy_size_buf, sizeof(entropy_size_buf), "%zu",
+                                 (strlen(entropy) / HEX_CHARS_PER_BYTE) * 8);
                     }
-
                     break;
                 case 'z':
                     entropy_size = optarg;
@@ -776,6 +785,9 @@ int main(int argc, char* argv[])
                     if (!encrypted)
                         return showError("TPM can only be used with encrypted files");
                     tpm = true;
+                    break;
+                case 'l':
+                    electrum_v1 = true;
                     break;
                 case 'x':
                     txhex = optarg;
@@ -971,7 +983,6 @@ int main(int argc, char* argv[])
                     break;
                     }
                 else if (!strchr(digits, derived_path[i])) {
-                    // posbnum = -1; // value stored is never read
                     break;
                     }
                 }
@@ -1387,39 +1398,90 @@ int main(int argc, char* argv[])
         /* generate private key from mnemonic */
         dogecoin_hdnode node;
         dogecoin_hdnode extended_key;
-        SEED seed;
         KEY_PATH keypath;
         char wifstr[PRIVKEYWIFLEN];
         size_t wiflen = sizeof(wifstr);
 
-        /* generate seed from mnemonic */
-        if (dogecoin_seed_from_mnemonic(encrypted ? mnemonic : mnemonic_in, pass, seed) == -1) {
-            printf("mnemonic_to_key (-n <seed_phrase> or requires -y <file_num>, -j (use_tpm) optional),\n");
+        const char* mnemonic_src = encrypted ? mnemonic : mnemonic_in;
+
+        if (electrum_v1) {
+            /* Electrum v1: decode mnemonic to raw 16-byte seed */
+            if (dogecoin_seed_from_electrum_v1_mnemonic(mnemonic_src, pass, seed) == -1) {
+                printf("mnemonic_to_key (-n <seed_phrase> or requires -y <file_num>, -j (use_tpm) optional),\n");
+                if (pass) {
+                    dogecoin_mem_zero(pass, strlen(pass));
+                    dogecoin_free(pass);
+                    }
+                return showError("failed to generate electrum v1 seed from mnemonic\n");
+                }
+
+            if (pass) {
+                dogecoin_mem_zero(pass, strlen(pass));
+                dogecoin_free(pass);
+                }
+
+            uint32_t for_change = (uint32_t)strtoul(change_level, (char**)NULL, 10);
+
+            uint8_t priv32[32];
+            dogecoin_mem_zero(priv32, sizeof(priv32));
+
+            if (!electrum_v1_derive_privkey32((const uint8_t*)seed, inputindex, for_change, priv32)) {
+                dogecoin_mem_zero(seed, sizeof(seed));
+                dogecoin_mem_zero(priv32, sizeof(priv32));
+                return showError("electrum v1 derivation failed\n");
+                }
+
+            if (!dogecoin_ecc_verify_privatekey(priv32)) {
+                dogecoin_mem_zero(seed, sizeof(seed));
+                dogecoin_mem_zero(priv32, sizeof(priv32));
+                return showError("electrum v1 derived invalid privkey\n");
+                }
+
+            printf("keypath: electrum_v1:%u/%u\n", for_change, inputindex);
+
+            /* Electrum v1 uses uncompressed WIF (no 0x01 suffix) per bip-utils reference */
+            uint8_t wif_payload[33];
+            dogecoin_mem_zero(wif_payload, sizeof(wif_payload));
+            wif_payload[0] = chain->b58prefix_secret_address;
+            memcpy(&wif_payload[1], priv32, 32);
+            dogecoin_base58_encode_check(wif_payload, 33, wifstr, wiflen);
+            dogecoin_mem_zero(wif_payload, sizeof(wif_payload));
+            printf("private key (wif): %s\n", wifstr);
+
+            dogecoin_mem_zero(seed, sizeof(seed));
+            dogecoin_mem_zero(priv32, sizeof(priv32));
+            }
+        else {
+            /* generate seed from mnemonic */
+            if (dogecoin_seed_from_mnemonic(mnemonic_src, pass, seed) == -1) {
+                printf("mnemonic_to_key (-n <seed_phrase> or requires -y <file_num>, -j (use_tpm) optional),\n");
+
+                /* clear and free passphrase */
+                if (pass) {
+                    dogecoin_mem_zero(pass, strlen(pass));
+                    dogecoin_free(pass);
+                    }
+                return showError("failed to generate seed from mnemonic\n");
+                }
 
             /* clear and free passphrase */
             if (pass) {
                 dogecoin_mem_zero(pass, strlen(pass));
                 dogecoin_free(pass);
                 }
-            return showError("failed to generate seed from mnemonic\n");
+
+            /* generate master key from seed */
+            dogecoin_hdnode_from_seed(seed, sizeof(seed), &node);
+
+            /* derive bip44 extended key from master key */
+            derive_bip44_extended_key(&node, &account, &inputindex, change_level, NULL, (chain == &dogecoin_chainparams_test), keypath, &extended_key);
+            printf("keypath: %s\n", keypath);
+
+            /* encode private key to wif */
+            dogecoin_privkey_encode_wif((dogecoin_key*) extended_key.private_key, chain, wifstr, &wiflen);
+            printf("private key (wif): %s\n", wifstr);
+            dogecoin_mem_zero(seed, sizeof(seed));
             }
-
-        /* clear and free passphrase */
-        if (pass) {
-            dogecoin_mem_zero(pass, strlen(pass));
-            dogecoin_free(pass);
-            }
-
-        /* generate master key from seed */
-        dogecoin_hdnode_from_seed(seed, sizeof(seed), &node);
-
-        /* derive bip44 extended key from master key */
-        derive_bip44_extended_key(&node, &account, &inputindex, change_level, NULL, (chain == &dogecoin_chainparams_test), keypath, &extended_key);
-        printf("keypath: %s\n", keypath);
-
-        /* encode private key to wif */
-        dogecoin_privkey_encode_wif((dogecoin_key*) extended_key.private_key, chain, wifstr, &wiflen);
-        printf("private key (wif): %s\n", wifstr);
 
         }
     else if (strcmp(cmd, "mnemonic_to_addresses") == 0) { /* Creating wif addresses from a mnemonic via slip44. */
@@ -1464,12 +1526,117 @@ int main(int argc, char* argv[])
             return showError("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a (all optional))\n");
             }
 
-        /* generate wif address for slip44 account, index, and change_level, from bip39 mnemonic and password (optional) */
-        if (inputindex == 0) {
+        const char* mnemonic_src = encrypted ? mnemonic : mnemonic_in;
 
-            /* Generate all addresses for the account. */
-            for (int i = 0; i < 20; i++) {
-                if (getDerivedHDAddressFromMnemonic(account, i, change_level, encrypted ? mnemonic : mnemonic_in, pass, hd_pubkey_address, (chain == &dogecoin_chainparams_test)) == -1) {
+        if (electrum_v1) {
+            /* derive v1 seed once */
+            if (dogecoin_seed_from_electrum_v1_mnemonic(mnemonic_src, pass, seed) == -1) {
+                if (pass) {
+                    dogecoin_mem_zero(pass, strlen(pass));
+                    dogecoin_free(pass);
+                    }
+                return showError("Failed to generate electrum v1 seed from mnemonic\n");
+                }
+
+            /* clear and free passphrase */
+            if (pass) {
+                dogecoin_mem_zero(pass, strlen(pass));
+                dogecoin_free(pass);
+                }
+
+            uint32_t for_change = (uint32_t)strtoul(change_level, (char**)NULL, 10);
+
+            /* Electrum v1 has no account tree, ignore -o */
+            if (inputindex == 0) {
+                for (int i = 0; i < 20; i++) {
+                    uint8_t priv32[32];
+                    dogecoin_mem_zero(priv32, sizeof(priv32));
+
+                    if (!electrum_v1_derive_privkey32((const uint8_t*)seed, (uint32_t)i, for_change, priv32)) {
+                        dogecoin_mem_zero(seed, sizeof(seed));
+                        dogecoin_mem_zero(priv32, sizeof(priv32));
+                        return showError("Electrum v1 derivation failed\n");
+                        }
+
+                    /* Electrum v1 uses uncompressed pubkeys for addresses per bip-utils reference */
+                    uint8_t pubser[65];
+                    size_t publen = sizeof(pubser);
+                    dogecoin_ecc_get_pubkey(priv32, pubser, &publen, false);
+
+                    dogecoin_pubkey pubkey;
+                    dogecoin_pubkey_init(&pubkey);
+                    memcpy(pubkey.pubkey, pubser, 65);
+                    pubkey.compressed = false;
+
+                    char addr[P2PKHLEN];
+                    dogecoin_mem_zero(addr, sizeof(addr));
+                    dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, addr);
+
+                    printf("Address %d: %s\n", i, addr);
+
+                    dogecoin_mem_zero(priv32, sizeof(priv32));
+                    dogecoin_mem_zero(pubser, sizeof(pubser));
+                    dogecoin_mem_zero(&pubkey, sizeof(pubkey));
+                    dogecoin_mem_zero(addr, sizeof(addr));
+                    }
+                }
+            else {
+                uint8_t priv32[32];
+                dogecoin_mem_zero(priv32, sizeof(priv32));
+
+                if (!electrum_v1_derive_privkey32((const uint8_t*)seed, inputindex, for_change, priv32)) {
+                    dogecoin_mem_zero(seed, sizeof(seed));
+                    dogecoin_mem_zero(priv32, sizeof(priv32));
+                    return showError("Electrum v1 derivation failed\n");
+                    }
+
+                /* Electrum v1 uses uncompressed pubkeys for addresses per bip-utils reference */
+                uint8_t pubser[65];
+                size_t publen = sizeof(pubser);
+                dogecoin_ecc_get_pubkey(priv32, pubser, &publen, false);
+
+                dogecoin_pubkey pubkey;
+                dogecoin_pubkey_init(&pubkey);
+                memcpy(pubkey.pubkey, pubser, 65);
+                pubkey.compressed = false;
+
+                char addr[P2PKHLEN];
+                dogecoin_mem_zero(addr, sizeof(addr));
+                dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, addr);
+
+                printf("Address %d: %s\n", inputindex, addr);
+
+                dogecoin_mem_zero(priv32, sizeof(priv32));
+                dogecoin_mem_zero(pubser, sizeof(pubser));
+                dogecoin_mem_zero(&pubkey, sizeof(pubkey));
+                dogecoin_mem_zero(addr, sizeof(addr));
+                }
+
+            dogecoin_mem_zero(seed, sizeof(seed));
+            }
+        else {
+            /* generate wif address for slip44 account, index, and change_level, from bip39 mnemonic and password (optional) */
+            if (inputindex == 0) {
+
+                /* Generate all addresses for the account. */
+                for (int i = 0; i < 20; i++) {
+                    if (getDerivedHDAddressFromMnemonic(account, i, change_level, mnemonic_src, pass, hd_pubkey_address, (chain == &dogecoin_chainparams_test)) == -1) {
+
+                        /* clear and free passphrase */
+                        if (pass) {
+                            dogecoin_mem_zero(pass, strlen(pass));
+                            dogecoin_free(pass);
+                            }
+                        return showError("Failed to generate wif address from mnemonic\n");
+                        }
+                    printf("Address %d: %s\n", i, hd_pubkey_address);
+                    }
+                }
+            else {
+
+                /* Generate a single address for the account. */
+                if (getDerivedHDAddressFromMnemonic(account, inputindex, change_level, mnemonic_src, pass, hd_pubkey_address, (chain == &dogecoin_chainparams_test)) == -1) {
+                    printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
 
                     /* clear and free passphrase */
                     if (pass) {
@@ -1478,30 +1645,15 @@ int main(int argc, char* argv[])
                         }
                     return showError("Failed to generate wif address from mnemonic\n");
                     }
-                printf("Address %d: %s\n", i, hd_pubkey_address);
-                }
-            }
-        else {
 
-            /* Generate a single address for the account. */
-            if (getDerivedHDAddressFromMnemonic(account, inputindex, change_level, encrypted ? mnemonic : mnemonic_in, pass, hd_pubkey_address, (chain == &dogecoin_chainparams_test)) == -1) {
-                printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
-
-                /* clear and free passphrase */
-                if (pass) {
-                    dogecoin_mem_zero(pass, strlen(pass));
-                    dogecoin_free(pass);
-                    }
-                return showError("Failed to generate wif address from mnemonic\n");
+                printf("Address %d: %s\n", inputindex, hd_pubkey_address);
                 }
 
-            printf("Address %d: %s\n", inputindex, hd_pubkey_address);
-            }
-
-        /* clear and free passphrase */
-        if (pass) {
-            dogecoin_mem_zero(pass, strlen(pass));
-            dogecoin_free(pass);
+            /* clear and free passphrase */
+            if (pass) {
+                dogecoin_mem_zero(pass, strlen(pass));
+                dogecoin_free(pass);
+                }
             }
         }
     else if (strcmp(cmd, "signmessage") == 0) {

@@ -204,6 +204,26 @@ LIBDOGECOIN_API int generateRandomEnglishMnemonic(const ENTROPY_SIZE size, MNEMO
 /* return: 0 (success), -1 (fail) */
 LIBDOGECOIN_API int generateEnglishMnemonic(const HEX_ENTROPY entropy, const ENTROPY_SIZE size, MNEMONIC mnemonic);
 
+/* Check if mnemonic is an Electrum v2+ seed */
+/* mnemonic code words */
+/* pointer to receive version number (optional, may be NULL) */
+/* returns 0 (success), -1 (fail) */
+LIBDOGECOIN_API int dogecoin_mnemonic_is_electrum_seed(const char* mnemonic, uint32_t* out_version);
+
+/* Derive the seed from an Electrum v2+ mnemonic and optional passphrase */
+/* mnemonic code words */
+/* passphrase (optional) */
+/* 512-bit seed */
+/* returns 0 (success), -1 (fail) */
+LIBDOGECOIN_API int dogecoin_seed_from_electrum_mnemonic(const char* mnemonic, const char* passphrase, SEED seed);
+
+/* Derive the seed from an Electrum v1 mnemonic and optional passphrase */
+/* mnemonic code words (12 words from 1626-word list) */
+/* passphrase (optional) */
+/* 512-bit seed (16 bytes of decoded entropy, zero-padded) */
+/* returns 0 (success), -1 (fail) */
+LIBDOGECOIN_API int dogecoin_seed_from_electrum_v1_mnemonic(const char* mnemonic, const char* passphrase, SEED seed);
+
 LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_BIP39_H__
