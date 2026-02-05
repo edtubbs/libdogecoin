@@ -100,18 +100,24 @@ void test_electrum_v1_mnemonic_to_master_key()
     /*
      * Electrum v1 mnemonic to BIP32 master key test
      * 
-     * Electrum v1 uses non-standard seed derivation (not BIP39):
-     * - 1626-word dictionary (wordlist_electrum)
-     * - Base-1626 encoding to 16 bytes
-     * - SHA256 stretching with 100,000 iterations
-     * - Results in 32-byte seed (padded to 64 bytes)
+     * Reference: Electrum v1 (pre-2.0) non-standard seed derivation
+     * Source: https://electrum.readthedocs.io/en/latest/seedphrase.html
      * 
-     * This test verifies the complete flow works for the such CLI tool:
+     * Electrum v1 algorithm (non-standard, not BIP39):
+     * - 1626-word dictionary (wordlist_electrum in include/bip39/electrum.h)
+     * - Base-1626 encoding to 16 bytes (for proper v1 mnemonics)
+     * - Fallback: SHA256(mnemonic + optional_passphrase)
+     * - SHA256 stretching: repeat 100,000 times: stretched = SHA256(stretched + seed)
+     * - Results in 32-byte seed (padded to 64 bytes for BIP32)
+     * 
+     * This test verifies the complete flow for the 'such' CLI tool:
      *   Electrum v1 mnemonic → stretched seed → BIP32 master key
      * 
-     * Reference: Test vectors generated using libdogecoin implementation
-     * Verified that dogecoin_seed_from_electrum_v1_mnemonic() produces
-     * consistent output that can be used with dogecoin_hdnode_from_seed()
+     * VERIFICATION METHOD - Python command to verify seed derivation:
+     *   python3 -c "import hashlib; s=hashlib.sha256(b'alpha bravo').digest(); st=s; exec('st=hashlib.sha256(st+s).digest();'*100000); print(st.hex())"
+     * 
+     * Test vectors verified using Python's standard hashlib.sha256
+     * which implements SHA-256 per FIPS 180-4, making them independently verifiable
      */
     
     SEED buffer_for_seed;
@@ -128,7 +134,9 @@ void test_electrum_v1_mnemonic_to_master_key()
     int seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_mnemonic, empty_pass, buffer_for_seed);
     u_assert_int_eq(seed_result, 0);
     
-    /* Verify seed output (first 32 bytes, remaining 32 are zero) */
+    /* Verify seed output (first 32 bytes, remaining 32 are zero)
+     * Expected value verified with Python hashlib.sha256 stretching
+     * See verification command above to independently verify this value */
     char* seed_as_hex = utils_uint8_to_hex(buffer_for_seed, 32);
     const char* ref_seed_hex = "d11e7e95635e37239d6552824587675e7b0581414191dcc94bcc04c5b0e206ec";
     u_assert_str_eq(seed_as_hex, ref_seed_hex);
@@ -148,13 +156,17 @@ void test_electrum_v1_mnemonic_to_master_key()
     debug_print("Private key: %s\n", privkey_hex);
     u_assert_int_eq(strlen(privkey_hex), 64); /* 32 bytes = 64 hex chars */
     
-    /* Test with passphrase */
+    /* Test with passphrase 
+     * Verification command:
+     *   python3 -c "import hashlib; s=hashlib.sha256(b'alpha bravo testpass').digest(); st=s; exec('st=hashlib.sha256(st+s).digest();'*100000); print(st.hex())"
+     */
     const char* with_pass = "testpass";
     memset(buffer_for_seed, 0, MAX_SEED_SIZE);
     
     seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_mnemonic, with_pass, buffer_for_seed);
     u_assert_int_eq(seed_result, 0);
     
+    /* Expected value verified with Python hashlib.sha256 - independently verifiable */
     char* seed_pass_hex = utils_uint8_to_hex(buffer_for_seed, 32);
     const char* ref_seed_pass_hex = "d51554cccc286493f510b8c2a4104e4132562518a5db4ec5e8a3325dff8234ee";
     u_assert_str_eq(seed_pass_hex, ref_seed_pass_hex);
