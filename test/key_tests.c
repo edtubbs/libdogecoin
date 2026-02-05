@@ -136,9 +136,12 @@ void test_electrum_v1_mnemonic_to_master_key()
     
     /* Verify seed output (first 32 bytes, remaining 32 are zero)
      * Expected value verified with Python hashlib.sha256 stretching
-     * See verification command above to independently verify this value */
+     * Verification command:
+     *   python3 -c "import hashlib; s=hashlib.sha256(b'alpha bravo').digest(); st=s; exec('st=hashlib.sha256(st+s).digest();'*100000); print(st.hex())"
+     * Expected output: d46b151636c4b8dfe628364198808d25e83c0ba21bc0bab094357094ef0b537d
+     */
     char* seed_as_hex = utils_uint8_to_hex(buffer_for_seed, 32);
-    const char* ref_seed_hex = "d11e7e95635e37239d6552824587675e7b0581414191dcc94bcc04c5b0e206ec";
+    const char* ref_seed_hex = "d46b151636c4b8dfe628364198808d25e83c0ba21bc0bab094357094ef0b537d";
     u_assert_str_eq(seed_as_hex, ref_seed_hex);
     debug_print("Electrum v1 seed (32 bytes): %s\n", seed_as_hex);
     
