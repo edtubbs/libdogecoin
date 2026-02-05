@@ -118,14 +118,14 @@ void test_electrum_v1_mnemonic_to_master_key()
     dogecoin_hdnode root_node;
     
     /* Electrum v1 two-word test case */
-    const char* v1_phrase = "alpha bravo";
+    const char* v1_mnemonic = "alpha bravo";
     const char* empty_pass = "";
     
     memset(buffer_for_seed, 0, MAX_SEED_SIZE);
     memset(&root_node, 0, sizeof(root_node));
     
     /* Step 1: Convert Electrum v1 mnemonic to seed */
-    int seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_phrase, empty_pass, buffer_for_seed);
+    int seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_mnemonic, empty_pass, buffer_for_seed);
     u_assert_int_eq(seed_result, 0);
     
     /* Verify seed output (first 32 bytes, remaining 32 are zero) */
@@ -152,7 +152,7 @@ void test_electrum_v1_mnemonic_to_master_key()
     const char* with_pass = "testpass";
     memset(buffer_for_seed, 0, MAX_SEED_SIZE);
     
-    seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_phrase, with_pass, buffer_for_seed);
+    seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_mnemonic, with_pass, buffer_for_seed);
     u_assert_int_eq(seed_result, 0);
     
     char* seed_pass_hex = utils_uint8_to_hex(buffer_for_seed, 32);
