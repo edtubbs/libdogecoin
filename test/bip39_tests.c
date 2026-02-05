@@ -1525,16 +1525,19 @@ void test_bip39()
      * 
      * Algorithm for v1 (non-standard, different from BIP39):
      *   1. Attempt to decode 12-word mnemonic using base-1626 encoding (1626-word list)
-     *   2. If decoding fails, use fallback: seed = SHA256(mnemonic + (" " + passphrase if non-empty))
-     *   3. Stretch the seed: stretched = seed, then repeat 100,000 times: stretched = SHA256(stretched + seed)
-     *   4. Result is 32 bytes (padded to 64 bytes with zeros for BIP32 compatibility)
+     *      - Each group of 3 words encodes 32 bits: x = w1 + N*(w2-w1 mod N) + N²*(w3-w2 mod N) where N=1626
+     *   2. If decoding succeeds: Convert 16-byte seed to hex string, hash it
+     *   3. If decoding fails: Use fallback SHA256(mnemonic + passphrase)
+     *   4. Stretch: repeat 100,000 times: stretched = SHA256(stretched + seed)
+     *   5. Result is 32 bytes (padded to 64 bytes with zeros for BIP32 compatibility)
      * 
-     * VERIFICATION METHOD - Python command to independently verify fallback algorithm:
-     *   python3 -c "import hashlib; s=hashlib.sha256(b'like just love know never want time out there make look eye').digest(); st=s; exec('st=hashlib.sha256(st+s).digest();'*100000); print(st.hex())"
+     * VERIFICATION - "like just love..." is a VALID Electrum v1 mnemonic:
+     *   - All 12 words are at indices 0-11 in the Electrum v1 wordlist
+     *   - Decodes to 16-byte seed: 00285dfe00285e0100285e0400285e07
+     *   - Hex string "00285dfe00285e0100285e0400285e07" is hashed and stretched
+     *   - This produces: d11e7e95635e37239d6552824587675e7b0581414191dcc94bcc04c5b0e206ec
      * 
-     * Note: This uses the fallback path (direct SHA256 stretching) since the test mnemonics
-     * are not valid base-1626 encoded seeds. The test validates the stretching algorithm
-     * which is the core of Electrum v1 security.
+     * Note: This mnemonic uses the proper base-1626 decoding path, NOT the fallback.
      */
     const char* v1_twelve_word_mnemonic = "like just love know never want time out there make look eye";
     const char* v1_pass2 = "";
@@ -1543,11 +1546,7 @@ void test_bip39()
     u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_twelve_word_mnemonic, v1_pass2, seed), 0);
 
     /* Expected: Electrum v1 stretched seed (32 bytes + 32 zero bytes)
-     * Verified with Python hashlib.sha256 stretching algorithm (see verification command above)
-     * Expected value from stretching: 2bd764644cac9c997c2492dc9532ba8510d1eee63329af9f590e8e98487b881a
-     * 
-     * NOTE: The libdogecoin implementation may use a different derivation path for this mnemonic
-     * This test validates that the implementation produces consistent output */
+     * Value verified by proper base-1626 decoding followed by SHA-256 stretching */
     const char* expect_v1_12_hex =
         "d11e7e95635e37239d6552824587675e7b0581414191dcc94bcc04c5b0e206ec"
         "0000000000000000000000000000000000000000000000000000000000000000";
