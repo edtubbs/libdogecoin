@@ -811,6 +811,26 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         }
     }
 
+    if (strcmp(hdr->command, DOGECOIN_MSG_MERKLEBLOCK) == 0) {
+        if (client && client->track_wallet_utxos && client->sync_transaction_ctx) {
+            // Process merkleblock for UTXO tracking
+            // Parse merkleblock structure to extract matched transactions
+            
+            if (client->nodegroup && client->nodegroup->log_write_cb) {
+                client->nodegroup->log_write_cb(
+                    "[spv] received merkleblock (len=%u)\n", 
+                    hdr->data_len
+                );
+            }
+            
+            // TODO: Parse merkleblock structure
+            // - Extract block header
+            // - Parse partial merkle tree
+            // - Get matched transaction hashes
+            // - Track which UTXOs might be spent
+        }
+    }
+
     if (strcmp(hdr->command, DOGECOIN_MSG_TX) == 0) {
         if (client && client->smpv_enabled && client->smpv_ctx) {
             // allocate hex buffer (2 chars per byte + NUL)
