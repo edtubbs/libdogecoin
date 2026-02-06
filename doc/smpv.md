@@ -51,11 +51,24 @@ Block 110: New tip → confirmations = 10
 
 ### Reorg Handling
 
-During blockchain reorganizations, transactions can be:
-- Unconfirmed (moved back to mempool with 0 confirmations)
-- Re-confirmed at different heights (confirmation count recalculated)
+During blockchain reorganizations, confirmations are automatically adjusted:
+- When blocks are disconnected, confirmations decrease accordingly
+- When the tip moves backward (reorg), all confirmed transactions are recalculated
+- Formula handles both forward and backward tip movement: `conf = max(0, tip_height - tx_height + 1)`
+- Transactions above the new tip height get 0 confirmations
+- The system tracks synchronization state to detect stale confirmation data
 
-The system handles these transitions automatically and maintains accurate counts.
+**Example Reorg Flow:**
+```
+Height 100: TX confirmed → confirmations = 1
+Height 105: Tip advances → confirmations = 6
+[REORG: Tip moves back to 102]
+Height 102: Recalculated → confirmations = 3
+[DEEPER REORG: Tip at 99]
+Height 99:  TX above tip → confirmations = 0
+```
+
+The system handles these transitions automatically whenever the tip tick is called with a new height.
 
 ## Features
 

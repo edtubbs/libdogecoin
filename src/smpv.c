@@ -128,6 +128,8 @@ dogecoin_smpv_client* dogecoin_smpv_client_new(const dogecoin_chainparams* chain
     client->confirmed_count = 0;
     client->unconfirmed_count = 0;
     client->last_seen_ts = 0;
+    client->synced_to_tip_height = 0;
+    client->needs_revalidation = false;
 
     return client;
 }
@@ -497,18 +499,30 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
 ) {
     if (!client) return;
 
-    /* if txid is NULL, this is a "tip tick" to update confirmations for all confirmed transactions at the new tip height */
+    /* Tip tick: recalculate all confirmations based on provided height */
     if (!txid) {
-        uint32_t tip = block_height;
-        for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
-            dogecoin_smpv_tx* t = &client->mempool_txs[i];
-            if (!t->is_confirmed || t->block_height == 0) continue;
-            if (tip >= t->block_height) {
-                t->confirmations = (uint32_t)(tip - t->block_height + 1);
+        uint32_t reference_height = block_height;
+        
+        /* Detect potential reorg: if new height is less than what we're synced to */
+        if (reference_height < client->synced_to_tip_height) {
+            client->needs_revalidation = true;
+        }
+        
+        for (uint32_t idx = 0; idx < client->mempool_tx_count; idx++) {
+            dogecoin_smpv_tx* entry = &client->mempool_txs[idx];
+            if (!entry->is_confirmed || entry->block_height == 0) continue;
+            
+            if (reference_height >= entry->block_height) {
+                entry->confirmations = (reference_height - entry->block_height) + 1;
             } else {
-                t->confirmations = 0;
+                /* Chain tip is now below this transaction's recorded height */
+                entry->confirmations = 0;
             }
         }
+        
+        /* Update sync state */
+        client->synced_to_tip_height = reference_height;
+        client->needs_revalidation = false;
         client->last_update_time = time(NULL);
         return;
     }
