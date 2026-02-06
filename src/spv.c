@@ -192,6 +192,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     // SMPV default off
     client->smpv_ctx = NULL;
     client->smpv_enabled = false;
+    client->track_wallet_utxos = false;
 
     return client;
 }
@@ -521,6 +522,11 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
 
     if (nodes_at_same_height >= COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT && !client->called_sync_completed && client->sync_completed)
     {
+        // Post-sync actions
+        if (client->track_wallet_utxos) {
+            dogecoin_net_spv_post_sync_utxo_filters(client);
+        }
+        
         client->sync_completed(client);
         client->called_sync_completed = true;
     }
@@ -727,8 +733,13 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             if (client->headers_db->getchaintip(client->headers_db_ctx)->height >= node->bestknownheight - 5) {
                 // last requested block reached, consider stop syncing
                 if (!client->called_sync_completed && client->sync_completed) {
+                    // Post-sync actions
+                    if (client->track_wallet_utxos) {
+                        dogecoin_net_spv_post_sync_utxo_filters(client);
+                    }
                     // enable mempool requests if smpv is enabled
                     if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
+                    
                     client->sync_completed(client);
                     client->called_sync_completed = true;
                 }
@@ -950,4 +961,81 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_mempool(dogecoin_spv_client *clien
     }
     if (client->nodegroup && client->nodegroup->log_write_cb)
         client->nodegroup->log_write_cb("[spv] sent 'mempool' to peers\n");
+}
+
+LIBDOGECOIN_API void dogecoin_spv_enable_utxo_tracking(dogecoin_spv_client* client, dogecoin_bool enable)
+{
+    if (client) client->track_wallet_utxos = enable;
+}
+
+LIBDOGECOIN_API void dogecoin_net_spv_post_sync_utxo_filters(dogecoin_spv_client *client)
+{
+    if (!client || !client->nodegroup || !client->nodegroup->nodes) return;
+    
+    // Get wallet context if available
+    void* wallet_ctx = client->sync_transaction_ctx;
+    if (!wallet_ctx) {
+        if (client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb("[spv] no wallet context for utxo filters\n");
+        return;
+    }
+    
+    dogecoin_wallet* w = (dogecoin_wallet*)wallet_ctx;
+    
+    // Count UTXOs to track
+    int utxo_count = 0;
+    dogecoin_utxo* utxo_item = w->utxos;
+    while (utxo_item) {
+        if (utxo_item->spendable) utxo_count++;
+        utxo_item = (dogecoin_utxo*)utxo_item->hh.next;
+    }
+    
+    if (utxo_count == 0) {
+        if (client->nodegroup->log_write_cb)
+            client->nodegroup->log_write_cb("[spv] no spendable utxos to track\n");
+        return;
+    }
+    
+    // Broadcast filterload to each peer
+    vector_t* node_list = client->nodegroup->nodes;
+    unsigned int node_idx;
+    for (node_idx = 0; node_idx < (unsigned int)node_list->len; node_idx++) {
+        dogecoin_node* peer = (dogecoin_node*)vector_idx(node_list, node_idx);
+        if (!peer) continue;
+        
+        // Build filter payload for this peer
+        cstring* filter_data = cstr_new_sz(utxo_count * 36);  // txid + vout per utxo
+        
+        // Add each spendable UTXO to filter data
+        utxo_item = w->utxos;
+        while (utxo_item) {
+            if (utxo_item->spendable) {
+                // Add transaction ID
+                cstr_append_buf(filter_data, (const void*)utxo_item->txid, 32);
+                // Add vout index
+                uint32_t vout_val = (uint32_t)utxo_item->vout;
+                cstr_append_buf(filter_data, (const void*)&vout_val, 4);
+            }
+            utxo_item = (dogecoin_utxo*)utxo_item->hh.next;
+        }
+        
+        // Construct P2P filterload message
+        cstring* filter_msg = dogecoin_p2p_message_new(
+            peer->nodegroup->chainparams->netmagic,
+            DOGECOIN_MSG_FILTERLOAD,
+            filter_data->str,
+            filter_data->len
+        );
+        
+        cstr_free(filter_data, true);
+        dogecoin_node_send(peer, filter_msg);
+        cstr_free(filter_msg, true);
+    }
+    
+    if (client->nodegroup && client->nodegroup->log_write_cb) {
+        char log_msg[256];
+        snprintf(log_msg, sizeof(log_msg), "[spv] sent utxo filters to %u peers (%d utxos)\n", 
+                 (unsigned int)node_list->len, utxo_count);
+        client->nodegroup->log_write_cb(log_msg);
+    }
 }

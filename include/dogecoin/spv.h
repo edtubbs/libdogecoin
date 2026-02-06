@@ -82,6 +82,7 @@ typedef struct dogecoin_spv_client_
 
     void* smpv_ctx;
     dogecoin_bool smpv_enabled;
+    dogecoin_bool track_wallet_utxos;
 
     /* callbacks */
     /* ========= */
@@ -104,6 +105,9 @@ LIBDOGECOIN_API void dogecoin_spv_enable_smpv(dogecoin_spv_client* client, dogec
 LIBDOGECOIN_API dogecoin_bool dogecoin_spv_handle_mempool_tx_hex(dogecoin_spv_client* client, const char* raw_tx_hex);
 LIBDOGECOIN_API void dogecoin_spv_get_smpv_stats(dogecoin_spv_client* client, uint32_t* total_txs, uint32_t* watched_addrs);
 LIBDOGECOIN_API void dogecoin_net_spv_request_mempool(dogecoin_spv_client *client);
+
+LIBDOGECOIN_API void dogecoin_spv_enable_utxo_tracking(dogecoin_spv_client* client, dogecoin_bool enable);
+LIBDOGECOIN_API void dogecoin_net_spv_post_sync_utxo_filters(dogecoin_spv_client *client);
 
 LIBDOGECOIN_END_DECL
 
