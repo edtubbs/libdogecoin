@@ -245,6 +245,16 @@ static pqc_bench_state dilithium5_state = {0};
 static pqc_bench_state sphincs_shake_128s_state = {0};
 static pqc_bench_state sphincs_shake_128f_state = {0};
 
+/* Helper to check if a PQC algorithm is available by name */
+static dogecoin_bool pqc_alg_is_available(const char *alg_name) {
+    OQS_SIG *alg = OQS_SIG_new(alg_name);
+    if (alg) {
+        OQS_SIG_free(alg);
+        return true;
+    }
+    return false;
+}
+
 static void pqc_init_state(pqc_bench_state *state, const char *alg_name) {
     if (state->primed) return;
     state->alg_name = alg_name;
@@ -343,74 +353,74 @@ static void pqc_commit_bench_generic(benchmark_context *ctx, pqc_bench_state *st
     ctx->totalTime += ctx->end - ctx->start; ctx->totalCycles += ctx->endCycles - ctx->startCycles;
 }
 
-/* Dilithium2 benchmarks */
+/* Dilithium2 benchmarks - use string names for compatibility */
 static void dilithium2_keypair_bench(benchmark_context *ctx) {
-    pqc_keypair_bench_generic(ctx, OQS_SIG_alg_dilithium_2);
+    pqc_keypair_bench_generic(ctx, "Dilithium2");
 }
 static void dilithium2_sign_bench(benchmark_context *ctx) {
-    pqc_sign_bench_generic(ctx, &dilithium2_state, OQS_SIG_alg_dilithium_2);
+    pqc_sign_bench_generic(ctx, &dilithium2_state, "Dilithium2");
 }
 static void dilithium2_verify_bench(benchmark_context *ctx) {
-    pqc_verify_bench_generic(ctx, &dilithium2_state, OQS_SIG_alg_dilithium_2);
+    pqc_verify_bench_generic(ctx, &dilithium2_state, "Dilithium2");
 }
 static void dilithium2_commit_bench(benchmark_context *ctx) {
-    pqc_commit_bench_generic(ctx, &dilithium2_state, OQS_SIG_alg_dilithium_2);
+    pqc_commit_bench_generic(ctx, &dilithium2_state, "Dilithium2");
 }
 
-/* Dilithium3 benchmarks */
+/* Dilithium3 benchmarks - use string names for compatibility */
 static void dilithium3_keypair_bench(benchmark_context *ctx) {
-    pqc_keypair_bench_generic(ctx, OQS_SIG_alg_dilithium_3);
+    pqc_keypair_bench_generic(ctx, "Dilithium3");
 }
 static void dilithium3_sign_bench(benchmark_context *ctx) {
-    pqc_sign_bench_generic(ctx, &dilithium3_state, OQS_SIG_alg_dilithium_3);
+    pqc_sign_bench_generic(ctx, &dilithium3_state, "Dilithium3");
 }
 static void dilithium3_verify_bench(benchmark_context *ctx) {
-    pqc_verify_bench_generic(ctx, &dilithium3_state, OQS_SIG_alg_dilithium_3);
+    pqc_verify_bench_generic(ctx, &dilithium3_state, "Dilithium3");
 }
 static void dilithium3_commit_bench(benchmark_context *ctx) {
-    pqc_commit_bench_generic(ctx, &dilithium3_state, OQS_SIG_alg_dilithium_3);
+    pqc_commit_bench_generic(ctx, &dilithium3_state, "Dilithium3");
 }
 
-/* Dilithium5 benchmarks */
+/* Dilithium5 benchmarks - use string names for compatibility */
 static void dilithium5_keypair_bench(benchmark_context *ctx) {
-    pqc_keypair_bench_generic(ctx, OQS_SIG_alg_dilithium_5);
+    pqc_keypair_bench_generic(ctx, "Dilithium5");
 }
 static void dilithium5_sign_bench(benchmark_context *ctx) {
-    pqc_sign_bench_generic(ctx, &dilithium5_state, OQS_SIG_alg_dilithium_5);
+    pqc_sign_bench_generic(ctx, &dilithium5_state, "Dilithium5");
 }
 static void dilithium5_verify_bench(benchmark_context *ctx) {
-    pqc_verify_bench_generic(ctx, &dilithium5_state, OQS_SIG_alg_dilithium_5);
+    pqc_verify_bench_generic(ctx, &dilithium5_state, "Dilithium5");
 }
 static void dilithium5_commit_bench(benchmark_context *ctx) {
-    pqc_commit_bench_generic(ctx, &dilithium5_state, OQS_SIG_alg_dilithium_5);
+    pqc_commit_bench_generic(ctx, &dilithium5_state, "Dilithium5");
 }
 
-/* SPHINCS+ SHAKE-128s benchmarks */
+/* SPHINCS+ SHAKE-128s benchmarks - use string names for compatibility */
 static void sphincs_shake_128s_keypair_bench(benchmark_context *ctx) {
-    pqc_keypair_bench_generic(ctx, OQS_SIG_alg_sphincs_shake_128s_simple);
+    pqc_keypair_bench_generic(ctx, "SPHINCS+-SHAKE-128s-simple");
 }
 static void sphincs_shake_128s_sign_bench(benchmark_context *ctx) {
-    pqc_sign_bench_generic(ctx, &sphincs_shake_128s_state, OQS_SIG_alg_sphincs_shake_128s_simple);
+    pqc_sign_bench_generic(ctx, &sphincs_shake_128s_state, "SPHINCS+-SHAKE-128s-simple");
 }
 static void sphincs_shake_128s_verify_bench(benchmark_context *ctx) {
-    pqc_verify_bench_generic(ctx, &sphincs_shake_128s_state, OQS_SIG_alg_sphincs_shake_128s_simple);
+    pqc_verify_bench_generic(ctx, &sphincs_shake_128s_state, "SPHINCS+-SHAKE-128s-simple");
 }
 static void sphincs_shake_128s_commit_bench(benchmark_context *ctx) {
-    pqc_commit_bench_generic(ctx, &sphincs_shake_128s_state, OQS_SIG_alg_sphincs_shake_128s_simple);
+    pqc_commit_bench_generic(ctx, &sphincs_shake_128s_state, "SPHINCS+-SHAKE-128s-simple");
 }
 
-/* SPHINCS+ SHAKE-128f benchmarks */
+/* SPHINCS+ SHAKE-128f benchmarks - use string names for compatibility */
 static void sphincs_shake_128f_keypair_bench(benchmark_context *ctx) {
-    pqc_keypair_bench_generic(ctx, OQS_SIG_alg_sphincs_shake_128f_simple);
+    pqc_keypair_bench_generic(ctx, "SPHINCS+-SHAKE-128f-simple");
 }
 static void sphincs_shake_128f_sign_bench(benchmark_context *ctx) {
-    pqc_sign_bench_generic(ctx, &sphincs_shake_128f_state, OQS_SIG_alg_sphincs_shake_128f_simple);
+    pqc_sign_bench_generic(ctx, &sphincs_shake_128f_state, "SPHINCS+-SHAKE-128f-simple");
 }
 static void sphincs_shake_128f_verify_bench(benchmark_context *ctx) {
-    pqc_verify_bench_generic(ctx, &sphincs_shake_128f_state, OQS_SIG_alg_sphincs_shake_128f_simple);
+    pqc_verify_bench_generic(ctx, &sphincs_shake_128f_state, "SPHINCS+-SHAKE-128f-simple");
 }
 static void sphincs_shake_128f_commit_bench(benchmark_context *ctx) {
-    pqc_commit_bench_generic(ctx, &sphincs_shake_128f_state, OQS_SIG_alg_sphincs_shake_128f_simple);
+    pqc_commit_bench_generic(ctx, &sphincs_shake_128f_state, "SPHINCS+-SHAKE-128f-simple");
 }
 
 #endif /* USE_LIBOQS */
@@ -510,7 +520,7 @@ int main(void) {
 
     /* Dilithium variants - compare against Falcon */
     printf("\n--- Dilithium (NIST PQC Standard) - Compare vs Falcon ---\n");
-    if (OQS_SIG_alg_is_enabled(OQS_SIG_alg_dilithium_2)) {
+    if (pqc_alg_is_available("Dilithium2")) {
         run_benchmark(dilithium2_keypair_bench, "Dilith2-kp");
         run_benchmark(dilithium2_sign_bench,    "Dilith2-sig");
         run_benchmark(dilithium2_verify_bench,  "Dilith2-ver");
@@ -519,7 +529,7 @@ int main(void) {
         printf("%-16s %s\n", "Dilithium2", "not available");
     }
     
-    if (OQS_SIG_alg_is_enabled(OQS_SIG_alg_dilithium_3)) {
+    if (pqc_alg_is_available("Dilithium3")) {
         run_benchmark(dilithium3_keypair_bench, "Dilith3-kp");
         run_benchmark(dilithium3_sign_bench,    "Dilith3-sig");
         run_benchmark(dilithium3_verify_bench,  "Dilith3-ver");
@@ -528,7 +538,7 @@ int main(void) {
         printf("%-16s %s\n", "Dilithium3", "not available");
     }
     
-    if (OQS_SIG_alg_is_enabled(OQS_SIG_alg_dilithium_5)) {
+    if (pqc_alg_is_available("Dilithium5")) {
         run_benchmark(dilithium5_keypair_bench, "Dilith5-kp");
         run_benchmark(dilithium5_sign_bench,    "Dilith5-sig");
         run_benchmark(dilithium5_verify_bench,  "Dilith5-ver");
@@ -539,7 +549,7 @@ int main(void) {
 
     /* SPHINCS+ variants - compare against Falcon */
     printf("\n--- SPHINCS+ (Hash-based) - Compare vs Falcon ---\n");
-    if (OQS_SIG_alg_is_enabled(OQS_SIG_alg_sphincs_shake_128s_simple)) {
+    if (pqc_alg_is_available("SPHINCS+-SHAKE-128s-simple")) {
         run_benchmark(sphincs_shake_128s_keypair_bench, "SPHNCS128s-kp");
         run_benchmark(sphincs_shake_128s_sign_bench,    "SPHNCS128s-sig");
         run_benchmark(sphincs_shake_128s_verify_bench,  "SPHNCS128s-ver");
@@ -548,7 +558,7 @@ int main(void) {
         printf("%-16s %s\n", "SPHINCS128s", "not available");
     }
     
-    if (OQS_SIG_alg_is_enabled(OQS_SIG_alg_sphincs_shake_128f_simple)) {
+    if (pqc_alg_is_available("SPHINCS+-SHAKE-128f-simple")) {
         run_benchmark(sphincs_shake_128f_keypair_bench, "SPHNCS128f-kp");
         run_benchmark(sphincs_shake_128f_sign_bench,    "SPHNCS128f-sig");
         run_benchmark(sphincs_shake_128f_verify_bench,  "SPHNCS128f-ver");
