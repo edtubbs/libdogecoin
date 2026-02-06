@@ -10,9 +10,52 @@ SMPV provides real-time monitoring of mempool transactions for watched addresses
 - Monitor transaction sizes
 - Receive real-time notifications
 - Generate statistics and reports
-- Handle both confirmed and unconfirmed transactions
+- **Handle both confirmed and unconfirmed transactions with accurate confirmation counts**
+- Track transactions from mempool through confirmation and beyond
 
 > Note: SMPV operates on mempool data only and does not calculate transaction fees. Fee computation requires UTXO context that is not available during mempool tracking.
+
+## Confirmation Tracking
+
+SMPV includes a complete confirmation tracking system that automatically updates transaction confirmation counts as new blocks are added to the blockchain:
+
+### How It Works
+
+1. **Unconfirmed State**: When a transaction first enters the mempool, it starts with 0 confirmations and `is_confirmed = false`.
+
+2. **Block Confirmation**: When the SPV node processes a block containing the transaction:
+   - Transaction is marked as confirmed (`is_confirmed = true`)
+   - Block height and hash are recorded
+   - Confirmation count is set to 1
+
+3. **Confirmation Increments**: After each new block is processed:
+   - All confirmed transactions have their confirmation counts updated
+   - Formula: `confirmations = current_tip_height - tx_block_height + 1`
+   - This happens automatically via the "tip tick" mechanism
+
+4. **Confirmed Stubs**: If a transaction is found in a block but was never seen in the mempool:
+   - A lightweight "stub" entry is created with the txid, block hash, and height
+   - This ensures all confirmed transactions are tracked, even if missed in the mempool
+   - Stub entries are bounded (limit: 4096) to prevent memory exhaustion
+
+### Example Confirmation Flow
+
+```
+Block 100: Transaction enters mempool → confirmations = 0
+Block 101: Transaction confirmed in block → confirmations = 1, block_height = 101
+Block 102: New tip → confirmations = 2
+Block 103: New tip → confirmations = 3
+...
+Block 110: New tip → confirmations = 10
+```
+
+### Reorg Handling
+
+During blockchain reorganizations, transactions can be:
+- Unconfirmed (moved back to mempool with 0 confirmations)
+- Re-confirmed at different heights (confirmation count recalculated)
+
+The system handles these transitions automatically and maintains accurate counts.
 
 ## Features
 
@@ -42,6 +85,41 @@ If you are also running the HTTP server, the SMPV endpoints are documented separ
 ```bash
 ./spvnode -x -u 127.0.0.1:8080 scan
 ```
+
+### Full Example with All Options
+
+To run spvnode with debug logging, continuous mode, SMPV enabled, HTTP REST API, and checkpoints:
+
+```bash
+./spvnode -d -c -x -u 0.0.0.0:8080 -p scan
+```
+
+Flags explained:
+- `-d`: Enable debug logging
+- `-c`: Continuous mode (keep running after sync)
+- `-x`: Enable SMPV tracking
+- `-u address:port`: Enable HTTP REST API server on specified address and port
+- `-p`: Use checkpoints for faster initial sync
+- `scan`: Command to scan and sync the blockchain
+
+### Checking SMPV Status
+
+Once spvnode is running with SMPV enabled and the HTTP server, you can check the status:
+
+```bash
+# Check SMPV statistics including confirmation counts
+curl http://localhost:8080/smpvStats
+
+# Check a specific transaction's confirmation count
+curl "http://localhost:8080/smpvTx?id=<txid>"
+```
+
+The `/smpvStats` endpoint shows:
+- `enabled`: Whether SMPV is active
+- `mempool_txs`: Total transactions being tracked
+- `confirmed`: Number of confirmed transactions
+- `unconfirmed`: Number of unconfirmed transactions
+- Other statistics about transaction types and activity
 
 ## API Reference
 
