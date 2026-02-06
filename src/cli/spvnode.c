@@ -461,6 +461,8 @@ int main(int argc, char* argv[]) {
         print_utxos(wallet);
         client->sync_transaction = dogecoin_wallet_check_transaction;
         client->sync_transaction_ctx = wallet;
+        // Enable UTXO tracking with bloom filters
+        dogecoin_spv_enable_utxo_tracking(client, true);
 #endif
         char* header_suffix = "_headers.db";
         char* header_prefix = (char*)chain->chainname;
