@@ -82,6 +82,7 @@ typedef struct dogecoin_spv_client_
 
     void* smpv_ctx;
     dogecoin_bool smpv_enabled;
+    int32_t last_known_tip_height;  /* Track tip height to detect reorgs */
 
     /* callbacks */
     /* ========= */
