@@ -40,6 +40,51 @@ dogecoin_bool dogecoin_falcon512_commit_bytes(const uint8_t* pk, size_t pk_len,
     return true;
 }
 
+/* Append OP_RETURN output with Falcon-512 commit */
+dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t* commit32) {
+    if (!tx || !commit32) return false;
+
+    // script: OP_RETURN (0x6a) PUSHDATA(32) <32 bytes>
+    cstring* spk = cstr_new_sz(1 + 1 + 32);
+    uint8_t opret = 0x6a;
+    uint8_t push  = 32;
+
+    cstr_append_buf(spk, &opret, 1);
+    cstr_append_buf(spk, &push, 1);
+    cstr_append_buf(spk, commit32, 32);
+
+    dogecoin_tx_out* out = dogecoin_tx_out_new();
+    if (!out) { cstr_free(spk, true); return false; }
+
+    out->value = 0;               // OP_RETURN outputs are zero-value
+    if (out->script_pubkey) cstr_free(out->script_pubkey, true);
+    out->script_pubkey = spk;
+
+    vector_add(tx->vout, out);
+    return true;
+}
+
+/* Extract Falcon-512 commit from tx */
+dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_t* out32) {
+    if (!tx || !out32) return false;
+
+    // Look for the first vout whose script matches: 6a 20 <32 bytes>
+    for (unsigned i = 0; i < tx->vout->len; ++i) {
+        const dogecoin_tx_out* o = vector_idx(tx->vout, i);
+        if (!o || !o->script_pubkey || o->script_pubkey->len < (1 + 1 + 32))
+            continue;
+
+        const unsigned char* p = (const unsigned char*)o->script_pubkey->str;
+        size_t n = o->script_pubkey->len;
+
+        if (n >= 34 && p[0] == 0x6a && p[1] == 32) {
+            memcpy(out32, p + 2, 32);
+            return true;
+        }
+    }
+    return false;
+}
+
 #ifdef USE_LIBOQS
 
 /* Allocate and produce a Falcon-512 keypair */
@@ -129,51 +174,6 @@ dogecoin_bool dogecoin_falcon512_verify(const uint8_t* pk, size_t pk_len,
     OQS_STATUS st = OQS_SIG_verify(alg, msg, msg_len, sig, sig_len, pk);
     OQS_SIG_free(alg);
     return st == OQS_SUCCESS;
-}
-
-/* Append OP_RETURN output with Falcon-512 commit */
-dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t* commit32) {
-    if (!tx || !commit32) return false;
-
-    // script: OP_RETURN (0x6a) PUSHDATA(32) <32 bytes>
-    cstring* spk = cstr_new_sz(1 + 1 + 32);
-    uint8_t opret = 0x6a;
-    uint8_t push  = 32;
-
-    cstr_append_buf(spk, &opret, 1);
-    cstr_append_buf(spk, &push, 1);
-    cstr_append_buf(spk, commit32, 32);
-
-    dogecoin_tx_out* out = dogecoin_tx_out_new();
-    if (!out) { cstr_free(spk, true); return false; }
-
-    out->value = 0;               // OP_RETURN outputs are zero-value
-    if (out->script_pubkey) cstr_free(out->script_pubkey, true);
-    out->script_pubkey = spk;
-
-    vector_add(tx->vout, out);
-    return true;
-}
-
-/* Extract Falcon-512 commit from tx */
-dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_t* out32) {
-    if (!tx || !out32) return false;
-
-    // Look for the first vout whose script matches: 6a 20 <32 bytes>
-    for (unsigned i = 0; i < tx->vout->len; ++i) {
-        const dogecoin_tx_out* o = vector_idx(tx->vout, i);
-        if (!o || !o->script_pubkey || o->script_pubkey->len < (1 + 1 + 32))
-            continue;
-
-        const unsigned char* p = (const unsigned char*)o->script_pubkey->str;
-        size_t n = o->script_pubkey->len;
-
-        if (n >= 34 && p[0] == 0x6a && p[1] == 32) {
-            memcpy(out32, p + 2, 32);
-            return true;
-        }
-    }
-    return false;
 }
 
 #else /* !USE_LIBOQS */
