@@ -71,6 +71,7 @@ static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
+static void spv_check_and_update_smpv_for_tip_change(dogecoin_spv_client* client);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
 void dogecoin_net_spv_node_handshake_done(dogecoin_node *node);
 
