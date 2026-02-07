@@ -170,8 +170,9 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     if (http_server) {
         // split ip and port
         char* http_server_copy = strdup(http_server);
-        char* ip = strtok(http_server_copy, ":");
-        char* port = strtok(NULL, ":");
+        char* saveptr;
+        char* ip = strtok_r(http_server_copy, ":", &saveptr);
+        char* port = strtok_r(NULL, ":", &saveptr);
 
         // HTTP server initialization
         dogecoin_http_server_init(client->nodegroup, ip, atoi(port));
@@ -617,7 +618,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             struct tm *p = localtime(&t);
             strftime(s, sizeof s, "%F %T", p);
             char *ctime_no_newline;
-            ctime_no_newline = strtok(s, "\n");
+            char *saveptr;
+            ctime_no_newline = strtok_r(s, "\n", &saveptr);
             printf("%s|%d|%s|%d\n", hash_to_string(pindex->hash), pindex->height, ctime_no_newline, hdr->data_len);
             uint64_t start = time(NULL);
 

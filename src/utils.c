@@ -656,11 +656,12 @@ void replace_last_after_delim(const char *str, char* delim, char* replacement) {
 #ifndef USE_OPTEE // OPTEE has no filesystem or console
     char* tmp = strdup((char*)str);
     char* new = tmp;
-    char *strptr = strtok(new, delim);
+    char *saveptr;
+    char *strptr = strtok_r(new, delim, &saveptr);
     char* last = NULL;
     while (strptr != NULL) {
         last = strptr;
-        strptr = strtok(NULL, delim);
+        strptr = strtok_r(NULL, delim, &saveptr);
     }
     if (last) {
         remove_substr((char*)str, last);

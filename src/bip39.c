@@ -257,14 +257,15 @@ static int electrum_v1_decode_mnemonic(const char* mnemonic,
     /* parse 12 words */
     uint16_t idx[ELECTRUM_V1_WORDS];
     int wc = 0;
+    char *saveptr; /* for strtok_r calls - thread-safe tokenization */
 
-    char* tok = strtok(buf, " ");
+    char* tok = strtok_r(buf, " ", &saveptr);
     while (tok) {
         if (wc >= ELECTRUM_V1_WORDS) return -1;
         int w = electrum_v1_find_word(tok);
         if (w < 0) return -1;
         idx[wc++] = (uint16_t)w;
-        tok = strtok(NULL, " ");
+        tok = strtok_r(NULL, " ", &saveptr);
     }
     if (wc != ELECTRUM_V1_WORDS) return -1;
 
