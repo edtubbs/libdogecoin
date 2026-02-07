@@ -280,6 +280,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/map.c
     src/mem.c
     src/moon.c
+    src/pqc_falcon.c
     src/qr.c
     src/qrengine.c
     src/pow.c
