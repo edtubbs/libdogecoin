@@ -64,7 +64,13 @@ typedef struct {
 /* ---- timing helpers ---- */
 static double gettimedouble(void) {
 #ifdef _WIN32
-    return (double)GetTickCount64() / 1000.0;
+    /* Use GetTickCount64 if available (Vista+), otherwise fall back to GetTickCount */
+    #if defined(_WIN64) || (defined(_WIN32_WINNT) && _WIN32_WINNT >= 0x0600)
+        return (double)GetTickCount64() / 1000.0;
+    #else
+        /* For 32-bit Windows or older MinGW, use GetTickCount (32-bit, wraps every 49.7 days) */
+        return (double)GetTickCount() / 1000.0;
+    #endif
 #else
     struct timeval tv;
     gettimeofday(&tv, NULL);
