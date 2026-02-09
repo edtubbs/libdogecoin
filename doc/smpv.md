@@ -104,7 +104,7 @@ To run spvnode with debug logging, continuous mode, SMPV enabled, HTTP REST API,
 ./spvnode -d -c -x -u 0.0.0.0:8080 -p -b scan
 ```
 
-**IMPORTANT**: The `-b` flag (full block sync) is **REQUIRED** for SMPV confirmations to work!
+**Note**: The `-b` flag is **recommended** but not strictly required. Without it, SPV will automatically transition to full block sync when reaching the chain tip.
 
 Flags explained:
 - `-d`: Enable debug logging
@@ -112,32 +112,61 @@ Flags explained:
 - `-x`: Enable SMPV tracking
 - `-u address:port`: Enable HTTP REST API server on specified address and port
 - `-p`: Use checkpoints for faster initial sync
-- `-b`: **REQUIRED** - Enable full block sync (downloads full blocks, not just headers)
+- `-b`: **Recommended** - Enable full block sync from start (for immediate confirmations)
 - `scan`: Command to scan and sync the blockchain
+
+**Alternative (without -b):**
+```bash
+./spvnode -d -c -x -u 0.0.0.0:8080 -p scan
+```
+This will sync headers first (fast), then auto-transition to full block sync at the tip.
 
 ### Why Full Block Sync (-b) is Required
 
-SMPV confirmation tracking requires full block data:
+SMPV confirmation tracking requires full block data to match transaction IDs.
 
-**Without `-b` (Header-only sync):**
-- ❌ Only downloads block headers (80 bytes each)
-- ❌ Block transaction data is never seen
-- ❌ Confirmations will NEVER happen
-- ✅ Mempool transactions are still tracked
-- ✅ Unconfirmed transactions work normally
+**Two Sync Modes:**
 
-**With `-b` (Full block sync):**
-- ✅ Downloads complete blocks with all transactions
-- ✅ Transactions are matched and confirmed automatically
-- ✅ Confirmation counts increment with each new block
-- ⚠️ Requires more bandwidth and storage
+1. **Header-only sync (default, no -b flag):**
+   - Downloads only block headers (80 bytes each) - FAST
+   - Automatically transitions to full block sync when reaching chain tip
+   - Confirmations start working after automatic transition
+   - Best for: Quick initial sync, then confirmations at the tip
 
-> **Warning**: If you enable SMPV without `-b`, you will see:
-> ```
-> confirmed: 0
-> unconfirmed: [all transactions]
-> ```
-> The system will log a warning at startup if `-b` is missing.
+2. **Full block sync (with -b flag):**
+   - Downloads complete blocks from the start
+   - Confirmations work throughout the entire sync
+   - Best for: Immediate confirmation tracking, historical analysis
+
+**Automatic Transition (without -b):**
+
+When SPV reaches within 5 blocks of the chain tip, it automatically:
+- Switches from header-only to full block sync mode
+- Starts downloading full blocks
+- Enables SMPV confirmation matching
+- Logs: "Reached chain tip - switching to full block sync mode"
+
+**Comparison:**
+
+| Feature | Header-only (default) | Full block sync (-b) |
+|---------|----------------------|----------------------|
+| Initial sync | ✅ Fast | ⏱️ Slower |
+| Bandwidth | 💚 Low initially | 📊 High throughout |
+| Storage | 💾 Minimal → Moderate | 💾 Moderate |
+| **Confirmations at tip** | ✅ **Works after auto-transition** | ✅ **Works** |
+| **Confirmations during sync** | ❌ Not yet | ✅ **Works** |
+| Auto-transition | ✅ Yes, at chain tip | N/A |
+
+**Example Log Output (without -b):**
+```
+[smpv] enabled
+[smpv] INFO: Starting in header-only sync mode (fast)
+[smpv] INFO: Will automatically switch to full block sync at chain tip
+[smpv] INFO: Confirmations will work after transition (use -b for immediate full sync)
+... syncing headers ...
+Reached chain tip - switching to full block sync mode
+[smpv] Full block sync enabled - confirmations will now work
+```
 
 ### Checking SMPV Status
 

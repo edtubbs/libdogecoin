@@ -814,6 +814,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     client->stateflags |= SPV_FULLBLOCK_SYNC_FLAG;
                     node->state &= ~NODE_HEADERSYNC;
                     node->state |= NODE_BLOCKSYNC;
+                    client->nodegroup->log_write_cb("Reached chain tip - switching to full block sync mode\n");
+                    if (client->smpv_enabled) {
+                        client->nodegroup->log_write_cb("[smpv] Full block sync enabled - confirmations will now work\n");
+                    }
                     client->nodegroup->log_write_cb("start loading block from node %d at height %d at time: %ld\n", node->nodeid, client->headers_db->getchaintip(client->headers_db_ctx)->height, client->headers_db->getchaintip(client->headers_db_ctx)->header.timestamp);
                     dogecoin_net_spv_node_request_headers_or_blocks(node, true);
                     break;
@@ -960,11 +964,11 @@ LIBDOGECOIN_API void dogecoin_spv_enable_smpv(dogecoin_spv_client* client, dogec
             if (client->nodegroup && client->nodegroup->log_write_cb) {
                 client->nodegroup->log_write_cb("[smpv] enabled\n");
                 
-                /* Warn if full block sync is not enabled */
+                /* Inform about sync mode and automatic transition */
                 if ((client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) != SPV_FULLBLOCK_SYNC_FLAG) {
-                    client->nodegroup->log_write_cb("[smpv] WARNING: Full block sync not enabled (-b flag)\n");
-                    client->nodegroup->log_write_cb("[smpv] WARNING: Transactions will NOT be confirmed without full block sync\n");
-                    client->nodegroup->log_write_cb("[smpv] WARNING: Use -b flag to enable full block sync for confirmations\n");
+                    client->nodegroup->log_write_cb("[smpv] INFO: Starting in header-only sync mode (fast)\n");
+                    client->nodegroup->log_write_cb("[smpv] INFO: Will automatically switch to full block sync at chain tip\n");
+                    client->nodegroup->log_write_cb("[smpv] INFO: Confirmations will work after transition (use -b for immediate full sync)\n");
                 }
             }
         } else {
