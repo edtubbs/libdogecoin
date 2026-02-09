@@ -1,5 +1,6 @@
-# Security-critical paths require at minimum two reviewers.
-# See doc/mitre_att&ck_tabletop.md — Mitigation M4.
+# Security-critical paths require a minimum of two reviewers.
+# See doc/mitre_att&ck_tabletop.md — Mitigations M4/M25.
+# Configure branch protection rules to enforce the two-reviewer minimum.
 
 # Cryptographic primitives
 /src/ecc.c           @edtubbs

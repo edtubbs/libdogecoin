@@ -112,10 +112,16 @@ void dogecoin_http_server_init(dogecoin_node_group* group, const char* bindaddr,
     assert(group != NULL);
     assert(group->event_base != NULL);
 
-    /* M11: Warn if binding to non-localhost address */
+    /* M11/M23: Warn and enforce API key for non-localhost binding */
     if (bindaddr && strcmp(bindaddr, "127.0.0.1") != 0 && strcmp(bindaddr, "::1") != 0 && strcmp(bindaddr, "localhost") != 0) {
+        const char* api_key = getenv("DOGECOIN_API_KEY");
+        if (!api_key || api_key[0] == '\0') {
+            fprintf(stderr, "ERROR: HTTP API binding to non-localhost address '%s' requires "
+                    "DOGECOIN_API_KEY to be set. Refusing to start without authentication.\n", bindaddr);
+            exit(1);
+        }
         fprintf(stderr, "WARNING: HTTP API binding to non-localhost address '%s'. "
-                "Consider using 127.0.0.1 to prevent remote access.\n", bindaddr);
+                "API key authentication is active. Consider using a gateway (e.g., Dogebox) for TLS.\n", bindaddr);
     }
 
     group->http_server = evhttp_new(group->event_base);

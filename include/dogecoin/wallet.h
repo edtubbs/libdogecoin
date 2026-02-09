@@ -168,6 +168,12 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_flush(dogecoin_wallet* wallet);
 /** M2: compute SHA-256 checksum of wallet file for integrity verification */
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_checksum(dogecoin_wallet* wallet, uint256_t hash_out);
 
+/** M17: write wallet checksum to sidecar .chk file */
+LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_write_checksum(dogecoin_wallet* wallet);
+
+/** M17: verify wallet against sidecar .chk file (true if no .chk or match) */
+LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_verify_checksum(dogecoin_wallet* wallet);
+
 /** set the master key of new created wallet
  consuming app needs to ensure that we don't override exiting masterkeys */
 LIBDOGECOIN_API void dogecoin_wallet_set_master_key_copy(dogecoin_wallet* wallet, const dogecoin_hdnode* master_xpub);

@@ -147,6 +147,12 @@ void remove_eckey(eckey* key) {
  */
 void dogecoin_key_free(eckey* eckey)
 {
+    /* M20: cleanse key material before freeing to prevent heap residue */
+    dogecoin_privkey_cleanse(&eckey->private_key);
+    dogecoin_pubkey_cleanse(&eckey->public_key);
+    dogecoin_mem_zero(eckey->private_key_wif, sizeof(eckey->private_key_wif));
+    dogecoin_mem_zero(eckey->public_key_hex, sizeof(eckey->public_key_hex));
+    dogecoin_mem_zero(eckey->address, sizeof(eckey->address));
     dogecoin_free(eckey);
 }
 

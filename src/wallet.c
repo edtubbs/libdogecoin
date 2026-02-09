@@ -818,6 +818,10 @@ dogecoin_bool dogecoin_wallet_create(dogecoin_wallet* wallet, const char* file_p
         wallet->dbfile = fopen(file_path, "a+b");
         if (wallet->dbfile) {
             snprintf((char*)wallet->filename, sizeof(wallet->filename), "%s", file_path);
+#ifndef _MSC_VER
+            /* M21: restrict wallet file permissions to owner-only (0600) */
+            chmod(file_path, 0600);
+#endif
         }
         else {
             *error = 1;
@@ -1000,6 +1004,12 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
             return false;
         }
 
+        /* M17: verify wallet integrity against sidecar checksum */
+        if (!dogecoin_wallet_verify_checksum(wallet)) {
+            fprintf(stderr, "Wallet file: integrity check failed — file may have been tampered with\n");
+            return false;
+        }
+
         // read
         while (!feof(wallet->dbfile))
         {
@@ -1036,6 +1046,8 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
 dogecoin_bool dogecoin_wallet_flush(dogecoin_wallet* wallet)
 {
     dogecoin_file_commit(wallet->dbfile);
+    /* M17: update sidecar checksum after every flush */
+    dogecoin_wallet_write_checksum(wallet);
     return true;
 }
 
@@ -1064,6 +1076,45 @@ dogecoin_bool dogecoin_wallet_checksum(dogecoin_wallet* wallet, uint256_t hash_o
     dogecoin_hash(buf, file_size, hash_out);
     dogecoin_free(buf);
     return true;
+}
+
+/**
+ * M17: Write the wallet checksum to a sidecar .chk file.
+ * Called after wallet flush to persist integrity data.
+ */
+dogecoin_bool dogecoin_wallet_write_checksum(dogecoin_wallet* wallet)
+{
+    if (!wallet || !wallet->filename[0]) return false;
+    uint256_t hash;
+    if (!dogecoin_wallet_checksum(wallet, hash)) return false;
+    char chk_path[1024];
+    snprintf(chk_path, sizeof(chk_path), "%s.chk", wallet->filename);
+    FILE* f = fopen(chk_path, "wb");
+    if (!f) return false;
+    size_t written = fwrite(hash, sizeof(uint256_t), 1, f);
+    fclose(f);
+    return (written == 1);
+}
+
+/**
+ * M17: Verify wallet integrity against the sidecar .chk file.
+ * Returns true if no .chk file exists (first load), or if checksum matches.
+ * Returns false only if a .chk file exists but the checksum does not match.
+ */
+dogecoin_bool dogecoin_wallet_verify_checksum(dogecoin_wallet* wallet)
+{
+    if (!wallet || !wallet->filename[0]) return true;
+    char chk_path[1024];
+    snprintf(chk_path, sizeof(chk_path), "%s.chk", wallet->filename);
+    FILE* f = fopen(chk_path, "rb");
+    if (!f) return true; /* no checksum file yet — first run */
+    uint256_t stored_hash;
+    size_t nread = fread(stored_hash, sizeof(uint256_t), 1, f);
+    fclose(f);
+    if (nread != 1) return false;
+    uint256_t current_hash;
+    if (!dogecoin_wallet_checksum(wallet, current_hash)) return false;
+    return (memcmp(stored_hash, current_hash, sizeof(uint256_t)) == 0);
 }
 
 dogecoin_bool wallet_write_record(dogecoin_wallet *wallet, const cstring* record, uint8_t record_type) {

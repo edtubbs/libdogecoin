@@ -78,7 +78,7 @@ case $host in
   ;;
 esac
 warn_CFLAGS="-std=gnu99 -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings"
-harden_CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2"
+harden_CFLAGS="-fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIE"
 saved_CFLAGS="$CFLAGS"
 CFLAGS="$CFLAGS $warn_CFLAGS"
 AC_MSG_CHECKING([if ${CC} supports ${warn_CFLAGS}])
