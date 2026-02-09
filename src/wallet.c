@@ -61,6 +61,9 @@ static const unsigned char file_hdr_magic[4] = {0xA8, 0xF0, 0x11, 0xC5}; /* head
 static const unsigned char file_rec_magic[4] = {0xC8, 0xF2, 0x69, 0x1E}; /* record magic */
 static const uint32_t current_version = 1;
 
+#define HMAC_PAYLOAD_SIZE 32 /* HMAC-SHA256 output size */
+#define HMAC_RECORD_SIZE  38 /* 4 (magic) + 1 (varlen) + 1 (type) + 32 (payload) */
+
 /* forward declaration */
 dogecoin_bool wallet_write_record(dogecoin_wallet *wallet, const cstring* record, uint8_t record_type);
 
@@ -1143,7 +1146,7 @@ dogecoin_bool dogecoin_wallet_verify_checksum(dogecoin_wallet* wallet)
  * M15/M16: Compute HMAC-SHA256 over wallet file bytes up to the given position,
  * keyed by the serialized master xpub.
  */
-static dogecoin_bool wallet_compute_hmac(dogecoin_wallet* wallet, long data_len, uint8_t hmac_out[32])
+static dogecoin_bool wallet_compute_hmac(dogecoin_wallet* wallet, long data_len, uint8_t hmac_out[HMAC_PAYLOAD_SIZE])
 {
     if (!wallet || !wallet->dbfile || !wallet->masterkey) return false;
 
@@ -1182,12 +1185,12 @@ dogecoin_bool dogecoin_wallet_write_hmac(dogecoin_wallet* wallet)
     long data_len = ftell(wallet->dbfile);
     if (data_len <= 0) return false;
 
-    uint8_t hmac_out[32];
+    uint8_t hmac_out[HMAC_PAYLOAD_SIZE];
     if (!wallet_compute_hmac(wallet, data_len, hmac_out)) return false;
 
     /* Write HMAC as a new record */
-    cstring* hmac_rec = cstr_new_sz(32);
-    cstr_append_buf(hmac_rec, hmac_out, 32);
+    cstring* hmac_rec = cstr_new_sz(HMAC_PAYLOAD_SIZE);
+    cstr_append_buf(hmac_rec, hmac_out, HMAC_PAYLOAD_SIZE);
     dogecoin_bool ret = wallet_write_record(wallet, hmac_rec, WALLET_DB_REC_TYPE_HMAC);
     cstr_free(hmac_rec, true);
     dogecoin_file_commit(wallet->dbfile);
@@ -1204,15 +1207,15 @@ dogecoin_bool dogecoin_wallet_verify_hmac(dogecoin_wallet* wallet)
     if (!wallet || !wallet->dbfile || !wallet->masterkey) return true;
 
     /* Scan from the end of the file to find the HMAC record.
-     * The HMAC record is the last record; its payload is exactly 32 bytes. */
+     * The HMAC record is the last record; its payload is exactly HMAC_PAYLOAD_SIZE bytes. */
     fseek(wallet->dbfile, 0, SEEK_END);
     long file_size = ftell(wallet->dbfile);
 
     /* Minimum: 40-byte header + 4-byte rec_magic + 1-byte varlen + 1-byte type + 32-byte hmac = 78 */
-    if (file_size < 78) return true; /* too small to contain HMAC */
+    if (file_size < (40 + HMAC_RECORD_SIZE)) return true; /* too small to contain HMAC */
 
     /* The HMAC record: 4 (magic) + 1 (varlen for 32) + 1 (type) + 32 (payload) = 38 bytes */
-    long hmac_rec_start = file_size - 38;
+    long hmac_rec_start = file_size - HMAC_RECORD_SIZE;
     fseek(wallet->dbfile, hmac_rec_start, SEEK_SET);
 
     uint8_t buf[6];
@@ -1222,24 +1225,24 @@ dogecoin_bool dogecoin_wallet_verify_hmac(dogecoin_wallet* wallet)
     }
 
     /* Check: magic bytes + varlen(32) = 0x20 + rectype = 3 */
-    if (memcmp(buf, file_rec_magic, 4) != 0 || buf[4] != 32 || buf[5] != WALLET_DB_REC_TYPE_HMAC) {
+    if (memcmp(buf, file_rec_magic, 4) != 0 || buf[4] != HMAC_PAYLOAD_SIZE || buf[5] != WALLET_DB_REC_TYPE_HMAC) {
         rewind(wallet->dbfile);
         return true; /* no HMAC record found — legacy wallet */
     }
 
     /* Read the stored HMAC */
-    uint8_t stored_hmac[32];
-    if (fread(stored_hmac, 32, 1, wallet->dbfile) != 1) {
+    uint8_t stored_hmac[HMAC_PAYLOAD_SIZE];
+    if (fread(stored_hmac, HMAC_PAYLOAD_SIZE, 1, wallet->dbfile) != 1) {
         rewind(wallet->dbfile);
         return false;
     }
     rewind(wallet->dbfile);
 
     /* Compute HMAC over data before the HMAC record */
-    uint8_t computed_hmac[32];
+    uint8_t computed_hmac[HMAC_PAYLOAD_SIZE];
     if (!wallet_compute_hmac(wallet, hmac_rec_start, computed_hmac)) return false;
 
-    return (memcmp(stored_hmac, computed_hmac, 32) == 0);
+    return (memcmp(stored_hmac, computed_hmac, HMAC_PAYLOAD_SIZE) == 0);
 }
 
 /**
