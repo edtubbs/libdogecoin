@@ -43,8 +43,8 @@ The Round 1 tabletop exercise identified 8 threat scenarios and recommended 14 m
 | Metric | Round 1 | Round 2 |
 |--------|---------|---------|
 | Scenarios rated Critical | 4 | 0 |
-| Scenarios rated High | 3 | 3 |
-| Scenarios rated Medium | 1 | 4 |
+| Scenarios rated High | 3 | 2 |
+| Scenarios rated Medium | 1 | 5 |
 | Scenarios rated Low | 0 | 1 |
 | Mitigations implemented | 0/14 | 14/14 |
 
