@@ -43,12 +43,12 @@ The Round 1 tabletop exercise identified 8 threat scenarios and recommended 14 m
 | Metric | Round 1 | Round 2 |
 |--------|---------|---------|
 | Scenarios rated Critical | 4 | 0 |
-| Scenarios rated High | 3 | 2 |
-| Scenarios rated Medium | 1 | 5 |
+| Scenarios rated High | 3 | 1 |
+| Scenarios rated Medium | 1 | 6 |
 | Scenarios rated Low | 0 | 1 |
 | Mitigations implemented | 0/14 | 14/14 |
 
-Key residual risks center on **TLS encryption for the REST API** (M1 partial — auth implemented but no encryption in transit), **wallet encryption at rest** (M2 partial — integrity check implemented but not full AES encryption of the wallet file), and **runtime entropy validation** (M3 partial — fail-secure implemented but no entropy quality testing).
+Key residual risks center on **wallet file record integrity** — address records (Type 1) have no per-field integrity protection, allowing an attacker with file write access to silently replace `pubkeyhash` values and redirect funds. The REST API risk is substantially mitigated in the standard Dogebox deployment where `spvnode` runs behind a local gateway that provides TLS, rate limiting, and session management.
 
 ---
 
@@ -188,7 +188,7 @@ The /16 subnet limit raises the bar for eclipse attacks: an attacker now needs I
 ### Scenario 4 — REST API Exploitation and Wallet Drain
 
 **Round 1 Risk Level:** Critical
-**Round 2 Risk Level:** **High** ↓
+**Round 2 Risk Level:** **Medium** ↓↓
 
 **ATT&CK Techniques:** T1596, T1190, T1087.002, T1654, T1005, T1657
 
@@ -196,29 +196,37 @@ The /16 subnet limit raises the bar for eclipse attacks: an attacker now needs I
 - ✅ **M1** — `src/rest.c`: `check_api_key()` validates `X-API-Key` header against `DOGECOIN_API_KEY` environment variable; returns 403 Forbidden on mismatch
 - ✅ **M11** — `src/net.c`: Warning printed to stderr when HTTP server binds to non-localhost address
 
+**Deployment Context — Dogebox Gateway:**
+In the typical production deployment, the libdogecoin REST API runs **behind Dogebox** as a local service. Dogebox acts as a gateway/proxy on the same host, handling:
+- TLS termination for external connections
+- Authentication and session management
+- Rate limiting and request filtering
+- Routing from the public interface to `spvnode`'s localhost-bound API
+
+The `spvnode` binary is normally started with `-u 127.0.0.1:<port>`, binding exclusively to localhost. Dogebox then proxies authorized requests to this local endpoint. This architecture means the REST API is **not directly exposed** to the network — the concerns about plaintext API keys and brute-force attacks are mitigated at the gateway layer.
+
 **Controls Now in Place:**
 1. API key authentication blocks unauthenticated access when `DOGECOIN_API_KEY` is set
 2. Non-localhost binding produces a visible security warning
 3. REST API remains optional — must be explicitly started with `-u` flag
 4. Error handling via `evhttp_send_error()`
+5. Default localhost binding (`127.0.0.1`) with Dogebox handling external access
+6. Dogebox gateway provides TLS, rate limiting, and session management
 
-**Residual Gaps:**
-- **No TLS/HTTPS** — API key transmitted in plaintext over the network, vulnerable to interception
-- **No rate limiting** — API can be brute-forced or DoS'd
-- Authentication is opt-in (env var) — if `DOGECOIN_API_KEY` is not set, API is completely open
-- No CORS policy enforcement
+**Residual Gaps (when deployed without Dogebox):**
+- No built-in TLS — API key transmitted in plaintext if accessed directly over network
+- No built-in rate limiting
+- Authentication is opt-in (env var) — if `DOGECOIN_API_KEY` is not set, API is open
 - No input validation/sanitization on query parameters beyond path matching
-- API key is a single shared secret — no per-user/per-role access control
 - No audit logging of API requests
 
 **Residual Risk Assessment:**
-The API key authentication is a significant improvement but incomplete: without TLS, the key can be intercepted by network observers. Without rate limiting, the key can be brute-forced. The risk level remains High because the REST API exposes financial data (balances, UTXOs) and a successful compromise enables wallet enumeration.
+Risk is reduced from Critical to Medium. In the standard Dogebox deployment, the REST API is localhost-only and protected by the gateway's TLS, authentication, and rate limiting. The API key (M1) provides defense-in-depth even behind the gateway. The remaining risk applies to non-standard deployments where `spvnode` is started with a non-localhost bind address without a gateway, which the M11 warning explicitly flags.
 
 **Discussion Questions:**
-1. Should TLS be a requirement before the API key feature is considered production-ready?
-2. Can libevent's built-in SSL support be enabled without adding a new dependency?
-3. Should API key authentication be mandatory (not opt-in) when binding to non-localhost?
-4. Should the API implement separate read-only vs. write/sign authorization tiers?
+1. Should the documentation explicitly recommend Dogebox (or equivalent gateway) for production deployments?
+2. Should API key authentication be mandatory (not opt-in) when binding to non-localhost?
+3. Should the REST API refuse to start on a non-localhost address unless `DOGECOIN_API_KEY` is set?
 
 ---
 
@@ -267,28 +275,81 @@ Risk is reduced from High to Medium because integrators now have clear guidance.
 **Mitigations Applied:**
 - ✅ **M2** — `src/wallet.c`: `dogecoin_wallet_checksum()` computes SHA-256 hash over wallet file contents
 
+**Wallet File Format — Field-Level Vulnerability Analysis:**
+
+The wallet binary format consists of a 40-byte file header followed by variable-length records:
+
+```
+FILE HEADER (40 bytes):
+Offset  Size    Field                   Protected?
+------  ----    -----                   ----------
+0       4       file_hdr_magic          ✅ Validated on load (0xA8F011C5)
+4       4       version (uint32_t LE)   ✅ Validated ≤ current_version
+8       32      genesis block hash      ✅ Validated against chain params
+```
+
+```
+EACH RECORD:
+Offset  Size    Field                   Protected?
+------  ----    -----                   ----------
+0       4       file_rec_magic          ✅ Validated on load (0xC8F2691E)
+4       var     record length (varint)  ❌ Not independently verified
+var     1       record type (uint8_t)   ❌ Not independently verified
+var+1   N       record payload          ❌ Type-dependent (see below)
+```
+
+**Record Type 0 — MASTERPUBKEY:**
+| Field | Size | Protected? | Notes |
+|-------|------|-----------|-------|
+| xpub string (1st copy) | ~195 bytes | ✅ Double-write check | strcmp'd against 2nd copy on load |
+| xpub string (2nd copy) | ~195 bytes | ✅ Double-write check | Must match 1st copy |
+
+**Record Type 1 — ADDRESS (the primary vulnerability):**
+| Field | Size | Protected? | Tamper Impact |
+|-------|------|-----------|---------------|
+| pubkeyhash | 20 bytes | ❌ **None** | **Attacker can replace address hash → redirect funds** |
+| type | 1 byte | ❌ **None** | Can alter address type classification |
+| childindex | 4 bytes | ❌ **None** | Can break HD derivation path tracking |
+| ignore flag | 1 byte | ❌ **None** | **Can mark addresses as ignored → hide balances** |
+
+**Record Type 2 — TRANSACTION:**
+| Field | Size | Protected? | Tamper Impact |
+|-------|------|-----------|---------------|
+| height | 4 bytes | ❌ **None** | **Can falsify confirmation count** |
+| tx_hash_cache | 32 bytes | ❌ **None** | Can break transaction lookup |
+| full tx payload | variable | ❌ **None** | **Can modify inputs/outputs → fabricate history** |
+
+**The Core Issue:** Only the master public key has per-record integrity protection (double-write check). Address records and transaction records have **zero per-field integrity verification**. An attacker with file write access can:
+
+1. **Replace a `pubkeyhash`** in an address record → the wallet sends funds to the attacker's address
+2. **Set the `ignore` flag** on address records → balances become invisible to the user
+3. **Modify `height`** on transaction records → fake confirmations
+4. **Alter full transaction payloads** → fabricate spending history
+
+All of these modifications preserve the file structure (magic bytes, record lengths) and pass the existing load-time validation.
+
 **Controls Now in Place:**
-1. SHA-256 checksum function available for integrity verification
+1. SHA-256 checksum function available for integrity verification (M2)
 2. Magic byte validation (`0xA8F011C5`) on wallet file load
 3. Record-level magic bytes (`0xC8F2691E`) for structural integrity
 4. Version number validation
 5. Master public key double-write verification on load
 
 **Residual Gaps:**
-- **Checksum is not automatically computed or verified** — `dogecoin_wallet_checksum()` must be called explicitly by the consuming application
+- **Address records (Type 1) have no integrity check** — the `pubkeyhash`, `type`, `childindex`, and `ignore` fields can be modified without detection
+- **Transaction records (Type 2) have no integrity check** — `height`, `tx_hash_cache`, and full tx payload can be modified
+- **Checksum (M2) is not automatically verified** — `dogecoin_wallet_checksum()` must be called explicitly
 - **No HMAC** — checksum is a plain hash, not keyed; an attacker who modifies the file can recompute the hash
-- **No encryption at rest** — private keys/master key in wallet file are not encrypted (except when using TPM/seal features)
+- **No encryption at rest** — wallet contents accessible to any process with file read access (except when using TPM/seal features)
 - **No file permission enforcement** — library does not set `chmod 0600` on wallet creation
-- **No backup/recovery mechanism** in the library
-- The checksum is external — not embedded in the wallet file format itself
 
 **Residual Risk Assessment:**
-Risk remains High because the checksum is not keyed (HMAC) and is not automatically verified. An attacker with file write access can modify the wallet and recompute the hash. The fundamental gap — no encryption at rest — means private key material in the wallet file is accessible to any process with read access.
+Risk remains High. The specific vulnerability is in **address records (Type 1)**: the 20-byte `pubkeyhash` field has no integrity protection, allowing an attacker with file write access to silently redirect funds. This is the highest-impact tamper vector because it directly enables financial theft without alerting the user.
 
 **Discussion Questions:**
-1. Should `dogecoin_wallet_load()` automatically verify the checksum and fail on mismatch?
-2. Should the wallet format be extended to embed an HMAC in the file header?
-3. Can the existing AES-256-CBC implementation be used to encrypt the wallet file at rest?
+1. Should per-record HMAC-SHA256 be added to address and transaction records?
+2. Should `dogecoin_wallet_load()` automatically verify the M2 checksum and fail on mismatch?
+3. Is the `pubkeyhash` field the highest-priority candidate for integrity protection?
 4. Should wallet creation enforce `chmod 0600` on POSIX systems?
 
 ---
@@ -377,7 +438,7 @@ The multi-layer defense (CODEOWNERS + KATs + CodeQL + GPG signing + reproducible
 | S1 | Supply Chain Compromise | **Critical** | **Medium** | ↓↓ | M4, M8, M10 |
 | S2 | Memory Exploit / Key Extraction | **Critical** | **Medium** | ↓↓ | M5, M6, M9, M14 |
 | S3 | Eclipse Attack on SPV | **High** | **Medium** | ↓ | M7 |
-| S4 | REST API Exploitation | **Critical** | **High** | ↓ | M1, M11 |
+| S4 | REST API Exploitation | **Critical** | **Medium** | ↓↓ | M1, M11 + Dogebox |
 | S5 | Mnemonic Seed Interception | **High** | **Medium** | ↓ | M12, M9 |
 | S6 | Wallet File Tampering | **High** | **High** | — | M2 (partial) |
 | S7 | Weak Randomness | **Critical** | **Low** | ↓↓↓ | M3, M6 |
@@ -387,7 +448,7 @@ The multi-layer defense (CODEOWNERS + KATs + CodeQL + GPG signing + reproducible
 
 | ATT&CK ID | Technique | Round 1 Risk | Round 2 Risk | Mitigation Coverage |
 |------------|-----------|-------------|-------------|---------------------|
-| T1190 | Exploit Public-Facing Application | Critical | High | M1, M5, M6, M14 |
+| T1190 | Exploit Public-Facing Application | Critical | Medium | M1, M5, M6, M11, M14 + Dogebox |
 | T1195.001 | Supply Chain — Software Dependencies | Critical | Medium | M4, M8, M10 |
 | T1657 | Financial Theft | Critical | High | M1, M2, M3, M7 |
 | T1552.004 | Unsecured Credentials — Private Keys | Critical | Medium | M3, M9, M12 |
@@ -410,12 +471,12 @@ The multi-layer defense (CODEOWNERS + KATs + CodeQL + GPG signing + reproducible
 - **Supply Chain (S1):** Multi-layer defense with CODEOWNERS, dependency verification, and KATs
 - **Memory Exploit (S2):** Safe string ops, allocation checks, signature cleansing, and compiler hardening
 - **Eclipse Attack (S3):** Per-/16 subnet diversity limits
+- **REST API (S4):** API key authentication + Dogebox local gateway provides TLS/rate limiting
 - **Mnemonic Interception (S5):** Comprehensive integrator documentation
 - **Insider Backdoor (S8):** Code review enforcement, KATs, and audit schedule
 
 ### Risks Partially Mitigated (High)
-- **REST API Exploitation (S4):** Authentication implemented but no TLS encryption; brute-force possible
-- **Wallet File Tampering (S6):** Checksum available but not keyed (HMAC) and not auto-verified; no encryption at rest
+- **Wallet File Tampering (S6):** Address records (Type 1) have no per-field integrity protection — `pubkeyhash` can be replaced to redirect funds; transaction records (Type 2) have no integrity check on `height` or tx payload
 
 ---
 
@@ -423,26 +484,26 @@ The multi-layer defense (CODEOWNERS + KATs + CodeQL + GPG signing + reproducible
 
 Based on residual risk analysis, the following mitigations are recommended for the next cycle:
 
-### Priority 1 — Critical (Address REST API and Wallet gaps)
+### Priority 1 — High (Address Wallet record integrity gap)
 
 | ID | Mitigation | Addresses | Effort |
 |----|-----------|-----------|--------|
-| M15 | Add TLS support for REST API (via libevent SSL or mbedTLS) | S4 | High |
-| M16 | Implement HMAC-SHA256 keyed integrity for wallet file (embedded in header) | S6 | Medium |
-| M17 | Implement wallet file encryption at rest using AES-256-CBC | S6 | Medium |
-| M18 | Make API key mandatory when binding to non-localhost | S4 | Low |
+| M15 | Add per-record HMAC-SHA256 to address records (Type 1) — protect `pubkeyhash` field | S6 | Medium |
+| M16 | Add per-record HMAC-SHA256 to transaction records (Type 2) — protect `height` and tx payload | S6 | Medium |
+| M17 | Auto-verify M2 checksum in `dogecoin_wallet_load()` — fail on mismatch | S6 | Low |
+| M18 | Implement wallet file encryption at rest using AES-256-CBC | S6 | High |
 
-### Priority 2 — High (Expand defense depth)
+### Priority 2 — Medium (Expand defense depth)
 
 | ID | Mitigation | Addresses | Effort |
 |----|-----------|-----------|--------|
-| M19 | Add rate limiting for REST API (token bucket per source IP) | S4 | Medium |
-| M20 | Extend KATs to AES-256-CBC, SHA-256, RIPEMD-160, ChaCha20 | S8 | Low |
-| M21 | Add private key expiry/auto-cleanse in uthash key table | S2 | Medium |
-| M22 | Enforce `chmod 0600` on wallet file creation (POSIX) | S6 | Low |
-| M23 | Add `-fPIE` to hardening flags for ASLR support | S2 | Low |
+| M19 | Extend KATs to AES-256-CBC, SHA-256, RIPEMD-160, ChaCha20 | S8 | Low |
+| M20 | Add private key expiry/auto-cleanse in uthash key table | S2 | Medium |
+| M21 | Enforce `chmod 0600` on wallet file creation (POSIX) | S6 | Low |
+| M22 | Add `-fPIE` to hardening flags for ASLR support | S2 | Low |
+| M23 | Make API key mandatory when binding to non-localhost (non-Dogebox deployments) | S4 | Low |
 
-### Priority 3 — Medium (Process and documentation)
+### Priority 3 — Low (Process and documentation)
 
 | ID | Mitigation | Addresses | Effort |
 |----|-----------|-----------|--------|
@@ -451,6 +512,7 @@ Based on residual risk analysis, the following mitigations are recommended for t
 | M26 | Implement peer reputation scoring and ASN diversity | S3 | High |
 | M27 | Conduct first annual third-party cryptographic audit | S1, S7, S8 | High |
 | M28 | Add `dogecoin_secure_mnemonic_generate()` with auto-zeroing buffer | S5 | Medium |
+| M29 | Document Dogebox gateway deployment as recommended architecture for REST API | S4 | Low |
 
 ---
 
@@ -470,23 +532,25 @@ Based on residual risk analysis, the following mitigations are recommended for t
 
 | Milestone | Target |
 |-----------|--------|
-| M18 (mandatory API key for non-localhost) | 2 weeks |
-| M20 (extended KATs) | 2 weeks |
-| M22 (wallet file permissions) | 2 weeks |
-| M23 (`-fPIE` hardening) | 2 weeks |
+| M17 (auto-verify checksum on load) | 2 weeks |
+| M19 (extended KATs) | 2 weeks |
+| M21 (wallet file permissions) | 2 weeks |
+| M22 (`-fPIE` hardening) | 2 weeks |
+| M23 (mandatory API key for non-localhost) | 2 weeks |
 | M24 (verify-deps in CI) | 2 weeks |
-| M16 (wallet HMAC) | 4 weeks |
-| M17 (wallet encryption) | 6 weeks |
-| M15 (REST TLS) | 8 weeks |
+| M29 (Dogebox deployment docs) | 2 weeks |
+| M15 (address record HMAC) | 4 weeks |
+| M16 (transaction record HMAC) | 4 weeks |
+| M18 (wallet encryption at rest) | 8 weeks |
 | M27 (first audit) | 12 weeks |
 
 ---
 
 ## Conclusion
 
-The Round 1 mitigations (M1–M14) have materially improved libdogecoin's security posture. Four scenarios previously rated Critical are now at Medium or Low, and no scenarios remain at Critical. The most significant improvements are in RNG fail-secure behavior (S7: Critical→Low), memory exploit resistance (S2: Critical→Medium), and supply chain protection (S1: Critical→Medium).
+The Round 1 mitigations (M1–M14) have materially improved libdogecoin's security posture. Four scenarios previously rated Critical are now at Medium or Low, and no scenarios remain at Critical. The most significant improvements are in RNG fail-secure behavior (S7: Critical→Low), memory exploit resistance (S2: Critical→Medium), supply chain protection (S1: Critical→Medium), and REST API security (S4: Critical→Medium, factoring in the Dogebox local gateway deployment pattern).
 
-The two remaining High-risk scenarios — REST API exploitation (S4) and wallet file tampering (S6) — require TLS encryption and keyed integrity verification, respectively. These are recommended as Priority 1 for Round 3.
+The remaining High-risk scenario — wallet file tampering (S6) — has a specific, well-defined vulnerability: **address records (Type 1) lack per-field integrity protection**, allowing silent `pubkeyhash` replacement. Per-record HMAC-SHA256 on address and transaction records is the recommended Priority 1 mitigation for Round 3.
 
 Regular tabletop exercise re-assessment (every 6–12 months) and the first annual third-party audit will ensure the security posture continues to improve.
 
