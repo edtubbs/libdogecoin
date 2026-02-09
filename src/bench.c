@@ -396,46 +396,75 @@ static void pqc_commit_bench_generic(benchmark_context *ctx, pqc_bench_state *st
     ctx->totalTime += ctx->end - ctx->start; ctx->totalCycles += ctx->endCycles - ctx->startCycles;
 }
 
+/* Helper to get actual Dilithium algorithm name (tries ML-DSA and legacy names) */
+static const char* get_dilithium2_name(void) {
+    if (pqc_alg_is_available("ML-DSA-44")) return "ML-DSA-44";
+    if (pqc_alg_is_available("Dilithium2")) return "Dilithium2";
+    return NULL;
+}
+static const char* get_dilithium3_name(void) {
+    if (pqc_alg_is_available("ML-DSA-65")) return "ML-DSA-65";
+    if (pqc_alg_is_available("Dilithium3")) return "Dilithium3";
+    return NULL;
+}
+static const char* get_dilithium5_name(void) {
+    if (pqc_alg_is_available("ML-DSA-87")) return "ML-DSA-87";
+    if (pqc_alg_is_available("Dilithium5")) return "Dilithium5";
+    return NULL;
+}
+
 /* Dilithium2 benchmarks - use string names for compatibility */
 static void dilithium2_keypair_bench(benchmark_context *ctx) {
-    pqc_keypair_bench_generic(ctx, "Dilithium2");
+    const char *alg = get_dilithium2_name();
+    if (alg) pqc_keypair_bench_generic(ctx, alg);
 }
 static void dilithium2_sign_bench(benchmark_context *ctx) {
-    pqc_sign_bench_generic(ctx, &dilithium2_state, "Dilithium2");
+    const char *alg = get_dilithium2_name();
+    if (alg) pqc_sign_bench_generic(ctx, &dilithium2_state, alg);
 }
 static void dilithium2_verify_bench(benchmark_context *ctx) {
-    pqc_verify_bench_generic(ctx, &dilithium2_state, "Dilithium2");
+    const char *alg = get_dilithium2_name();
+    if (alg) pqc_verify_bench_generic(ctx, &dilithium2_state, alg);
 }
 static void dilithium2_commit_bench(benchmark_context *ctx) {
-    pqc_commit_bench_generic(ctx, &dilithium2_state, "Dilithium2");
+    const char *alg = get_dilithium2_name();
+    if (alg) pqc_commit_bench_generic(ctx, &dilithium2_state, alg);
 }
 
 /* Dilithium3 benchmarks - use string names for compatibility */
 static void dilithium3_keypair_bench(benchmark_context *ctx) {
-    pqc_keypair_bench_generic(ctx, "Dilithium3");
+    const char *alg = get_dilithium3_name();
+    if (alg) pqc_keypair_bench_generic(ctx, alg);
 }
 static void dilithium3_sign_bench(benchmark_context *ctx) {
-    pqc_sign_bench_generic(ctx, &dilithium3_state, "Dilithium3");
+    const char *alg = get_dilithium3_name();
+    if (alg) pqc_sign_bench_generic(ctx, &dilithium3_state, alg);
 }
 static void dilithium3_verify_bench(benchmark_context *ctx) {
-    pqc_verify_bench_generic(ctx, &dilithium3_state, "Dilithium3");
+    const char *alg = get_dilithium3_name();
+    if (alg) pqc_verify_bench_generic(ctx, &dilithium3_state, alg);
 }
 static void dilithium3_commit_bench(benchmark_context *ctx) {
-    pqc_commit_bench_generic(ctx, &dilithium3_state, "Dilithium3");
+    const char *alg = get_dilithium3_name();
+    if (alg) pqc_commit_bench_generic(ctx, &dilithium3_state, alg);
 }
 
 /* Dilithium5 benchmarks - use string names for compatibility */
 static void dilithium5_keypair_bench(benchmark_context *ctx) {
-    pqc_keypair_bench_generic(ctx, "Dilithium5");
+    const char *alg = get_dilithium5_name();
+    if (alg) pqc_keypair_bench_generic(ctx, alg);
 }
 static void dilithium5_sign_bench(benchmark_context *ctx) {
-    pqc_sign_bench_generic(ctx, &dilithium5_state, "Dilithium5");
+    const char *alg = get_dilithium5_name();
+    if (alg) pqc_sign_bench_generic(ctx, &dilithium5_state, alg);
 }
 static void dilithium5_verify_bench(benchmark_context *ctx) {
-    pqc_verify_bench_generic(ctx, &dilithium5_state, "Dilithium5");
+    const char *alg = get_dilithium5_name();
+    if (alg) pqc_verify_bench_generic(ctx, &dilithium5_state, alg);
 }
 static void dilithium5_commit_bench(benchmark_context *ctx) {
-    pqc_commit_bench_generic(ctx, &dilithium5_state, "Dilithium5");
+    const char *alg = get_dilithium5_name();
+    if (alg) pqc_commit_bench_generic(ctx, &dilithium5_state, alg);
 }
 
 /* SPHINCS+ SHAKE-128s benchmarks - use string names for compatibility */
@@ -557,28 +586,67 @@ static void print_analysis(void) {
     printf("PERFORMANCE ANALYSIS & RANKINGS\n");
     printf("================================================================================================================================\n");
 
-    /* Overall ranking by average time */
-    printf("\n--- Overall Speed Ranking (by Average Time) ---\n");
-    printf("%-4s %-16s %-16s %-12s %-12s\n", "Rank", "Benchmark", "Category", "Avg Time", "Ops/sec");
-    printf("--------------------------------------------------------------------------------\n");
+    /* Category-based rankings */
+    printf("\n--- Rankings by Category ---\n\n");
     
-    /* Create a sorted copy of results */
-    benchmark_result sorted[MAX_BENCHMARKS];
-    memcpy(sorted, results, sizeof(benchmark_result) * num_results);
-    qsort(sorted, num_results, sizeof(benchmark_result), compare_avg_time);
+    /* Define category groups */
+    const char *categories[][3] = {
+        {"Hash Algorithms", "hash", NULL},
+        {"OP_RETURN Commits", "commit", NULL},
+        {"Classical ECC (secp256k1)", "ecc-keypair", "ecc-sign,ecc-verify"},
+        {"PQC Key Generation", "pqc-keypair", NULL},
+        {"PQC Signing", "pqc-sign", NULL},
+        {"PQC Verification", "pqc-verify", NULL},
+        {"PQC Commits", "pqc-commit", NULL}
+    };
     
-    for (int i = 0; i < num_results; i++) {
-        double ops_per_sec = sorted[i].avgTime > 0 ? 1.0 / sorted[i].avgTime : 0;
-        printf("%-4d %-16s %-16s %10.6f   %10.0f\n",
-               i + 1,
-               sorted[i].name,
-               sorted[i].category,
-               sorted[i].avgTime,
-               ops_per_sec);
+    for (int cat = 0; cat < 7; cat++) {
+        const char *cat_name = categories[cat][0];
+        const char *cat_prefix = categories[cat][1];
+        
+        /* Collect results for this category */
+        benchmark_result cat_results[MAX_BENCHMARKS];
+        int cat_count = 0;
+        
+        for (int i = 0; i < num_results; i++) {
+            dogecoin_bool matches = false;
+            
+            /* Check if result matches this category */
+            if (strncmp(results[i].category, cat_prefix, strlen(cat_prefix)) == 0) {
+                matches = true;
+            }
+            /* Special handling for multi-category (ecc operations) */
+            if (categories[cat][2] != NULL) {
+                if (strstr(categories[cat][2], results[i].category)) {
+                    matches = true;
+                }
+            }
+            
+            if (matches) {
+                cat_results[cat_count++] = results[i];
+            }
+        }
+        
+        if (cat_count == 0) continue;
+        
+        /* Sort within category */
+        qsort(cat_results, cat_count, sizeof(benchmark_result), compare_avg_time);
+        
+        /* Print category header and results */
+        printf("• %s:\n", cat_name);
+        for (int i = 0; i < cat_count; i++) {
+            double ops_per_sec = cat_results[i].avgTime > 0 ? 1.0 / cat_results[i].avgTime : 0;
+            printf("  %d. %-16s  %10.6f sec  (%10.0f ops/sec)\n",
+                   i + 1,
+                   cat_results[i].name,
+                   cat_results[i].avgTime,
+                   ops_per_sec);
+        }
+        printf("\n");
     }
 
     /* Key comparisons */
-    printf("\n--- Key Performance Comparisons ---\n");
+    printf("--- Key Performance Comparisons ---\n");
     
     /* Find specific benchmarks for comparison */
     benchmark_result *falcon_kp = find_result("Falcon512-kp");
@@ -590,12 +658,19 @@ static void print_analysis(void) {
     benchmark_result *sphincs_s_kp = find_result("SPHNCS128s-kp");
     benchmark_result *sphincs_s_sig = find_result("SPHNCS128s-sig");
     benchmark_result *sphincs_f_kp = find_result("SPHNCS128f-kp");
+    benchmark_result *dilith2_kp = find_result("Dilith2-kp");
+    benchmark_result *dilith2_sig = find_result("Dilith2-sig");
     
     if (secp_kp && falcon_kp) {
         double ratio = falcon_kp->avgTime / secp_kp->avgTime;
         printf("• Keypair Generation:\n");
         printf("  - Falcon512 is %.1fx SLOWER than secp256k1 (%.6f vs %.6f sec)\n",
                ratio, falcon_kp->avgTime, secp_kp->avgTime);
+        if (dilith2_kp) {
+            double ratio2 = dilith2_kp->avgTime / secp_kp->avgTime;
+            printf("  - Dilithium2 is %.1fx SLOWER than secp256k1 (%.6f vs %.6f sec)\n",
+                   ratio2, dilith2_kp->avgTime, secp_kp->avgTime);
+        }
     }
     
     if (secp_sig && falcon_sig) {
@@ -603,6 +678,11 @@ static void print_analysis(void) {
         printf("• Signing:\n");
         printf("  - Falcon512 is %.1fx SLOWER than secp256k1 (%.6f vs %.6f sec)\n",
                ratio, falcon_sig->avgTime, secp_sig->avgTime);
+        if (dilith2_sig) {
+            double ratio2 = dilith2_sig->avgTime / secp_sig->avgTime;
+            printf("  - Dilithium2 is %.1fx SLOWER than secp256k1 (%.6f vs %.6f sec)\n",
+                   ratio2, dilith2_sig->avgTime, secp_sig->avgTime);
+        }
     }
     
     if (secp_ver && falcon_ver) {
@@ -633,8 +713,8 @@ static void print_analysis(void) {
     /* Category winners */
     printf("\n--- Category Winners (Fastest in Each Operation) ---\n");
     
-    const char *categories[] = {"keypair", "sign", "verify", "commit"};
-    const char *category_names[] = {"Key Generation", "Signing", "Verification", "Commit"};
+    const char *op_types[] = {"keypair", "sign", "verify", "commit"};
+    const char *op_names[] = {"Key Generation", "Signing", "Verification", "Commit"};
     
     for (int c = 0; c < 4; c++) {
         double best_time = DBL_MAX;
@@ -642,22 +722,22 @@ static void print_analysis(void) {
         
         for (int i = 0; i < num_results; i++) {
             /* Check if this benchmark is in the operation category */
-            if (strstr(results[i].name, "-kp") && strcmp(categories[c], "keypair") == 0) {
+            if (strstr(results[i].name, "-kp") && strcmp(op_types[c], "keypair") == 0) {
                 if (results[i].avgTime < best_time) {
                     best_time = results[i].avgTime;
                     best_name = results[i].name;
                 }
-            } else if (strstr(results[i].name, "-sig") && strcmp(categories[c], "sign") == 0) {
+            } else if (strstr(results[i].name, "-sig") && strcmp(op_types[c], "sign") == 0) {
                 if (results[i].avgTime < best_time) {
                     best_time = results[i].avgTime;
                     best_name = results[i].name;
                 }
-            } else if (strstr(results[i].name, "-ver") && strcmp(categories[c], "verify") == 0) {
+            } else if (strstr(results[i].name, "-ver") && strcmp(op_types[c], "verify") == 0) {
                 if (results[i].avgTime < best_time) {
                     best_time = results[i].avgTime;
                     best_name = results[i].name;
                 }
-            } else if (strstr(results[i].name, "-cmt") && strcmp(categories[c], "commit") == 0) {
+            } else if (strstr(results[i].name, "-cmt") && strcmp(op_types[c], "commit") == 0) {
                 if (results[i].avgTime < best_time) {
                     best_time = results[i].avgTime;
                     best_name = results[i].name;
@@ -667,7 +747,7 @@ static void print_analysis(void) {
         
         if (best_name) {
             printf("• Fastest %s: %s (%.6f sec, %.0f ops/sec)\n",
-                   category_names[c], best_name, best_time, 1.0 / best_time);
+                   op_names[c], best_name, best_time, 1.0 / best_time);
         }
     }
 
@@ -716,7 +796,7 @@ int main(void) {
 
     /* Dilithium variants - compare against Falcon */
     printf("\n--- Dilithium (NIST PQC Standard) - Compare vs Falcon ---\n");
-    if (pqc_alg_is_available("Dilithium2")) {
+    if (get_dilithium2_name()) {
         run_benchmark(dilithium2_keypair_bench, "Dilith2-kp", "pqc-keypair");
         run_benchmark(dilithium2_sign_bench,    "Dilith2-sig", "pqc-sign");
         run_benchmark(dilithium2_verify_bench,  "Dilith2-ver", "pqc-verify");
@@ -725,7 +805,7 @@ int main(void) {
         printf("%-16s %s\n", "Dilithium2", "not available");
     }
     
-    if (pqc_alg_is_available("Dilithium3")) {
+    if (get_dilithium3_name()) {
         run_benchmark(dilithium3_keypair_bench, "Dilith3-kp", "pqc-keypair");
         run_benchmark(dilithium3_sign_bench,    "Dilith3-sig", "pqc-sign");
         run_benchmark(dilithium3_verify_bench,  "Dilith3-ver", "pqc-verify");
@@ -734,7 +814,7 @@ int main(void) {
         printf("%-16s %s\n", "Dilithium3", "not available");
     }
     
-    if (pqc_alg_is_available("Dilithium5")) {
+    if (get_dilithium5_name()) {
         run_benchmark(dilithium5_keypair_bench, "Dilith5-kp", "pqc-keypair");
         run_benchmark(dilithium5_sign_bench,    "Dilith5-sig", "pqc-sign");
         run_benchmark(dilithium5_verify_bench,  "Dilith5-ver", "pqc-verify");
