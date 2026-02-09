@@ -174,6 +174,15 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_write_checksum(dogecoin_wallet* wa
 /** M17: verify wallet against sidecar .chk file (true if no .chk or match) */
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_verify_checksum(dogecoin_wallet* wallet);
 
+/** M15/M16: write HMAC-SHA256 record covering all wallet data */
+LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_write_hmac(dogecoin_wallet* wallet);
+
+/** M15/M16: verify HMAC record (true if no HMAC record or match) */
+LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_verify_hmac(dogecoin_wallet* wallet);
+
+/** M15/M16: strip old HMAC and write fresh one */
+LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_replace_hmac(dogecoin_wallet* wallet);
+
 /** set the master key of new created wallet
  consuming app needs to ensure that we don't override exiting masterkeys */
 LIBDOGECOIN_API void dogecoin_wallet_set_master_key_copy(dogecoin_wallet* wallet, const dogecoin_hdnode* master_xpub);
