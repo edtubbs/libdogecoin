@@ -218,7 +218,7 @@ Key Generation  Transaction  SPV Node
 3. How would applications detect memory corruption in the library?
 
 **Recommended Mitigations:**
-- Replace all `strcpy()` usage with `strncpy()` or safe string functions
+- Replace all `strcpy()` usage with safe alternatives (`snprintf()` or `strlcpy()` with explicit null-termination)
 - Validate all memory allocation return values
 - Minimize private key lifetime in memory — cleanse immediately after use
 - Compile with hardening flags: `-fstack-protector-strong`, `-D_FORTIFY_SOURCE=2`, `-fPIE`
@@ -527,7 +527,7 @@ The following mitigations address the highest-impact risks identified across all
 
 | ID | Mitigation | Addresses |
 |----|-----------|-----------|
-| M5 | Replace unsafe string operations (`strcpy`) with bounds-checked alternatives | Scenario 2 |
+| M5 | Replace unsafe string operations (`strcpy`) with safe alternatives (`snprintf()` or `strlcpy()` with explicit null-termination) | Scenario 2 |
 | M6 | Validate all `malloc`/`calloc` return values | Scenario 2 |
 | M7 | Implement peer diversity enforcement for SPV connections | Scenario 3 |
 | M8 | Add dependency hash verification and SBOM generation | Scenario 1 |
