@@ -58,6 +58,7 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/vector.h>
+#include <dogecoin/wallet.h>
 #include <event2/event.h>
 
 #define DOGECOIN_KOINU_PER_COIN 100000000ULL
