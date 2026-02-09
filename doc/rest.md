@@ -572,6 +572,8 @@ uptime_sec: 3600
 Lightweight status and counters for the SMPV (Simplified Mempool Payment Verification) tracker.
 SMPV must be enabled with the CLI flag `-x` (e.g., `spvnode -x ...`).
 
+> **Important**: For transaction confirmations to work, you must also use the `-b` flag to enable full block sync. Without `-b`, `confirmed` will always be 0. See `doc/smpv.md` for details.
+
 **Request**
 
 * Method: `GET`
@@ -587,7 +589,7 @@ SMPV must be enabled with the CLI flag `-x` (e.g., `spvnode -x ...`).
 enabled: <0|1>
 mempool_txs: <uint32>
 watchers: <uint32>
-confirmed: <uint32>
+confirmed: <uint32>       # Requires -b flag (full block sync)
 unconfirmed: <uint32>
 total_bytes: <uint64>
 last_seen_ts: <unix-epoch>

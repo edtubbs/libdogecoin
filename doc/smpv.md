@@ -101,8 +101,10 @@ If you are also running the HTTP server, the SMPV endpoints are documented separ
 To run spvnode with debug logging, continuous mode, SMPV enabled, HTTP REST API, and checkpoints:
 
 ```bash
-./spvnode -d -c -x -u 0.0.0.0:8080 -p scan
+./spvnode -d -c -x -u 0.0.0.0:8080 -p -b scan
 ```
+
+**IMPORTANT**: The `-b` flag (full block sync) is **REQUIRED** for SMPV confirmations to work!
 
 Flags explained:
 - `-d`: Enable debug logging
@@ -110,7 +112,32 @@ Flags explained:
 - `-x`: Enable SMPV tracking
 - `-u address:port`: Enable HTTP REST API server on specified address and port
 - `-p`: Use checkpoints for faster initial sync
+- `-b`: **REQUIRED** - Enable full block sync (downloads full blocks, not just headers)
 - `scan`: Command to scan and sync the blockchain
+
+### Why Full Block Sync (-b) is Required
+
+SMPV confirmation tracking requires full block data:
+
+**Without `-b` (Header-only sync):**
+- ❌ Only downloads block headers (80 bytes each)
+- ❌ Block transaction data is never seen
+- ❌ Confirmations will NEVER happen
+- ✅ Mempool transactions are still tracked
+- ✅ Unconfirmed transactions work normally
+
+**With `-b` (Full block sync):**
+- ✅ Downloads complete blocks with all transactions
+- ✅ Transactions are matched and confirmed automatically
+- ✅ Confirmation counts increment with each new block
+- ⚠️ Requires more bandwidth and storage
+
+> **Warning**: If you enable SMPV without `-b`, you will see:
+> ```
+> confirmed: 0
+> unconfirmed: [all transactions]
+> ```
+> The system will log a warning at startup if `-b` is missing.
 
 ### Checking SMPV Status
 

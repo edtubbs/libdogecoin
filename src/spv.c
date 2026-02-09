@@ -957,8 +957,16 @@ LIBDOGECOIN_API void dogecoin_spv_enable_smpv(dogecoin_spv_client* client, dogec
         client->smpv_ctx = dogecoin_smpv_client_new(client->chainparams);
         if (client->smpv_ctx && dogecoin_smpv_start((dogecoin_smpv_client*)client->smpv_ctx)) {
             client->smpv_enabled = true;
-            if (client->nodegroup && client->nodegroup->log_write_cb)
+            if (client->nodegroup && client->nodegroup->log_write_cb) {
                 client->nodegroup->log_write_cb("[smpv] enabled\n");
+                
+                /* Warn if full block sync is not enabled */
+                if ((client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) != SPV_FULLBLOCK_SYNC_FLAG) {
+                    client->nodegroup->log_write_cb("[smpv] WARNING: Full block sync not enabled (-b flag)\n");
+                    client->nodegroup->log_write_cb("[smpv] WARNING: Transactions will NOT be confirmed without full block sync\n");
+                    client->nodegroup->log_write_cb("[smpv] WARNING: Use -b flag to enable full block sync for confirmations\n");
+                }
+            }
         } else {
             if (client->nodegroup && client->nodegroup->log_write_cb)
                 client->nodegroup->log_write_cb("[smpv] failed to enable (alloc/start)\n");
