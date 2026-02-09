@@ -536,11 +536,9 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
         }
     }
 
-    /* minimal: if a block confirms a tx we never saw, add a bounded confirmed stub */
+    /* Only track confirmations for transactions we've seen in mempool */
     if (!tx) {
-        if (confirmed) {
-            (void)smpv_append_confirmed_stub(client, txid, block_hash, block_height);
-        }
+        /* Transaction not in mempool - do not track */
         return;
     }
 

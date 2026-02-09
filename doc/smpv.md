@@ -33,10 +33,7 @@ SMPV includes a complete confirmation tracking system that automatically updates
    - Formula: `confirmations = current_tip_height - tx_block_height + 1`
    - This happens automatically via the "tip tick" mechanism
 
-4. **Confirmed Stubs**: If a transaction is found in a block but was never seen in the mempool:
-   - A lightweight "stub" entry is created with the txid, block hash, and height
-   - This ensures all confirmed transactions are tracked, even if missed in the mempool
-   - Stub entries are bounded (limit: 4096) to prevent memory exhaustion
+> **Note**: SMPV only tracks confirmations for transactions that were previously seen in the mempool. Transactions that appear in blocks without being seen in the mempool first are ignored. This ensures SMPV focuses on its primary purpose: mempool transaction monitoring.
 
 ### Example Confirmation Flow
 
