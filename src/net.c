@@ -84,7 +84,7 @@ static int count_peers_in_subnet(dogecoin_node_group* group, struct sockaddr* ad
 {
     if (addr->sa_family != AF_INET) return 0;
     struct sockaddr_in* target = (struct sockaddr_in*)addr;
-    uint16_t target_prefix = ntohs(target->sin_addr.s_addr & 0xFFFF); /* first 2 bytes = /16 */
+    uint16_t target_prefix = ntohl(target->sin_addr.s_addr) >> 16; /* first 2 octets = /16 */
 
     int count = 0;
     for (size_t i = 0; i < group->nodes->len; i++) {
@@ -94,7 +94,7 @@ static int count_peers_in_subnet(dogecoin_node_group* group, struct sockaddr* ad
             continue;
         if (n->addr.sa_family != AF_INET) continue;
         struct sockaddr_in* peer = (struct sockaddr_in*)&n->addr;
-        uint16_t peer_prefix = ntohs(peer->sin_addr.s_addr & 0xFFFF);
+        uint16_t peer_prefix = ntohl(peer->sin_addr.s_addr) >> 16;
         if (peer_prefix == target_prefix)
             count++;
     }

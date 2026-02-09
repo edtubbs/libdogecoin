@@ -579,7 +579,7 @@ int produce_mnemonic_sentence(const int segSize, const int checksumBits, const c
         fprintf(stderr, "ERROR: Failed to allocate memory for segment\n");
         return -1;
     }
-    strcpy(segment, "");
+    segment[0] = '\0';
 
     char *csBits = dogecoin_string_vla (checksumBits);
     if (csBits == NULL) {

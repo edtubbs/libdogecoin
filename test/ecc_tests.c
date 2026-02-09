@@ -59,8 +59,9 @@ void test_ecc()
     {
         /* Known private key (32 bytes) */
         uint8_t kat_privkey[32];
-        memcpy_safe(kat_privkey, utils_hex_to_uint8(
-            "0000000000000000000000000000000000000000000000000000000000000001"), 32);
+        uint8_t* tmp_hex = utils_hex_to_uint8(
+            "0000000000000000000000000000000000000000000000000000000000000001");
+        memcpy_safe(kat_privkey, tmp_hex, 32);
         u_assert_int_eq(dogecoin_ecc_verify_privatekey(kat_privkey), 1);
 
         /* Derive public key — secp256k1 generator point G (compressed) */
@@ -76,8 +77,9 @@ void test_ecc()
 
         /* Sign a known hash and verify */
         uint8_t kat_hash[32];
-        memcpy_safe(kat_hash, utils_hex_to_uint8(
-            "4b688df40bcedbe641ddb16ff0a1842d9c67ea1c3bf63f3e0471baa664531d1a"), 32);
+        uint8_t* tmp_hash = utils_hex_to_uint8(
+            "4b688df40bcedbe641ddb16ff0a1842d9c67ea1c3bf63f3e0471baa664531d1a");
+        memcpy_safe(kat_hash, tmp_hash, 32);
         unsigned char kat_sig[74];
         size_t kat_siglen = 74;
         u_assert_int_eq(dogecoin_ecc_sign(kat_privkey, kat_hash, kat_sig, &kat_siglen), 1);
