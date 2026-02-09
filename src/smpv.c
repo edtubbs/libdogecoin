@@ -115,7 +115,7 @@ dogecoin_bool dogecoin_smpv_add_watcher(
     dogecoin_smpv_watcher* watcher = &client->watchers[client->watcher_count];
     watcher->address = dogecoin_calloc(1, strlen(address) + 1);
     if (!watcher->address) return false;
-    strcpy(watcher->address, address);
+    snprintf(watcher->address, strlen(address) + 1, "%s", address);
     watcher->total_received = 0;
     watcher->total_sent = 0;
     watcher->balance = 0;
@@ -201,7 +201,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_process_tx(
     const size_t raw_len = strlen(raw_tx_hex);
     smpv_tx->raw_hex = (char*)dogecoin_calloc(1, raw_len + 1);
     if (!smpv_tx->raw_hex) { dogecoin_smpv_tx_free(smpv_tx); return false; }
-    strcpy(smpv_tx->raw_hex, raw_tx_hex);
+    snprintf(smpv_tx->raw_hex, raw_len + 1, "%s", raw_tx_hex);
 
     /* hex -> bytes */
     const size_t alloc_bytes = raw_len / 2;
@@ -218,7 +218,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_process_tx(
     if (!smpv_tx->txid) { dogecoin_free(bin); dogecoin_smpv_tx_free(smpv_tx); return false; }
     char* hex = utils_uint8_to_hex((const uint8_t*)h, 32);
     if (!hex) { dogecoin_free(bin); dogecoin_smpv_tx_free(smpv_tx); return false; }
-    strcpy(smpv_tx->txid, hex);
+    snprintf(smpv_tx->txid, 65, "%s", hex);
     utils_reverse_hex(smpv_tx->txid, 64);
 
     /* base metadata */
@@ -311,7 +311,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_process_tx(
         size_t alen = strlen(client->watchers[0].address);
         relevant_address = (char*)dogecoin_calloc(1, alen + 1);
         if (relevant_address) {
-            strcpy(relevant_address, client->watchers[0].address);
+            snprintf(relevant_address, alen + 1, "%s", client->watchers[0].address);
             client->watchers[0].tx_count++;
         }
     }
@@ -432,7 +432,7 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
         if (block_hash) {
             if (tx->block_hash) dogecoin_free(tx->block_hash);
             tx->block_hash = dogecoin_calloc(1, strlen(block_hash) + 1);
-            strcpy(tx->block_hash, block_hash);
+            snprintf(tx->block_hash, strlen(block_hash) + 1, "%s", block_hash);
         }
         tx->block_height = block_height;
     }

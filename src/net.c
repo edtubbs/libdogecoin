@@ -74,6 +74,32 @@
 static const int DOGECOIN_PERIODICAL_NODE_TIMER_S = 3;
 static const int DOGECOIN_PING_INTERVAL_S = 120;
 static const int DOGECOIN_CONNECT_TIMEOUT_S = 10;
+static const int DOGECOIN_MAX_PEERS_PER_SUBNET = 2; /* M7: peer diversity limit per /16 */
+
+/**
+ * M7: Count how many connected/connecting nodes share the same /16 subnet
+ * as the given node address. IPv4 only — IPv6 is not limited.
+ */
+static int count_peers_in_subnet(dogecoin_node_group* group, struct sockaddr* addr)
+{
+    if (addr->sa_family != AF_INET) return 0;
+    struct sockaddr_in* target = (struct sockaddr_in*)addr;
+    uint16_t target_prefix = ntohs(target->sin_addr.s_addr & 0xFFFF); /* first 2 bytes = /16 */
+
+    int count = 0;
+    for (size_t i = 0; i < group->nodes->len; i++) {
+        dogecoin_node* n = vector_idx(group->nodes, i);
+        if (!((n->state & NODE_CONNECTED) == NODE_CONNECTED ||
+              (n->state & NODE_CONNECTING) == NODE_CONNECTING))
+            continue;
+        if (n->addr.sa_family != AF_INET) continue;
+        struct sockaddr_in* peer = (struct sockaddr_in*)&n->addr;
+        uint16_t peer_prefix = ntohs(peer->sin_addr.s_addr & 0xFFFF);
+        if (peer_prefix == target_prefix)
+            count++;
+    }
+    return count;
+}
 
 /**
  * Initializes the HTTP server part of the node group.
@@ -85,6 +111,12 @@ static const int DOGECOIN_CONNECT_TIMEOUT_S = 10;
 void dogecoin_http_server_init(dogecoin_node_group* group, const char* bindaddr, int port) {
     assert(group != NULL);
     assert(group->event_base != NULL);
+
+    /* M11: Warn if binding to non-localhost address */
+    if (bindaddr && strcmp(bindaddr, "127.0.0.1") != 0 && strcmp(bindaddr, "::1") != 0 && strcmp(bindaddr, "localhost") != 0) {
+        fprintf(stderr, "WARNING: HTTP API binding to non-localhost address '%s'. "
+                "Consider using 127.0.0.1 to prevent remote access.\n", bindaddr);
+    }
 
     group->http_server = evhttp_new(group->event_base);
     if (!group->http_server) {
@@ -482,7 +514,7 @@ dogecoin_node_group* dogecoin_node_group_new(const dogecoin_chainparams* chainpa
     node_group->nodes = vector_new(1, dogecoin_node_free_cb);
     node_group->chainparams = (chainparams ? chainparams : &dogecoin_chainparams_main);
     node_group->parse_cmd_cb = NULL;
-    strcpy(node_group->clientstr, "libdogecoin-spv-node");
+    snprintf(node_group->clientstr, sizeof(node_group->clientstr), "%s", "libdogecoin-spv-node");
 
     /* nullify callbacks */
     node_group->postcmd_cb = NULL;
@@ -599,6 +631,10 @@ dogecoin_bool dogecoin_node_group_connect_next_nodes(dogecoin_node_group* group)
             !((node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
             !((node->state & NODE_DISCONNECTED) == NODE_DISCONNECTED) &&
             !((node->state & NODE_CONNECTING) == NODE_CONNECTING)) {
+            /* M7: enforce peer diversity — skip if /16 subnet is over-represented */
+            if (count_peers_in_subnet(group, &node->addr) >= DOGECOIN_MAX_PEERS_PER_SUBNET) {
+                continue;
+            }
             /* setup buffer event */
             node->event_bev = bufferevent_socket_new(group->event_base, -1, BEV_OPT_CLOSE_ON_FREE);
             bufferevent_setcb(node->event_bev, read_cb, write_cb, event_cb, node);

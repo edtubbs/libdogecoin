@@ -124,7 +124,7 @@ int get_mnemonic(const int entropysize, const char* entropy, const char* wordlis
 
     /* Convert local entropy and copy to entropy parameter if allocated */
     if (entropy_out != NULL) {
-        strcpy(entropy_out, utils_uint8_to_hex(local_entropy, entBytes));
+        snprintf(entropy_out, entBytes * 2 + 1, "%s", utils_uint8_to_hex(local_entropy, entBytes));
         utils_clear_buffers();
     }
 
@@ -486,7 +486,7 @@ int get_custom_words(const char *filepath, char* wordlist[]) {
             fclose(fp);
             return -1;
         }
-        strcpy(wordlist[i], word);
+        snprintf(wordlist[i], strlen(word) + 1, "%s", word);
         i++;
     }
 
@@ -587,7 +587,7 @@ int produce_mnemonic_sentence(const int segSize, const int checksumBits, const c
         dogecoin_free (segment);
         return -1;
     }
-    strcpy(csBits, "");
+    csBits[0] = '\0';
 
     /* Convert the checksum string to a byte */
     unsigned char *bytes = utils_hex_to_uint8(firstByte);

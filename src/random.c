@@ -215,8 +215,9 @@ dogecoin_bool dogecoin_random_bytes_internal(uint8_t* buf, uint32_t len, const u
     if (!frand)
         return false;
     size_t len_read = fread(buf, 1, len, frand);
-    assert(len_read == len);
     fclose(frand);
+    if (len_read != len)
+        return false;
     return true;
 #endif
     }
@@ -303,6 +304,7 @@ dogecoin_bool randbool(struct fast_random_context* this) { return randbits(this,
 
 struct fast_random_context* init_fast_random_context(dogecoin_bool f_deterministic, const uint256_t* seed) {
     struct fast_random_context* this = dogecoin_calloc(1, sizeof(*this));
+    if (!this) return NULL;
     this->requires_seed = false;
     this->random_seed = random_seed;
     this->fill_bit_buffer = fill_bit_buffer;

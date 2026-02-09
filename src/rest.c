@@ -36,8 +36,27 @@
 
 #define TIMESTAMP_MAX_LEN 32
 
-#include <stdlib.h>   // qsort
+#include <stdlib.h>   // qsort, getenv
 #include <stdint.h>   // uint64_t
+
+/**
+ * Check API key from the DOGECOIN_API_KEY environment variable.
+ * If the env var is set, all REST requests must include a matching
+ * X-API-Key header. Returns true if access is allowed.
+ */
+static dogecoin_bool check_api_key(struct evhttp_request *req) {
+    const char* expected = getenv("DOGECOIN_API_KEY");
+    if (!expected || expected[0] == '\0') {
+        return true; /* no key configured, allow all */
+    }
+    struct evkeyvalq* headers = evhttp_request_get_input_headers(req);
+    const char* provided = evhttp_find_header(headers, "X-API-Key");
+    if (!provided || strcmp(provided, expected) != 0) {
+        evhttp_send_error(req, 403, "Forbidden");
+        return false;
+    }
+    return true;
+}
 
 static int cmp_u64(const void *a, const void *b) {
     uint64_t va = *(const uint64_t*)a, vb = *(const uint64_t*)b;
@@ -54,6 +73,9 @@ static int cmp_u64(const void *a, const void *b) {
  * @return Nothing.
  */
 void dogecoin_http_request_cb(struct evhttp_request *req, void *arg) {
+    /* M1: API key authentication */
+    if (!check_api_key(req)) return;
+
     dogecoin_spv_client* client = (dogecoin_spv_client*)arg;
     dogecoin_wallet* wallet = (dogecoin_wallet*)client->sync_transaction_ctx;
     if (!wallet) {

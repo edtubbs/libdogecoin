@@ -1,0 +1,43 @@
+# Security-critical paths require at minimum two reviewers.
+# See doc/mitre_att&ck_tabletop.md — Mitigation M4.
+
+# Cryptographic primitives
+/src/ecc.c           @edtubbs
+/src/aes.c           @edtubbs
+/src/random.c        @edtubbs
+/src/bip32.c         @edtubbs
+/src/bip39.c         @edtubbs
+/src/bip44.c         @edtubbs
+/src/key.c           @edtubbs
+/src/eckey.c         @edtubbs
+/src/chacha20.c      @edtubbs
+/src/sha2.c          @edtubbs
+/src/rmd160.c        @edtubbs
+/src/ctaes.c         @edtubbs
+/src/seal.c          @edtubbs
+
+# Corresponding headers
+/include/dogecoin/ecc.h      @edtubbs
+/include/dogecoin/aes.h      @edtubbs
+/include/dogecoin/random.h   @edtubbs
+/include/dogecoin/bip32.h    @edtubbs
+/include/dogecoin/bip39.h    @edtubbs
+/include/dogecoin/bip44.h    @edtubbs
+/include/dogecoin/key.h      @edtubbs
+/include/dogecoin/eckey.h    @edtubbs
+/include/dogecoin/seal.h     @edtubbs
+
+# Wallet and networking
+/src/wallet.c        @edtubbs
+/src/net.c           @edtubbs
+/src/rest.c          @edtubbs
+/src/spv.c           @edtubbs
+/src/sign.c          @edtubbs
+
+# Vendored dependencies — require review for subtree updates
+/src/secp256k1/      @edtubbs
+/src/libevent/       @edtubbs
+
+# Build system
+/configure.ac        @edtubbs
+/Makefile.am         @edtubbs

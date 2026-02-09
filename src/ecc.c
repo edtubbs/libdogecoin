@@ -4,6 +4,7 @@
 
 #include <dogecoin/random.h>
 #include <dogecoin/dogecoin.h>
+#include <dogecoin/mem.h>
 #include <dogecoin/utils.h>
 
 #include "secp256k1/include/secp256k1.h"
@@ -91,10 +92,15 @@ dogecoin_bool dogecoin_ecc_sign(const uint8_t* private_key, const uint256_t hash
 {
     assert(secp256k1_ctx);
     secp256k1_ecdsa_signature sig;
-    if (!secp256k1_ecdsa_sign(secp256k1_ctx, &sig, hash, private_key, secp256k1_nonce_function_rfc6979, NULL))
+    if (!secp256k1_ecdsa_sign(secp256k1_ctx, &sig, hash, private_key, secp256k1_nonce_function_rfc6979, NULL)) {
+        dogecoin_mem_zero(&sig, sizeof(sig));
         return 0;
-    if (!secp256k1_ecdsa_signature_serialize_der(secp256k1_ctx, sigder, outlen, &sig))
+    }
+    if (!secp256k1_ecdsa_signature_serialize_der(secp256k1_ctx, sigder, outlen, &sig)) {
+        dogecoin_mem_zero(&sig, sizeof(sig));
         return 0;
+    }
+    dogecoin_mem_zero(&sig, sizeof(sig));
     return 1;
 }
 
@@ -102,11 +108,16 @@ dogecoin_bool dogecoin_ecc_sign_compact(const uint8_t* private_key, const uint25
 {
     assert(secp256k1_ctx);
     secp256k1_ecdsa_signature sig;
-    if (!secp256k1_ecdsa_sign(secp256k1_ctx, &sig, hash, private_key, secp256k1_nonce_function_rfc6979, NULL))
+    if (!secp256k1_ecdsa_sign(secp256k1_ctx, &sig, hash, private_key, secp256k1_nonce_function_rfc6979, NULL)) {
+        dogecoin_mem_zero(&sig, sizeof(sig));
         return 0;
+    }
     *outlen = 64;
-    if (!secp256k1_ecdsa_signature_serialize_compact(secp256k1_ctx, sigcomp, &sig))
+    if (!secp256k1_ecdsa_signature_serialize_compact(secp256k1_ctx, sigcomp, &sig)) {
+        dogecoin_mem_zero(&sig, sizeof(sig));
         return 0;
+    }
+    dogecoin_mem_zero(&sig, sizeof(sig));
     return 1;
 }
 
@@ -114,11 +125,16 @@ dogecoin_bool dogecoin_ecc_sign_compact_recoverable(const uint8_t* private_key, 
 {
     assert(secp256k1_ctx);
     secp256k1_ecdsa_recoverable_signature sig;
-    if (!secp256k1_ecdsa_sign_recoverable(secp256k1_ctx, &sig, hash, private_key, secp256k1_nonce_function_rfc6979, NULL))
+    if (!secp256k1_ecdsa_sign_recoverable(secp256k1_ctx, &sig, hash, private_key, secp256k1_nonce_function_rfc6979, NULL)) {
+        dogecoin_mem_zero(&sig, sizeof(sig));
         return 0;
+    }
     *outlen = 65;
-    if (!secp256k1_ecdsa_recoverable_signature_serialize_compact(secp256k1_ctx, sigrec, recid, &sig))
+    if (!secp256k1_ecdsa_recoverable_signature_serialize_compact(secp256k1_ctx, sigrec, recid, &sig)) {
+        dogecoin_mem_zero(&sig, sizeof(sig));
         return 0;
+    }
+    dogecoin_mem_zero(&sig, sizeof(sig));
     return 1;
 }
 
@@ -126,11 +142,14 @@ dogecoin_bool dogecoin_ecc_sign_compact_recoverable_fcomp(const uint8_t* private
 {
     assert(secp256k1_ctx);
     secp256k1_ecdsa_recoverable_signature sig;
-    if (!secp256k1_ecdsa_sign_recoverable(secp256k1_ctx, &sig, hash, private_key, secp256k1_nonce_function_rfc6979, NULL))
+    if (!secp256k1_ecdsa_sign_recoverable(secp256k1_ctx, &sig, hash, private_key, secp256k1_nonce_function_rfc6979, NULL)) {
+        dogecoin_mem_zero(&sig, sizeof(sig));
         return 0;
+    }
     *outlen = 65;
     secp256k1_ecdsa_recoverable_signature_serialize_compact(secp256k1_ctx, &sigrec[1], recid, &sig);
     sigrec[0] = (27 + *recid + (fCompressed ? 4 : 0));
+    dogecoin_mem_zero(&sig, sizeof(sig));
     return true;
 }
 

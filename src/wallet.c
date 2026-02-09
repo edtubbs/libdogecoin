@@ -45,6 +45,7 @@
 #endif
 
 #include <dogecoin/wallet.h>
+#include <dogecoin/hash.h>
 #include <dogecoin/seal.h>
 
 #define COINBASE_MATURITY 100
@@ -1035,6 +1036,33 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
 dogecoin_bool dogecoin_wallet_flush(dogecoin_wallet* wallet)
 {
     dogecoin_file_commit(wallet->dbfile);
+    return true;
+}
+
+/**
+ * M2: Compute a SHA-256 checksum of the wallet file contents.
+ * Consumers can store/compare this hash to detect tampering.
+ *
+ * @param wallet The wallet whose file to checksum.
+ * @param hash_out A 32-byte buffer to receive the SHA-256 hash.
+ *
+ * @return true on success, false on failure.
+ */
+dogecoin_bool dogecoin_wallet_checksum(dogecoin_wallet* wallet, uint256_t hash_out)
+{
+    if (!wallet || !wallet->dbfile) return false;
+    long cur = ftell(wallet->dbfile);
+    fseek(wallet->dbfile, 0, SEEK_END);
+    long file_size = ftell(wallet->dbfile);
+    if (file_size <= 0) { if (cur >= 0) fseek(wallet->dbfile, cur, SEEK_SET); return false; }
+    rewind(wallet->dbfile);
+    uint8_t* buf = dogecoin_malloc(file_size);
+    if (!buf) { if (cur >= 0) fseek(wallet->dbfile, cur, SEEK_SET); return false; }
+    size_t nread = fread(buf, 1, file_size, wallet->dbfile);
+    if (cur >= 0) fseek(wallet->dbfile, cur, SEEK_SET);
+    if ((long)nread != file_size) { dogecoin_free(buf); return false; }
+    dogecoin_hash(buf, file_size, hash_out);
+    dogecoin_free(buf);
     return true;
 }
 
