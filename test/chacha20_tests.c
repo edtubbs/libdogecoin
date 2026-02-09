@@ -45,6 +45,8 @@ void testchacha20(const char* hexkey, uint64_t nonce, uint64_t seek, const char*
 }
 
 void test_chacha20() {
+    /* M19: Known-Answer Tests — RFC 7539 ChaCha20 test vectors verify correct
+     * keystream output for known inputs, catching regressions or backdoors. */
     // Test vector_t from RFC 7539
     testchacha20("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f", 0x4a000000UL, 1,
                  "224f51f3401bd9e12fde276fb8631ded8c131f823d2c06e27e4fcaec9ef3cf788a3b0aa372600a92b57974cded2b9334794cb"

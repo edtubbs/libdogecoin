@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <bip39/index.h>
 #include <dogecoin/bip39.h>
+#include <dogecoin/mem.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/random.h>
 #include <dogecoin/sha2.h>
@@ -1069,4 +1070,28 @@ int generateEnglishMnemonic (const HEX_ENTROPY entropy, const ENTROPY_SIZE size,
     dogecoin_free (entropy_out);
 
     return 0;
+}
+
+/**
+ * M28: Secure mnemonic generation with auto-zeroing.
+ */
+int dogecoin_secure_mnemonic_generate(const ENTROPY_SIZE size, MNEMONIC mnemonic_out)
+{
+    if (!mnemonic_out) return -1;
+    dogecoin_mem_zero(mnemonic_out, MAX_MNEMONIC_STRING_SIZE);
+    int ret = generateRandomEnglishMnemonic(size, mnemonic_out);
+    if (ret != 0) {
+        dogecoin_mem_zero(mnemonic_out, MAX_MNEMONIC_STRING_SIZE);
+    }
+    return ret;
+}
+
+/**
+ * M28: Securely cleanse a mnemonic buffer.
+ */
+void dogecoin_mnemonic_cleanse(MNEMONIC mnemonic)
+{
+    if (mnemonic) {
+        dogecoin_mem_zero(mnemonic, MAX_MNEMONIC_STRING_SIZE);
+    }
 }

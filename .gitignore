@@ -160,3 +160,6 @@ store/*
 !/src/optee/host/Makefile
 !/src/optee/ta/Makefile
 /src/optee/build
+
+# Wallet checksum sidecar files
+*.chk

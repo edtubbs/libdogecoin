@@ -416,6 +416,8 @@ static const struct sha_hmac_test_v sha_hmac_test_vectors[] =
 
 void test_sha_256()
 {
+    /* M19: Known-Answer Tests — NIST SHA-256 test vectors verify correct digest
+     * output for known inputs, catching regressions or backdoors. */
     sha256_context context;
     uint8_t buf[SHA256_DIGEST_LENGTH];
     uint8_t* digest_out; /* use non thread save buffer (optimized for embedded systems) */

@@ -545,7 +545,8 @@ static const struct nist_aes_test_vector nist_aes_test_vectors_decrypt[] =
 
 void test_aes()
 {
-    /* TODO: add more NIST test vectors (non CBC / 128) */
+    /* M19: Known-Answer Tests — NIST AES-256-CBC test vectors verify correct
+     * encryption/decryption for known inputs, catching regressions or backdoors. */
     uint8_t key_bin[128], iv_bin[128], plaintext_bin[65], ciphertext_bin[64], plaintext_bin_check[64];
 
     unsigned int i;

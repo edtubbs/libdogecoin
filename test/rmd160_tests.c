@@ -53,6 +53,8 @@ static const unsigned char ripemd160_test_md[TESTS][20] =
 
 void test_rmd160()
 {
+    /* M19: Known-Answer Tests — standard RIPEMD-160 test vectors verify correct
+     * digest output for known inputs, catching regressions or backdoors. */
     unsigned char* output[20];
     unsigned int i;
     dogecoin_mem_zero(output, sizeof output);

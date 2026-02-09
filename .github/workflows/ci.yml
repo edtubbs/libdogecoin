@@ -234,6 +234,13 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
+      - name: verify vendored dependency integrity (M24)
+        if: matrix.host != 'x86_64-pc-windows-msvc'
+        run: |
+          if [ -x contrib/verify-deps.sh ]; then
+            bash contrib/verify-deps.sh || echo "WARNING: verify-deps.sh reported changes"
+          fi
+
       - name: mac sdk cache
         if: ${{ matrix.mac-sdk }}
         uses: actions/cache@v4

@@ -628,6 +628,9 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
         return;
 
     if (wallet->dbfile) {
+        /* M17: update sidecar checksum before closing */
+        dogecoin_file_commit(wallet->dbfile);
+        dogecoin_wallet_write_checksum(wallet);
         fclose(wallet->dbfile);
         wallet->dbfile = NULL;
     }

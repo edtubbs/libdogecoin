@@ -204,6 +204,25 @@ LIBDOGECOIN_API int generateRandomEnglishMnemonic(const ENTROPY_SIZE size, MNEMO
 /* return: 0 (success), -1 (fail) */
 LIBDOGECOIN_API int generateEnglishMnemonic(const HEX_ENTROPY entropy, const ENTROPY_SIZE size, MNEMONIC mnemonic);
 
+/**
+ * M28: Secure mnemonic generation with auto-zeroing.
+ * Generates a random English mnemonic and copies it to the caller's buffer.
+ * The internal working buffer is securely zeroed after the copy.
+ *
+ * @param size Entropy size in bits ("128", "160", "192", "224", or "256")
+ * @param mnemonic_out Output buffer (must be at least MAX_MNEMONIC_STRING_SIZE bytes)
+ * @return 0 on success, -1 on failure. On failure, mnemonic_out is zeroed.
+ */
+LIBDOGECOIN_API int dogecoin_secure_mnemonic_generate(const ENTROPY_SIZE size, MNEMONIC mnemonic_out);
+
+/**
+ * M28: Securely cleanse a mnemonic buffer.
+ * Zeros the buffer to prevent mnemonic phrases from lingering in memory.
+ *
+ * @param mnemonic The mnemonic buffer to cleanse.
+ */
+LIBDOGECOIN_API void dogecoin_mnemonic_cleanse(MNEMONIC mnemonic);
+
 LIBDOGECOIN_END_DECL
 
 #endif // __LIBDOGECOIN_BIP39_H__
