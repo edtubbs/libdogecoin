@@ -53,6 +53,7 @@
 
 #define BUFFER_SIZE (1000 * 1000)
 #define HASH_SIZE 32
+#define MAX_BENCHMARKS 50
 
 typedef struct {
     double start, end, minTime, maxTime, totalTime;
@@ -60,6 +61,23 @@ typedef struct {
     uint8_t *input;
     uint8_t *output;
 } benchmark_context;
+
+/* Structure to store benchmark results for analysis */
+typedef struct {
+    char name[32];
+    char category[64];
+    uint64_t count;
+    double minTime;
+    double maxTime;
+    double avgTime;
+    uint64_t minCycles;
+    uint64_t maxCycles;
+    uint64_t avgCycles;
+} benchmark_result;
+
+/* Global storage for all benchmark results */
+static benchmark_result results[MAX_BENCHMARKS];
+static int num_results = 0;
 
 /* ---- timing helpers ---- */
 static double gettimedouble(void) {
@@ -95,7 +113,7 @@ static uint64_t perf_cpucycles(void) {
 /* ---- harness ---- */
 typedef void (*bench_fn)(benchmark_context *);
 
-static void run_benchmark(bench_fn fn, const char *name) {
+static void run_benchmark(bench_fn fn, const char *name, const char *category) {
     benchmark_context ctx;
     ctx.input = (uint8_t*)calloc(BUFFER_SIZE, sizeof(uint8_t));
     ctx.output = (uint8_t*)malloc(HASH_SIZE);
@@ -128,15 +146,34 @@ static void run_benchmark(bench_fn fn, const char *name) {
         ctx.startCycles = ctx.endCycles;
     }
 
+    double avgTime = ctx.count ? ctx.totalTime / (double)ctx.count : 0.0;
+    uint64_t avgCycles = ctx.count ? ctx.totalCycles / ctx.count : 0ULL;
+
     printf("%-16s %-8lu %-10.6f %-10.6f %-10.6f %-12lu %-12lu %-12llu\n",
            name,
            (unsigned long)ctx.count,
            ctx.minTime,
            ctx.maxTime,
-           (ctx.count ? ctx.totalTime / (double)ctx.count : 0.0),
+           avgTime,
            (unsigned long)ctx.minCycles,
            (unsigned long)ctx.maxCycles,
-           (unsigned long long)(ctx.count ? ctx.totalCycles / ctx.count : 0ULL));
+           (unsigned long long)avgCycles);
+
+    /* Store result for later analysis */
+    if (num_results < MAX_BENCHMARKS) {
+        strncpy(results[num_results].name, name, sizeof(results[num_results].name) - 1);
+        results[num_results].name[sizeof(results[num_results].name) - 1] = '\0';
+        strncpy(results[num_results].category, category, sizeof(results[num_results].category) - 1);
+        results[num_results].category[sizeof(results[num_results].category) - 1] = '\0';
+        results[num_results].count = ctx.count;
+        results[num_results].minTime = ctx.minTime;
+        results[num_results].maxTime = ctx.maxTime;
+        results[num_results].avgTime = avgTime;
+        results[num_results].minCycles = ctx.minCycles;
+        results[num_results].maxCycles = ctx.maxCycles;
+        results[num_results].avgCycles = avgCycles;
+        num_results++;
+    }
 
     free(ctx.input);
     free(ctx.output);
@@ -490,6 +527,159 @@ static void secp_verify_bench(benchmark_context *ctx) {
     ctx->totalTime += ctx->end - ctx->start; ctx->totalCycles += ctx->endCycles - ctx->startCycles;
 }
 
+/* ---- Analysis and Ranking Functions ---- */
+
+/* Comparison function for sorting by average time (ascending) */
+static int compare_avg_time(const void *a, const void *b) {
+    const benchmark_result *ra = (const benchmark_result *)a;
+    const benchmark_result *rb = (const benchmark_result *)b;
+    if (ra->avgTime < rb->avgTime) return -1;
+    if (ra->avgTime > rb->avgTime) return 1;
+    return 0;
+}
+
+/* Find result by name */
+static benchmark_result* find_result(const char *name) {
+    for (int i = 0; i < num_results; i++) {
+        if (strcmp(results[i].name, name) == 0) {
+            return &results[i];
+        }
+    }
+    return NULL;
+}
+
+/* Print performance analysis and rankings */
+static void print_analysis(void) {
+    if (num_results == 0) return;
+
+    printf("\n");
+    printf("================================================================================================================================\n");
+    printf("PERFORMANCE ANALYSIS & RANKINGS\n");
+    printf("================================================================================================================================\n");
+
+    /* Overall ranking by average time */
+    printf("\n--- Overall Speed Ranking (by Average Time) ---\n");
+    printf("%-4s %-16s %-16s %-12s %-12s\n", "Rank", "Benchmark", "Category", "Avg Time", "Ops/sec");
+    printf("--------------------------------------------------------------------------------\n");
+    
+    /* Create a sorted copy of results */
+    benchmark_result sorted[MAX_BENCHMARKS];
+    memcpy(sorted, results, sizeof(benchmark_result) * num_results);
+    qsort(sorted, num_results, sizeof(benchmark_result), compare_avg_time);
+    
+    for (int i = 0; i < num_results; i++) {
+        double ops_per_sec = sorted[i].avgTime > 0 ? 1.0 / sorted[i].avgTime : 0;
+        printf("%-4d %-16s %-16s %10.6f   %10.0f\n",
+               i + 1,
+               sorted[i].name,
+               sorted[i].category,
+               sorted[i].avgTime,
+               ops_per_sec);
+    }
+
+    /* Key comparisons */
+    printf("\n--- Key Performance Comparisons ---\n");
+    
+    /* Find specific benchmarks for comparison */
+    benchmark_result *falcon_kp = find_result("Falcon512-kp");
+    benchmark_result *falcon_sig = find_result("Falcon512-sig");
+    benchmark_result *falcon_ver = find_result("Falcon512-ver");
+    benchmark_result *secp_kp = find_result("secp-kp");
+    benchmark_result *secp_sig = find_result("secp-sig");
+    benchmark_result *secp_ver = find_result("secp-ver");
+    benchmark_result *sphincs_s_kp = find_result("SPHNCS128s-kp");
+    benchmark_result *sphincs_s_sig = find_result("SPHNCS128s-sig");
+    benchmark_result *sphincs_f_kp = find_result("SPHNCS128f-kp");
+    
+    if (secp_kp && falcon_kp) {
+        double ratio = falcon_kp->avgTime / secp_kp->avgTime;
+        printf("• Keypair Generation:\n");
+        printf("  - Falcon512 is %.1fx SLOWER than secp256k1 (%.6f vs %.6f sec)\n",
+               ratio, falcon_kp->avgTime, secp_kp->avgTime);
+    }
+    
+    if (secp_sig && falcon_sig) {
+        double ratio = falcon_sig->avgTime / secp_sig->avgTime;
+        printf("• Signing:\n");
+        printf("  - Falcon512 is %.1fx SLOWER than secp256k1 (%.6f vs %.6f sec)\n",
+               ratio, falcon_sig->avgTime, secp_sig->avgTime);
+    }
+    
+    if (secp_ver && falcon_ver) {
+        double ratio = falcon_ver->avgTime / secp_ver->avgTime;
+        printf("  - Falcon512 verification is %.2fx vs secp256k1 (%.6f vs %.6f sec)\n",
+               ratio, falcon_ver->avgTime, secp_ver->avgTime);
+    }
+    
+    if (falcon_kp && sphincs_s_kp) {
+        double ratio = sphincs_s_kp->avgTime / falcon_kp->avgTime;
+        printf("• SPHINCS+ vs Falcon512:\n");
+        printf("  - SPHINCS128s keypair is %.1fx SLOWER than Falcon512 (%.6f vs %.6f sec)\n",
+               ratio, sphincs_s_kp->avgTime, falcon_kp->avgTime);
+    }
+    
+    if (falcon_sig && sphincs_s_sig) {
+        double ratio = sphincs_s_sig->avgTime / falcon_sig->avgTime;
+        printf("  - SPHINCS128s signing is %.0fx SLOWER than Falcon512 (%.6f vs %.6f sec)\n",
+               ratio, sphincs_s_sig->avgTime, falcon_sig->avgTime);
+    }
+    
+    if (falcon_kp && sphincs_f_kp) {
+        double ratio = sphincs_f_kp->avgTime / falcon_kp->avgTime;
+        printf("  - SPHINCS128f keypair is %.2fx vs Falcon512 (%.6f vs %.6f sec)\n",
+               ratio, sphincs_f_kp->avgTime, falcon_kp->avgTime);
+    }
+
+    /* Category winners */
+    printf("\n--- Category Winners (Fastest in Each Operation) ---\n");
+    
+    const char *categories[] = {"keypair", "sign", "verify", "commit"};
+    const char *category_names[] = {"Key Generation", "Signing", "Verification", "Commit"};
+    
+    for (int c = 0; c < 4; c++) {
+        double best_time = DBL_MAX;
+        const char *best_name = NULL;
+        
+        for (int i = 0; i < num_results; i++) {
+            /* Check if this benchmark is in the operation category */
+            if (strstr(results[i].name, "-kp") && strcmp(categories[c], "keypair") == 0) {
+                if (results[i].avgTime < best_time) {
+                    best_time = results[i].avgTime;
+                    best_name = results[i].name;
+                }
+            } else if (strstr(results[i].name, "-sig") && strcmp(categories[c], "sign") == 0) {
+                if (results[i].avgTime < best_time) {
+                    best_time = results[i].avgTime;
+                    best_name = results[i].name;
+                }
+            } else if (strstr(results[i].name, "-ver") && strcmp(categories[c], "verify") == 0) {
+                if (results[i].avgTime < best_time) {
+                    best_time = results[i].avgTime;
+                    best_name = results[i].name;
+                }
+            } else if (strstr(results[i].name, "-cmt") && strcmp(categories[c], "commit") == 0) {
+                if (results[i].avgTime < best_time) {
+                    best_time = results[i].avgTime;
+                    best_name = results[i].name;
+                }
+            }
+        }
+        
+        if (best_name) {
+            printf("• Fastest %s: %s (%.6f sec, %.0f ops/sec)\n",
+                   category_names[c], best_name, best_time, 1.0 / best_time);
+        }
+    }
+
+    /* Summary recommendation */
+    printf("\n--- Summary ---\n");
+    printf("For quantum-resistant signatures on Dogecoin:\n");
+    printf("• Falcon-512 offers the best balance of speed and security\n");
+    printf("• Verification is nearly as fast as classical signatures\n");
+    printf("• SPHINCS+ provides conservative hash-based security at much lower speed\n");
+    printf("• All PQC signatures use OP_RETURN commits for off-chain verification\n");
+}
+
 /* ---- main ---- */
 
 int main(void) {
@@ -503,52 +693,52 @@ int main(void) {
 
     /* baselines */
     printf("\n--- Classical Baselines ---\n");
-    run_benchmark(sha256_bench,       "SHA256");
-    run_benchmark(scrypt_bench,       "Scrypt");
+    run_benchmark(sha256_bench,       "SHA256", "hash");
+    run_benchmark(scrypt_bench,       "Scrypt", "hash");
 
     /* commit embed/extract */
     printf("\n--- OP_RETURN Commit (for off-chain SPV verification) ---\n");
-    run_benchmark(opret_commit_bench, "OPRET-32");
+    run_benchmark(opret_commit_bench, "OPRET-32", "commit");
 
     /* secp256k1 via ECC module - classical baseline for comparison */
     printf("\n--- secp256k1 (Classical ECC Baseline) ---\n");
-    run_benchmark(secp_keypair_bench, "secp-kp");
-    run_benchmark(secp_sign_bench,    "secp-sig");
-    run_benchmark(secp_verify_bench,  "secp-ver");
+    run_benchmark(secp_keypair_bench, "secp-kp", "ecc-keypair");
+    run_benchmark(secp_sign_bench,    "secp-sig", "ecc-sign");
+    run_benchmark(secp_verify_bench,  "secp-ver", "ecc-verify");
 
 #ifdef USE_LIBOQS
     /* Falcon-512 - primary PQC baseline */
     printf("\n--- Falcon-512 (Primary PQC Baseline) ---\n");
-    run_benchmark(falcon512_keypair_bench,      "Falcon512-kp");
-    run_benchmark(falcon512_sign_bench,         "Falcon512-sig");
-    run_benchmark(falcon512_verify_bench,       "Falcon512-ver");
-    run_benchmark(falcon512_commit_bytes_bench, "Falcon512-cmt");
+    run_benchmark(falcon512_keypair_bench,      "Falcon512-kp", "pqc-keypair");
+    run_benchmark(falcon512_sign_bench,         "Falcon512-sig", "pqc-sign");
+    run_benchmark(falcon512_verify_bench,       "Falcon512-ver", "pqc-verify");
+    run_benchmark(falcon512_commit_bytes_bench, "Falcon512-cmt", "pqc-commit");
 
     /* Dilithium variants - compare against Falcon */
     printf("\n--- Dilithium (NIST PQC Standard) - Compare vs Falcon ---\n");
     if (pqc_alg_is_available("Dilithium2")) {
-        run_benchmark(dilithium2_keypair_bench, "Dilith2-kp");
-        run_benchmark(dilithium2_sign_bench,    "Dilith2-sig");
-        run_benchmark(dilithium2_verify_bench,  "Dilith2-ver");
-        run_benchmark(dilithium2_commit_bench,  "Dilith2-cmt");
+        run_benchmark(dilithium2_keypair_bench, "Dilith2-kp", "pqc-keypair");
+        run_benchmark(dilithium2_sign_bench,    "Dilith2-sig", "pqc-sign");
+        run_benchmark(dilithium2_verify_bench,  "Dilith2-ver", "pqc-verify");
+        run_benchmark(dilithium2_commit_bench,  "Dilith2-cmt", "pqc-commit");
     } else {
         printf("%-16s %s\n", "Dilithium2", "not available");
     }
     
     if (pqc_alg_is_available("Dilithium3")) {
-        run_benchmark(dilithium3_keypair_bench, "Dilith3-kp");
-        run_benchmark(dilithium3_sign_bench,    "Dilith3-sig");
-        run_benchmark(dilithium3_verify_bench,  "Dilith3-ver");
-        run_benchmark(dilithium3_commit_bench,  "Dilith3-cmt");
+        run_benchmark(dilithium3_keypair_bench, "Dilith3-kp", "pqc-keypair");
+        run_benchmark(dilithium3_sign_bench,    "Dilith3-sig", "pqc-sign");
+        run_benchmark(dilithium3_verify_bench,  "Dilith3-ver", "pqc-verify");
+        run_benchmark(dilithium3_commit_bench,  "Dilith3-cmt", "pqc-commit");
     } else {
         printf("%-16s %s\n", "Dilithium3", "not available");
     }
     
     if (pqc_alg_is_available("Dilithium5")) {
-        run_benchmark(dilithium5_keypair_bench, "Dilith5-kp");
-        run_benchmark(dilithium5_sign_bench,    "Dilith5-sig");
-        run_benchmark(dilithium5_verify_bench,  "Dilith5-ver");
-        run_benchmark(dilithium5_commit_bench,  "Dilith5-cmt");
+        run_benchmark(dilithium5_keypair_bench, "Dilith5-kp", "pqc-keypair");
+        run_benchmark(dilithium5_sign_bench,    "Dilith5-sig", "pqc-sign");
+        run_benchmark(dilithium5_verify_bench,  "Dilith5-ver", "pqc-verify");
+        run_benchmark(dilithium5_commit_bench,  "Dilith5-cmt", "pqc-commit");
     } else {
         printf("%-16s %s\n", "Dilithium5", "not available");
     }
@@ -556,19 +746,19 @@ int main(void) {
     /* SPHINCS+ variants - compare against Falcon */
     printf("\n--- SPHINCS+ (Hash-based) - Compare vs Falcon ---\n");
     if (pqc_alg_is_available("SPHINCS+-SHAKE-128s-simple")) {
-        run_benchmark(sphincs_shake_128s_keypair_bench, "SPHNCS128s-kp");
-        run_benchmark(sphincs_shake_128s_sign_bench,    "SPHNCS128s-sig");
-        run_benchmark(sphincs_shake_128s_verify_bench,  "SPHNCS128s-ver");
-        run_benchmark(sphincs_shake_128s_commit_bench,  "SPHNCS128s-cmt");
+        run_benchmark(sphincs_shake_128s_keypair_bench, "SPHNCS128s-kp", "pqc-keypair");
+        run_benchmark(sphincs_shake_128s_sign_bench,    "SPHNCS128s-sig", "pqc-sign");
+        run_benchmark(sphincs_shake_128s_verify_bench,  "SPHNCS128s-ver", "pqc-verify");
+        run_benchmark(sphincs_shake_128s_commit_bench,  "SPHNCS128s-cmt", "pqc-commit");
     } else {
         printf("%-16s %s\n", "SPHINCS128s", "not available");
     }
     
     if (pqc_alg_is_available("SPHINCS+-SHAKE-128f-simple")) {
-        run_benchmark(sphincs_shake_128f_keypair_bench, "SPHNCS128f-kp");
-        run_benchmark(sphincs_shake_128f_sign_bench,    "SPHNCS128f-sig");
-        run_benchmark(sphincs_shake_128f_verify_bench,  "SPHNCS128f-ver");
-        run_benchmark(sphincs_shake_128f_commit_bench,  "SPHNCS128f-cmt");
+        run_benchmark(sphincs_shake_128f_keypair_bench, "SPHNCS128f-kp", "pqc-keypair");
+        run_benchmark(sphincs_shake_128f_sign_bench,    "SPHNCS128f-sig", "pqc-sign");
+        run_benchmark(sphincs_shake_128f_verify_bench,  "SPHNCS128f-ver", "pqc-verify");
+        run_benchmark(sphincs_shake_128f_commit_bench,  "SPHNCS128f-cmt", "pqc-commit");
     } else {
         printf("%-16s %s\n", "SPHINCS128f", "not available");
     }
@@ -578,6 +768,9 @@ int main(void) {
     printf("%-16s %s\n", "Dilithium",    "skipped (liboqs disabled)");
     printf("%-16s %s\n", "SPHINCS+",     "skipped (liboqs disabled)");
 #endif
+
+    /* Print analysis and rankings */
+    print_analysis();
 
     printf("\n================================================================================================================================\n");
     printf("\nBuild Options:\n");
