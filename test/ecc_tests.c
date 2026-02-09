@@ -52,4 +52,42 @@ void test_ecc()
     u_assert_int_eq(dogecoin_ecc_compact_to_der_normalized(sigcomp, sigder, &sigderlen), true);
     u_assert_uint32_eq(outlen, sigderlen);
     u_assert_int_eq(memcmp(sig, sigder, sigderlen), 0);
+
+    /* M10: Known-Answer Test — verify a known private key derives the expected
+     * public key, signs a known hash, and the signature verifies. This catches
+     * regressions or backdoors in the ECC implementation. */
+    {
+        /* Known private key (32 bytes) */
+        uint8_t kat_privkey[32];
+        memcpy_safe(kat_privkey, utils_hex_to_uint8(
+            "0000000000000000000000000000000000000000000000000000000000000001"), 32);
+        u_assert_int_eq(dogecoin_ecc_verify_privatekey(kat_privkey), 1);
+
+        /* Derive public key — secp256k1 generator point G (compressed) */
+        uint8_t kat_pubkey[33];
+        size_t kat_publen = 33;
+        dogecoin_ecc_get_pubkey(kat_privkey, kat_pubkey, &kat_publen, true);
+        /* Expected: 0279BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798 */
+        u_assert_int_eq(kat_pubkey[0], 0x02);
+        u_assert_int_eq(kat_pubkey[1], 0x79);
+        u_assert_int_eq(kat_pubkey[2], 0xbe);
+        u_assert_int_eq(kat_pubkey[32], 0x98);
+        u_assert_int_eq(dogecoin_ecc_verify_pubkey(kat_pubkey, true), 1);
+
+        /* Sign a known hash and verify */
+        uint8_t kat_hash[32];
+        memcpy_safe(kat_hash, utils_hex_to_uint8(
+            "4b688df40bcedbe641ddb16ff0a1842d9c67ea1c3bf63f3e0471baa664531d1a"), 32);
+        unsigned char kat_sig[74];
+        size_t kat_siglen = 74;
+        u_assert_int_eq(dogecoin_ecc_sign(kat_privkey, kat_hash, kat_sig, &kat_siglen), 1);
+        u_assert_int_eq(dogecoin_ecc_verify_sig(kat_pubkey, true, kat_hash, kat_sig, kat_siglen), 1);
+
+        /* Verify signature does NOT verify with wrong hash */
+        uint8_t kat_wrong_hash[32];
+        memset(kat_wrong_hash, 0xAA, 32);
+        u_assert_int_eq(dogecoin_ecc_verify_sig(kat_pubkey, true, kat_wrong_hash, kat_sig, kat_siglen), 0);
+
+        dogecoin_mem_zero(kat_privkey, 32);
+    }
 }
