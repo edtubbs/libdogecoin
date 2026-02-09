@@ -197,7 +197,7 @@ The /16 subnet limit raises the bar for eclipse attacks: an attacker now needs I
 - ✅ **M11** — `src/net.c`: Warning printed to stderr when HTTP server binds to non-localhost address
 
 **Deployment Context — Dogebox Gateway:**
-In the typical production deployment, the libdogecoin REST API runs **behind Dogebox** as a local service. Dogebox acts as a gateway/proxy on the same host, handling:
+In the typical production deployment, the libdogecoin REST API runs **behind Dogebox** as a local service on the same host. Dogebox acts as a localhost gateway/proxy, handling:
 - TLS termination for external connections
 - Authentication and session management
 - Rate limiting and request filtering
@@ -319,7 +319,7 @@ var+1   N       record payload          ❌ Type-dependent (see below)
 | tx_hash_cache | 32 bytes | ❌ **None** | Can break transaction lookup |
 | full tx payload | variable | ❌ **None** | **Can modify inputs/outputs → fabricate history** |
 
-**The Core Issue:** Only the master public key has per-record integrity protection (double-write check). Address records and transaction records have **zero per-field integrity verification**. An attacker with file write access can:
+**The Core Issue:** Only the master public key has per-record integrity protection (double-write check). Address records and transaction records have **zero per-field integrity verification**. An attacker with **local file system access** (malware on the user's machine, compromised application, or physical access) can:
 
 1. **Replace a `pubkeyhash`** in an address record → the wallet sends funds to the attacker's address
 2. **Set the `ignore` flag** on address records → balances become invisible to the user
