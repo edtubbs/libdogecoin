@@ -33,6 +33,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
+#include <sys/types.h>
+#endif
 
 #if defined(HAVE_CONFIG_H) && !defined(USE_LIB)
 #include <config/libdogecoin-config.h>
