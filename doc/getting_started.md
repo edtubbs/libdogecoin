@@ -1,5 +1,21 @@
 # Getting Started with Libdogecoin
 
+## Ubuntu 22.04 LTS Users
+
+**For Ubuntu 22.04 LTS users, we have a dedicated guide:**
+
+👉 **[Ubuntu 22.04 Build Guide](build_ubuntu_22.md)** 👈
+
+This guide includes:
+- Complete dependency installation instructions
+- Both autotools and CMake build methods
+- Troubleshooting for common issues
+- Quick reference commands
+
+Continue reading below for general instructions that apply to all platforms.
+
+---
+
 ## Download Pre-built Binaries
 
 To use Libdogecoin directly out of the box without making any modifications to the source code, you can download the pre-made binaries from [https://github.com/dogecoinfoundation/libdogecoin/releases](https://github.com/dogecoinfoundation/libdogecoin/releases).

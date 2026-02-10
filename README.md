@@ -112,7 +112,23 @@ The `/doc` folder has many helpful resources regarding setup and usage of Libdog
 
 ## Quick Start
 
-For more detailed build and installation instructions, please refer to [`getting_started.md`](docs/../doc/getting_started.md)
+### Building on Ubuntu 22.04 LTS
+
+For detailed Ubuntu 22.04 build instructions with dependency installation, see **[Ubuntu 22.04 Build Guide](doc/build_ubuntu_22.md)**
+
+Quick reference:
+```bash
+# Install dependencies
+sudo apt install -y build-essential autoconf automake libtool libevent-dev git
+
+# Build
+./autogen.sh
+./configure
+make -j$(nproc)
+make check
+```
+
+For more detailed build and installation instructions for all platforms, please refer to [`getting_started.md`](docs/../doc/getting_started.md)
 
 ### Preliminary
 
