@@ -128,6 +128,19 @@ make -j$(nproc)
 make check
 ```
 
+### Building the Swift Module
+
+For Swift Package Manager integration, see **[Swift Build Instructions](doc/swift_build_instructions.md)**
+
+Quick reference:
+```bash
+# Build Swift package
+swift build
+
+# Run test
+cd swift-test && swift run
+```
+
 For more detailed build and installation instructions for all platforms, please refer to [`getting_started.md`](docs/../doc/getting_started.md)
 
 ### Preliminary

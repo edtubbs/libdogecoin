@@ -2,6 +2,52 @@
 
 This directory contains Swift examples demonstrating how to use the libdogecoin C library from Swift.
 
+## 📖 Complete Build Instructions
+
+**For complete Swift build and test instructions, see:**
+
+👉 **[Swift Build Instructions](../../doc/swift_build_instructions.md)** 👈
+
+That guide includes:
+- Prerequisites and Swift installation
+- Step-by-step build process
+- Running tests and examples
+- Troubleshooting common issues
+- Platform-specific notes
+
+---
+
+## Quick Start
+
+```bash
+# Build the library
+swift build
+
+# Create and run a test
+mkdir swift-test && cd swift-test
+cat > Package.swift << 'EOF'
+// swift-tools-version: 5.9
+import PackageDescription
+let package = Package(
+    name: "LibdogecoinTest",
+    dependencies: [.package(path: "..")],
+    targets: [.executableTarget(name: "LibdogecoinTest", dependencies: [.product(name: "clibdogecoin", package: "libdogecoin")], path: ".", sources: ["main.swift"])]
+)
+EOF
+
+# Create test program
+cat > main.swift << 'EOF'
+import clibdogecoin
+print("Testing libdogecoin...")
+dogecoin_ecc_start()
+var pk = [CChar](repeating: 0, count: 53), addr = [CChar](repeating: 0, count: 35)
+print(generatePrivPubKeypair(&pk, &addr, 0) == 1 ? "✓ Works! \(String(cString: addr))" : "✗ Failed")
+dogecoin_ecc_stop()
+EOF
+
+swift run
+```
+
 ## Prerequisites
 
 - Swift 5.9 or later
