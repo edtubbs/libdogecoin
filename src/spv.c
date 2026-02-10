@@ -829,6 +829,13 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         client->nodegroup->log_write_cb("Connected %d headers\n", connected_headers);
         client->nodegroup->log_write_cb("Chaintip at height %d\n", chaintip->height);
 
+        /* Update bestknownheight if we received fewer than max headers (2000) */
+        /* This means we've caught up to what the node knows about */
+        if (amount_of_headers < 2000 && chaintip->height > node->bestknownheight) {
+            node->bestknownheight = chaintip->height;
+            client->nodegroup->log_write_cb("Updated best known height to %d for node %d\n", node->bestknownheight, node->nodeid);
+        }
+
         /* Check if tip changed (forward or reorg) and update SMPV confirmations */
         spv_check_and_update_smpv_for_tip_change(client);
 
