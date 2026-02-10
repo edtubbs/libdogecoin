@@ -10,28 +10,101 @@ This guide shows you how to build the libdogecoin Swift Package Manager module a
 - Command Line Tools: `xcode-select --install`
 
 ### Linux (Ubuntu 22.04 / Debian)
-- Swift 5.9 or later
-- Build tools: `sudo apt install -y build-essential`
 
-#### Installing Swift on Linux
+**Important:** Swift is NOT available via `apt-get`. The `swift` package in apt is for OpenStack Swift (object storage), not the Swift programming language.
+
+You need to install Swift manually. Here are three recommended methods:
+
+#### Method 1: Using Swiftly (Recommended - Easiest)
+
+[Swiftly](https://swift-server.github.io/swiftly/) is the official Swift version manager, similar to rustup or nvm.
 
 ```bash
-# Ubuntu 22.04 / Debian
-# Download Swift from swift.org
+# Install Swiftly
+curl -L https://swift-server.github.io/swiftly/swiftly-install.sh | bash
+
+# Restart your shell or source the config
+source ~/.local/share/swiftly/env.sh
+
+# Install latest Swift
+swiftly install latest
+
+# Verify installation
+swift --version
+```
+
+#### Method 2: Manual Installation from swift.org
+
+```bash
+# Install dependencies
+sudo apt-get update
+sudo apt-get install -y \
+    binutils \
+    git \
+    gnupg2 \
+    libc6-dev \
+    libcurl4-openssl-dev \
+    libedit2 \
+    libgcc-9-dev \
+    libpython3.8 \
+    libsqlite3-0 \
+    libstdc++-9-dev \
+    libxml2-dev \
+    libz3-dev \
+    pkg-config \
+    tzdata \
+    unzip \
+    zlib1g-dev
+
+# Download Swift (check https://swift.org/download/ for latest version)
 wget https://download.swift.org/swift-5.9.2-release/ubuntu2204/swift-5.9.2-RELEASE/swift-5.9.2-RELEASE-ubuntu22.04.tar.gz
 
-# Extract
-tar xzf swift-5.9.2-RELEASE-ubuntu22.04.tar.gz
+# Extract to /opt (or your preferred location)
+sudo tar xzf swift-5.9.2-RELEASE-ubuntu22.04.tar.gz -C /opt/
 
-# Add to PATH
-echo 'export PATH="/path/to/swift-5.9.2-RELEASE-ubuntu22.04/usr/bin:$PATH"' >> ~/.bashrc
+# Add to PATH permanently
+echo 'export PATH="/opt/swift-5.9.2-RELEASE-ubuntu22.04/usr/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 
 # Verify installation
 swift --version
 ```
 
-For other platforms, visit: https://swift.org/download/
+#### Method 3: Using Snap (Ubuntu Only)
+
+```bash
+# Install Swift via snap
+sudo snap install swift-lang --classic
+
+# Verify installation
+swift --version
+```
+
+**Note:** After installation, you may need to restart your terminal for PATH changes to take effect.
+
+### Complete Setup for Ubuntu 22.04 (All-in-One)
+
+Here's a complete installation from scratch on Ubuntu 22.04:
+
+```bash
+# Step 1: Install build tools
+sudo apt-get update
+sudo apt-get install -y build-essential git curl
+
+# Step 2: Install Swift using Swiftly (easiest method)
+curl -L https://swift-server.github.io/swiftly/swiftly-install.sh | bash
+source ~/.local/share/swiftly/env.sh
+swiftly install latest
+
+# Step 3: Verify Swift is installed
+swift --version
+
+# You should see something like:
+# Swift version 5.9.2 (swift-5.9.2-RELEASE)
+# Target: x86_64-unknown-linux-gnu
+```
+
+Now you're ready to build libdogecoin!
 
 ## Quick Start: Build and Run the Example
 
@@ -326,6 +399,18 @@ if let result = wallet.generateAddress() {
 ```
 
 ## Troubleshooting
+
+### "swift: command not found"
+
+Swift is not available via `apt-get` on Ubuntu. You need to install it manually. See the [Installing Swift on Linux](#method-1-using-swiftly-recommended---easiest) section above.
+
+Quick fix:
+```bash
+# Use Swiftly (recommended)
+curl -L https://swift-server.github.io/swiftly/swiftly-install.sh | bash
+source ~/.local/share/swiftly/env.sh
+swiftly install latest
+```
 
 ### "error: terminated(72): xcrun: error: unable to find utility "swift""
 

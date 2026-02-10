@@ -9,7 +9,8 @@ This directory contains Swift examples demonstrating how to use the libdogecoin 
 👉 **[Swift Build Instructions](../../doc/swift_build_instructions.md)** 👈
 
 That guide includes:
-- Prerequisites and Swift installation
+- **Swift installation** (NOT in apt-get - manual install required)
+- Prerequisites and Swift installation methods
 - Step-by-step build process
 - Running tests and examples
 - Troubleshooting common issues
@@ -19,7 +20,13 @@ That guide includes:
 
 ## Quick Start
 
+**Note:** You need to install Swift first. See the [build guide](../../doc/swift_build_instructions.md#method-1-using-swiftly-recommended---easiest) for installation instructions.
+
 ```bash
+# Install Swift (Ubuntu/Linux)
+curl -L https://swift-server.github.io/swiftly/swiftly-install.sh | bash
+source ~/.local/share/swiftly/env.sh
+swiftly install latest
 # Build the library
 swift build
 

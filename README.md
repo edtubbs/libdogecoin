@@ -132,7 +132,9 @@ make check
 
 For Swift Package Manager integration, see **[Swift Build Instructions](doc/swift_build_instructions.md)**
 
-Quick reference:
+**Note:** Swift is NOT available via `apt-get`. See the guide for installation instructions.
+
+Quick reference (after installing Swift):
 ```bash
 # Build Swift package
 swift build
