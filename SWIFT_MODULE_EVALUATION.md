@@ -55,20 +55,10 @@ Note: `src/cli/tool.c` is included as it provides utility functions used by the 
 
 ## Build Fixes Applied
 
-Two minor fixes were required to successfully build the Swift package:
+Only ONE fix was required to successfully build the Swift package:
 
-### 1. Missing `ssize_t` Type Definition
-**Issue:** The `ssize_t` type was not available when building with Swift Package Manager.
-
-**Fix:** Added `#include <sys/types.h>` to `include/dogecoin/dogecoin.h` for non-Windows platforms:
-```c
-#ifndef _WIN32
-#include <sys/types.h>
-#endif
-```
-
-### 2. Missing Platform Defines
-**Issue:** Certain platform-specific macros were not being defined.
+### Required: Platform Defines
+**Issue:** Certain platform-specific macros and types (`ssize_t`, endian functions) were not being defined when building with Swift Package Manager on Linux.
 
 **Fix:** Added `-D_GNU_SOURCE` compiler flag to `Package.swift`:
 ```swift
@@ -78,6 +68,15 @@ Two minor fixes were required to successfully build the Swift package:
     // ... other flags
 ])
 ```
+
+**Why needed:** The `-D_GNU_SOURCE` flag enables POSIX and GNU extensions which provide:
+- The `ssize_t` type definition (from `<sys/types.h>`)
+- Endian conversion functions like `le16toh()`, `htole32()`, etc. (from `<endian.h>`)
+
+These are automatically included when `-D_GNU_SOURCE` is defined on Linux systems.
+
+### Not Required: sys/types.h Include
+**Note:** An earlier version added `#include <sys/types.h>` to `include/dogecoin/dogecoin.h`, but testing confirmed this is **NOT needed** when `-D_GNU_SOURCE` is defined. The `_GNU_SOURCE` flag ensures the necessary headers are included automatically.
 
 ## Included Functionality
 
@@ -227,9 +226,10 @@ The module successfully provides all essential libdogecoin functionality for bui
 
 ## Files Modified
 
-1. `Package.swift` - Added `-D_GNU_SOURCE` compiler flag
-2. `include/dogecoin/dogecoin.h` - Added `<sys/types.h>` include
-3. `.gitignore` - Added Swift Package Manager build directories
+1. `Package.swift` - Added `-D_GNU_SOURCE` compiler flag (required for Linux builds)
+2. `.gitignore` - Added Swift Package Manager build directories
+
+**Note:** The `include/dogecoin/dogecoin.h` file does NOT need to be modified. An earlier version added `#include <sys/types.h>` but this was found to be unnecessary.
 
 ## Repository Structure
 
