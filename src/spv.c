@@ -587,10 +587,36 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
         if (contains_block) {
             node->time_last_request = time(NULL);
-            client->nodegroup->log_write_cb("Requesting %d blocks\n", varlen);
-            cstring *p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, original_inv.p, original_inv.len);
-            dogecoin_node_send(node, p2p_msg);
-            cstr_free(p2p_msg, true);
+            if (client->track_wallet_utxos && client->called_sync_completed) {
+                // Request filtered blocks (merkleblock) when bloom filter is active
+                client->nodegroup->log_write_cb("Requesting %d filtered blocks (merkleblock)\n", varlen);
+                cstring *getdata = cstr_new_sz(original_inv.len);
+                struct const_buffer rebuild = { original_inv.p, original_inv.len };
+                uint32_t cnt;
+                deser_varlen(&cnt, &rebuild);
+                ser_varlen(getdata, cnt);
+                unsigned int j;
+                for (j = 0; j < cnt; j++) {
+                    uint32_t inv_type;
+                    deser_u32(&inv_type, &rebuild);
+                    if (inv_type == DOGECOIN_INV_TYPE_BLOCK) {
+                        inv_type = DOGECOIN_INV_TYPE_FILTERED_BLOCK;
+                    }
+                    ser_u32(getdata, inv_type);
+                    uint8_t hash[32];
+                    deser_bytes(hash, &rebuild, 32);
+                    ser_bytes(getdata, hash, 32);
+                }
+                cstring *p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, getdata->str, getdata->len);
+                dogecoin_node_send(node, p2p_msg);
+                cstr_free(getdata, true);
+                cstr_free(p2p_msg, true);
+            } else {
+                client->nodegroup->log_write_cb("Requesting %d blocks\n", varlen);
+                cstring *p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, original_inv.p, original_inv.len);
+                dogecoin_node_send(node, p2p_msg);
+                cstr_free(p2p_msg, true);
+            }
         }
 
         if (contains_tx && client->smpv_enabled) {
