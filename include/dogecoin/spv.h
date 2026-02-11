@@ -83,6 +83,7 @@ typedef struct dogecoin_spv_client_
     void* smpv_ctx;
     dogecoin_bool smpv_enabled;
     dogecoin_bool track_wallet_utxos;
+    uint64_t merkle_wait_start_time;
 
     /* callbacks */
     /* ========= */
