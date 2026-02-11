@@ -673,9 +673,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     char* txid_hex = utils_uint8_to_hex((const uint8_t*)h, 32);
                     if (txid_hex) {
                         utils_reverse_hex(txid_hex, 64);
+                        char txid_copy[65];
+                        memcpy(txid_copy, txid_hex, 65);
                         dogecoin_smpv_update_tx_status(
                             (dogecoin_smpv_client*)client->smpv_ctx,
-                            txid_hex,
+                            txid_copy,
                             true,
                             hash_to_string(pindex->hash),
                             (uint32_t)pindex->height
