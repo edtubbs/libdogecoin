@@ -553,7 +553,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 {
     dogecoin_spv_client *client = (dogecoin_spv_client *)node->nodegroup->ctx;
 
-    if (strcmp(hdr->command, DOGECOIN_MSG_INV) == 0 && (node->state & NODE_BLOCKSYNC) == NODE_BLOCKSYNC)
+    if (strcmp(hdr->command, DOGECOIN_MSG_INV) == 0 && ((node->state & NODE_BLOCKSYNC) == NODE_BLOCKSYNC || (client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG))
     {
         struct const_buffer original_inv = { buf->p, buf->len };
         uint32_t varlen;
