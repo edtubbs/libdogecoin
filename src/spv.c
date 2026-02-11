@@ -70,7 +70,6 @@ static const unsigned int MIN_TIME_DELTA_FOR_STATE_CHECK = 5;
 static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
-static const unsigned int MERKLE_BLOCK_WAIT_TIMEOUT = 3600;
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
@@ -195,7 +194,6 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->smpv_ctx = NULL;
     client->smpv_enabled = false;
     client->track_wallet_utxos = false;
-    client->merkle_wait_start_time = 0;
 
     return client;
 }
@@ -371,18 +369,6 @@ static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, u
         dogecoin_net_spv_periodic_statecheck(node, now);
     }
 
-    if (client->merkle_wait_start_time > 0 && *now > client->merkle_wait_start_time)
-    {
-        uint64_t waited = *now - client->merkle_wait_start_time;
-        if (waited >= MERKLE_BLOCK_WAIT_TIMEOUT)
-        {
-            client->nodegroup->log_write_cb("No merkle blocks received after %llu seconds, shutting down\n", (unsigned long long)waited);
-            printf("No merkle blocks received after %llu seconds, shutting down\n", (unsigned long long)waited);
-            dogecoin_node_group_shutdown(client->nodegroup);
-            return false;
-        }
-    }
-
     return true;
 }
 
@@ -540,7 +526,6 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
         // Post-sync actions
         if (client->track_wallet_utxos) {
             dogecoin_net_spv_post_sync_utxo_filters(client);
-            client->merkle_wait_start_time = time(NULL);
         }
         
         client->sync_completed(client);
@@ -752,7 +737,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     // Post-sync actions
                     if (client->track_wallet_utxos) {
                         dogecoin_net_spv_post_sync_utxo_filters(client);
-                        client->merkle_wait_start_time = time(NULL);
                     }
                     // enable mempool requests if smpv is enabled
                     if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
@@ -830,9 +814,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
     if (strcmp(hdr->command, DOGECOIN_MSG_MERKLEBLOCK) == 0) {
         if (client && client->track_wallet_utxos && client->sync_transaction_ctx) {
-            // Reset merkle block wait timer on receipt
-            client->merkle_wait_start_time = time(NULL);
-
             // Process merkleblock for UTXO tracking
             // Parse merkleblock structure to extract matched transactions
             
