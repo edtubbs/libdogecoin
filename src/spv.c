@@ -52,6 +52,7 @@
 #include <dogecoin/headersdb_file.h>
 #include <dogecoin/net.h>
 #include <dogecoin/protocol.h>
+#include <dogecoin/random.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/spv.h>
 #include <dogecoin/smpv.h>
@@ -1003,60 +1004,109 @@ LIBDOGECOIN_API void dogecoin_net_spv_post_sync_utxo_filters(dogecoin_spv_client
     
     dogecoin_wallet* w = (dogecoin_wallet*)wallet_ctx;
     
-    // Count UTXOs to track
-    int utxo_count = 0;
-    dogecoin_utxo* utxo_item = w->utxos;
-    while (utxo_item) {
-        if (utxo_item->spendable) utxo_count++;
-        utxo_item = (dogecoin_utxo*)utxo_item->hh.next;
-    }
-    
-    if (utxo_count == 0) {
+    // Collect all watched address pubkeyhashes (20 bytes each)
+    unsigned int n_elements = w->waddr_vector->len;
+    if (n_elements == 0) {
         if (client->nodegroup->log_write_cb)
-            client->nodegroup->log_write_cb("[spv] no spendable utxos to track\n");
+            client->nodegroup->log_write_cb("[spv] no wallet addresses to filter\n");
         return;
     }
-    
-    // Broadcast filterload to each peer
+
+    // BIP37 bloom filter parameters
+    // filter size: min(n_elements * 20 / (log(2)^2), MAX_BLOOM_FILTER_SIZE=36000)
+    // For small n, use a reasonable minimum
+    uint32_t n_filter_bytes = (n_elements * 20) / 2;
+    if (n_filter_bytes < 32) n_filter_bytes = 32;
+    if (n_filter_bytes > 36000) n_filter_bytes = 36000;
+    uint32_t n_hash_funcs = (n_filter_bytes * 8 / n_elements);
+    if (n_hash_funcs > 50) n_hash_funcs = 50;
+    if (n_hash_funcs < 1) n_hash_funcs = 1;
+
+    // Generate random tweak
+    uint32_t n_tweak = 0;
+    dogecoin_random_bytes((uint8_t*)&n_tweak, sizeof(n_tweak), 0);
+
+    // Allocate filter
+    uint8_t* filter = dogecoin_calloc(1, n_filter_bytes);
+
+    // Insert each address pubkeyhash into the bloom filter using MurmurHash3
+    unsigned int ai;
+    for (ai = 0; ai < n_elements; ai++) {
+        dogecoin_wallet_addr* waddr = vector_idx(w->waddr_vector, ai);
+        if (!waddr || waddr->ignore) continue;
+
+        // Insert the 20-byte pubkeyhash into bloom filter
+        unsigned int hi;
+        for (hi = 0; hi < n_hash_funcs; hi++) {
+            uint32_t seed = hi * 0xFBA4C795u + n_tweak;
+            // MurmurHash3 (32-bit) of pubkeyhash with this seed
+            uint32_t h = seed;
+            const uint8_t* data = waddr->pubkeyhash;
+            uint32_t len = 20;
+            const uint32_t c1 = 0xcc9e2d51u;
+            const uint32_t c2 = 0x1b873593u;
+            int nblocks = len / 4;
+            int bi;
+            for (bi = 0; bi < nblocks; bi++) {
+                uint32_t k;
+                memcpy(&k, data + bi * 4, 4);
+                k *= c1;
+                k = (k << 15) | (k >> 17);
+                k *= c2;
+                h ^= k;
+                h = (h << 13) | (h >> 19);
+                h = h * 5 + 0xe6546b64u;
+            }
+            const uint8_t* tail = data + nblocks * 4;
+            uint32_t k1 = 0;
+            switch (len & 3) {
+                case 3: k1 ^= (uint32_t)tail[2] << 16; /* fall through */
+                case 2: k1 ^= (uint32_t)tail[1] << 8;  /* fall through */
+                case 1: k1 ^= (uint32_t)tail[0];
+                        k1 *= c1; k1 = (k1 << 15) | (k1 >> 17); k1 *= c2; h ^= k1;
+            }
+            h ^= len;
+            h ^= h >> 16; h *= 0x85ebca6bu;
+            h ^= h >> 13; h *= 0xc2b2ae35u;
+            h ^= h >> 16;
+            uint32_t bit_pos = h % (n_filter_bytes * 8);
+            filter[bit_pos >> 3] |= (1 << (bit_pos & 7));
+        }
+    }
+
+    // Serialize the filterload payload: var_bytes(filter) + nHashFuncs(u32) + nTweak(u32) + nFlags(u8)
+    cstring* payload = cstr_new_sz(n_filter_bytes + 16);
+    ser_varlen(payload, n_filter_bytes);
+    ser_bytes(payload, filter, n_filter_bytes);
+    ser_u32(payload, n_hash_funcs);
+    ser_u32(payload, n_tweak);
+    uint8_t n_flags = 1; // BLOOM_UPDATE_ALL
+    ser_bytes(payload, &n_flags, 1);
+
+    // Send filterload to each connected peer
     vector_t* node_list = client->nodegroup->nodes;
     unsigned int node_idx;
+    unsigned int sent_count = 0;
     for (node_idx = 0; node_idx < (unsigned int)node_list->len; node_idx++) {
         dogecoin_node* peer = (dogecoin_node*)vector_idx(node_list, node_idx);
-        if (!peer) continue;
+        if (!peer || !(peer->state & NODE_CONNECTED)) continue;
         
-        // Build filter payload for this peer
-        cstring* filter_data = cstr_new_sz(utxo_count * 36);  // txid + vout per utxo
-        
-        // Add each spendable UTXO to filter data
-        utxo_item = w->utxos;
-        while (utxo_item) {
-            if (utxo_item->spendable) {
-                // Add transaction ID
-                cstr_append_buf(filter_data, (const void*)utxo_item->txid, 32);
-                // Add vout index
-                uint32_t vout_val = (uint32_t)utxo_item->vout;
-                cstr_append_buf(filter_data, (const void*)&vout_val, 4);
-            }
-            utxo_item = (dogecoin_utxo*)utxo_item->hh.next;
-        }
-        
-        // Construct P2P filterload message
         cstring* filter_msg = dogecoin_p2p_message_new(
             peer->nodegroup->chainparams->netmagic,
             DOGECOIN_MSG_FILTERLOAD,
-            filter_data->str,
-            filter_data->len
+            payload->str,
+            payload->len
         );
-        
-        cstr_free(filter_data, true);
         dogecoin_node_send(peer, filter_msg);
         cstr_free(filter_msg, true);
+        sent_count++;
     }
     
-    if (client->nodegroup && client->nodegroup->log_write_cb) {
-        char log_msg[256];
-        snprintf(log_msg, sizeof(log_msg), "[spv] sent utxo filters to %u peers (%d utxos)\n", 
-                 (unsigned int)node_list->len, utxo_count);
-        client->nodegroup->log_write_cb(log_msg);
+    cstr_free(payload, true);
+    dogecoin_free(filter);
+
+    if (client->nodegroup->log_write_cb) {
+        client->nodegroup->log_write_cb("[spv] sent BIP37 bloom filter to %u peers (%u addresses, filter=%u bytes, %u hash funcs)\n",
+                 sent_count, n_elements, n_filter_bytes, n_hash_funcs);
     }
 }
