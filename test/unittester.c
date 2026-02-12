@@ -105,6 +105,7 @@ extern void test_protocol();
 extern void test_net_flag_defined();
 extern void test_reorg();
 extern void test_spv();
+extern void test_bip37_merkleblock_vector();
 #else
 extern void test_net_flag_not_defined();
 #endif
@@ -190,6 +191,7 @@ int main()
     u_run_test(test_protocol);
     u_run_test(test_reorg);
     u_run_test(test_spv);
+    u_run_test(test_bip37_merkleblock_vector);
 #else
     u_run_test(test_net_flag_not_defined);
 #endif

@@ -82,7 +82,21 @@ typedef struct dogecoin_spv_client_
 
     void* smpv_ctx;
     dogecoin_bool smpv_enabled;
-    dogecoin_bool track_wallet_utxos;
+
+    /* BIP37 bloom filter (optional). When set, getdata requests are rewritten
+       to request FILTERED_BLOCK so peers answer with merkleblock + matched tx. */
+    uint8_t* bloom_filter;
+    uint32_t bloom_filter_len;
+    uint32_t bloom_nhashfunc;
+    uint32_t bloom_ntweak;
+    uint8_t  bloom_flags;
+
+   /* merkleblock -> matched tx state
+      stored as a btree keyed by txid so tx lookup is O(log n) */
+   void*      merkle_match_tree;
+   uint32_t   merkle_match_pending;
+    dogecoin_bool merkle_match_active;
+    dogecoin_blockindex* merkle_match_blockindex;
 
     /* callbacks */
     /* ========= */
@@ -106,8 +120,21 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_handle_mempool_tx_hex(dogecoin_spv_cl
 LIBDOGECOIN_API void dogecoin_spv_get_smpv_stats(dogecoin_spv_client* client, uint32_t* total_txs, uint32_t* watched_addrs);
 LIBDOGECOIN_API void dogecoin_net_spv_request_mempool(dogecoin_spv_client *client);
 
-LIBDOGECOIN_API void dogecoin_spv_enable_utxo_tracking(dogecoin_spv_client* client, dogecoin_bool enable);
-LIBDOGECOIN_API void dogecoin_net_spv_post_sync_utxo_filters(dogecoin_spv_client *client);
+/* BIP37: caller supplies a bloom filter payload (as built elsewhere) */
+LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterload(
+    dogecoin_spv_client* client,
+    const uint8_t* filter,
+    uint32_t filter_len,
+    uint32_t nHashFuncs,
+    uint32_t nTweak,
+    uint8_t flags);
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
+    dogecoin_spv_client* client,
+    const uint8_t* data,
+    uint32_t data_len);
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterclear(dogecoin_spv_client* client);
 
 LIBDOGECOIN_END_DECL
 
