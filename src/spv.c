@@ -753,7 +753,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             node->state |= NODE_MISSBEHAVED;
             node->nodegroup->node_connection_state_changed_cb(node);
             dogecoin_free(pindex);
-            
+
             /* Even on error, check if tip changed due to disconnect */
             spv_check_and_update_smpv_for_tip_change(client);
             return;
@@ -816,10 +816,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     client->stateflags |= SPV_FULLBLOCK_SYNC_FLAG;
                     node->state &= ~NODE_HEADERSYNC;
                     node->state |= NODE_BLOCKSYNC;
-                    client->nodegroup->log_write_cb("Reached chain tip - switching to full block sync mode\n");
-                    if (client->smpv_enabled) {
-                        client->nodegroup->log_write_cb("[smpv] Full block sync enabled - confirmations will now work\n");
-                    }
                     client->nodegroup->log_write_cb("start loading block from node %d at height %d at time: %ld\n", node->nodeid, client->headers_db->getchaintip(client->headers_db_ctx)->height, client->headers_db->getchaintip(client->headers_db_ctx)->header.timestamp);
                     dogecoin_net_spv_node_request_headers_or_blocks(node, true);
                     break;
@@ -938,14 +934,14 @@ static void spv_check_and_update_smpv_for_tip_change(dogecoin_spv_client* client
     if (!client || !client->smpv_enabled || !client->smpv_ctx) {
         return;
     }
-    
+
     dogecoin_blockindex* current_tip = client->headers_db->getchaintip(client->headers_db_ctx);
     if (!current_tip) {
         return;
     }
-    
+
     int32_t current_height = (int32_t)current_tip->height;
-    
+
     /* Check if tip height changed */
     if (client->last_known_tip_height != current_height) {
         /* Update SMPV confirmation counts based on new tip */
@@ -956,7 +952,7 @@ static void spv_check_and_update_smpv_for_tip_change(dogecoin_spv_client* client
             NULL,
             (uint32_t)current_height
         );
-        
+
         /* Remember this height for next comparison */
         client->last_known_tip_height = current_height;
     }
@@ -970,16 +966,8 @@ LIBDOGECOIN_API void dogecoin_spv_enable_smpv(dogecoin_spv_client* client, dogec
         client->smpv_ctx = dogecoin_smpv_client_new(client->chainparams);
         if (client->smpv_ctx && dogecoin_smpv_start((dogecoin_smpv_client*)client->smpv_ctx)) {
             client->smpv_enabled = true;
-            if (client->nodegroup && client->nodegroup->log_write_cb) {
+            if (client->nodegroup && client->nodegroup->log_write_cb)
                 client->nodegroup->log_write_cb("[smpv] enabled\n");
-                
-                /* Inform about sync mode and automatic transition */
-                if ((client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) != SPV_FULLBLOCK_SYNC_FLAG) {
-                    client->nodegroup->log_write_cb("[smpv] INFO: Starting in header-only sync mode (fast)\n");
-                    client->nodegroup->log_write_cb("[smpv] INFO: Will automatically switch to full block sync at chain tip\n");
-                    client->nodegroup->log_write_cb("[smpv] INFO: Confirmations will work after transition (use -b for immediate full sync)\n");
-                }
-            }
         } else {
             if (client->nodegroup && client->nodegroup->log_write_cb)
                 client->nodegroup->log_write_cb("[smpv] failed to enable (alloc/start)\n");

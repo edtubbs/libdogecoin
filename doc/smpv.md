@@ -10,62 +10,10 @@ SMPV provides real-time monitoring of mempool transactions for watched addresses
 - Monitor transaction sizes
 - Receive real-time notifications
 - Generate statistics and reports
-- **Handle both confirmed and unconfirmed transactions with accurate confirmation counts**
+- Handle both confirmed and unconfirmed transactions
 - Track transactions from mempool through confirmation and beyond
 
 > Note: SMPV operates on mempool data only and does not calculate transaction fees. Fee computation requires UTXO context that is not available during mempool tracking.
-
-## Confirmation Tracking
-
-SMPV includes a complete confirmation tracking system that automatically updates transaction confirmation counts as new blocks are added to the blockchain:
-
-### How It Works
-
-1. **Unconfirmed State**: When a transaction first enters the mempool, it starts with 0 confirmations and `is_confirmed = false`.
-
-2. **Block Confirmation**: When the SPV node processes a block containing the transaction:
-   - Transaction is marked as confirmed (`is_confirmed = true`)
-   - Block height and hash are recorded
-   - Confirmation count is set to 1
-
-3. **Confirmation Increments**: After each new block is processed:
-   - All confirmed transactions have their confirmation counts updated
-   - Formula: `confirmations = current_tip_height - tx_block_height + 1`
-   - This happens automatically via the "tip tick" mechanism
-
-> **Note**: SMPV only tracks confirmations for transactions that were previously seen in the mempool. Transactions that appear in blocks without being seen in the mempool first are ignored. This ensures SMPV focuses on its primary purpose: mempool transaction monitoring.
-
-### Example Confirmation Flow
-
-```
-Block 100: Transaction enters mempool → confirmations = 0
-Block 101: Transaction confirmed in block → confirmations = 1, block_height = 101
-Block 102: New tip → confirmations = 2
-Block 103: New tip → confirmations = 3
-...
-Block 110: New tip → confirmations = 10
-```
-
-### Reorg Handling
-
-During blockchain reorganizations, confirmations are automatically adjusted:
-- When blocks are disconnected, confirmations decrease accordingly
-- When the tip moves backward (reorg), all confirmed transactions are recalculated
-- Formula handles both forward and backward tip movement: `conf = max(0, tip_height - tx_height + 1)`
-- Transactions above the new tip height get 0 confirmations
-- The system tracks synchronization state to detect stale confirmation data
-
-**Example Reorg Flow:**
-```
-Height 100: TX confirmed → confirmations = 1
-Height 105: Tip advances → confirmations = 6
-[REORG: Tip moves back to 102]
-Height 102: Recalculated → confirmations = 3
-[DEEPER REORG: Tip at 99]
-Height 99:  TX above tip → confirmations = 0
-```
-
-The system handles these transitions automatically whenever the tip tick is called with a new height.
 
 ## Features
 
@@ -96,96 +44,18 @@ If you are also running the HTTP server, the SMPV endpoints are documented separ
 ./spvnode -x -u 127.0.0.1:8080 scan
 ```
 
-### Full Example with All Options
-
 To run spvnode with debug logging, continuous mode, SMPV enabled, HTTP REST API, and checkpoints:
 
 ```bash
-./spvnode -d -c -x -u 0.0.0.0:8080 -p -b scan
+./spvnode -d -c -x -u 127.0.0.1:8080 -p -b scan
 ```
 
-**Note**: The `-b` flag is **recommended** but not strictly required. Without it, SPV will automatically transition to full block sync when reaching the chain tip.
+**Note**: The `-b` flag is **recommended** but not strictly required. Without it, `spvnode` will automatically transition to full block sync when reaching the chain tip. See tools.md for more details on all available flags.
 
-Flags explained:
-- `-d`: Enable debug logging
-- `-c`: Continuous mode (keep running after sync)
-- `-x`: Enable SMPV tracking
-- `-u address:port`: Enable HTTP REST API server on specified address and port
-- `-p`: Use checkpoints for faster initial sync
-- `-b`: **Recommended** - Enable full block sync from start (for immediate confirmations)
-- `scan`: Command to scan and sync the blockchain
-
-**Alternative (without -b):**
 ```bash
-./spvnode -d -c -x -u 0.0.0.0:8080 -p scan
+./spvnode -d -c -x -u 127.0.0.1:8080 -p scan
 ```
 This will sync headers first (fast), then auto-transition to full block sync at the tip.
-
-### Why Full Block Sync (-b) is Required
-
-SMPV confirmation tracking requires full block data to match transaction IDs.
-
-**Two Sync Modes:**
-
-1. **Header-only sync (default, no -b flag):**
-   - Downloads only block headers (80 bytes each) - FAST
-   - Automatically transitions to full block sync when reaching chain tip
-   - Confirmations start working after automatic transition
-   - Best for: Quick initial sync, then confirmations at the tip
-
-2. **Full block sync (with -b flag):**
-   - Downloads complete blocks from the start
-   - Confirmations work throughout the entire sync
-   - Best for: Immediate confirmation tracking, historical analysis
-
-**Automatic Transition (without -b):**
-
-When SPV reaches within 5 blocks of the chain tip, it automatically:
-- Switches from header-only to full block sync mode
-- Starts downloading full blocks
-- Enables SMPV confirmation matching
-- Logs: "Reached chain tip - switching to full block sync mode"
-
-**Comparison:**
-
-| Feature | Header-only (default) | Full block sync (-b) |
-|---------|----------------------|----------------------|
-| Initial sync | ✅ Fast | ⏱️ Slower |
-| Bandwidth | 💚 Low initially | 📊 High throughout |
-| Storage | 💾 Minimal → Moderate | 💾 Moderate |
-| **Confirmations at tip** | ✅ **Works after auto-transition** | ✅ **Works** |
-| **Confirmations during sync** | ❌ Not yet | ✅ **Works** |
-| Auto-transition | ✅ Yes, at chain tip | N/A |
-
-**Example Log Output (without -b):**
-```
-[smpv] enabled
-[smpv] INFO: Starting in header-only sync mode (fast)
-[smpv] INFO: Will automatically switch to full block sync at chain tip
-[smpv] INFO: Confirmations will work after transition (use -b for immediate full sync)
-... syncing headers ...
-Reached chain tip - switching to full block sync mode
-[smpv] Full block sync enabled - confirmations will now work
-```
-
-### Checking SMPV Status
-
-Once spvnode is running with SMPV enabled and the HTTP server, you can check the status:
-
-```bash
-# Check SMPV statistics including confirmation counts
-curl http://localhost:8080/smpvStats
-
-# Check a specific transaction's confirmation count
-curl "http://localhost:8080/smpvTx?id=<txid>"
-```
-
-The `/smpvStats` endpoint shows:
-- `enabled`: Whether SMPV is active
-- `mempool_txs`: Total transactions being tracked
-- `confirmed`: Number of confirmed transactions
-- `unconfirmed`: Number of unconfirmed transactions
-- Other statistics about transaction types and activity
 
 ## API Reference
 
