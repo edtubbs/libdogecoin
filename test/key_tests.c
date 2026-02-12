@@ -156,7 +156,10 @@ void test_electrum_v1_mnemonic_to_master_key()
     uint8_t priv32_receiving[32];
     dogecoin_mem_zero(priv32_receiving, sizeof(priv32_receiving));
     
-    /* Derive key at index 0, for_change=0 (receiving address) */
+    /* Derive key at index 0, for_change=0 (receiving address)
+     * Keypath: electrum_v1:0/0 (index=0, for_change=0)
+     * Reference: https://github.com/spesmilo/electrum/blob/master/electrum/old_mnemonic.py
+     */
     int derive_result = electrum_v1_derive_privkey32((const uint8_t*)buffer_for_seed, 0, 0, priv32_receiving);
     u_assert_int_eq(derive_result, 1); /* returns 1 on success */
     
@@ -169,7 +172,9 @@ void test_electrum_v1_mnemonic_to_master_key()
     char* privkey_hex = utils_uint8_to_hex(priv32_receiving, 32);
     debug_print("Electrum v1 derived privkey (index=0, change=0): %s\n", privkey_hex);
     
-    /* Also test change address derivation (for_change=1) */
+    /* Also test change address derivation (for_change=1)
+     * Keypath: electrum_v1:0/1 (index=0, for_change=1)
+     */
     uint8_t priv32_change[32];
     dogecoin_mem_zero(priv32_change, sizeof(priv32_change));
     

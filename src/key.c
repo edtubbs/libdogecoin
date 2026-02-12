@@ -285,10 +285,20 @@ int getDecodedPrivKeyWif(const char privkey_wif[PRIVKEYWIFLEN], const dogecoin_b
  *   tweak = SHA256( "<n>:<for_change>:" + mpk_hex )
  *   priv_n = (master_secret + tweak) mod curve_order
  *
- * We map:
- *   -i => n
- *   -g => for_change (0 external, 1 internal)
- *   -o ignored (no accounts in v1)
+ * Keypath format: electrum_v1:n/for_change
+ *   where n = address index (0, 1, 2, ...), for_change = 0 or 1
+ *
+ * Examples:
+ *   electrum_v1:0/0  → index=0, for_change=0 (first receiving address)
+ *   electrum_v1:0/1  → index=0, for_change=1 (first change address)
+ *   electrum_v1:5/0  → index=5, for_change=0 (sixth receiving address)
+ *
+ * CLI parameters:
+ *   -i => n (address index)
+ *   -g => for_change (0 = receiving/external, 1 = change/internal)
+ *   -o ignored (no accounts in Electrum v1)
+ *
+ * Reference: https://github.com/spesmilo/electrum/blob/master/electrum/old_mnemonic.py
  */
 int electrum_v1_derive_privkey32(const uint8_t master_secret32[32],
                                  uint32_t n,

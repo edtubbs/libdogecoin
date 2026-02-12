@@ -656,6 +656,7 @@ static void print_usage()
     printf("decrypt_mnemonic (requires -y <file_num>, -j (use_tpm) optional),\n");
     printf("seed_to_master_key (-y <file_num>, -j (use_tpm) optional),\n");
     printf("mnemonic_to_key (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -l (electrum_v1), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
+    printf("  Electrum v1: -l flag uses keypath electrum_v1:n/for_change where -i=n (index), -g=for_change (0=receiving, 1=change)\n");
     printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -l (electrum_v1), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
@@ -1440,6 +1441,10 @@ int main(int argc, char* argv[])
                 return showError("electrum v1 derived invalid privkey\n");
                 }
 
+            /* Display keypath in format: electrum_v1:n/for_change
+             * where n = address index, for_change = 0 (receiving) or 1 (change)
+             * Examples: electrum_v1:0/0 (first receiving), electrum_v1:5/1 (sixth change)
+             */
             printf("keypath: electrum_v1:%u/%u\n", inputindex, for_change);
 
             dogecoin_privkey_encode_wif(&k, chain, wifstr, &wiflen);
