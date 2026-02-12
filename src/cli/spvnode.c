@@ -350,6 +350,15 @@ static dogecoin_bool quit_when_synced = true;
  */
 void spv_sync_completed(dogecoin_spv_client* client) {
     printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
+
+    /* If a bloom filter is active, request filtered blocks for recent history
+       to discover any UTXOs for watched addresses. */
+    if (client->bloom_filter && client->bloom_filter_len > 0) {
+        int scan_depth = 1440; /* ~24 hours of blocks at 1-minute intervals */
+        printf("[spv] Requesting %d historical filtered blocks for UTXO discovery...\n", scan_depth);
+        dogecoin_net_spv_request_filtered_history(client, scan_depth);
+    }
+
     if (quit_when_synced) {
         dogecoin_node_group_shutdown(client->nodegroup);
     } else {

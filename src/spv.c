@@ -1030,16 +1030,33 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         dogecoin_blockindex *pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, false, &connected);
         node->time_last_request = time(NULL);
 
-        if (!connected || !pindex) {
-            client->nodegroup->log_write_cb("Got invalid merkleblock (not in sequence) from node %d\n", node->nodeid);
+        /* If not newly connected, the block may already be in the chain (historical rescan).
+           Look it up to get the real blockindex with correct height. */
+        dogecoin_bool is_historical = false;
+        if (!connected && pindex) {
+            dogecoin_headers_db* db = (dogecoin_headers_db*)client->headers_db_ctx;
+            dogecoin_blockindex* found = dogecoin_headersdb_find(db, pindex->hash);
+            if (found) {
+                dogecoin_free(pindex);
+                pindex = found;
+                is_historical = true;
+            }
+        }
+
+        if (!connected && !is_historical) {
+            if (!pindex) {
+                client->nodegroup->log_write_cb("Got invalid merkleblock (not in sequence) from node %d\n", node->nodeid);
+            } else {
+                client->nodegroup->log_write_cb("Got unknown merkleblock from node %d\n", node->nodeid);
+            }
             node->state &= ~NODE_BLOCKSYNC;
             node->state |= NODE_MISSBEHAVED;
             node->nodegroup->node_connection_state_changed_cb(node);
-            if (pindex) dogecoin_free(pindex);
+            if (pindex && !is_historical) dogecoin_free(pindex);
             return;
         }
 
-        if (client->header_connected) { client->header_connected(client); }
+        if (client->header_connected && connected) { client->header_connected(client); }
 
         /* reset prior match state */
         if (client->merkle_match_tree) {
@@ -1057,8 +1074,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         /* after connect_hdr, buf points at nTx (uint32) */
         uint32_t nTx = 0;
         if (!deser_u32(&nTx, buf)) {
-            if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                dogecoin_free(pindex);
+            if (!is_historical) {
+                if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
+                    dogecoin_free(pindex);
+                }
             }
             client->nodegroup->log_write_cb("Merkleblock nTx deser failed (node %d)\n", node->nodeid);
             node->state &= ~NODE_BLOCKSYNC;
@@ -1068,8 +1087,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
         uint32_t hashCount = 0;
         if (!deser_varlen(&hashCount, buf) || hashCount == 0) {
-            if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                dogecoin_free(pindex);
+            if (!is_historical) {
+                if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
+                    dogecoin_free(pindex);
+                }
             }
             client->nodegroup->log_write_cb("Merkleblock hashCount deser failed/zero (node %d)\n", node->nodeid);
             node->state &= ~NODE_BLOCKSYNC;
@@ -1079,8 +1100,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
         uint256_t* hashes = (uint256_t*)dogecoin_calloc(hashCount, sizeof(uint256_t));
         if (!hashes) {
-            if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                dogecoin_free(pindex);
+            if (!is_historical) {
+                if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
+                    dogecoin_free(pindex);
+                }
             }
             node->state &= ~NODE_BLOCKSYNC;
             node->nodegroup->node_connection_state_changed_cb(node);
@@ -1091,8 +1114,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         for (i = 0; i < hashCount; i++) {
             if (!deser_u256(hashes[i], buf)) {
                 dogecoin_free(hashes);
-                if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                    dogecoin_free(pindex);
+                if (!is_historical) {
+                    if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
+                        dogecoin_free(pindex);
+                    }
                 }
                 client->nodegroup->log_write_cb("Merkleblock hash deser failed (node %d)\n", node->nodeid);
                 node->state &= ~NODE_BLOCKSYNC;
@@ -1104,8 +1129,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         uint32_t flags_len = 0;
         if (!deser_varlen(&flags_len, buf) || flags_len == 0 || flags_len > buf->len) {
             dogecoin_free(hashes);
-            if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                dogecoin_free(pindex);
+            if (!is_historical) {
+                if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
+                    dogecoin_free(pindex);
+                }
             }
             client->nodegroup->log_write_cb("Merkleblock flags deser failed/badlen (node %d)\n", node->nodeid);
             node->state &= ~NODE_BLOCKSYNC;
@@ -1116,8 +1143,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         uint8_t* flags = (uint8_t*)dogecoin_calloc(flags_len, 1);
         if (!flags) {
             dogecoin_free(hashes);
-            if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                dogecoin_free(pindex);
+            if (!is_historical) {
+                if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
+                    dogecoin_free(pindex);
+                }
             }
             node->state &= ~NODE_BLOCKSYNC;
             node->nodegroup->node_connection_state_changed_cb(node);
@@ -1127,8 +1156,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (!deser_skip(buf, flags_len)) {
             dogecoin_free(flags);
             dogecoin_free(hashes);
-            if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                dogecoin_free(pindex);
+            if (!is_historical) {
+                if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
+                    dogecoin_free(pindex);
+                }
             }
             node->state &= ~NODE_BLOCKSYNC;
             node->nodegroup->node_connection_state_changed_cb(node);
@@ -1146,8 +1177,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (height > 32) {
             dogecoin_free(flags);
             dogecoin_free(hashes);
-            if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                dogecoin_free(pindex);
+            if (!is_historical) {
+                if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
+                    dogecoin_free(pindex);
+                }
             }
             client->nodegroup->log_write_cb("Merkleblock height too large (node %d)\n", node->nodeid);
             node->state &= ~NODE_BLOCKSYNC;
@@ -1280,8 +1313,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             dogecoin_free(flags);
             dogecoin_free(hashes);
 
-            if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                dogecoin_free(pindex);
+            if (!is_historical) {
+                if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
+                    dogecoin_free(pindex);
+                }
             }
 
             client->nodegroup->log_write_cb("Merkleblock verify failed (node %d)\n", node->nodeid);
@@ -1344,7 +1379,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         if (client->merkle_match_pending > 0) client->merkle_match_pending--;
 
                         client->nodegroup->log_write_cb("[merkle-tx] MATCH at pos %u, calling sync_transaction (height=%d)\n",
-                            pos, bi ? bi->height : -1);
+                            pos, bi ? (int)bi->height : -1);
                         client->sync_transaction(client->sync_transaction_ctx, tx, pos, bi);
 
                         if (client->merkle_match_pending == 0) {
@@ -1512,6 +1547,104 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_mempool(dogecoin_spv_client *clien
     }
     if (client->nodegroup && client->nodegroup->log_write_cb)
         client->nodegroup->log_write_cb("[spv] sent 'mempool' to peers\n");
+}
+
+LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_client *client, int depth)
+{
+    if (!client || !client->nodegroup || !client->nodegroup->nodes) return;
+    if (!client->bloom_filter || client->bloom_filter_len == 0) return;
+    if (depth <= 0) return;
+
+    /* Walk backwards from the chain tip collecting block hashes. */
+    dogecoin_blockindex *tip = client->headers_db->getchaintip(client->headers_db_ctx);
+    if (!tip) return;
+
+    /* Collect block hashes in reverse (oldest first) order. */
+    uint256_t* hashes = (uint256_t*)dogecoin_calloc(depth, sizeof(uint256_t));
+    if (!hashes) return;
+
+    int count = 0;
+    dogecoin_blockindex* cur = tip;
+    while (cur && count < depth) {
+        memcpy(hashes[count], cur->hash, 32);
+        count++;
+        cur = cur->prev;
+    }
+
+    /* Find a connected peer to send the request to. */
+    dogecoin_node* peer = NULL;
+    unsigned int ni;
+    for (ni = 0; ni < (unsigned int)client->nodegroup->nodes->len; ni++) {
+        dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, ni);
+        if (n && (n->state & NODE_CONNECTED) && n->version_handshake) {
+            peer = n;
+            break;
+        }
+    }
+    if (!peer) {
+        dogecoin_free(hashes);
+        return;
+    }
+
+    /* Send getdata in batches of up to 50000 filtered blocks (avoid huge messages). */
+    int batch_max = 500;
+    int sent = 0;
+    while (sent < count) {
+        int batch = count - sent;
+        if (batch > batch_max) batch = batch_max;
+
+        /* Build getdata payload: varint(count) + count * (uint32 type + uint256 hash) */
+        size_t payload_sz = 9 + (size_t)batch * 36;  /* varint(max 9) + entries */
+        uint8_t* payload = (uint8_t*)dogecoin_calloc(1, payload_sz);
+        if (!payload) break;
+
+        size_t off = 0;
+        /* write varint */
+        uint64_t vv = (uint64_t)batch;
+        if (vv < 0xfdULL) {
+            payload[off++] = (uint8_t)vv;
+        } else if (vv <= 0xffffULL) {
+            payload[off++] = 0xfd;
+            payload[off++] = (uint8_t)(vv & 0xff);
+            payload[off++] = (uint8_t)((vv >> 8) & 0xff);
+        } else {
+            payload[off++] = 0xfe;
+            payload[off++] = (uint8_t)(vv & 0xff);
+            payload[off++] = (uint8_t)((vv >> 8) & 0xff);
+            payload[off++] = (uint8_t)((vv >> 16) & 0xff);
+            payload[off++] = (uint8_t)((vv >> 24) & 0xff);
+        }
+
+        int bi;
+        /* Emit oldest first (reverse our collection order). */
+        for (bi = 0; bi < batch; bi++) {
+            int idx = count - 1 - (sent + bi);
+            uint32_t type = DOGECOIN_INV_TYPE_FILTERED_BLOCK;
+            payload[off + 0] = (uint8_t)(type & 0xff);
+            payload[off + 1] = (uint8_t)((type >> 8) & 0xff);
+            payload[off + 2] = (uint8_t)((type >> 16) & 0xff);
+            payload[off + 3] = (uint8_t)((type >> 24) & 0xff);
+            off += 4;
+            memcpy(payload + off, hashes[idx], 32);
+            off += 32;
+        }
+
+        cstring *p2p_msg = dogecoin_p2p_message_new(
+            peer->nodegroup->chainparams->netmagic,
+            DOGECOIN_MSG_GETDATA,
+            payload, (uint32_t)off);
+        dogecoin_node_send(peer, p2p_msg);
+        cstr_free(p2p_msg, true);
+        dogecoin_free(payload);
+
+        sent += batch;
+    }
+
+    if (client->nodegroup->log_write_cb) {
+        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks from node %d\n",
+            count, peer->nodeid);
+    }
+    dogecoin_free(hashes);
 }
 
 LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterload(
