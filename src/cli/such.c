@@ -1440,7 +1440,7 @@ int main(int argc, char* argv[])
                 return showError("electrum v1 derived invalid privkey\n");
                 }
 
-            printf("keypath: electrum_v1:%u/%u\n", for_change, inputindex);
+            printf("keypath: electrum_v1:%u/%u\n", inputindex, for_change);
 
             dogecoin_privkey_encode_wif(&k, chain, wifstr, &wiflen);
             printf("private key (wif): %s\n", wifstr);
