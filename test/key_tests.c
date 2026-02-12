@@ -98,20 +98,25 @@ void test_key()
 void test_electrum_v1_mnemonic_to_master_key()
 {
     /*
-     * Electrum v1 mnemonic to BIP32 master key test
+     * Electrum v1 mnemonic to private key derivation test
      * 
      * Reference: Electrum v1 (pre-2.0) non-standard seed derivation
      * Source: https://electrum.readthedocs.io/en/latest/seedphrase.html
      * 
-     * Electrum v1 algorithm (non-standard, not BIP39):
+     * Electrum v1 algorithm (non-standard, not BIP32/BIP39):
      * - 1626-word dictionary (wordlist_electrum in include/bip39/electrum.h)
      * - Base-1626 encoding to 16 bytes (for proper v1 mnemonics)
      * - Fallback: SHA256(mnemonic + optional_passphrase)
      * - SHA256 stretching: repeat 100,000 times: stretched = SHA256(stretched + seed)
-     * - Results in 32-byte seed (padded to 64 bytes for BIP32)
+     * - Results in 32-byte seed (NOT used with BIP32)
      * 
-     * This test verifies the complete flow for the 'such' CLI tool:
-     *   Electrum v1 mnemonic → stretched seed → BIP32 master key
+     * Electrum v1 key derivation (NOT BIP32):
+     * - Derives keys using: privkey = master_secret + SHA256(n:for_change:mpk) mod n
+     * - Where mpk is the uncompressed public key from master_secret
+     * - This is completely different from BIP32 hierarchical deterministic derivation
+     * 
+     * This test verifies the complete Electrum v1 flow:
+     *   Electrum v1 mnemonic → stretched seed → electrum_v1_derive_privkey32()
      * 
      * VERIFICATION METHOD - Python command to verify seed derivation:
      *   python3 -c "import hashlib; s=hashlib.sha256(b'alpha bravo').digest(); st=s; exec('st=hashlib.sha256(st+s).digest();'*100000); print(st.hex())"
@@ -121,14 +126,12 @@ void test_electrum_v1_mnemonic_to_master_key()
      */
     
     SEED buffer_for_seed;
-    dogecoin_hdnode root_node;
     
     /* Electrum v1 two-word test case */
     const char* v1_mnemonic = "alpha bravo";
     const char* empty_pass = "";
     
     memset(buffer_for_seed, 0, MAX_SEED_SIZE);
-    memset(&root_node, 0, sizeof(root_node));
     
     /* Step 1: Convert Electrum v1 mnemonic to seed */
     int seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_mnemonic, empty_pass, buffer_for_seed);
@@ -145,19 +148,45 @@ void test_electrum_v1_mnemonic_to_master_key()
     u_assert_str_eq(seed_as_hex, ref_seed_hex);
     debug_print("Electrum v1 seed (32 bytes): %s\n", seed_as_hex);
     
-    /* Step 2: Derive BIP32 master node from seed */
-    dogecoin_bool node_result = dogecoin_hdnode_from_seed(buffer_for_seed, MAX_SEED_SIZE, &root_node);
-    u_assert_int_eq(node_result, true);
+    /* Step 2: Derive private key using Electrum v1 custom derivation (NOT BIP32)
+     * Electrum v1 derivation: privkey = master_secret + SHA256(n:for_change:mpk) mod n
+     * where mpk is the uncompressed public key derived from master_secret
+     * This is different from BIP32 hierarchical deterministic derivation
+     */
+    uint8_t priv32_receiving[32];
+    dogecoin_mem_zero(priv32_receiving, sizeof(priv32_receiving));
     
-    /* Verify chain code was generated */
-    char* chain_hex = utils_uint8_to_hex(root_node.chain_code, 32);
-    debug_print("Chain code: %s\n", chain_hex);
-    u_assert_int_eq(strlen(chain_hex), 64); /* 32 bytes = 64 hex chars */
+    /* Derive key at index 0, for_change=0 (receiving address) */
+    int derive_result = electrum_v1_derive_privkey32((const uint8_t*)buffer_for_seed, 0, 0, priv32_receiving);
+    u_assert_int_eq(derive_result, 1); /* returns 1 on success */
     
-    /* Verify private key was generated */
-    char* privkey_hex = utils_uint8_to_hex(root_node.private_key, 32);
-    debug_print("Private key: %s\n", privkey_hex);
-    u_assert_int_eq(strlen(privkey_hex), 64); /* 32 bytes = 64 hex chars */
+    /* Verify derived private key is valid */
+    dogecoin_key receiving_key;
+    dogecoin_privkey_init(&receiving_key);
+    memcpy(receiving_key.privkey, priv32_receiving, 32);
+    u_assert_int_eq(dogecoin_privkey_is_valid(&receiving_key), 1);
+    
+    char* privkey_hex = utils_uint8_to_hex(priv32_receiving, 32);
+    debug_print("Electrum v1 derived privkey (index=0, change=0): %s\n", privkey_hex);
+    
+    /* Also test change address derivation (for_change=1) */
+    uint8_t priv32_change[32];
+    dogecoin_mem_zero(priv32_change, sizeof(priv32_change));
+    
+    derive_result = electrum_v1_derive_privkey32((const uint8_t*)buffer_for_seed, 0, 1, priv32_change);
+    u_assert_int_eq(derive_result, 1);
+    
+    dogecoin_key change_key;
+    dogecoin_privkey_init(&change_key);
+    memcpy(change_key.privkey, priv32_change, 32);
+    u_assert_int_eq(dogecoin_privkey_is_valid(&change_key), 1);
+    
+    char* change_privkey_hex = utils_uint8_to_hex(priv32_change, 32);
+    debug_print("Electrum v1 derived privkey (index=0, change=1): %s\n", change_privkey_hex);
+    
+    /* Verify receiving and change keys are different */
+    int keys_differ = (memcmp(priv32_receiving, priv32_change, 32) != 0);
+    u_assert_int_eq(keys_differ, 1);
     
     /* Test with passphrase 
      * Verification command:
