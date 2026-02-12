@@ -63,6 +63,7 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/wow.h>
+#include <dogecoin/pqc_falcon.h>
 
 // ******************************** SUCH -C TRANSACTION MENU ********************************
 #ifdef WITH_NET
@@ -663,6 +664,13 @@ static void print_usage()
     printf("signmessage (-x '<message>' -p <private key>),\n");
     printf("verifymessage (-x '<message>' -s <signature (base64 encoded)> -k <address>),\n");
     printf("transaction\n");
+#ifdef USE_LIBOQS
+    printf("\nFalcon-512 Post-Quantum Crypto Commands:\n");
+    printf("falcon_keygen (generates Falcon-512 keypair),\n");
+    printf("falcon_sign (requires -p <falcon_secret_key_hex> -x <message_hex>),\n");
+    printf("falcon_verify (requires -k <falcon_public_key_hex> -x <message_hex> -s <signature_hex>),\n");
+    printf("falcon_commit (requires -k <falcon_public_key_hex> -s <signature_hex>)\n");
+#endif
     printf("\nExamples: \n");
     printf("Generate a testnet private ec keypair wif/hex:\n");
     printf("> such -c generate_private_key\n\n");
@@ -1541,6 +1549,174 @@ int main(int argc, char* argv[])
     else if (strcmp(cmd, "transaction") == 0) {
         main_menu();
         }
+#ifdef USE_LIBOQS
+    else if (strcmp(cmd, "falcon_keygen") == 0) {
+        // ./such -c falcon_keygen
+        uint8_t *pk = NULL, *sk = NULL;
+        size_t pk_len = 0, sk_len = 0;
+        
+        printf("Generating Falcon-512 keypair...\n");
+        
+        if (!dogecoin_falcon512_keypair(&pk, &pk_len, &sk, &sk_len)) {
+            return showError("Failed to generate Falcon-512 keypair\n");
+        }
+        
+        // utils_uint8_to_hex returns static buffer, don't free
+        char* pk_hex = utils_uint8_to_hex(pk, pk_len);
+        char* sk_hex = utils_uint8_to_hex(sk, sk_len);
+        
+        printf("\n=== Falcon-512 Keypair Generated ===\n");
+        printf("public key:  %s\n", pk_hex);
+        printf("secret key:  %s\n", sk_hex);
+        printf("pk length:   %zu bytes\n", pk_len);
+        printf("sk length:   %zu bytes\n", sk_len);
+        printf("\n⚠️  Keep your secret key safe! Anyone with it can sign messages.\n");
+        
+        // Only free the allocated keypair buffers, not the hex strings
+        dogecoin_free(pk);
+        dogecoin_free(sk);
+        }
+    else if (strcmp(cmd, "falcon_sign") == 0) {
+        // ./such -c falcon_sign -p <secret_key_hex> -x <message_hex>
+        if (!pkey) {
+            return showError("Missing secret key (use -p)\n");
+        }
+        if (!txhex) {
+            return showError("Missing message (use -x)\n");
+        }
+        
+        printf("Signing message with Falcon-512...\n");
+        
+        // Parse secret key (returns static buffer, don't free)
+        uint8_t* sk = utils_hex_to_uint8(pkey);
+        if (!sk) {
+            return showError("Invalid secret key hex\n");
+        }
+        size_t sk_len = strlen(pkey) / 2;
+        
+        // Parse message (returns static buffer, don't free)
+        uint8_t* msg = utils_hex_to_uint8(txhex);
+        if (!msg) {
+            return showError("Invalid message hex\n");
+        }
+        size_t msg_len = strlen(txhex) / 2;
+        
+        // Sign (allocates new buffer that must be freed)
+        uint8_t* sig = NULL;
+        size_t sig_len = 0;
+        
+        if (!dogecoin_falcon512_sign(sk, sk_len, msg, msg_len, &sig, &sig_len)) {
+            return showError("Failed to sign message with Falcon-512\n");
+        }
+        
+        // utils_uint8_to_hex returns static buffer, don't free
+        char* sig_hex = utils_uint8_to_hex(sig, sig_len);
+        
+        printf("\n=== Falcon-512 Signature Generated ===\n");
+        printf("signature:   %s\n", sig_hex);
+        printf("sig length:  %zu bytes\n", sig_len);
+        printf("msg length:  %zu bytes\n", msg_len);
+        
+        // Only free the allocated signature, not the hex string or static buffers
+        dogecoin_free(sig);
+        }
+    else if (strcmp(cmd, "falcon_verify") == 0) {
+        // ./such -c falcon_verify -k <public_key_hex> -x <message_hex> -s <signature_hex>
+        if (!pubkey) {
+            return showError("Missing public key (use -k)\n");
+        }
+        if (!txhex) {
+            return showError("Missing message (use -x)\n");
+        }
+        if (!scripthex) {
+            return showError("Missing signature (use -s)\n");
+        }
+        
+        printf("Verifying Falcon-512 signature...\n");
+        
+        // Parse public key
+        uint8_t* pk = utils_hex_to_uint8(pubkey);
+        if (!pk) {
+            return showError("Invalid public key hex\n");
+        }
+        size_t pk_len = strlen(pubkey) / 2;
+        
+        // Parse message
+        uint8_t* msg = utils_hex_to_uint8(txhex);
+        if (!msg) {
+            return showError("Invalid message hex\n");
+        }
+        size_t msg_len = strlen(txhex) / 2;
+        
+        // Parse signature
+        uint8_t* sig = utils_hex_to_uint8(scripthex);
+        if (!sig) {
+            return showError("Invalid signature hex\n");
+        }
+        size_t sig_len = strlen(scripthex) / 2;
+        
+        // Verify
+        dogecoin_bool verified = dogecoin_falcon512_verify(pk, pk_len, msg, msg_len, sig, sig_len);
+        
+        printf("\n=== Falcon-512 Verification Result ===\n");
+        if (verified) {
+            printf("✓ VERIFIED: Signature is valid!\n");
+            printf("The signature is authentic for this message and public key.\n");
+        } else {
+            printf("✗ FAILED: Signature is invalid!\n");
+            printf("The signature does NOT match the message/public key.\n");
+        }
+        
+        if (!verified) {
+            dogecoin_ecc_stop();
+            return 1;
+        }
+        }
+    else if (strcmp(cmd, "falcon_commit") == 0) {
+        // ./such -c falcon_commit -k <public_key_hex> -s <signature_hex>
+        if (!pubkey) {
+            return showError("Missing public key (use -k)\n");
+        }
+        if (!scripthex) {
+            return showError("Missing signature (use -s)\n");
+        }
+        
+        printf("Generating Falcon-512 commitment...\n");
+        
+        // Parse public key
+        uint8_t* pk = utils_hex_to_uint8(pubkey);
+        if (!pk) {
+            return showError("Invalid public key hex\n");
+        }
+        size_t pk_len = strlen(pubkey) / 2;
+        
+        // Parse signature
+        uint8_t* sig = utils_hex_to_uint8(scripthex);
+        if (!sig) {
+            return showError("Invalid signature hex\n");
+        }
+        size_t sig_len = strlen(scripthex) / 2;
+        
+        // Generate commitment
+        uint8_t commit[32];
+        if (!dogecoin_falcon512_commit_bytes(pk, pk_len, sig, sig_len, commit)) {
+            return showError("Failed to generate Falcon-512 commitment\n");
+        }
+        
+        char commit_hex[65];
+        utils_bin_to_hex(commit, 32, commit_hex);
+        
+        printf("\n=== Falcon-512 Commitment Generated ===\n");
+        printf("commitment:  %s\n", commit_hex);
+        printf("length:      32 bytes\n");
+        printf("\nThis commitment can be included in an OP_RETURN output:\n");
+        printf("OP_RETURN script: 6a20%s\n", commit_hex);
+        printf("\nTo verify off-chain:\n");
+        printf("1. Get the full signature from the signer\n");
+        printf("2. Recompute: commit = SHA256(public_key || signature)\n");
+        printf("3. Compare with this on-chain commitment\n");
+        }
+#endif
     else {
         print_usage();
         return showError("Unknown command\n");
