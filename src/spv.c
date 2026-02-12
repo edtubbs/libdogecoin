@@ -40,6 +40,7 @@
 
 #include <assert.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -1553,23 +1554,22 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
 {
     if (!client || !client->nodegroup || !client->nodegroup->nodes) return;
     if (!client->bloom_filter || client->bloom_filter_len == 0) return;
-    if (depth <= 0) return;
 
     /* Walk backwards from the chain tip collecting block hashes. */
     dogecoin_blockindex *tip = client->headers_db->getchaintip(client->headers_db_ctx);
     if (!tip) return;
 
-    /* Collect block hashes in reverse (oldest first) order. */
-    uint256_t* hashes = (uint256_t*)dogecoin_calloc(depth, sizeof(uint256_t));
-    if (!hashes) return;
+    /* depth <= 0 means "scan all available blocks (to checkpoint/genesis)". */
+    int max_depth = (depth > 0) ? depth : INT_MAX;
 
-    int count = 0;
+    /* Count how many blocks are available via the prev chain. */
+    int total = 0;
     dogecoin_blockindex* cur = tip;
-    while (cur && count < depth) {
-        memcpy(hashes[count], cur->hash, 32);
-        count++;
+    while (cur && total < max_depth) {
+        total++;
         cur = cur->prev;
     }
+    if (total == 0) return;
 
     /* Find a connected peer to send the request to. */
     dogecoin_node* peer = NULL;
@@ -1581,20 +1581,63 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
             break;
         }
     }
-    if (!peer) {
-        dogecoin_free(hashes);
+    if (!peer) return;
+
+    if (client->nodegroup->log_write_cb) {
+        client->nodegroup->log_write_cb("[spv] scanning %d historical blocks for UTXO discovery\n", total);
+    }
+
+    /* Send getdata in batches to avoid huge allocations and messages.
+       We walk backwards collecting a batch of hashes, reverse them (oldest first),
+       then send and repeat. */
+    int batch_max = 500;
+    int sent = 0;
+    cur = tip;
+
+    /* We need to skip the first (total - sent - batch_max) blocks each time,
+       so instead we collect ALL hashes into a temp batch buffer and send in order.
+       To avoid allocating `total` hashes at once (could be >600k), we use a
+       two-pass approach: collect a batch, reverse it, send it, advance. */
+
+    /* Collect all block pointers into a reusable batch. */
+    uint256_t* batch_hashes = (uint256_t*)dogecoin_calloc(batch_max, sizeof(uint256_t));
+    if (!batch_hashes) return;
+
+    /* First, walk back to collect all block pointers in a stack-like array.
+       Since we need oldest-first order but walk tip-to-bottom, we process
+       in chunks: collect batch_max hashes walking backward, reverse them,
+       push them to a queue. To keep it simple and memory-bounded, we collect
+       all blocks into a dynamically grown array of block pointers, then
+       iterate forward through it sending batches. */
+    dogecoin_free(batch_hashes);
+
+    /* Allocate array of block pointers (each is 8 bytes, so ~5MB for 680k blocks). */
+    dogecoin_blockindex** block_ptrs = (dogecoin_blockindex**)dogecoin_calloc(total, sizeof(dogecoin_blockindex*));
+    if (!block_ptrs) return;
+
+    /* Walk backward from tip, storing pointers in reverse order. */
+    cur = tip;
+    int idx = total - 1;
+    while (cur && idx >= 0) {
+        block_ptrs[idx] = cur;
+        idx--;
+        cur = cur->prev;
+    }
+
+    /* Now block_ptrs[0] is the oldest block, block_ptrs[total-1] is the tip.
+       Send in batches of batch_max, oldest first. */
+    batch_hashes = (uint256_t*)dogecoin_calloc(batch_max, sizeof(uint256_t));
+    if (!batch_hashes) {
+        dogecoin_free(block_ptrs);
         return;
     }
 
-    /* Send getdata in batches of up to 50000 filtered blocks (avoid huge messages). */
-    int batch_max = 500;
-    int sent = 0;
-    while (sent < count) {
-        int batch = count - sent;
+    while (sent < total) {
+        int batch = total - sent;
         if (batch > batch_max) batch = batch_max;
 
         /* Build getdata payload: varint(count) + count * (uint32 type + uint256 hash) */
-        size_t payload_sz = 9 + (size_t)batch * 36;  /* varint(max 9) + entries */
+        size_t payload_sz = 9 + (size_t)batch * 36;
         uint8_t* payload = (uint8_t*)dogecoin_calloc(1, payload_sz);
         if (!payload) break;
 
@@ -1616,16 +1659,14 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
         }
 
         int bi;
-        /* Emit oldest first (reverse our collection order). */
         for (bi = 0; bi < batch; bi++) {
-            int idx = count - 1 - (sent + bi);
             uint32_t type = DOGECOIN_INV_TYPE_FILTERED_BLOCK;
             payload[off + 0] = (uint8_t)(type & 0xff);
             payload[off + 1] = (uint8_t)((type >> 8) & 0xff);
             payload[off + 2] = (uint8_t)((type >> 16) & 0xff);
             payload[off + 3] = (uint8_t)((type >> 24) & 0xff);
             off += 4;
-            memcpy(payload + off, hashes[idx], 32);
+            memcpy(payload + off, block_ptrs[sent + bi]->hash, 32);
             off += 32;
         }
 
@@ -1641,10 +1682,14 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     }
 
     if (client->nodegroup->log_write_cb) {
-        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks from node %d\n",
-            count, peer->nodeid);
+        int start_height = block_ptrs[0] ? (int)block_ptrs[0]->height : 0;
+        int end_height = block_ptrs[total - 1] ? (int)block_ptrs[total - 1]->height : 0;
+        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) from node %d\n",
+            total, start_height, end_height, peer->nodeid);
     }
-    dogecoin_free(hashes);
+
+    dogecoin_free(batch_hashes);
+    dogecoin_free(block_ptrs);
 }
 
 LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterload(
