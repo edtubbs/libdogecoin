@@ -1543,7 +1543,12 @@ dogecoin_bool dogecoin_wallet_get_unspent(vector_t* unspents)
 void dogecoin_wallet_check_transaction(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *pindex) {
     (void)(pos);
     dogecoin_wallet *wallet = (dogecoin_wallet *)ctx;
-    if (dogecoin_wallet_is_mine(wallet, tx) || dogecoin_wallet_is_from_me(wallet, tx)) {
+    dogecoin_bool is_mine = dogecoin_wallet_is_mine(wallet, tx);
+    dogecoin_bool is_from_me = dogecoin_wallet_is_from_me(wallet, tx);
+    printf("[wallet] check_transaction called at height %d: is_mine=%d is_from_me=%d waddr_count=%u\n",
+        pindex ? pindex->height : -1, is_mine ? 1 : 0, is_from_me ? 1 : 0,
+        (unsigned int)wallet->waddr_vector->len);
+    if (is_mine || is_from_me) {
         printf("\nFound relevant transaction!\n");
         dogecoin_wtx* wtx = dogecoin_wallet_wtx_new();
         uint256_t blockhash;

@@ -1293,6 +1293,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         client->merkle_match_active = (client->merkle_match_pending > 0);
         client->merkle_match_blockindex = pindex;
 
+        client->nodegroup->log_write_cb("[merkle] block at height %d: nTx=%u matched=%u active=%d\n",
+            pindex->height, nTx, client->merkle_match_pending,
+            client->merkle_match_active ? 1 : 0);
+
         dogecoin_free(flags);
         dogecoin_free(hashes);
 
@@ -1319,6 +1323,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 uint256_t txid;
                 dogecoin_tx_hash(tx, txid);
 
+                char txid_hex[65];
+                utils_bin_to_hex(txid, 32, txid_hex);
+                client->nodegroup->log_write_cb("[merkle-tx] received tx %s (match_pending=%u)\n",
+                    txid_hex, client->merkle_match_pending);
+
                 spv_merkle_match key;
                 memset(&key, 0, sizeof(key));
                 memcpy(key.txid, txid, 32);
@@ -1334,6 +1343,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         m->consumed = true;
                         if (client->merkle_match_pending > 0) client->merkle_match_pending--;
 
+                        client->nodegroup->log_write_cb("[merkle-tx] MATCH at pos %u, calling sync_transaction (height=%d)\n",
+                            pos, bi ? bi->height : -1);
                         client->sync_transaction(client->sync_transaction_ctx, tx, pos, bi);
 
                         if (client->merkle_match_pending == 0) {
@@ -1345,6 +1356,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             }
                         }
                     }
+                } else {
+                    client->nodegroup->log_write_cb("[merkle-tx] tx NOT found in match tree\n");
                 }
             }
             if (tx) dogecoin_tx_free(tx);
