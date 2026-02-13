@@ -341,6 +341,24 @@ dogecoin_smpv_tx* dogecoin_smpv_get_tx(
     return NULL;
 }
 
+static dogecoin_bool smpv_tx_matches_address(const dogecoin_smpv_client* client, const dogecoin_tx* tx, const char* address)
+{
+    if (!client || !tx || !address || !tx->vout) return false;
+    int is_mainnet = (client->chain_params == &dogecoin_chainparams_main);
+
+    for (size_t i = 0; i < tx->vout->len; i++) {
+        dogecoin_tx_out* out = vector_idx(tx->vout, i);
+        if (!out || !out->script_pubkey || out->script_pubkey->len == 0) continue;
+
+        char out_address[P2PKHLEN];
+        dogecoin_mem_zero(out_address, sizeof(out_address));
+        if (!dogecoin_tx_out_pubkey_hash_to_p2pkh_address(out, out_address, is_mainnet)) continue;
+        if (strcmp(out_address, address) == 0) return true;
+    }
+
+    return false;
+}
+
 /* Get all transactions for an address */
 dogecoin_smpv_tx** dogecoin_smpv_get_address_txs(
     const dogecoin_smpv_client* client,
@@ -348,10 +366,33 @@ dogecoin_smpv_tx** dogecoin_smpv_get_address_txs(
     size_t* tx_count
 ) {
     if (!client || !address || !tx_count) return NULL;
-    
+
     *tx_count = 0;
-    /* Simplified implementation - would need proper address matching */
-    return NULL;
+    if (!client->mempool_txs || client->mempool_tx_count == 0) return NULL;
+
+    size_t match_count = 0;
+    for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
+        if (!client->mempool_txs[i].decoded_tx) continue;
+        if (smpv_tx_matches_address(client, client->mempool_txs[i].decoded_tx, address)) {
+            match_count++;
+        }
+    }
+
+    if (match_count == 0) return NULL;
+
+    dogecoin_smpv_tx** matches = (dogecoin_smpv_tx**)dogecoin_calloc(match_count, sizeof(dogecoin_smpv_tx*));
+    if (!matches) return NULL;
+
+    size_t idx = 0;
+    for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
+        if (!client->mempool_txs[i].decoded_tx) continue;
+        if (smpv_tx_matches_address(client, client->mempool_txs[i].decoded_tx, address)) {
+            matches[idx++] = &client->mempool_txs[i];
+        }
+    }
+
+    *tx_count = match_count;
+    return matches;
 }
 
 /* Check if transaction is relevant to watched addresses */
@@ -361,9 +402,20 @@ dogecoin_bool dogecoin_smpv_is_tx_relevant(
     char** relevant_address
 ) {
     if (!client || !tx || !relevant_address) return false;
-    
-    /* Simplified implementation - would need proper address matching */
+
     *relevant_address = NULL;
+
+    for (uint32_t i = 0; i < client->watcher_count; i++) {
+        if (!client->watchers[i].is_active || !client->watchers[i].address) continue;
+        if (!smpv_tx_matches_address(client, tx, client->watchers[i].address)) continue;
+
+        size_t alen = strlen(client->watchers[i].address);
+        *relevant_address = (char*)dogecoin_calloc(1, alen + 1);
+        if (!*relevant_address) return false;
+        strcpy(*relevant_address, client->watchers[i].address);
+        return true;
+    }
+
     return false;
 }
 
@@ -531,4 +583,3 @@ char* dogecoin_smpv_watcher_to_json(const dogecoin_smpv_watcher* watcher) {
     );
     return json;
 }
-
