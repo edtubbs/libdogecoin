@@ -351,11 +351,14 @@ static dogecoin_bool quit_when_synced = true;
 void spv_sync_completed(dogecoin_spv_client* client) {
     printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
 
-    /* If a bloom filter is active, request filtered blocks for the full
-       available chain (from checkpoint to tip) to discover UTXOs. */
+    /* If a bloom filter is active, request filtered blocks from the last
+       checkpoint to tip to discover UTXOs. Per BIP37, the peer responds
+       with a merkleblock for every requested block — blocks with matching
+       transactions include the matched TXs, while non-matching blocks
+       come back with 0 matched transactions. */
     if (client->bloom_filter && client->bloom_filter_len > 0) {
-        printf("[spv] Requesting historical filtered blocks for UTXO discovery (full chain from checkpoint)...\n");
-        dogecoin_net_spv_request_filtered_history(client, 0); /* 0 = scan all available blocks */
+        printf("[spv] Requesting historical filtered blocks for UTXO discovery (checkpoint to tip)...\n");
+        dogecoin_net_spv_request_filtered_history(client, 0); /* 0 = scan all available blocks back to checkpoint */
     }
 
     if (quit_when_synced) {
