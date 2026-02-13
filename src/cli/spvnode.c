@@ -497,8 +497,10 @@ int main(int argc, char* argv[]) {
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false, use_checkpoint, full_sync, maxnodes, http_server);
 
         /* Keep all headers in memory so historical filtered block scan can walk
-           the full prev chain from checkpoint to tip for UTXO discovery. */
-        ((dogecoin_headers_db*)client->headers_db_ctx)->max_hdr_in_mem = 0;
+           the full prev chain from checkpoint to tip for UTXO discovery.
+           NOTE: setting to 0 disables eviction but may cause issues with some
+           header connection paths. Use a large value instead. */
+        ((dogecoin_headers_db*)client->headers_db_ctx)->max_hdr_in_mem = 700000;
 
         if (http_server) {
             evhttp_set_gencb(client->nodegroup->http_server, dogecoin_http_request_cb, client);
