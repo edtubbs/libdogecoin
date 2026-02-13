@@ -125,7 +125,9 @@ LIBDOGECOIN_API void dogecoin_spv_get_smpv_stats(dogecoin_spv_client* client, ui
 LIBDOGECOIN_API void dogecoin_net_spv_request_mempool(dogecoin_spv_client *client);
 LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_client *client, int depth);
 
-/* BIP37: caller supplies a bloom filter payload (as built elsewhere) */
+/* BIP37: caller supplies a bloom filter payload (as built elsewhere).
+   Insert script-relevant data (e.g. pubkey hashes, script bytes, outpoints),
+   not base58 address strings. txids/outpoints are only useful when known. */
 LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterload(
     dogecoin_spv_client* client,
     const uint8_t* filter,

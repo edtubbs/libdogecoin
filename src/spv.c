@@ -48,6 +48,7 @@
 #include <math.h>
 
 #include <dogecoin/block.h>
+#include <dogecoin/bip37.h>
 #include <dogecoin/blockchain.h>
 #include <dogecoin/headersdb.h>
 #include <dogecoin/headersdb_file.h>
@@ -64,23 +65,6 @@
 #define DOGECOIN_KOINU_PER_COIN 100000000ULL
 /* Dogecoin block subsidy has been 10,000 DOGE for years; good for 24h stats */
 #define DOGECOIN_CURRENT_SUBSIDY_KOINU (10000ULL * DOGECOIN_KOINU_PER_COIN)
-
-/* BIP37 fallbacks (in case protocol.h doesn't provide them) */
-#ifndef DOGECOIN_INV_TYPE_FILTERED_BLOCK
-#define DOGECOIN_INV_TYPE_FILTERED_BLOCK 3
-#endif
-#ifndef DOGECOIN_MSG_FILTERLOAD
-#define DOGECOIN_MSG_FILTERLOAD "filterload"
-#endif
-#ifndef DOGECOIN_MSG_FILTERADD
-#define DOGECOIN_MSG_FILTERADD "filteradd"
-#endif
-#ifndef DOGECOIN_MSG_FILTERCLEAR
-#define DOGECOIN_MSG_FILTERCLEAR "filterclear"
-#endif
-#ifndef DOGECOIN_MSG_MERKLEBLOCK
-#define DOGECOIN_MSG_MERKLEBLOCK "merkleblock"
-#endif
 
 typedef struct spv_merkle_match_ {
     uint256_t txid;
@@ -603,75 +587,14 @@ void dogecoin_net_spv_node_handshake_done(dogecoin_node *node)
 
     /* If a BIP37 filter is configured, load it on this peer before requesting blocks. */
     if (client && client->bloom_filter && client->bloom_filter_len > 0) {
-        uint64_t flen = (uint64_t)client->bloom_filter_len;
-        uint8_t vi[9];
-        size_t vi_len = 0;
-
-        if (flen < 0xfdULL) {
-            vi[0] = (uint8_t)flen;
-            vi_len = 1;
-        } else if (flen <= 0xffffULL) {
-            vi[0] = 0xfd;
-            vi[1] = (uint8_t)(flen & 0xff);
-            vi[2] = (uint8_t)((flen >> 8) & 0xff);
-            vi_len = 3;
-        } else if (flen <= 0xffffffffULL) {
-            vi[0] = 0xfe;
-            vi[1] = (uint8_t)(flen & 0xff);
-            vi[2] = (uint8_t)((flen >> 8) & 0xff);
-            vi[3] = (uint8_t)((flen >> 16) & 0xff);
-            vi[4] = (uint8_t)((flen >> 24) & 0xff);
-            vi_len = 5;
-        } else {
-            vi[0] = 0xff;
-            vi[1] = (uint8_t)(flen & 0xff);
-            vi[2] = (uint8_t)((flen >> 8) & 0xff);
-            vi[3] = (uint8_t)((flen >> 16) & 0xff);
-            vi[4] = (uint8_t)((flen >> 24) & 0xff);
-            vi[5] = (uint8_t)((flen >> 32) & 0xff);
-            vi[6] = (uint8_t)((flen >> 40) & 0xff);
-            vi[7] = (uint8_t)((flen >> 48) & 0xff);
-            vi[8] = (uint8_t)((flen >> 56) & 0xff);
-            vi_len = 9;
-        }
-
-        size_t payload_len = vi_len + (size_t)client->bloom_filter_len + 4 + 4 + 1;
-        uint8_t* payload = (uint8_t*)dogecoin_calloc(1, payload_len);
-        if (payload) {
-            size_t off = 0;
-            memcpy(payload + off, vi, vi_len);
-            off += vi_len;
-
-            memcpy(payload + off, client->bloom_filter, client->bloom_filter_len);
-            off += client->bloom_filter_len;
-
-            payload[off + 0] = (uint8_t)(client->bloom_nhashfunc & 0xff);
-            payload[off + 1] = (uint8_t)((client->bloom_nhashfunc >> 8) & 0xff);
-            payload[off + 2] = (uint8_t)((client->bloom_nhashfunc >> 16) & 0xff);
-            payload[off + 3] = (uint8_t)((client->bloom_nhashfunc >> 24) & 0xff);
-            off += 4;
-
-            payload[off + 0] = (uint8_t)(client->bloom_ntweak & 0xff);
-            payload[off + 1] = (uint8_t)((client->bloom_ntweak >> 8) & 0xff);
-            payload[off + 2] = (uint8_t)((client->bloom_ntweak >> 16) & 0xff);
-            payload[off + 3] = (uint8_t)((client->bloom_ntweak >> 24) & 0xff);
-            off += 4;
-
-            payload[off] = (uint8_t)client->bloom_flags;
-            off += 1;
-
-            cstring* msg = dogecoin_p2p_message_new(
-                node->nodegroup->chainparams->netmagic,
-                DOGECOIN_MSG_FILTERLOAD,
-                payload,
-                (uint32_t)payload_len
-            );
-            dogecoin_node_send(node, msg);
-            cstr_free(msg, true);
-            dogecoin_free(payload);
-
-            if (client->nodegroup && client->nodegroup->log_write_cb)
-                client->nodegroup->log_write_cb("[spv] sent filterload to node %d (len=%u)\n", node->nodeid, client->bloom_filter_len);
+        if (dogecoin_bip37_send_filterload(node,
+                                           client->bloom_filter,
+                                           client->bloom_filter_len,
+                                           client->bloom_nhashfunc,
+                                           client->bloom_ntweak,
+                                           client->bloom_flags) &&
+            client->nodegroup && client->nodegroup->log_write_cb) {
+            client->nodegroup->log_write_cb("[spv] sent filterload to node %d (len=%u)\n", node->nodeid, client->bloom_filter_len);
         }
     }
 
@@ -725,71 +648,13 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             if (use_filtered) {
                 /* Rebuild getdata payload, rewriting BLOCK -> FILTERED_BLOCK so peer answers:
                    merkleblock + (matched) tx messages, and we drive sync_transaction only for matches. */
-                struct const_buffer inv2 = { original_inv.p, original_inv.len };
+                uint8_t* out = NULL;
+                uint32_t out_len = 0;
                 uint32_t n = 0;
-                if (!deser_varlen(&n, &inv2)) {
+                if (!dogecoin_bip37_build_filtered_getdata_payload(&original_inv, &out, &out_len, &n)) {
                     node->state &= ~NODE_BLOCKSYNC;
                     node->nodegroup->node_connection_state_changed_cb(node);
                     return;
-                }
-
-                uint8_t* out = (uint8_t*)dogecoin_calloc(1, original_inv.len);
-                if (!out) {
-                    node->state &= ~NODE_BLOCKSYNC;
-                    node->nodegroup->node_connection_state_changed_cb(node);
-                    return;
-                }
-
-                size_t off = 0;
-                {
-                    uint64_t vv = (uint64_t)n;
-                    if (vv < 0xfdULL) {
-                        out[off++] = (uint8_t)vv;
-                    } else if (vv <= 0xffffULL) {
-                        out[off++] = 0xfd;
-                        out[off++] = (uint8_t)(vv & 0xff);
-                        out[off++] = (uint8_t)((vv >> 8) & 0xff);
-                    } else if (vv <= 0xffffffffULL) {
-                        out[off++] = 0xfe;
-                        out[off++] = (uint8_t)(vv & 0xff);
-                        out[off++] = (uint8_t)((vv >> 8) & 0xff);
-                        out[off++] = (uint8_t)((vv >> 16) & 0xff);
-                        out[off++] = (uint8_t)((vv >> 24) & 0xff);
-                    } else {
-                        out[off++] = 0xff;
-                        out[off++] = (uint8_t)(vv & 0xff);
-                        out[off++] = (uint8_t)((vv >> 8) & 0xff);
-                        out[off++] = (uint8_t)((vv >> 16) & 0xff);
-                        out[off++] = (uint8_t)((vv >> 24) & 0xff);
-                        out[off++] = (uint8_t)((vv >> 32) & 0xff);
-                        out[off++] = (uint8_t)((vv >> 40) & 0xff);
-                        out[off++] = (uint8_t)((vv >> 48) & 0xff);
-                        out[off++] = (uint8_t)((vv >> 56) & 0xff);
-                    }
-                }
-
-                for (i = 0; i < n; i++) {
-                    uint32_t type = 0;
-                    uint256_t h;
-                    if (!deser_u32(&type, &inv2) || !deser_u256(h, &inv2)) {
-                        dogecoin_free(out);
-                        node->state &= ~NODE_BLOCKSYNC;
-                        node->nodegroup->node_connection_state_changed_cb(node);
-                        return;
-                    }
-
-                    if (type == DOGECOIN_INV_TYPE_BLOCK) {
-                        type = DOGECOIN_INV_TYPE_FILTERED_BLOCK;
-                    }
-
-                    out[off + 0] = (uint8_t)(type & 0xff);
-                    out[off + 1] = (uint8_t)((type >> 8) & 0xff);
-                    out[off + 2] = (uint8_t)((type >> 16) & 0xff);
-                    out[off + 3] = (uint8_t)((type >> 24) & 0xff);
-                    off += 4;
-
-                    memcpy(out + off, h, 32);
-                    off += 32;
                 }
 
                 client->nodegroup->log_write_cb("Requesting %d filtered blocks (merkleblock+tx)\n", n);
@@ -797,7 +662,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     node->nodegroup->chainparams->netmagic,
                     DOGECOIN_MSG_GETDATA,
                     out,
-                    (uint32_t)original_inv.len
+                    out_len
                 );
                 dogecoin_node_send(node, p2p_msg);
                 cstr_free(p2p_msg, true);
@@ -1683,211 +1548,4 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     }
 
     dogecoin_free(block_ptrs);
-}
-
-LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterload(
-    dogecoin_spv_client* client,
-    const uint8_t* filter,
-    uint32_t filter_len,
-    uint32_t nHashFuncs,
-    uint32_t nTweak,
-    uint8_t flags)
-{
-    if (!client || !filter || filter_len == 0) return false;
-
-    if (client->bloom_filter) {
-        dogecoin_free(client->bloom_filter);
-        client->bloom_filter = NULL;
-    }
-
-    client->bloom_filter = (uint8_t*)dogecoin_calloc(filter_len, 1);
-    if (!client->bloom_filter) return false;
-
-    memcpy(client->bloom_filter, filter, filter_len);
-    client->bloom_filter_len = filter_len;
-    client->bloom_nhashfunc = nHashFuncs;
-    client->bloom_ntweak = nTweak;
-    client->bloom_flags = flags;
-
-    if (!client->nodegroup || !client->nodegroup->nodes) return true;
-
-    for (unsigned int i = 0; i < (unsigned int)client->nodegroup->nodes->len; i++) {
-        dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, i);
-        if (!n) continue;
-        if (((n->state & NODE_CONNECTED) != NODE_CONNECTED) || !n->version_handshake) continue;
-
-        uint64_t flen = (uint64_t)filter_len;
-        uint8_t vi[9];
-        size_t vi_len = 0;
-
-        if (flen < 0xfdULL) {
-            vi[0] = (uint8_t)flen; vi_len = 1;
-        } else if (flen <= 0xffffULL) {
-            vi[0] = 0xfd;
-            vi[1] = (uint8_t)(flen & 0xff);
-            vi[2] = (uint8_t)((flen >> 8) & 0xff);
-            vi_len = 3;
-        } else if (flen <= 0xffffffffULL) {
-            vi[0] = 0xfe;
-            vi[1] = (uint8_t)(flen & 0xff);
-            vi[2] = (uint8_t)((flen >> 8) & 0xff);
-            vi[3] = (uint8_t)((flen >> 16) & 0xff);
-            vi[4] = (uint8_t)((flen >> 24) & 0xff);
-            vi_len = 5;
-        } else {
-            vi[0] = 0xff;
-            vi[1] = (uint8_t)(flen & 0xff);
-            vi[2] = (uint8_t)((flen >> 8) & 0xff);
-            vi[3] = (uint8_t)((flen >> 16) & 0xff);
-            vi[4] = (uint8_t)((flen >> 24) & 0xff);
-            vi[5] = (uint8_t)((flen >> 32) & 0xff);
-            vi[6] = (uint8_t)((flen >> 40) & 0xff);
-            vi[7] = (uint8_t)((flen >> 48) & 0xff);
-            vi[8] = (uint8_t)((flen >> 56) & 0xff);
-            vi_len = 9;
-        }
-
-        size_t payload_len = vi_len + (size_t)filter_len + 4 + 4 + 1;
-        uint8_t* payload = (uint8_t*)dogecoin_calloc(1, payload_len);
-        if (!payload) continue;
-
-        size_t off = 0;
-        memcpy(payload + off, vi, vi_len); off += vi_len;
-        memcpy(payload + off, filter, filter_len); off += filter_len;
-
-        payload[off + 0] = (uint8_t)(nHashFuncs & 0xff);
-        payload[off + 1] = (uint8_t)((nHashFuncs >> 8) & 0xff);
-        payload[off + 2] = (uint8_t)((nHashFuncs >> 16) & 0xff);
-        payload[off + 3] = (uint8_t)((nHashFuncs >> 24) & 0xff);
-        off += 4;
-
-        payload[off + 0] = (uint8_t)(nTweak & 0xff);
-        payload[off + 1] = (uint8_t)((nTweak >> 8) & 0xff);
-        payload[off + 2] = (uint8_t)((nTweak >> 16) & 0xff);
-        payload[off + 3] = (uint8_t)((nTweak >> 24) & 0xff);
-        off += 4;
-
-        payload[off] = (uint8_t)flags;
-
-        cstring* msg = dogecoin_p2p_message_new(
-            n->nodegroup->chainparams->netmagic,
-            DOGECOIN_MSG_FILTERLOAD,
-            payload,
-            (uint32_t)payload_len
-        );
-        dogecoin_node_send(n, msg);
-        cstr_free(msg, true);
-        dogecoin_free(payload);
-    }
-
-    if (client->nodegroup && client->nodegroup->log_write_cb)
-        client->nodegroup->log_write_cb("[spv] filterload set (len=%u)\n", filter_len);
-
-    return true;
-}
-
-LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
-    dogecoin_spv_client* client,
-    const uint8_t* data,
-    uint32_t data_len)
-{
-    if (!client || !data || data_len == 0) return false;
-    if (!client->nodegroup || !client->nodegroup->nodes) return true;
-
-    for (unsigned int i = 0; i < (unsigned int)client->nodegroup->nodes->len; i++) {
-        dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, i);
-        if (!n) continue;
-        if (((n->state & NODE_CONNECTED) != NODE_CONNECTED) || !n->version_handshake) continue;
-
-        uint64_t dlen = (uint64_t)data_len;
-        uint8_t vi[9];
-        size_t vi_len = 0;
-
-        if (dlen < 0xfdULL) {
-            vi[0] = (uint8_t)dlen; vi_len = 1;
-        } else if (dlen <= 0xffffULL) {
-            vi[0] = 0xfd;
-            vi[1] = (uint8_t)(dlen & 0xff);
-            vi[2] = (uint8_t)((dlen >> 8) & 0xff);
-            vi_len = 3;
-        } else if (dlen <= 0xffffffffULL) {
-            vi[0] = 0xfe;
-            vi[1] = (uint8_t)(dlen & 0xff);
-            vi[2] = (uint8_t)((dlen >> 8) & 0xff);
-            vi[3] = (uint8_t)((dlen >> 16) & 0xff);
-            vi[4] = (uint8_t)((dlen >> 24) & 0xff);
-            vi_len = 5;
-        } else {
-            vi[0] = 0xff;
-            vi[1] = (uint8_t)(dlen & 0xff);
-            vi[2] = (uint8_t)((dlen >> 8) & 0xff);
-            vi[3] = (uint8_t)((dlen >> 16) & 0xff);
-            vi[4] = (uint8_t)((dlen >> 24) & 0xff);
-            vi[5] = (uint8_t)((dlen >> 32) & 0xff);
-            vi[6] = (uint8_t)((dlen >> 40) & 0xff);
-            vi[7] = (uint8_t)((dlen >> 48) & 0xff);
-            vi[8] = (uint8_t)((dlen >> 56) & 0xff);
-            vi_len = 9;
-        }
-
-        size_t payload_len = vi_len + (size_t)data_len;
-        uint8_t* payload = (uint8_t*)dogecoin_calloc(1, payload_len);
-        if (!payload) continue;
-
-        memcpy(payload, vi, vi_len);
-        memcpy(payload + vi_len, data, data_len);
-
-        cstring* msg = dogecoin_p2p_message_new(
-            n->nodegroup->chainparams->netmagic,
-            DOGECOIN_MSG_FILTERADD,
-            payload,
-            (uint32_t)payload_len
-        );
-        dogecoin_node_send(n, msg);
-        cstr_free(msg, true);
-        dogecoin_free(payload);
-    }
-
-    if (client->nodegroup && client->nodegroup->log_write_cb)
-        client->nodegroup->log_write_cb("[spv] sent filteradd (len=%u)\n", data_len);
-
-    return true;
-}
-
-LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterclear(dogecoin_spv_client* client)
-{
-    if (!client) return false;
-
-    if (client->bloom_filter) {
-        dogecoin_free(client->bloom_filter);
-        client->bloom_filter = NULL;
-    }
-    client->bloom_filter_len = 0;
-    client->bloom_nhashfunc = 0;
-    client->bloom_ntweak = 0;
-    client->bloom_flags = 0;
-
-    if (!client->nodegroup || !client->nodegroup->nodes) return true;
-
-    for (unsigned int i = 0; i < (unsigned int)client->nodegroup->nodes->len; i++) {
-        dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, i);
-        if (!n) continue;
-        if (((n->state & NODE_CONNECTED) != NODE_CONNECTED) || !n->version_handshake) continue;
-
-        cstring* payload = cstr_new_sz(0);
-        cstring* msg = dogecoin_p2p_message_new(
-            n->nodegroup->chainparams->netmagic,
-            DOGECOIN_MSG_FILTERCLEAR,
-            payload->str,
-            payload->len
-        );
-        cstr_free(payload, true);
-        dogecoin_node_send(n, msg);
-        cstr_free(msg, true);
-    }
-
-    if (client->nodegroup && client->nodegroup->log_write_cb)
-        client->nodegroup->log_write_cb("[spv] sent filterclear\n");
-
-    return true;
 }

@@ -589,6 +589,33 @@ void test_reorg() {
     remove_all_maps();
 }
 
+// BIP37 filter state tests
+void test_bip37_filter_state()
+{
+    dogecoin_spv_client* client = dogecoin_spv_client_new(&dogecoin_chainparams_main, false, true, false, false, 1, NULL);
+    u_assert_true(client != NULL);
+
+    uint8_t filter[3] = {0xaa, 0xbb, 0xcc};
+    u_assert_true(dogecoin_spv_client_filterload(client, filter, sizeof(filter), 2, 123, 1));
+    u_assert_true(client->bloom_filter != NULL);
+    u_assert_true(client->bloom_filter_len == sizeof(filter));
+    u_assert_true(client->bloom_nhashfunc == 2);
+    u_assert_true(client->bloom_ntweak == 123);
+    u_assert_true(client->bloom_flags == 1);
+
+    filter[0] = 0x00;
+    u_assert_true(client->bloom_filter[0] == 0xaa);
+
+    u_assert_true(!dogecoin_spv_client_filterload(client, NULL, 0, 0, 0, 0));
+    u_assert_true(dogecoin_spv_client_filterclear(client));
+    u_assert_true(client->bloom_filter == NULL);
+    u_assert_true(client->bloom_filter_len == 0);
+
+    dogecoin_spv_client_free(client);
+    remove_all_hashes();
+    remove_all_maps();
+}
+
 // BIP37 merkleblock tests
 typedef struct bip37_test_ctx_ {
     int tx_calls;
