@@ -211,6 +211,8 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->merkle_match_pending = 0;
     client->merkle_match_active = false;
     client->merkle_match_blockindex = NULL;
+    client->rescan_total = 0;
+    client->rescan_matched = 0;
 
     if (http_server) {
         // split ip and port
@@ -1329,9 +1331,20 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         client->merkle_match_active = (client->merkle_match_pending > 0);
         client->merkle_match_blockindex = pindex;
 
-        client->nodegroup->log_write_cb("[merkle] block at height %d: nTx=%u matched=%u active=%d\n",
-            pindex->height, nTx, client->merkle_match_pending,
-            client->merkle_match_active ? 1 : 0);
+        /* Update rescan progress counters. */
+        client->rescan_total++;
+        if (client->merkle_match_pending > 0) {
+            client->rescan_matched++;
+            /* Log individual blocks only when they have matches. */
+            client->nodegroup->log_write_cb("[merkle] MATCH at height %d: nTx=%u matched=%u\n",
+                pindex->height, nTx, client->merkle_match_pending);
+        }
+        /* Log periodic progress every 10,000 blocks. */
+        if (client->rescan_total % 10000 == 0) {
+            client->nodegroup->log_write_cb("[merkle] progress: %llu blocks scanned, %llu with matches\n",
+                (unsigned long long)client->rescan_total,
+                (unsigned long long)client->rescan_matched);
+        }
 
         dogecoin_free(flags);
         dogecoin_free(hashes);
@@ -1583,8 +1596,12 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     }
     if (!peer) return;
 
+    /* Reset rescan progress counters. */
+    client->rescan_total = 0;
+    client->rescan_matched = 0;
+
     if (client->nodegroup->log_write_cb) {
-        client->nodegroup->log_write_cb("[spv] scanning %d historical blocks for UTXO discovery\n", total);
+        client->nodegroup->log_write_cb("[spv] scanning %d historical blocks for UTXO discovery (only matches will be logged)\n", total);
     }
 
     /* Send getdata in batches to avoid huge allocations and messages.

@@ -98,6 +98,10 @@ typedef struct dogecoin_spv_client_
     dogecoin_bool merkle_match_active;
     dogecoin_blockindex* merkle_match_blockindex;
 
+    /* historical rescan progress counters */
+    uint64_t rescan_total;      /* total merkle blocks received during rescan */
+    uint64_t rescan_matched;    /* merkle blocks with at least one matched tx */
+
     /* callbacks */
     /* ========= */
     void (*header_connected)(struct dogecoin_spv_client_ *client);
