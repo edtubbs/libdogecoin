@@ -95,10 +95,13 @@ Options used to compile and link:
 
 ### Step 2: Get Testnet Coins
 Visit a Dogecoin testnet faucet:
-- https://testnet-faucet.com/dogecoin-testnet/
+- https://faucet.doge.toys/
+- https://faucet.triangleplatform.com/dogecoin/testnet
+- https://dogecoin-faucet.ruan.dev/
 - Enter your testnet address from Step 1
 - Request test DOGE
 - If unavailable, search for another active Dogecoin testnet faucet (faucet endpoints change frequently)
+- Some faucets require browser CAPTCHA and/or have strict IP rate limits
 
 ### Step 3: Generate Falcon-512 Keypair
 ```bash
