@@ -28,6 +28,7 @@
 */
 
 #include <assert.h>
+#include <ctype.h>
 #ifndef _MSC_VER
 #include <getopt.h>
 #include <unistd.h>
@@ -669,8 +670,9 @@ static void print_usage()
     printf("falcon_keygen (generates Falcon-512 keypair),\n");
     printf("falcon_sign (requires -p <falcon_secret_key_hex> -x <message_hex>),\n");
     printf("falcon_verify (requires -k <falcon_public_key_hex> -x <message_hex> -s <signature_hex>),\n");
-    printf("falcon_commit (requires -k <falcon_public_key_hex> -s <signature_hex>)\n");
+    printf("falcon_commit (requires -k <falcon_public_key_hex> -s <signature_hex>),\n");
 #endif
+    printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <32-byte_commit_hex>)\n");
     printf("\nExamples: \n");
     printf("Generate a testnet private ec keypair wif/hex:\n");
     printf("> such -c generate_private_key\n\n");
@@ -1716,7 +1718,56 @@ int main(int argc, char* argv[])
         printf("2. Recompute: commit = SHA256(public_key || signature)\n");
         printf("3. Compare with this on-chain commitment\n");
         }
-#endif
+    #endif
+    else if (strcmp(cmd, "falcon_add_commit_tx") == 0) {
+        // ./such -c falcon_add_commit_tx -x <raw_tx_hex> -s <32-byte_commit_hex>
+        if (!txhex || !scripthex) {
+            return showError("Missing tx hex or commitment hex (use -x, -s)\n");
+        }
+        if (strlen(scripthex) != 64) {
+            return showError("Commitment must be exactly 32 bytes (64 hex chars)\n");
+        }
+        for (size_t i = 0; i < strlen(scripthex); i++) {
+            if (!isxdigit((unsigned char)scripthex[i])) {
+                return showError("Commitment must be hex encoded\n");
+            }
+        }
+
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex\n");
+        }
+        dogecoin_free(data_bin);
+
+        uint8_t commit32[32];
+        size_t commit_len = 0;
+        utils_hex_to_bin(scripthex, commit32, strlen(scripthex), &commit_len);
+        if (commit_len != sizeof(commit32)) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to decode commitment\n");
+        }
+
+        if (!dogecoin_tx_add_falcon512_commit(tx, commit32)) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to append Falcon commitment output\n");
+        }
+
+        cstring* tx_with_commit = cstr_new_sz(1024);
+        dogecoin_tx_serialize(tx_with_commit, tx);
+        char* tx_with_commit_hex = dogecoin_char_vla(tx_with_commit->len * 2 + 1);
+        utils_bin_to_hex((unsigned char*)tx_with_commit->str, tx_with_commit->len, tx_with_commit_hex);
+
+        printf("tx with commitment: %s\n", tx_with_commit_hex);
+
+        cstr_free(tx_with_commit, true);
+        free(tx_with_commit_hex);
+        dogecoin_tx_free(tx);
+        }
     else {
         print_usage();
         return showError("Unknown command\n");

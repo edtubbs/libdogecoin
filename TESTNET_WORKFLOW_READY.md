@@ -85,7 +85,7 @@ Options used to compile and link:
 
 ### Step 2: Get Testnet Coins
 Visit a Dogecoin testnet faucet:
-- Search for "Dogecoin testnet faucet"
+- https://testnet-faucet.com/dogecoin-testnet/
 - Enter your testnet address from Step 1
 - Request test DOGE
 
@@ -142,32 +142,29 @@ Outputs:
   - Output 1: OP_RETURN <FALCON_COMMIT>
 ```
 
-**Building the Transaction:**
+**Building the Transaction with CLI tools (`such`):**
 
-You can use the libdogecoin API to build a transaction with OP_RETURN:
-```c
-// C code example
-dogecoin_tx* tx = dogecoin_tx_new();
+```bash
+# 1) Build an unsigned tx with such (interactive menu)
+./such -c transaction
 
-// Add your input (from testnet coins)
-dogecoin_tx_add_input(...);
+# 2) Append OP_RETURN commitment output
+./such -c falcon_add_commit_tx -x <unsigned_raw_tx_hex> -s <falcon_commit_hex>
 
-// Add recipient output
-dogecoin_tx_add_output(...);
+# Output:
+# tx with commitment: <raw_tx_hex_with_opreturn>
 
-// Add Falcon commit as OP_RETURN
-uint8_t commit[32];
-// ... (decode FALCON_COMMIT hex to bytes)
-dogecoin_tx_add_falcon512_commit(tx, commit);
+# 3) Sign input 0 (single-input example)
+./such -c sign -x <raw_tx_hex_with_opreturn> -s <script_pubkey_hex> -i 0 -h 1 -p <wif_privkey>
 
-// Sign and serialize transaction
-// ... (use standard libdogecoin TX signing)
+# Output:
+# signed TX: <signed_raw_tx_hex>
 ```
 
 ### Step 8: Broadcast Transaction
 ```bash
-# Once you have the raw signed transaction hex
-./sendtx -t <raw_transaction_hex>
+# Broadcast signed raw tx to testnet
+./sendtx -t <signed_raw_tx_hex>
 
 # This will broadcast to Dogecoin testnet
 ```

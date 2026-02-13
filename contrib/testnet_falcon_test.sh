@@ -186,55 +186,48 @@ EOF
 build_transaction() {
     info "Step 6: Building transaction with OP_RETURN commit..."
     
-    warning "This step requires UTXO information from your testnet wallet"
+    echo "Create an unsigned testnet transaction with such first:"
+    echo "  ./such -c transaction"
     echo ""
-    echo "You need to provide:"
-    echo "  1. Previous transaction ID (txid)"
-    echo "  2. Previous output index (vout)"
-    echo "  3. Amount in koinu (1 DOGE = 100,000,000 koinu)"
-    echo ""
-    
-    read -p "Enter txid: " PREV_TXID
-    read -p "Enter vout: " PREV_VOUT
-    read -p "Enter amount (koinu): " PREV_AMOUNT
-    
-    # Calculate output amount (deduct fee)
-    FEE=100000  # 0.001 DOGE fee
-    OUTPUT_AMOUNT=$((PREV_AMOUNT - FEE))
-    
-    if [ $OUTPUT_AMOUNT -lt 0 ]; then
-        error "Amount too small to cover fee"
+    echo "Then paste the unsigned raw tx hex below."
+    read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
+    read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
+
+    ADD_COMMIT_OUTPUT=$(./such -c falcon_add_commit_tx -x "$RAW_UNSIGNED_TX" -s "$FALCON_COMMIT")
+    TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | awk '{print $4}')
+
+    if [ -z "$TX_WITH_COMMIT" ]; then
+        echo "$ADD_COMMIT_OUTPUT"
+        error "Failed to append Falcon commitment to transaction"
     fi
-    
-    info "Building transaction..."
-    info "  Input: $PREV_TXID:$PREV_VOUT ($PREV_AMOUNT koinu)"
-    info "  Output 1: $TESTNET_ADDR ($OUTPUT_AMOUNT koinu)"
-    info "  Output 2: OP_RETURN with Falcon commit"
-    info "  Fee: $FEE koinu (0.001 DOGE)"
-    
-    # Build OP_RETURN script
-    # OP_RETURN (0x6a) + PUSH_DATA (0x20 for 32 bytes) + commitment
-    OPRETURN_SCRIPT="6a20${FALCON_COMMIT}"
-    
-    success "Transaction structure prepared"
-    echo "  OP_RETURN script: $OPRETURN_SCRIPT"
-    
-    warning "Transaction building with OP_RETURN requires code implementation"
-    warning "Current 'such' tool may not support adding custom OP_RETURN outputs"
+
+    info "Signing transaction with commitment output..."
+    SIGN_OUTPUT=$(./such -c sign -x "$TX_WITH_COMMIT" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF")
+    SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
+
+    if [ -z "$SIGNED_TX" ]; then
+        echo "$SIGN_OUTPUT"
+        error "Failed to sign transaction"
+    fi
+
+    success "Signed transaction with Falcon commitment ready"
+    echo "  Signed TX: ${SIGNED_TX:0:80}..."
     echo ""
-    echo "Manual steps:"
-    echo "1. Use external wallet software or RPC to build transaction"
-    echo "2. Add OP_RETURN output with script: $OPRETURN_SCRIPT"
-    echo "3. Sign transaction with: $PRIVKEY_WIF"
-    echo "4. Broadcast with: ./sendtx $TESTNET_FLAG <signed_tx_hex>"
-    
+    read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
+    if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
+        ./sendtx $TESTNET_FLAG "$SIGNED_TX"
+        success "Broadcast command submitted"
+    else
+        warning "Skipping broadcast. You can run:"
+        echo "  ./sendtx $TESTNET_FLAG $SIGNED_TX"
+    fi
+
     cat > "$TMPDIR/tx_info.txt" <<EOF
-PREV_TXID=$PREV_TXID
-PREV_VOUT=$PREV_VOUT
-PREV_AMOUNT=$PREV_AMOUNT
-OUTPUT_AMOUNT=$OUTPUT_AMOUNT
-FEE=$FEE
-OPRETURN_SCRIPT=$OPRETURN_SCRIPT
+RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
+TX_WITH_COMMIT=$TX_WITH_COMMIT
+SCRIPT_PUBKEY=$SCRIPT_PUBKEY
+SIGNED_TX=$SIGNED_TX
+OPRETURN_SCRIPT=6a20${FALCON_COMMIT}
 EOF
 }
 
