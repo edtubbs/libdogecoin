@@ -30,6 +30,10 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - signmessage
 - verify_message
 - transaction
+- falcon_keygen (requires --enable-liboqs)
+- falcon_sign (requires --enable-liboqs)
+- falcon_verify (requires --enable-liboqs)
+- falcon_commit (requires --enable-liboqs)
 
 So an example run of `such` could be something like this:
 ```
@@ -464,3 +468,179 @@ When using -n with a mnemonic, instead of main_wallet.db, spvnode will generate 
 
 #### Sync up, with a wallet file "main_wallet.db", with encrypted mnemonic 0, show debug info, with a headers file "main_headers.db", wait for new blocks, use TPM:
     ./spvnode -d -c -w "./main_wallet.db" -h "./main_headers.db" -y 0 -j -b scan
+
+## Falcon-512 Post-Quantum Cryptography (PQC) Commands
+
+> **Note**: These commands are only available when libdogecoin is built with `--enable-liboqs` flag.
+
+The `such` tool includes support for Falcon-512 post-quantum signatures and commitments. These commands enable quantum-resistant cryptographic operations and allow publishing commitments to the Dogecoin blockchain via OP_RETURN outputs for off-chain verification.
+
+### Available Falcon Commands
+
+| Command | Required Flags | Description |
+| - | - | - |
+| falcon_keygen | None | Generates a Falcon-512 keypair (public key: 897 bytes, secret key: 1281 bytes) |
+| falcon_sign | -p, -x | Signs a message with Falcon-512 secret key. Returns signature (~660 bytes) |
+| falcon_verify | -k, -x, -s | Verifies a Falcon-512 signature against a message and public key |
+| falcon_commit | -k, -s | Generates a 32-byte SHA256 commitment from public key and signature for OP_RETURN |
+
+### Flag Usage for Falcon Commands
+
+| Flag | Description | Format |
+| - | - | - |
+| -k, --pubkey | Falcon-512 public key | Hex string (1794 chars for 897 bytes) |
+| -p, --privkey | Falcon-512 secret key | Hex string (2562 chars for 1281 bytes) |
+| -x | Message to sign/verify | Hex string |
+| -s | Falcon-512 signature | Hex string (~1320 chars for ~660 bytes) |
+
+### Examples
+
+#### Generate a Falcon-512 keypair:
+```bash
+./such -c falcon_keygen
+```
+Output:
+```
+Generating Falcon-512 keypair...
+Public Key (897 bytes): 0141...
+Secret Key (1281 bytes): 5014...
+```
+
+#### Sign a message with Falcon-512:
+```bash
+# First, convert your message to hex
+MESSAGE_HEX=$(echo -n "Hello Dogecoin" | xxd -p | tr -d '\n')
+
+# Sign with Falcon secret key
+./such -c falcon_sign -p <secret_key_hex> -x $MESSAGE_HEX
+```
+Output:
+```
+Signing message with Falcon-512...
+Message (hex): 48656c6c6f20446f6765636f696e
+Signature (666 bytes): 3a7f...
+```
+
+#### Verify a Falcon-512 signature:
+```bash
+./such -c falcon_verify -k <public_key_hex> -x <message_hex> -s <signature_hex>
+```
+Output:
+```
+Verifying Falcon-512 signature...
+Signature is VALID
+```
+
+#### Generate a commitment for OP_RETURN:
+```bash
+./such -c falcon_commit -k <public_key_hex> -s <signature_hex>
+```
+Output:
+```
+Generating Falcon-512 commitment...
+Commitment (32 bytes): a1b2c3d4e5f6789...
+```
+
+### Testnet Workflow: Falcon Commitments
+
+The typical workflow for testing Falcon commitments on testnet involves:
+
+1. **Generate testnet wallet**:
+```bash
+./such -c generate_private_key -t
+./such -c generate_public_key -p <wif_key> -t
+```
+
+2. **Get testnet coins** from a faucet
+
+3. **Generate Falcon keypair**:
+```bash
+./such -c falcon_keygen > falcon_keys.txt
+```
+
+4. **Sign a message**:
+```bash
+MESSAGE_HEX=$(echo -n "Testnet proof $(date)" | xxd -p | tr -d '\n')
+./such -c falcon_sign -p <falcon_sk> -x $MESSAGE_HEX > falcon_sig.txt
+```
+
+5. **Generate commitment**:
+```bash
+./such -c falcon_commit -k <falcon_pk> -s <falcon_sig> > falcon_commit.txt
+```
+
+6. **Build and broadcast transaction** with OP_RETURN containing the commitment:
+```
+OP_RETURN script: 6a20<commitment_hex>
+```
+
+7. **Monitor with SPV node**:
+```bash
+./spvnode -t -d -f 0 -c -b scan
+```
+The SPV node will detect and log Falcon commitments:
+```
+[falcon-commit] Found at height=4567890 txpos=2 commit=a1b2c3d4...
+```
+
+8. **Verify off-chain**: Anyone with the public key, message, and signature can:
+   - Verify the signature: `./such -c falcon_verify ...`
+   - Regenerate the commitment: `./such -c falcon_commit ...`
+   - Compare with on-chain commitment
+
+### Use Cases
+
+**Why use Falcon commitments with OP_RETURN?**
+
+- **Compact on-chain storage**: Only 32 bytes on-chain vs 666+ bytes for full signature
+- **Quantum-resistant**: Protects against future quantum computer attacks
+- **Off-chain verification**: Full signature can be verified separately
+- **Timestamping**: Prove existence and integrity of data at a specific blockchain height
+- **Notarization**: Create quantum-resistant notarized proofs
+- **Hybrid schemes**: Combine classical and post-quantum signatures
+
+### Automated Testing Script
+
+A comprehensive testnet integration test script is available at:
+```
+contrib/testnet_falcon_test.sh
+```
+
+Run it to perform end-to-end testing:
+```bash
+./contrib/testnet_falcon_test.sh
+```
+
+This script automates:
+- Testnet wallet generation
+- Falcon keypair generation
+- Message signing
+- Commitment generation
+- Transaction building guidance
+- SPV monitoring instructions
+
+### Security Model
+
+The Falcon commitment scheme uses:
+```
+commitment = SHA256(public_key || signature)
+```
+
+**Benefits**:
+1. **Space efficiency**: 32 bytes on-chain vs 1563 bytes (pk + sig)
+2. **Privacy**: Signature not revealed unless necessary
+3. **Verification**: Commitment proves signature exists without storing it
+4. **Future-proof**: Quantum-resistant security model
+
+**Verification process**:
+1. Obtain full signature off-chain (from issuer/database)
+2. Recompute: `SHA256(pk || sig)`
+3. Compare with on-chain commitment
+4. If match, verify signature with Falcon-512
+
+### References
+
+- [Falcon Specification](https://falcon-sign.info/)
+- [liboqs Documentation](https://github.com/open-quantum-safe/liboqs)
+- [NIST PQC Standardization](https://csrc.nist.gov/projects/post-quantum-cryptography)
+- [OP_RETURN Specification](https://en.bitcoin.it/wiki/OP_RETURN)
