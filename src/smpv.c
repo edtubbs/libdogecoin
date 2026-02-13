@@ -33,9 +33,9 @@
 #include <dogecoin/hash.h>
 #include <dogecoin/cstr.h>
 
-/* keep confirmed stubs bounded so we do not grow forever on full blocks */
-#ifndef SMPV_CONFIRMED_STUB_LIMIT
-#define SMPV_CONFIRMED_STUB_LIMIT 4096
+/* keep confirmed entries bounded so we do not grow forever on full blocks */
+#ifndef SMPV_CONFIRMED_ENTRY_LIMIT
+#define SMPV_CONFIRMED_ENTRY_LIMIT 4096
 #endif
 
 static void dogecoin_smpv_tx_cleanup_entry(dogecoin_smpv_tx* tx)
@@ -66,7 +66,7 @@ static void dogecoin_smpv_tx_cleanup_entry(dogecoin_smpv_tx* tx)
     tx->is_coinbase = false;
 }
 
-static dogecoin_smpv_tx* smpv_append_confirmed_stub(
+static dogecoin_smpv_tx* smpv_append_confirmed_entry(
     dogecoin_smpv_client* client,
     const char* txid,
     const char* block_hash,
@@ -74,7 +74,7 @@ static dogecoin_smpv_tx* smpv_append_confirmed_stub(
 ) {
     if (!client || !txid) return NULL;
 
-    if (client->confirmed_count >= SMPV_CONFIRMED_STUB_LIMIT) {
+    if (client->confirmed_count >= SMPV_CONFIRMED_ENTRY_LIMIT) {
         return NULL;
     }
 
