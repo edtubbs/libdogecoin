@@ -71,6 +71,7 @@
 #include <dogecoin/rest.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/tool.h>
+#include <dogecoin/pqc_falcon.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/wallet.h>
@@ -193,7 +194,89 @@ static struct option long_options[] = {
         {"http_server", required_argument, NULL, 'u'},
         {"smpv", no_argument, NULL, 'x'},
         {"daemon", no_argument, NULL, 'z'},
+        {"falcon_pubkey", required_argument, NULL, 1001},
+        {"falcon_signature", required_argument, NULL, 1002},
+        {"falcon_message", required_argument, NULL, 1003},
         {NULL, 0, NULL, 0} };
+
+typedef struct falcon_verify_ctx_ {
+#if WITH_WALLET
+    dogecoin_wallet* wallet;
+#endif
+    dogecoin_bool verify_enabled;
+    uint8_t* pk;
+    size_t pk_len;
+    uint8_t* sig;
+    size_t sig_len;
+    uint8_t* msg;
+    size_t msg_len;
+    uint8_t expected_commit[32];
+} falcon_verify_ctx;
+
+static dogecoin_bool is_hex_string(const char* s) {
+    if (!s || !s[0]) return false;
+    size_t i = 0;
+    size_t len = strlen(s);
+    for (; i < len; i++) {
+        if (!isxdigit((unsigned char)s[i])) return false;
+    }
+    return true;
+}
+
+static dogecoin_bool parse_hex_alloc(const char* hex, uint8_t** out, size_t* out_len) {
+    if (!hex || !out || !out_len) return false;
+    if ((strlen(hex) % 2) != 0 || !is_hex_string(hex)) return false;
+    *out_len = strlen(hex) / 2;
+    *out = dogecoin_malloc(*out_len);
+    if (!*out) return false;
+    size_t parsed_len = 0;
+    utils_hex_to_bin(hex, *out, strlen(hex), &parsed_len);
+    if (parsed_len != *out_len) {
+        dogecoin_free(*out);
+        *out = NULL;
+        return false;
+    }
+    return true;
+}
+
+static void spvnode_sync_transaction_cb(void* ctxptr, dogecoin_tx* tx, unsigned int pos, dogecoin_blockindex* blockindex) {
+    falcon_verify_ctx* ctx = (falcon_verify_ctx*)ctxptr;
+    if (!ctx || !tx) return;
+#if WITH_WALLET
+    if (ctx->wallet) {
+        dogecoin_wallet_check_transaction(ctx->wallet, tx, pos, blockindex);
+    }
+#endif
+    if (!ctx->verify_enabled) return;
+
+    uint8_t onchain_commit[32];
+    if (!dogecoin_tx_extract_falcon512_commit(tx, onchain_commit)) return;
+
+    const dogecoin_bool commit_matches = memcmp(onchain_commit, ctx->expected_commit, 32) == 0;
+    const dogecoin_bool should_verify_sig = commit_matches;
+    dogecoin_bool sig_valid = false;
+    if (should_verify_sig) {
+        sig_valid = dogecoin_falcon512_verify(ctx->pk, ctx->pk_len, ctx->msg, ctx->msg_len, ctx->sig, ctx->sig_len);
+    }
+
+    char commit_hex[65];
+    int height = blockindex ? (int)blockindex->height : -1;
+    utils_bin_to_hex(onchain_commit, 32, commit_hex);
+    printf("[falcon-verify] height=%d txpos=%u commit=%s match=%s sig_checked=%s sig_valid=%s\n",
+           height,
+           pos,
+           commit_hex,
+           commit_matches ? "yes" : "no",
+           should_verify_sig ? "yes" : "no",
+           sig_valid ? "yes" : "no");
+}
+
+static void falcon_verify_ctx_cleanup(falcon_verify_ctx* ctx) {
+    if (!ctx) return;
+    if (ctx->pk) dogecoin_free(ctx->pk);
+    if (ctx->sig) dogecoin_free(ctx->sig);
+    if (ctx->msg) dogecoin_free(ctx->msg);
+}
 
 /**
  * Print_version() prints the version of the program
@@ -210,7 +293,8 @@ static void print_usage() {
     printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m[--maxpeers] <int>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
 (-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
-(-u|--http_server <ip:port>) (-x|--smpv) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
+(-u|--http_server <ip:port>) (-x|--smpv) (-t|--testnet) (-r|--regtest) (-d|--debug) \
+(--falcon_pubkey <hex> --falcon_signature <hex> --falcon_message <hex>) <command>\n");
     printf("Supported commands:\n");
     printf("        scan      (scan blocks up to the tip, creates header.db file)\n");
     printf("\nExamples: \n");
@@ -324,6 +408,9 @@ int main(int argc, char* argv[]) {
     char* http_server = NULL;
     int file_num = NO_FILE;
     dogecoin_bool smpv_cli_enable = false;
+    char* falcon_pubkey_hex = NULL;
+    char* falcon_signature_hex = NULL;
+    char* falcon_message_hex = NULL;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -407,6 +494,15 @@ int main(int argc, char* argv[]) {
                 case 'x':
                     smpv_cli_enable = true;
                     break;
+                case 1001:
+                    falcon_pubkey_hex = optarg;
+                    break;
+                case 1002:
+                    falcon_signature_hex = optarg;
+                    break;
+                case 1003:
+                    falcon_message_hex = optarg;
+                    break;
                 default:
                     print_usage();
                     exit(EXIT_FAILURE);
@@ -422,6 +518,12 @@ int main(int argc, char* argv[]) {
         if (smpv_cli_enable) {
             dogecoin_spv_enable_smpv(client, true);
             printf("[smpv] enabled via CLI flag\n");
+        }
+        falcon_verify_ctx* verify_ctx = dogecoin_calloc(1, sizeof(*verify_ctx));
+        if (!verify_ctx) {
+            dogecoin_spv_client_free(client);
+            dogecoin_ecc_stop();
+            return EXIT_FAILURE;
         }
         client->header_message_processed = spv_header_message_processed;
         client->sync_completed = spv_sync_completed;
@@ -449,6 +551,8 @@ int main(int argc, char* argv[]) {
                 dogecoin_mem_zero (pass, strlen(pass));
                 dogecoin_free(pass);
                 }
+            falcon_verify_ctx_cleanup(verify_ctx);
+            dogecoin_free(verify_ctx);
             dogecoin_spv_client_free(client);
             dogecoin_ecc_stop();
             return EXIT_FAILURE;
@@ -459,9 +563,50 @@ int main(int argc, char* argv[]) {
             dogecoin_free(pass);
             }
         print_utxos(wallet);
-        client->sync_transaction = dogecoin_wallet_check_transaction;
-        client->sync_transaction_ctx = wallet;
+        verify_ctx->wallet = wallet;
 #endif
+        int num_provided_falcon_args = (falcon_pubkey_hex != NULL) + (falcon_signature_hex != NULL) + (falcon_message_hex != NULL);
+        if (num_provided_falcon_args > 0 && num_provided_falcon_args < 3) {
+            printf("To verify Falcon commitments, provide all: --falcon_pubkey --falcon_signature --falcon_message\n");
+#if WITH_WALLET
+            dogecoin_wallet_free(wallet);
+#endif
+            falcon_verify_ctx_cleanup(verify_ctx);
+            dogecoin_free(verify_ctx);
+            dogecoin_spv_client_free(client);
+            dogecoin_ecc_stop();
+            return EXIT_FAILURE;
+        }
+        else if (falcon_pubkey_hex && falcon_signature_hex && falcon_message_hex) {
+            if (!parse_hex_alloc(falcon_pubkey_hex, &verify_ctx->pk, &verify_ctx->pk_len) ||
+                !parse_hex_alloc(falcon_signature_hex, &verify_ctx->sig, &verify_ctx->sig_len) ||
+                !parse_hex_alloc(falcon_message_hex, &verify_ctx->msg, &verify_ctx->msg_len)) {
+                printf("Invalid Falcon hex input for verification\n");
+#if WITH_WALLET
+                dogecoin_wallet_free(wallet);
+#endif
+                falcon_verify_ctx_cleanup(verify_ctx);
+                dogecoin_free(verify_ctx);
+                dogecoin_spv_client_free(client);
+                dogecoin_ecc_stop();
+                return EXIT_FAILURE;
+            }
+            if (!dogecoin_falcon512_commit_bytes(verify_ctx->pk, verify_ctx->pk_len, verify_ctx->sig, verify_ctx->sig_len, verify_ctx->expected_commit)) {
+                printf("Could not compute expected Falcon commitment\n");
+#if WITH_WALLET
+                dogecoin_wallet_free(wallet);
+#endif
+                falcon_verify_ctx_cleanup(verify_ctx);
+                dogecoin_free(verify_ctx);
+                dogecoin_spv_client_free(client);
+                dogecoin_ecc_stop();
+                return EXIT_FAILURE;
+            }
+            verify_ctx->verify_enabled = true;
+            printf("[falcon-verify] enabled (expecting commit from provided key/signature/message)\n");
+        }
+        client->sync_transaction = spvnode_sync_transaction_cb;
+        client->sync_transaction_ctx = verify_ctx;
         char* header_suffix = "_headers.db";
         char* header_prefix = (char*)chain->chainname;
         char* headersfile = NULL;
@@ -492,6 +637,11 @@ int main(int argc, char* argv[]) {
         dogecoin_free(headersfile);
         if (!response) {
             printf("Could not load or create headers database...aborting\n");
+#if WITH_WALLET
+            dogecoin_wallet_free(wallet);
+#endif
+            falcon_verify_ctx_cleanup(verify_ctx);
+            dogecoin_free(verify_ctx);
             ret = EXIT_FAILURE;
         } else {
             if (have_decl_daemon) {
@@ -532,6 +682,8 @@ int main(int argc, char* argv[]) {
             printf("Connecting to the p2p network...\n");
             dogecoin_spv_client_runloop(client);
             dogecoin_spv_client_free(client);
+            falcon_verify_ctx_cleanup(verify_ctx);
+            dogecoin_free(verify_ctx);
             printf("done\n");
             ret = EXIT_SUCCESS;
 #if WITH_WALLET
