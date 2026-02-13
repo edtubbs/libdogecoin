@@ -249,22 +249,28 @@ monitor_spvnode() {
     info "Step 7: Monitoring with SPV node..."
     
     echo ""
-    echo "After broadcasting your transaction, monitor it with:"
+    echo "After broadcasting your transaction, monitor it with header-first sync:"
     echo ""
-    echo "  ./spvnode $TESTNET_FLAG -d -f 0 -c -b scan"
+    echo "  # -l no prompt, -c continuous, -d debug, -x smpv, -p checkpoint, -a address"
+    echo "  ./spvnode $TESTNET_FLAG -l -c -d -x -p -a \"$TESTNET_ADDR\" scan"
+    echo ""
+    echo "Then switch to full block scan mode (or use -b directly):"
+    echo ""
+    echo "  ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a \"$TESTNET_ADDR\" scan"
     echo ""
     echo "The SPV node will:"
     echo "  - Sync testnet blockchain headers"
-    echo "  - Download and scan blocks"
+    echo "  - Track wallet activity for: $TESTNET_ADDR"
+    echo "  - Download and scan blocks in full mode"
     echo "  - Detect Falcon commitments"
     echo "  - Log: [falcon-commit] Found at height=X txpos=Y commit=$FALCON_COMMIT"
     echo ""
     
     warning "SPV sync may take time. Be patient!"
     if [ "$BROADCASTED" -eq 1 ]; then
-        read -p "Start spvnode scan now? [y/N]: " RUN_SPV
+        read -p "Start header-first spvnode scan now? [y/N]: " RUN_SPV
         if [[ "$RUN_SPV" =~ ^[Yy]$ ]]; then
-            ./spvnode $TESTNET_FLAG -d -f 0 -c -b scan
+            ./spvnode $TESTNET_FLAG -l -c -d -x -p -a "$TESTNET_ADDR" scan
         fi
     fi
 }

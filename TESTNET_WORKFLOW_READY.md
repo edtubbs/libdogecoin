@@ -185,10 +185,13 @@ Outputs:
 
 ### Step 9: Monitor with SPV Node
 ```bash
-# Start SPV node on testnet
-./spvnode -t
+# Header-first mode (no prompt, debug, SMPV + checkpoint, track your address)
+./spvnode -t -l -c -d -x -p -a <your_testnet_address e.g. nhnJDiavC1YWU5SKVtTdJmGoVYDUtuYhnf> scan
 
-# The SPV node will automatically detect Falcon commits:
+# Then switch to full block scanning mode (or run -b directly)
+./spvnode -t -l -c -d -x -p -b -a <your_testnet_address e.g. nhnJDiavC1YWU5SKVtTdJmGoVYDUtuYhnf> scan
+
+# The SPV node can detect Falcon commits:
 # Output will show:
 # [falcon-commit] Found at height=<block_height> txpos=<position> commit=<hex>
 ```
