@@ -7,7 +7,7 @@ $(package)_sha256_hash=3983f7cd1247f37fb76a040e6fd684894d44a84cecdcfbdb90559b321
 define $(package)_build_cmds
 	mkdir -p build && cd build && \
 	cmake -DOQS_BUILD_ONLY_LIB=ON -DOQS_USE_OPENSSL=OFF -DBUILD_SHARED_LIBS=OFF \
-		-DOQS_MINIMAL_BUILD="SIG_falcon_512;SIG_falcon_1024" \
+		-DOQS_MINIMAL_BUILD="SIG_falcon_512;SIG_falcon_1024;SIG_ml_dsa_44;SIG_ml_dsa_65;SIG_ml_dsa_87;SIG_sphincs_shake_128s_simple;SIG_sphincs_shake_128f_simple" \
 		-DCMAKE_INSTALL_PREFIX=$(host_prefix) .. && \
 	$(MAKE)
 endef
