@@ -23,6 +23,7 @@ NC='\033[0m' # No Color
 TESTNET_FLAG="-t"
 TMPDIR="/tmp/falcon_testnet_$$"
 mkdir -p "$TMPDIR"
+BROADCASTED=0
 
 # Function to print colored messages
 info() {
@@ -65,11 +66,11 @@ generate_testnet_wallet() {
     info "Step 1: Generating testnet wallet..."
     
     ./such -c generate_private_key $TESTNET_FLAG > "$TMPDIR/testnet_key.txt"
-    PRIVKEY_WIF=$(grep "privatekey WIF:" "$TMPDIR/testnet_key.txt" | cut -d: -f2 | tr -d ' ')
+    PRIVKEY_WIF=$(grep "^private key wif:" "$TMPDIR/testnet_key.txt" | cut -d: -f2 | tr -d ' ')
     
     ./such -c generate_public_key -p "$PRIVKEY_WIF" $TESTNET_FLAG > "$TMPDIR/testnet_addr.txt"
     TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
-    PUBKEY=$(grep "pubkey:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
+    PUBKEY=$(grep "^public key hex:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
     
     success "Testnet wallet generated"
     echo "  Address: $TESTNET_ADDR"
@@ -112,8 +113,8 @@ generate_falcon_keypair() {
     
     ./such -c falcon_keygen > "$TMPDIR/falcon_keys.txt"
     
-    FALCON_PK=$(grep "Public Key:" "$TMPDIR/falcon_keys.txt" | cut -d: -f2 | tr -d ' ')
-    FALCON_SK=$(grep "Secret Key:" "$TMPDIR/falcon_keys.txt" | cut -d: -f2 | tr -d ' ')
+    FALCON_PK=$(grep "^public key:" "$TMPDIR/falcon_keys.txt" | cut -d: -f2 | tr -d ' ')
+    FALCON_SK=$(grep "^secret key:" "$TMPDIR/falcon_keys.txt" | cut -d: -f2 | tr -d ' ')
     
     if [ -z "$FALCON_PK" ] || [ -z "$FALCON_SK" ]; then
         error "Failed to generate Falcon keypair"
@@ -144,7 +145,7 @@ sign_message_falcon() {
     # Sign with Falcon
     ./such -c falcon_sign -p "$FALCON_SK" -x "$MESSAGE_HEX" > "$TMPDIR/falcon_sig.txt"
     
-    FALCON_SIG=$(grep "Signature:" "$TMPDIR/falcon_sig.txt" | cut -d: -f2 | tr -d ' ')
+    FALCON_SIG=$(grep "^signature:" "$TMPDIR/falcon_sig.txt" | cut -d: -f2 | tr -d ' ')
     
     if [ -z "$FALCON_SIG" ]; then
         error "Failed to sign message"
@@ -167,7 +168,7 @@ generate_commitment() {
     
     ./such -c falcon_commit -k "$FALCON_PK" -s "$FALCON_SIG" > "$TMPDIR/falcon_commit.txt"
     
-    FALCON_COMMIT=$(grep "Commitment:" "$TMPDIR/falcon_commit.txt" | cut -d: -f2 | tr -d ' ')
+    FALCON_COMMIT=$(grep "^commitment:" "$TMPDIR/falcon_commit.txt" | cut -d: -f2 | tr -d ' ')
     
     if [ -z "$FALCON_COMMIT" ] || [ ${#FALCON_COMMIT} -ne 64 ]; then
         error "Failed to generate commitment (expected 64 hex chars, got ${#FALCON_COMMIT})"
@@ -217,9 +218,11 @@ build_transaction() {
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
         ./sendtx $TESTNET_FLAG "$SIGNED_TX"
         success "Broadcast command submitted"
+        BROADCASTED=1
     else
         warning "Skipping broadcast. You can run:"
         echo "  ./sendtx $TESTNET_FLAG $SIGNED_TX"
+        BROADCASTED=0
     fi
 
     cat > "$TMPDIR/tx_info.txt" <<EOF
@@ -248,6 +251,12 @@ monitor_spvnode() {
     echo ""
     
     warning "SPV sync may take time. Be patient!"
+    if [ "$BROADCASTED" -eq 1 ]; then
+        read -p "Start spvnode scan now? [y/N]: " RUN_SPV
+        if [[ "$RUN_SPV" =~ ^[Yy]$ ]]; then
+            ./spvnode $TESTNET_FLAG -d -f 0 -c -b scan
+        fi
+    fi
 }
 
 # Step 8: Verify commitment off-chain

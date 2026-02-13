@@ -4,6 +4,16 @@
 
 All tools have been successfully built with liboqs and network support enabled.
 
+### Recommended configure flags for running this workflow
+
+Use `--enable-test-passwd` so tests and workflow runs don't block on interactive password prompts:
+
+```bash
+./autogen.sh
+./configure --enable-liboqs --enable-test-passwd
+make -j$(nproc)
+```
+
 ### Built Tools
 
 ```bash
