@@ -11,6 +11,7 @@
 #
 
 set -e  # Exit on error
+umask 077
 
 # Colors for output
 RED='\033[0;31m'
@@ -22,7 +23,7 @@ NC='\033[0m' # No Color
 # Configuration
 TESTNET_FLAG="-t"
 TMPDIR="/tmp/falcon_testnet_$$"
-mkdir -p "$TMPDIR"
+mkdir -m 700 -p "$TMPDIR"
 BROADCASTED=0
 
 # Function to print colored messages
@@ -64,10 +65,15 @@ check_tools() {
 # Step 1: Generate testnet wallet
 generate_testnet_wallet() {
     info "Step 1: Generating testnet wallet..."
-    
-    ./such -c generate_private_key $TESTNET_FLAG > "$TMPDIR/testnet_key.txt"
-    PRIVKEY_WIF=$(grep "^private key wif:" "$TMPDIR/testnet_key.txt" | cut -d: -f2 | tr -d ' ')
-    
+
+    if [ -n "$TESTNET_PRIVKEY_WIF" ]; then
+        PRIVKEY_WIF="$TESTNET_PRIVKEY_WIF"
+        echo "private key wif: $PRIVKEY_WIF" > "$TMPDIR/testnet_key.txt"
+    else
+        ./such -c generate_private_key $TESTNET_FLAG > "$TMPDIR/testnet_key.txt"
+        PRIVKEY_WIF=$(grep "^private key wif:" "$TMPDIR/testnet_key.txt" | cut -d: -f2 | tr -d ' ')
+    fi
+
     ./such -c generate_public_key -p "$PRIVKEY_WIF" $TESTNET_FLAG > "$TMPDIR/testnet_addr.txt"
     TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
     PUBKEY=$(grep "^public key hex:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
@@ -207,7 +213,7 @@ build_transaction() {
     fi
 
     info "Signing transaction with commitment output..."
-    SIGN_OUTPUT=$(./such -c sign -x "$TX_WITH_COMMIT" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF")
+    SIGN_OUTPUT=$(./such -c sign -x "$TX_WITH_COMMIT" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $TESTNET_FLAG)
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
 
     if [ -z "$SIGNED_TX" ]; then
