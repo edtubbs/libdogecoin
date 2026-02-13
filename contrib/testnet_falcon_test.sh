@@ -194,7 +194,7 @@ build_transaction() {
     read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
 
     ADD_COMMIT_OUTPUT=$(./such -c falcon_add_commit_tx -x "$RAW_UNSIGNED_TX" -s "$FALCON_COMMIT")
-    TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | awk '{print $4}')
+    TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
 
     if [ -z "$TX_WITH_COMMIT" ]; then
         echo "$ADD_COMMIT_OUTPUT"

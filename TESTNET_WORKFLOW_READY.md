@@ -88,6 +88,7 @@ Visit a Dogecoin testnet faucet:
 - https://testnet-faucet.com/dogecoin-testnet/
 - Enter your testnet address from Step 1
 - Request test DOGE
+- If unavailable, search for another active Dogecoin testnet faucet (faucet endpoints change frequently)
 
 ### Step 3: Generate Falcon-512 Keypair
 ```bash

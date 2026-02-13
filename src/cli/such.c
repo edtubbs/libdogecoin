@@ -672,7 +672,7 @@ static void print_usage()
     printf("falcon_verify (requires -k <falcon_public_key_hex> -x <message_hex> -s <signature_hex>),\n");
     printf("falcon_commit (requires -k <falcon_public_key_hex> -s <signature_hex>),\n");
 #endif
-    printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <32-byte_commit_hex>)\n");
+    printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <commitment_hex_64_chars>)\n");
     printf("\nExamples: \n");
     printf("Generate a testnet private ec keypair wif/hex:\n");
     printf("> such -c generate_private_key\n\n");
@@ -1720,9 +1720,12 @@ int main(int argc, char* argv[])
         }
     #endif
     else if (strcmp(cmd, "falcon_add_commit_tx") == 0) {
-        // ./such -c falcon_add_commit_tx -x <raw_tx_hex> -s <32-byte_commit_hex>
+        // ./such -c falcon_add_commit_tx -x <raw_tx_hex> -s <commitment_hex_64_chars>
         if (!txhex || !scripthex) {
             return showError("Missing tx hex or commitment hex (use -x, -s)\n");
+        }
+        if ((strlen(txhex) % 2) != 0) {
+            return showError("Raw transaction hex length must be even\n");
         }
         if (strlen(scripthex) != 64) {
             return showError("Commitment must be exactly 32 bytes (64 hex chars)\n");
@@ -1759,13 +1762,18 @@ int main(int argc, char* argv[])
 
         cstring* tx_with_commit = cstr_new_sz(1024);
         dogecoin_tx_serialize(tx_with_commit, tx);
-        char* tx_with_commit_hex = dogecoin_char_vla(tx_with_commit->len * 2 + 1);
+        char* tx_with_commit_hex = dogecoin_malloc(tx_with_commit->len * 2 + 1);
+        if (!tx_with_commit_hex) {
+            cstr_free(tx_with_commit, true);
+            dogecoin_tx_free(tx);
+            return showError("Failed to allocate memory for tx hex\n");
+        }
         utils_bin_to_hex((unsigned char*)tx_with_commit->str, tx_with_commit->len, tx_with_commit_hex);
 
         printf("tx with commitment: %s\n", tx_with_commit_hex);
 
         cstr_free(tx_with_commit, true);
-        free(tx_with_commit_hex);
+        dogecoin_free(tx_with_commit_hex);
         dogecoin_tx_free(tx);
         }
     else {
