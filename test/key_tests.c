@@ -174,6 +174,46 @@ void test_electrum_v1_mnemonic_to_master_key()
     const char* ref_seed_pass_hex = "d51554cccc286493f510b8c2a4104e4132562518a5db4ec5e8a3325dff8234ee";
     u_assert_str_eq(seed_pass_hex, ref_seed_pass_hex);
     debug_print("Electrum v1 seed with passphrase: %s\n", seed_pass_hex);
+
+    /* Electrum v1 12-word vector from old_mnemonic mn_encode/mn_decode */
+    const char* v1_words = "hardly point goal hallway patience key stone difference ready caught listen fact";
+    /* old_mnemonic decode value for this phrase is:
+     * 8edad31a95e7d59f8837667510d75a4d */
+    memset(buffer_for_seed, 0, MAX_SEED_SIZE);
+    seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_words, empty_pass, buffer_for_seed);
+    u_assert_int_eq(seed_result, 0);
+
+    char* seed_v1_words_hex = utils_uint8_to_hex(buffer_for_seed, 32);
+    const char* ref_seed_v1_words_hex = "cceaa7e480350fab95a77d7aabfddb170442a047ab767c8b6fd6eb584b407acd";
+    u_assert_str_eq(seed_v1_words_hex, ref_seed_v1_words_hex);
+
+    uint8_t priv32[32];
+    dogecoin_mem_zero(priv32, sizeof(priv32));
+    u_assert_int_eq(electrum_v1_derive_privkey32((const uint8_t*)buffer_for_seed, 0, 0, priv32), true);
+
+    dogecoin_key v1key;
+    dogecoin_privkey_init(&v1key);
+    memcpy(v1key.privkey, priv32, sizeof(priv32));
+    u_assert_int_eq(dogecoin_privkey_is_valid(&v1key), true);
+
+    char v1_wif[PRIVKEYWIFLEN];
+    size_t v1_wif_len = sizeof(v1_wif);
+    dogecoin_privkey_encode_wif(&v1key, &dogecoin_chainparams_main, v1_wif, &v1_wif_len);
+    u_assert_str_eq(v1_wif, "QWxLN1YhYKgrgXRR2GeEEnKGL2utSbwRaM9LeEZR6MsWxG8oZs9F");
+
+    dogecoin_pubkey v1pub;
+    dogecoin_pubkey_init(&v1pub);
+    dogecoin_pubkey_from_key(&v1key, &v1pub);
+    u_assert_int_eq(dogecoin_pubkey_is_valid(&v1pub), true);
+
+    char v1_addr[P2PKHLEN];
+    dogecoin_mem_zero(v1_addr, sizeof(v1_addr));
+    u_assert_int_eq(dogecoin_pubkey_getaddr_p2pkh(&v1pub, &dogecoin_chainparams_main, v1_addr), true);
+    u_assert_str_eq(v1_addr, "DBgpmsFuwCs4tpeJw67wiPiL88qkibW1cD");
+
+    dogecoin_pubkey_cleanse(&v1pub);
+    dogecoin_privkey_cleanse(&v1key);
+    dogecoin_mem_zero(priv32, sizeof(priv32));
     
     utils_clear_buffers();
 }
