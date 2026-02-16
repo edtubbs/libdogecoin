@@ -708,6 +708,7 @@ int main(int argc, char* argv[])
     char* txhex = 0;
     char* scripthex = 0;
     uint32_t inputindex = 0;
+    dogecoin_bool inputindex_set = false;
     int sighashtype = 1;
     dogecoin_mem_zero(&pkey, sizeof(pkey));
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
@@ -795,6 +796,7 @@ int main(int argc, char* argv[])
                     break;
                 case 'i':
                     inputindex = (int)strtol(optarg, (char**)NULL, 10);
+                    inputindex_set = true;
                     break;
                 case 'h':
                     sighashtype = (int)strtol(optarg, (char**)NULL, 10);
@@ -1547,7 +1549,7 @@ int main(int argc, char* argv[])
             uint32_t for_change = (uint32_t)strtoul(change_level, (char**)NULL, 10);
 
             /* Electrum v1 has no account tree, ignore -o */
-            if (inputindex == 0) {
+            if (!inputindex_set) {
                 for (int i = 0; i < 20; i++) {
                     uint8_t priv32[32];
                     dogecoin_mem_zero(priv32, sizeof(priv32));
