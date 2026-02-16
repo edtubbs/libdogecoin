@@ -310,27 +310,29 @@ int electrum_v1_derive_privkey32(const uint8_t master_secret32[32],
         return 0;
     }
 
-    char mpk_hex[129];
-    dogecoin_mem_zero(mpk_hex, sizeof(mpk_hex));
-    utils_bin_to_hex(pubser + 1, 64, mpk_hex);
-
+    /* Electrum v1 uses raw binary MPK bytes (64 bytes), not hex string.
+     * tweak = double_SHA256( prefix + mpk_raw_bytes )
+     * where prefix = "%u:%u:" and mpk_raw_bytes = pubser[1..64] */
     char prefix[32];
     dogecoin_mem_zero(prefix, sizeof(prefix));
     int prefix_len = snprintf(prefix, sizeof(prefix), "%u:%u:", n, for_change);
     if (prefix_len <= 0 || prefix_len >= (int)sizeof(prefix)) {
         dogecoin_mem_zero(pubser, sizeof(pubser));
-        dogecoin_mem_zero(mpk_hex, sizeof(mpk_hex));
         return 0;
     }
 
-    char msg[32 + 128];
+    unsigned char msg[32 + 64];
     dogecoin_mem_zero(msg, sizeof(msg));
     memcpy(msg, prefix, (size_t)prefix_len);
-    memcpy(msg + prefix_len, mpk_hex, 128);
+    memcpy(msg + prefix_len, pubser + 1, 64);
 
+    /* Electrum v1 uses double SHA256 for the sequence/tweak */
+    uint8_t hash1[32];
     uint8_t tweak32[32];
+    dogecoin_mem_zero(hash1, sizeof(hash1));
     dogecoin_mem_zero(tweak32, sizeof(tweak32));
-    sha256_raw((const unsigned char*)msg, (size_t)prefix_len + 128, tweak32);
+    sha256_raw(msg, (size_t)prefix_len + 64, hash1);
+    sha256_raw(hash1, sizeof(hash1), tweak32);
 
     /* out_priv = master_secret + tweak (mod n) */
     memcpy(out_priv32, master_secret32, 32);
@@ -338,9 +340,9 @@ int electrum_v1_derive_privkey32(const uint8_t master_secret32[32],
     if (!dogecoin_ecc_verify_privatekey(out_priv32)) {
         dogecoin_mem_zero(out_priv32, 32);
         dogecoin_mem_zero(pubser, sizeof(pubser));
-        dogecoin_mem_zero(mpk_hex, sizeof(mpk_hex));
         dogecoin_mem_zero(prefix, sizeof(prefix));
         dogecoin_mem_zero(msg, sizeof(msg));
+        dogecoin_mem_zero(hash1, sizeof(hash1));
         dogecoin_mem_zero(tweak32, sizeof(tweak32));
         return 0;
     }
@@ -348,9 +350,9 @@ int electrum_v1_derive_privkey32(const uint8_t master_secret32[32],
     if (!dogecoin_ecc_private_key_tweak_add(out_priv32, tweak32)) {
         dogecoin_mem_zero(out_priv32, 32);
         dogecoin_mem_zero(pubser, sizeof(pubser));
-        dogecoin_mem_zero(mpk_hex, sizeof(mpk_hex));
         dogecoin_mem_zero(prefix, sizeof(prefix));
         dogecoin_mem_zero(msg, sizeof(msg));
+        dogecoin_mem_zero(hash1, sizeof(hash1));
         dogecoin_mem_zero(tweak32, sizeof(tweak32));
         return 0;
     }
@@ -358,17 +360,17 @@ int electrum_v1_derive_privkey32(const uint8_t master_secret32[32],
     if (!dogecoin_ecc_verify_privatekey(out_priv32)) {
         dogecoin_mem_zero(out_priv32, 32);
         dogecoin_mem_zero(pubser, sizeof(pubser));
-        dogecoin_mem_zero(mpk_hex, sizeof(mpk_hex));
         dogecoin_mem_zero(prefix, sizeof(prefix));
         dogecoin_mem_zero(msg, sizeof(msg));
+        dogecoin_mem_zero(hash1, sizeof(hash1));
         dogecoin_mem_zero(tweak32, sizeof(tweak32));
         return 0;
     }
 
     dogecoin_mem_zero(pubser, sizeof(pubser));
-    dogecoin_mem_zero(mpk_hex, sizeof(mpk_hex));
     dogecoin_mem_zero(prefix, sizeof(prefix));
     dogecoin_mem_zero(msg, sizeof(msg));
+    dogecoin_mem_zero(hash1, sizeof(hash1));
     dogecoin_mem_zero(tweak32, sizeof(tweak32));
     return 1;
 }

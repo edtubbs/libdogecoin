@@ -1546,14 +1546,42 @@ void test_bip39()
     u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_twelve_word_mnemonic, v1_pass2, seed), 0);
 
     /* Expected: Electrum v1 stretched seed (32 bytes + 32 zero bytes)
-     * Value verified by proper base-1626 decoding followed by SHA-256 stretching */
+     * Electrum v1 stretches the hex string bytes directly (no pre-hash):
+     *   oldseed = hex_seed; seed = oldseed; repeat 100000: seed = SHA256(seed + oldseed)
+     * Verification command:
+     *   python3 -c "s=b'00285dfe00285e0100285e0400285e07'; x=s; exec('import hashlib\\nx=hashlib.sha256(x+s).digest();'*100000); print(x.hex())"
+     */
     const char* expect_v1_12_hex =
-        "d11e7e95635e37239d6552824587675e7b0581414191dcc94bcc04c5b0e206ec"
+        "2fcbb0d72534b910ccdc08e5440b84993311ffbd5b1658222c68b867f0d94645"
         "0000000000000000000000000000000000000000000000000000000000000000";
 
     char* got_v1_12_hex = utils_uint8_to_hex(seed, 64);
     u_assert_str_eq(got_v1_12_hex, expect_v1_12_hex);
     debug_print("%s\n", got_v1_12_hex);
+    utils_clear_buffers();
+
+    /* 
+     * Electrum v1 test vector from Electrum's own test suite:
+     *   seed = '8edad31a95e7d59f8837667510d75a4d'
+     *   mn_encode(seed) == 'hardly point goal hallway patience key stone difference ready caught listen fact'
+     *   mn_decode(words) == seed
+     * 
+     * Verification command:
+     *   python3 -c "s=b'8edad31a95e7d59f8837667510d75a4d'; x=s; exec('import hashlib\\nx=hashlib.sha256(x+s).digest();'*100000); print(x.hex())"
+     */
+    const char* v1_hardly_mnemonic = "hardly point goal hallway patience key stone difference ready caught listen fact";
+    const char* v1_pass_hardly = "";
+    
+    memset(seed, 0, sizeof(seed));
+    u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_hardly_mnemonic, v1_pass_hardly, seed), 0);
+
+    const char* expect_v1_hardly_hex =
+        "64ea202eb1941a971e8a9af7b4caae1cbde9890103092ac57ce68ec5d9314213"
+        "0000000000000000000000000000000000000000000000000000000000000000";
+
+    char* got_v1_hardly_hex = utils_uint8_to_hex(seed, 64);
+    u_assert_str_eq(got_v1_hardly_hex, expect_v1_hardly_hex);
+    debug_print("%s\n", got_v1_hardly_hex);
     utils_clear_buffers();
 
     /* 

@@ -176,4 +176,48 @@ void test_electrum_v1_mnemonic_to_master_key()
     debug_print("Electrum v1 seed with passphrase: %s\n", seed_pass_hex);
     
     utils_clear_buffers();
+
+    /*
+     * Electrum v1 proper 12-word mnemonic test with key derivation
+     *
+     * Test vector from Electrum's test suite:
+     *   seed_hex = '8edad31a95e7d59f8837667510d75a4d'
+     *   mnemonic = 'hardly point goal hallway patience key stone difference ready caught listen fact'
+     *   mn_encode(seed_hex) == mnemonic.split()
+     *   mn_decode(mnemonic.split()) == seed_hex
+     *
+     * Stretched seed verified with Python:
+     *   python3 -c "s=b'8edad31a95e7d59f8837667510d75a4d'; x=s; exec('import hashlib\\nx=hashlib.sha256(x+s).digest();'*100000); print(x.hex())"
+     *   => 64ea202eb1941a971e8a9af7b4caae1cbde9890103092ac57ce68ec5d9314213
+     *
+     * Key derivation (n=0, for_change=0) verified with Python ecdsa:
+     *   tweak = double_SHA256("0:0:" + mpk_raw_64_bytes)
+     *   derived = (master_secret + tweak) mod curve_order
+     *   => 490aa18749841c21f4ece6da50898645578736ce0e38cd67568c14e3c47c9d95
+     */
+    const char* v1_12_mn = "hardly point goal hallway patience key stone difference ready caught listen fact";
+    const char* v1_12_pass = "";
+
+    memset(buffer_for_seed, 0, MAX_SEED_SIZE);
+    memset(&root_node, 0, sizeof(root_node));
+
+    seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_12_mn, v1_12_pass, buffer_for_seed);
+    u_assert_int_eq(seed_result, 0);
+
+    char* seed_12_hex = utils_uint8_to_hex(buffer_for_seed, 32);
+    const char* ref_seed_12_hex = "64ea202eb1941a971e8a9af7b4caae1cbde9890103092ac57ce68ec5d9314213";
+    u_assert_str_eq(seed_12_hex, ref_seed_12_hex);
+    debug_print("Electrum v1 12-word seed: %s\n", seed_12_hex);
+
+    /* Verify Electrum v1 key derivation (n=0, for_change=0) */
+    uint8_t priv32[32];
+    dogecoin_mem_zero(priv32, sizeof(priv32));
+    u_assert_int_eq(electrum_v1_derive_privkey32((const uint8_t*)buffer_for_seed, 0, 0, priv32), 1);
+
+    char* derived_hex = utils_uint8_to_hex(priv32, 32);
+    const char* ref_derived_hex = "490aa18749841c21f4ece6da50898645578736ce0e38cd67568c14e3c47c9d95";
+    u_assert_str_eq(derived_hex, ref_derived_hex);
+    debug_print("Electrum v1 derived key (0:0:): %s\n", derived_hex);
+
+    utils_clear_buffers();
 }

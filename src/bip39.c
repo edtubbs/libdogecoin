@@ -403,25 +403,14 @@ int dogecoin_seed_from_electrum_v1_mnemonic(const char* mnemonic, const char* pa
     }
     seed_hex[32] = '\0';
 
-    /* Step 3: Apply passphrase if provided */
-    unsigned char hash_input[512];
-    size_t hash_input_len;
-
-    if (strlen(passphrase) > 0) {
-        hash_input_len = snprintf((char*)hash_input, sizeof(hash_input), "%s %s", seed_hex, passphrase);
-    } else {
-        memcpy(hash_input, seed_hex, 32);
-        hash_input_len = 32;
-    }
-
-    /* Step 4: Hash and stretch */
-    unsigned char seed32[SHA256_DIGEST_LENGTH];
-    dogecoin_mem_zero(seed32, sizeof(seed32));
-    sha256_raw(hash_input, hash_input_len, seed32);
-
+    /* Step 3: Stretch the hex seed directly (no pre-hash).
+     * Electrum v1 passes the hex string bytes to stretch_key() directly:
+     *   oldseed = hex_seed; seed = oldseed
+     *   repeat 100000: seed = SHA256(seed + oldseed)
+     * The passphrase is NOT used in v1 seed derivation. */
     unsigned char stretched32[SHA256_DIGEST_LENGTH];
     dogecoin_mem_zero(stretched32, sizeof(stretched32));
-    electrum_v1_stretch(stretched32, seed32);
+    electrum_v1_stretch(stretched32, (const unsigned char*)seed_hex);
 
     /* Place stretched seed in output */
     memcpy_safe(seed, stretched32, SHA256_DIGEST_LENGTH);
@@ -429,8 +418,6 @@ int dogecoin_seed_from_electrum_v1_mnemonic(const char* mnemonic, const char* pa
     /* Clean up */
     dogecoin_mem_zero(seed16, sizeof(seed16));
     dogecoin_mem_zero(seed_hex, sizeof(seed_hex));
-    dogecoin_mem_zero(hash_input, sizeof(hash_input));
-    dogecoin_mem_zero(seed32, sizeof(seed32));
     dogecoin_mem_zero(stretched32, sizeof(stretched32));
 
     return 0;
