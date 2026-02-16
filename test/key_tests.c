@@ -36,6 +36,17 @@
 #include <dogecoin/address.h>
 #include <dogecoin/chainparams.h>
 
+extern const char * const wordlist_electrum[];
+
+static int electrum_v1_test_word_index(const char* word)
+{
+    int i;
+    for (i = 0; i < 1626; i++) {
+        if (strcmp(wordlist_electrum[i], word) == 0) return i;
+    }
+    return -1;
+}
+
 void test_key()
 {
     dogecoin_key key;
@@ -177,6 +188,38 @@ void test_electrum_v1_mnemonic_to_master_key()
 
     /* Electrum v1 12-word vector from old_mnemonic mn_encode/mn_decode */
     const char* v1_words = "hardly point goal hallway patience key stone difference ready caught listen fact";
+    char v1_words_buf[256];
+    strncpy(v1_words_buf, v1_words, sizeof(v1_words_buf) - 1);
+    v1_words_buf[sizeof(v1_words_buf) - 1] = '\0';
+
+    unsigned char decoded_seed16[16];
+    dogecoin_mem_zero(decoded_seed16, sizeof(decoded_seed16));
+    {
+        const uint32_t N = 1626;
+        int idx[12];
+        int wc = 0;
+        char* tok = strtok(v1_words_buf, " ");
+        while (tok && wc < 12) {
+            idx[wc++] = electrum_v1_test_word_index(tok);
+            tok = strtok(NULL, " ");
+        }
+        u_assert_int_eq(wc, 12);
+        for (int g = 0; g < 4; g++) {
+            uint32_t w1 = (uint32_t)idx[g * 3 + 0];
+            uint32_t w2 = (uint32_t)idx[g * 3 + 1];
+            uint32_t w3 = (uint32_t)idx[g * 3 + 2];
+            uint32_t d12 = (w2 + N - w1) % N;
+            uint32_t d23 = (w3 + N - w2) % N;
+            uint32_t x = w1 + N * d12 + N * N * d23;
+            decoded_seed16[g * 4 + 0] = (unsigned char)(x >> 24);
+            decoded_seed16[g * 4 + 1] = (unsigned char)(x >> 16);
+            decoded_seed16[g * 4 + 2] = (unsigned char)(x >> 8);
+            decoded_seed16[g * 4 + 3] = (unsigned char)(x);
+        }
+    }
+    char* decoded_seed16_hex = utils_uint8_to_hex(decoded_seed16, 16);
+    u_assert_str_eq(decoded_seed16_hex, "8edad31a95e7d59f8837667510d75a4d");
+
     memset(buffer_for_seed, 0, MAX_SEED_SIZE);
     seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_words, empty_pass, buffer_for_seed);
     u_assert_int_eq(seed_result, 0);
