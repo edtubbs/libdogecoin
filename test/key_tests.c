@@ -40,8 +40,7 @@ extern const char * const wordlist_electrum[];
 
 static int electrum_v1_test_word_index(const char* word)
 {
-    int i;
-    for (i = 0; i < 1626; i++) {
+    for (int i = 0; i < 1626; i++) {
         if (strcmp(wordlist_electrum[i], word) == 0) return i;
     }
     return -1;
