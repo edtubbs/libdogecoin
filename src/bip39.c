@@ -235,23 +235,18 @@ static int electrum_v1_decode_mnemonic(const char* mnemonic,
     dogecoin_mem_zero(buf, sizeof(buf));
     if (electrum_prepare_seed_ascii(mnemonic, buf, sizeof(buf)) == 0) return -1;
 
-    /* parse 12 words (manual tokenizer — strtok unavailable in OP-TEE) */
+    /* parse 12 words */
     uint16_t idx[ELECTRUM_V1_WORDS];
     int wc = 0;
+    char* saveptr = NULL;
 
-    char* p = buf;
-    while (*p) {
-        /* skip spaces */
-        while (*p == ' ') p++;
-        if (*p == '\0') break;
-        /* mark start of word */
-        char* word = p;
-        while (*p && *p != ' ') p++;
-        if (*p) *p++ = '\0';
+    char* tok = strtok_r(buf, " ", &saveptr);
+    while (tok) {
         if (wc >= ELECTRUM_V1_WORDS) return -1;
-        int w = electrum_v1_find_word(word);
+        int w = electrum_v1_find_word(tok);
         if (w < 0) return -1;
         idx[wc++] = (uint16_t)w;
+        tok = strtok_r(NULL, " ", &saveptr);
     }
     if (wc != ELECTRUM_V1_WORDS) return -1;
 
