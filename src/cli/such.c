@@ -47,6 +47,7 @@
 #include <dogecoin/uthash.h>
 
 #include <dogecoin/address.h>
+#include <dogecoin/base58.h>
 #include <dogecoin/bip32.h>
 #include <dogecoin/bip39.h>
 #include <dogecoin/bip44.h>
@@ -54,6 +55,7 @@
 #include <dogecoin/chainparams.h>
 #include <dogecoin/ecc.h>
 #include <dogecoin/eckey.h>
+#include <dogecoin/key.h>
 #include <dogecoin/hash.h>
 #include <dogecoin/koinu.h>
 #include <dogecoin/seal.h>
@@ -1403,7 +1405,7 @@ int main(int argc, char* argv[])
         const char* mnemonic_src = encrypted ? mnemonic : mnemonic_in;
 
         if (electrum_v1) {
-            /* Electrum v1 seed stretch is handled in bip39.c and stored in seed[0..31] */
+            /* Electrum v1: decode mnemonic to raw 16-byte seed */
             if (dogecoin_seed_from_electrum_v1_mnemonic(mnemonic_src, pass, seed) == -1) {
                 printf("mnemonic_to_key (-n <seed_phrase> or requires -y <file_num>, -j (use_tpm) optional),\n");
                 if (pass) {
@@ -1429,27 +1431,24 @@ int main(int argc, char* argv[])
                 return showError("electrum v1 derivation failed\n");
                 }
 
-            dogecoin_key k;
-            dogecoin_privkey_init(&k);
-            memcpy(k.privkey, priv32, 32);
-
-            if (!dogecoin_privkey_is_valid(&k)) {
+            if (!dogecoin_ecc_verify_privatekey(priv32)) {
                 dogecoin_mem_zero(seed, sizeof(seed));
                 dogecoin_mem_zero(priv32, sizeof(priv32));
-                dogecoin_mem_zero(&k, sizeof(k));
                 return showError("electrum v1 derived invalid privkey\n");
                 }
 
             printf("keypath: electrum_v1:%u/%u\n", for_change, inputindex);
 
-            dogecoin_privkey_encode_wif(&k, chain, wifstr, &wiflen);
+            /* Electrum v1 uses uncompressed WIF (no 0x01 suffix) per bip-utils reference */
+            uint8_t wif_payload[33];
+            wif_payload[0] = chain->b58prefix_secret_address;
+            memcpy(&wif_payload[1], priv32, 32);
+            dogecoin_base58_encode_check(wif_payload, 33, wifstr, wiflen);
+            dogecoin_mem_zero(wif_payload, sizeof(wif_payload));
             printf("private key (wif): %s\n", wifstr);
-
-
 
             dogecoin_mem_zero(seed, sizeof(seed));
             dogecoin_mem_zero(priv32, sizeof(priv32));
-            dogecoin_mem_zero(&k, sizeof(k));
             }
         else {
             /* generate seed from mnemonic */
@@ -1529,7 +1528,7 @@ int main(int argc, char* argv[])
         const char* mnemonic_src = encrypted ? mnemonic : mnemonic_in;
 
         if (electrum_v1) {
-            /* derive v1 stretched seed once */
+            /* derive v1 seed once */
             if (dogecoin_seed_from_electrum_v1_mnemonic(mnemonic_src, pass, seed) == -1) {
                 if (pass) {
                     dogecoin_mem_zero(pass, strlen(pass));
@@ -1558,41 +1557,25 @@ int main(int argc, char* argv[])
                         return showError("Electrum v1 derivation failed\n");
                         }
 
-                    dogecoin_key k;
-                    dogecoin_privkey_init(&k);
-                    memcpy(k.privkey, priv32, 32);
+                    /* Electrum v1 uses uncompressed pubkeys for addresses per bip-utils reference */
+                    uint8_t pubser[65];
+                    size_t publen = sizeof(pubser);
+                    dogecoin_ecc_get_pubkey(priv32, pubser, &publen, false);
 
-                    char wif[PRIVKEYWIFLEN];
-                    size_t wif_sz = sizeof(wif);
-                    dogecoin_mem_zero(wif, sizeof(wif));
-                    dogecoin_privkey_encode_wif(&k, chain, wif, &wif_sz);
-
-                    char pubkey_hex[PUBKEYHEXLEN];
-                    size_t pub_sz = sizeof(pubkey_hex);
-                    dogecoin_mem_zero(pubkey_hex, sizeof(pubkey_hex));
-                    if (!pubkey_from_privatekey(chain, wif, pubkey_hex, &pub_sz)) {
-                        dogecoin_mem_zero(seed, sizeof(seed));
-                        dogecoin_mem_zero(priv32, sizeof(priv32));
-                        dogecoin_mem_zero(&k, sizeof(k));
-                        return showError("Electrum v1 pubkey derivation failed\n");
-                        }
+                    dogecoin_pubkey pubkey;
+                    dogecoin_pubkey_init(&pubkey);
+                    memcpy(pubkey.pubkey, pubser, 65);
+                    pubkey.compressed = false;
 
                     char addr[P2PKHLEN];
                     dogecoin_mem_zero(addr, sizeof(addr));
-                    if (!addresses_from_pubkey(chain, pubkey_hex, addr)) {
-                        dogecoin_mem_zero(seed, sizeof(seed));
-                        dogecoin_mem_zero(priv32, sizeof(priv32));
-                        dogecoin_mem_zero(&k, sizeof(k));
-                        dogecoin_mem_zero(pubkey_hex, sizeof(pubkey_hex));
-                        return showError("Electrum v1 address derivation failed\n");
-                        }
+                    dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, addr);
 
                     printf("Address %d: %s\n", i, addr);
 
                     dogecoin_mem_zero(priv32, sizeof(priv32));
-                    dogecoin_mem_zero(&k, sizeof(k));
-                    dogecoin_mem_zero(wif, sizeof(wif));
-                    dogecoin_mem_zero(pubkey_hex, sizeof(pubkey_hex));
+                    dogecoin_mem_zero(pubser, sizeof(pubser));
+                    dogecoin_mem_zero(&pubkey, sizeof(pubkey));
                     dogecoin_mem_zero(addr, sizeof(addr));
                     }
                 }
@@ -1606,41 +1589,25 @@ int main(int argc, char* argv[])
                     return showError("Electrum v1 derivation failed\n");
                     }
 
-                dogecoin_key k;
-                dogecoin_privkey_init(&k);
-                memcpy(k.privkey, priv32, 32);
+                /* Electrum v1 uses uncompressed pubkeys for addresses per bip-utils reference */
+                uint8_t pubser[65];
+                size_t publen = sizeof(pubser);
+                dogecoin_ecc_get_pubkey(priv32, pubser, &publen, false);
 
-                char wif[PRIVKEYWIFLEN];
-                size_t wif_sz = sizeof(wif);
-                dogecoin_mem_zero(wif, sizeof(wif));
-                dogecoin_privkey_encode_wif(&k, chain, wif, &wif_sz);
-
-                char pubkey_hex[PUBKEYHEXLEN];
-                size_t pub_sz = sizeof(pubkey_hex);
-                dogecoin_mem_zero(pubkey_hex, sizeof(pubkey_hex));
-                if (!pubkey_from_privatekey(chain, wif, pubkey_hex, &pub_sz)) {
-                    dogecoin_mem_zero(seed, sizeof(seed));
-                    dogecoin_mem_zero(priv32, sizeof(priv32));
-                    dogecoin_mem_zero(&k, sizeof(k));
-                    return showError("Electrum v1 pubkey derivation failed\n");
-                    }
+                dogecoin_pubkey pubkey;
+                dogecoin_pubkey_init(&pubkey);
+                memcpy(pubkey.pubkey, pubser, 65);
+                pubkey.compressed = false;
 
                 char addr[P2PKHLEN];
                 dogecoin_mem_zero(addr, sizeof(addr));
-                if (!addresses_from_pubkey(chain, pubkey_hex, addr)) {
-                    dogecoin_mem_zero(seed, sizeof(seed));
-                    dogecoin_mem_zero(priv32, sizeof(priv32));
-                    dogecoin_mem_zero(&k, sizeof(k));
-                    dogecoin_mem_zero(pubkey_hex, sizeof(pubkey_hex));
-                    return showError("Electrum v1 address derivation failed\n");
-                    }
+                dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, addr);
 
                 printf("Address %d: %s\n", inputindex, addr);
 
                 dogecoin_mem_zero(priv32, sizeof(priv32));
-                dogecoin_mem_zero(&k, sizeof(k));
-                dogecoin_mem_zero(wif, sizeof(wif));
-                dogecoin_mem_zero(pubkey_hex, sizeof(pubkey_hex));
+                dogecoin_mem_zero(pubser, sizeof(pubser));
+                dogecoin_mem_zero(&pubkey, sizeof(pubkey));
                 dogecoin_mem_zero(addr, sizeof(addr));
                 }
 

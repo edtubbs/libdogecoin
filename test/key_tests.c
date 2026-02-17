@@ -30,6 +30,7 @@
 #include <test/utest.h>
 
 #include <dogecoin/key.h>
+#include <dogecoin/ecc.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/bip39.h>
 #include <dogecoin/bip32.h>
@@ -168,6 +169,65 @@ void test_electrum_v1_mnemonic_to_master_key()
     const char* ref_derived_hex = "490aa18749841c21f4ece6da50898645578736ce0e38cd67568c14e3c47c9d95";
     u_assert_str_eq(derived_hex, ref_derived_hex);
     debug_print("Electrum v1 derived key (0:0:): %s\n", derived_hex);
+
+    /*
+     * Verify uncompressed address matches bip-utils reference.
+     * Reference: pip install bip-utils; ElectrumV1.FromSeed(...).GetAddress(0, 0)
+     * Electrum v1 uses uncompressed P2PKH addresses per bip-utils reference:
+     *   https://bip-utils.readthedocs.io/en/latest/bip_utils/electrum/electrum_v1.html
+     *
+     * Verification:
+     *   from bip_utils import *
+     *   seed = ElectrumV1SeedGenerator("hardly point goal hallway patience key stone difference ready caught listen fact").Generate()
+     *   e = ElectrumV1.FromSeed(seed)
+     *   P2PKHAddr.EncodeKey(e.GetPublicKey(0, 0),
+     *       net_ver=CoinsConf.DogecoinMainNet.ParamByKey("p2pkh_net_ver"),
+     *       pub_key_mode=P2PKHPubKeyModes.UNCOMPRESSED)
+     *   => 'D5H1b4AHaZEVJeWTKn2M6SVyxc4DzQeefQ'
+     */
+    {
+        uint8_t pubser[65];
+        size_t publen = sizeof(pubser);
+        dogecoin_ecc_get_pubkey(priv32, pubser, &publen, false);
+        u_assert_int_eq(publen, 65);
+        u_assert_int_eq(pubser[0], 0x04);
+
+        dogecoin_pubkey pubkey;
+        dogecoin_pubkey_init(&pubkey);
+        memcpy(pubkey.pubkey, pubser, 65);
+        pubkey.compressed = false;
+
+        char addr[P2PKHLEN];
+        dogecoin_mem_zero(addr, sizeof(addr));
+        dogecoin_pubkey_getaddr_p2pkh(&pubkey, &dogecoin_chainparams_main, addr);
+        u_assert_str_eq(addr, "D5H1b4AHaZEVJeWTKn2M6SVyxc4DzQeefQ");
+        debug_print("Electrum v1 address (0:0:): %s\n", addr);
+    }
+
+    /* Verify additional child key at (n=1, for_change=0) matches bip-utils */
+    {
+        uint8_t priv32_1[32];
+        dogecoin_mem_zero(priv32_1, sizeof(priv32_1));
+        u_assert_int_eq(electrum_v1_derive_privkey32((const uint8_t*)buffer_for_seed, 1, 0, priv32_1), 1);
+
+        char* derived_hex_1 = utils_uint8_to_hex(priv32_1, 32);
+        u_assert_str_eq(derived_hex_1, "95de25eca551ebdb2b542371a375e9a9e6b7dcfdf8c978f22a29d70c3ff0c961");
+
+        uint8_t pubser[65];
+        size_t publen = sizeof(pubser);
+        dogecoin_ecc_get_pubkey(priv32_1, pubser, &publen, false);
+
+        dogecoin_pubkey pubkey;
+        dogecoin_pubkey_init(&pubkey);
+        memcpy(pubkey.pubkey, pubser, 65);
+        pubkey.compressed = false;
+
+        char addr[P2PKHLEN];
+        dogecoin_mem_zero(addr, sizeof(addr));
+        dogecoin_pubkey_getaddr_p2pkh(&pubkey, &dogecoin_chainparams_main, addr);
+        u_assert_str_eq(addr, "DFMtzW5hhucXAnZW4emfEAHwZrRUi3EQZG");
+        debug_print("Electrum v1 address (0:1:): %s\n", addr);
+    }
 
     utils_clear_buffers();
 }
