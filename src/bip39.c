@@ -64,10 +64,14 @@
 
 #define ELECTRUM_V1_WORDLIST_SIZE 1626
 #define ELECTRUM_V1_SEED_BYTES 16
+/* Electrum v1 requires exactly 12 words (4 groups of 3) encoding 16 bytes.
+ * Verified: bip-utils ElectrumV1MnemonicConst.MNEMONIC_WORD_NUM == [12] */
 #define ELECTRUM_V1_WORDS 12
 
-/* prepare Electrum seed for english/ascii cases:
- * lower-case and collapse whitespace. (kept intentionally minimal) */
+/* prepare Electrum v1 seed: lowercase + collapse whitespace.
+ * The v1 wordlist is English-only (pure ASCII), so this is equivalent to
+ * the NFKD normalization used by bip-utils Bip39Mnemonic._Normalize().
+ * NFKD only differs from ASCII lowering for non-ASCII characters. */
 static size_t electrum_prepare_seed_ascii(const char* in, char* out, size_t outlen)
 {
     if (!in || !out || outlen == 0) return 0;
@@ -224,7 +228,9 @@ static int electrum_v1_find_word(const char* word)
     return -1;
 }
 
-/* Decode 12-word Electrum v1 mnemonic to 16-byte seed (old_mnemonic.mn_decode). */
+/* Decode 12-word Electrum v1 mnemonic to 16-byte seed (old_mnemonic.mn_decode).
+ * Electrum v1 requires exactly 12 words — each group of 3 words encodes 32 bits
+ * via base-1626 arithmetic, yielding 4 × 4 = 16 bytes of entropy. */
 static int electrum_v1_decode_mnemonic(const char* mnemonic,
                                        unsigned char seed16_out[ELECTRUM_V1_SEED_BYTES])
 {
