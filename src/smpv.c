@@ -52,6 +52,7 @@ dogecoin_smpv_client* dogecoin_smpv_client_new(const dogecoin_chainparams* chain
     client->confirmed_count = 0;
     client->unconfirmed_count = 0;
     client->last_seen_ts = 0;
+    client->tx_lookup = NULL;
 
     return client;
 }
@@ -87,6 +88,15 @@ void dogecoin_smpv_client_free(dogecoin_smpv_client* client) {
     }
     if (client->mempool_txs) {
         dogecoin_free(client->mempool_txs);
+    }
+
+    /* Free txid lookup table */
+    {
+        smpv_tx_lookup *entry, *tmp;
+        HASH_ITER(hh, client->tx_lookup, entry, tmp) {
+            HASH_DEL(client->tx_lookup, entry);
+            dogecoin_free(entry);
+        }
     }
 
     dogecoin_free(client);
@@ -308,6 +318,18 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_process_tx(
 
     client->mempool_txs[client->mempool_tx_count] = *smpv_tx; /* struct copy */
     dogecoin_free(smpv_tx);
+
+    /* insert into txid hash index */
+    {
+        smpv_tx_lookup* lk = (smpv_tx_lookup*)dogecoin_calloc(1, sizeof(smpv_tx_lookup));
+        if (lk) {
+            strncpy(lk->txid, client->mempool_txs[client->mempool_tx_count].txid, 64);
+            lk->txid[64] = '\0';
+            lk->index = client->mempool_tx_count;
+            HASH_ADD_STR(client->tx_lookup, txid, lk);
+        }
+    }
+
     client->mempool_tx_count++;
 
     /* light rolling counters (internal only) */
@@ -342,10 +364,10 @@ dogecoin_smpv_tx* dogecoin_smpv_get_tx(
 ) {
     if (!client || !txid) return NULL;
 
-    for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
-        if (strcmp(client->mempool_txs[i].txid, txid) == 0) {
-            return &client->mempool_txs[i];
-        }
+    smpv_tx_lookup* lk = NULL;
+    HASH_FIND_STR(client->tx_lookup, txid, lk);
+    if (lk && lk->index < client->mempool_tx_count) {
+        return &client->mempool_txs[lk->index];
     }
 
     return NULL;
@@ -441,14 +463,8 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
         return;
     }
 
-    /* find tx */
-    dogecoin_smpv_tx* tx = NULL;
-    for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
-        if (client->mempool_txs[i].txid && strcmp(client->mempool_txs[i].txid, txid) == 0) {
-            tx = &client->mempool_txs[i];
-            break;
-        }
-    }
+    /* find tx via hash lookup */
+    dogecoin_smpv_tx* tx = dogecoin_smpv_get_tx(client, txid);
 
     /* Only track confirmations for transactions we've seen in mempool */
     if (!tx) {

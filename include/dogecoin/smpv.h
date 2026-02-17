@@ -28,6 +28,7 @@
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/chainparams.h>
 #include <dogecoin/tx.h>
+#include <dogecoin/uthash.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
@@ -69,6 +70,13 @@ typedef struct {
     dogecoin_bool is_active;       /* Whether watcher is active */
 } dogecoin_smpv_watcher;
 
+/* Hash table entry for O(1) txid lookup (backed by uthash) */
+typedef struct smpv_tx_lookup_ {
+    char txid[65];              /* key: hex txid (64 chars + NUL) */
+    uint32_t index;             /* index into mempool_txs array */
+    UT_hash_handle hh;
+} smpv_tx_lookup;
+
 /* SMPV client structure */
 typedef struct {
     const dogecoin_chainparams* chain_params;
@@ -78,6 +86,9 @@ typedef struct {
     uint32_t mempool_tx_count;
     dogecoin_bool is_running;
     uint64_t last_update_time;
+
+    /* O(1) txid lookup index */
+    smpv_tx_lookup* tx_lookup;
 
     /* lightweight running totals (not exposed via new APIs) */
     uint64_t total_bytes;
