@@ -125,30 +125,40 @@ static void electrum_hmac_sha512_hex(const unsigned char* key, size_t keylen,
     dogecoin_mem_zero(mac, sizeof(mac));
 }
 
-/* Returns non-zero if mnemonic looks like an Electrum v2+ seed, and optionally its version. */
+/* Check if mnemonic is an Electrum v2+ seed and optionally return its version. */
+/* mnemonic code words */
+/* pointer to receive version number (optional, may be NULL) */
+/* returns 0 (success), -1 (fail) */
 int dogecoin_mnemonic_is_electrum_seed(const char* mnemonic, uint32_t* out_version)
 {
-    if (!mnemonic) return 0;
+    if (!mnemonic) return -1;
 
-    char seed_prepared[MAX_MNEMONIC_STRING_SIZE];
-    dogecoin_mem_zero(seed_prepared, sizeof(seed_prepared));
-    size_t seed_len = electrum_prepare_seed_ascii(mnemonic, seed_prepared, sizeof(seed_prepared));
-    if (seed_len == 0) return 0;
+    /* NFKD normalize (same utf8proc_NFKD used elsewhere in bip39) */
+    uint8_t *norm = (uint8_t *)utf8proc_NFKD((const utf8proc_uint8_t *)mnemonic);
+    if (!norm) return -1;
+
+    /* lowercase in-place (Electrum normalizes to lowercase before HMAC) */
+    for (size_t i = 0; norm[i]; i++) {
+        if (norm[i] >= 'A' && norm[i] <= 'Z') norm[i] = norm[i] - 'A' + 'a';
+    }
+
+    size_t seed_len = strlen((const char *)norm);
 
     char mac_hex[129];
     electrum_hmac_sha512_hex((const unsigned char*)"Seed version", strlen("Seed version"),
-                             (const unsigned char*)seed_prepared, seed_len,
+                             norm, seed_len,
                              mac_hex);
+    dogecoin_free(norm);
 
     /* prefix length = int(mac_hex[0],16) + 2 */
     int nibble = 0;
     if (mac_hex[0] >= '0' && mac_hex[0] <= '9') nibble = mac_hex[0] - '0';
     else if (mac_hex[0] >= 'a' && mac_hex[0] <= 'f') nibble = mac_hex[0] - 'a' + 10;
     else if (mac_hex[0] >= 'A' && mac_hex[0] <= 'F') nibble = mac_hex[0] - 'A' + 10;
-    else return 0;
+    else return -1;
 
     int prefix_len = nibble + 2;
-    if (prefix_len < 2 || prefix_len > 8) return 0; /* sanity */
+    if (prefix_len < 2 || prefix_len > 8) return -1; /* sanity */
 
     char prefix[9];
     dogecoin_mem_zero(prefix, sizeof(prefix));
@@ -160,13 +170,17 @@ int dogecoin_mnemonic_is_electrum_seed(const char* mnemonic, uint32_t* out_versi
     /* known Electrum v2+ versions */
     if (ver == 0x01 || ver == 0x100 || ver == 0x101) {
         if (out_version) *out_version = ver;
-        return 1;
+        return 0;
     }
 
-    return 0;
+    return -1;
 }
 
 /* Derive the 64-byte seed from an Electrum v2+ seed phrase and optional passphrase. */
+/* mnemonic code words */
+/* passphrase (optional) */
+/* 512-bit seed */
+/* returns 0 (success), -1 (fail) */
 int dogecoin_seed_from_electrum_mnemonic(const char* mnemonic, const char* passphrase, SEED seed)
 {
     if (!mnemonic || !seed) {
@@ -178,18 +192,25 @@ int dogecoin_seed_from_electrum_mnemonic(const char* mnemonic, const char* passp
         passphrase = "";
     }
 
-    char seed_prepared[MAX_MNEMONIC_STRING_SIZE];
-    dogecoin_mem_zero(seed_prepared, sizeof(seed_prepared));
-    size_t seed_len = electrum_prepare_seed_ascii(mnemonic, seed_prepared, sizeof(seed_prepared));
-    if (seed_len == 0) {
-        fprintf(stderr, "ERROR: failed to prepare electrum seed\n");
+    /* NFKD normalize (same utf8proc_NFKD used elsewhere in bip39) */
+    uint8_t *norm = (uint8_t *)utf8proc_NFKD((const utf8proc_uint8_t *)mnemonic);
+    if (!norm) {
+        fprintf(stderr, "ERROR: failed to NFKD-normalize electrum mnemonic\n");
         return -1;
     }
+
+    /* lowercase in-place (Electrum normalizes to lowercase before PBKDF2) */
+    for (size_t i = 0; norm[i]; i++) {
+        if (norm[i] >= 'A' && norm[i] <= 'Z') norm[i] = norm[i] - 'A' + 'a';
+    }
+
+    size_t seed_len = strlen((const char *)norm);
 
     size_t salt_len = strlen("electrum") + strlen(passphrase);
     char* salt = malloc(salt_len + 1);
     if (!salt) {
         fprintf(stderr, "ERROR: Failed to allocate memory for electrum salt\n");
+        dogecoin_free(norm);
         return -1;
     }
     salt[0] = '\0';
@@ -198,11 +219,12 @@ int dogecoin_seed_from_electrum_mnemonic(const char* mnemonic, const char* passp
 
     /* PBKDF2-HMAC-SHA512, rounds=2048, dkLen=64 */
     memset(seed, 0, MAX_SEED_SIZE);
-    pbkdf2_hmac_sha512((const unsigned char*)seed_prepared, seed_len,
+    pbkdf2_hmac_sha512(norm, seed_len,
                        (const unsigned char*)salt, strlen(salt),
                        ITERATIONS, seed);
 
-    dogecoin_mem_zero(seed_prepared, sizeof(seed_prepared));
+    dogecoin_mem_zero(norm, seed_len);
+    dogecoin_free(norm);
     dogecoin_mem_zero(salt, salt_len + 1);
     dogecoin_free(salt);
     return 0;
@@ -1320,7 +1342,7 @@ int dogecoin_seed_from_mnemonic (const char* mnemonic, const char* passphrase, S
     }
 
     /* Electrum v2+ (post-v2) auto-detect */
-    if (dogecoin_mnemonic_is_electrum_seed(mnemonic, NULL)) {
+    if (dogecoin_mnemonic_is_electrum_seed(mnemonic, NULL) == 0) {
         if (dogecoin_seed_from_electrum_mnemonic(mnemonic, passphrase, seed) == 0) {
             return 0;
         }

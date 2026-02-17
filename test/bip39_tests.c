@@ -1388,7 +1388,7 @@ void test_bip39()
     const char* epass = "";
 
     uint32_t ver = 0;
-    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn, &ver), 1);
+    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn, &ver), 0);
     u_assert_int_eq((int)ver, 0x01);
 
     memset(seed, 0, sizeof(seed));
@@ -1440,7 +1440,7 @@ void test_bip39()
     
     memset(seed, 0, sizeof(seed));
     ver = 0;
-    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn2, &ver), 1);
+    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn2, &ver), 0);
     u_assert_int_eq((int)ver, 0x100); /* segwit seed type */
     u_assert_int_eq(dogecoin_seed_from_mnemonic(emn2, epass2, seed), 0);
 
@@ -1465,7 +1465,7 @@ void test_bip39()
     
     memset(seed, 0, sizeof(seed));
     ver = 0;
-    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn3, &ver), 1);
+    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn3, &ver), 0);
     u_assert_int_eq((int)ver, 0x100); /* segwit seed type */
     u_assert_int_eq(dogecoin_seed_from_mnemonic(emn3, epass3, seed), 0);
 
@@ -1493,7 +1493,7 @@ void test_bip39()
     
     memset(seed, 0, sizeof(seed));
     ver = 0;
-    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn4, &ver), 1);
+    u_assert_int_eq(dogecoin_mnemonic_is_electrum_seed(emn4, &ver), 0);
     u_assert_int_eq((int)ver, 0x01); /* standard seed type */
     u_assert_int_eq(dogecoin_seed_from_mnemonic(emn4, epass4, seed), 0);
 
