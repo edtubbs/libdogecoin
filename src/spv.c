@@ -71,7 +71,6 @@ static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
-static void spv_check_and_update_smpv_for_tip_change(dogecoin_spv_client* client);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
 void dogecoin_net_spv_node_handshake_done(dogecoin_node *node);
 
@@ -753,9 +752,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             node->state |= NODE_MISSBEHAVED;
             node->nodegroup->node_connection_state_changed_cb(node);
             dogecoin_free(pindex);
-
-            /* Even on error, check if tip changed due to disconnect */
-            spv_check_and_update_smpv_for_tip_change(client);
             return;
         }
 
@@ -827,15 +823,20 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         client->nodegroup->log_write_cb("Connected %d headers\n", connected_headers);
         client->nodegroup->log_write_cb("Chaintip at height %d\n", chaintip->height);
 
-        /* Update bestknownheight if we received fewer than max headers (2000) */
-        /* This means we've caught up to what the node knows about */
-        if (amount_of_headers < 2000 && chaintip->height > node->bestknownheight) {
-            node->bestknownheight = chaintip->height;
-            client->nodegroup->log_write_cb("Updated best known height to %d for node %d\n", node->bestknownheight, node->nodeid);
+        /* Update SMPV confirmations if tip height changed */
+        if (client->smpv_enabled && client->smpv_ctx) {
+            int32_t current_height = (int32_t)chaintip->height;
+            if (client->last_known_tip_height != current_height) {
+                dogecoin_smpv_update_tx_status(
+                    (dogecoin_smpv_client*)client->smpv_ctx,
+                    NULL,
+                    true,
+                    NULL,
+                    (uint32_t)current_height
+                );
+                client->last_known_tip_height = current_height;
+            }
         }
-
-        /* Check if tip changed (forward or reorg) and update SMPV confirmations */
-        spv_check_and_update_smpv_for_tip_change(client);
 
         if (client->header_message_processed && client->header_message_processed(client, node, chaintip) == false)
             return;
@@ -924,38 +925,6 @@ static void smpv_tx_cb(const dogecoin_smpv_tx* tx, const char* addr, void* user)
         tx->multisig_out, tx->opreturn_out, tx->nonstandard_out,
         addr ? " addr=" : "", addr ? addr : ""
     );
-}
-
-/**
- * Monitor chain tip and update SMPV confirmations on height changes (including reorgs)
- */
-static void spv_check_and_update_smpv_for_tip_change(dogecoin_spv_client* client)
-{
-    if (!client || !client->smpv_enabled || !client->smpv_ctx) {
-        return;
-    }
-
-    dogecoin_blockindex* current_tip = client->headers_db->getchaintip(client->headers_db_ctx);
-    if (!current_tip) {
-        return;
-    }
-
-    int32_t current_height = (int32_t)current_tip->height;
-
-    /* Check if tip height changed */
-    if (client->last_known_tip_height != current_height) {
-        /* Update SMPV confirmation counts based on new tip */
-        dogecoin_smpv_update_tx_status(
-            (dogecoin_smpv_client*)client->smpv_ctx,
-            NULL,  /* NULL = update all transactions */
-            true,
-            NULL,
-            (uint32_t)current_height
-        );
-
-        /* Remember this height for next comparison */
-        client->last_known_tip_height = current_height;
-    }
 }
 
 LIBDOGECOIN_API void dogecoin_spv_enable_smpv(dogecoin_spv_client* client, dogecoin_bool enable)
