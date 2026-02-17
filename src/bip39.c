@@ -68,44 +68,6 @@
  * Verified: bip-utils ElectrumV1MnemonicConst.MNEMONIC_WORD_NUM == [12] */
 #define ELECTRUM_V1_WORDS 12
 
-/* prepare Electrum v1 seed: lowercase + collapse whitespace.
- * The v1 wordlist is English-only (pure ASCII), so this is equivalent to
- * the NFKD normalization used by bip-utils Bip39Mnemonic._Normalize().
- * NFKD only differs from ASCII lowering for non-ASCII characters. */
-static size_t electrum_prepare_seed_ascii(const char* in, char* out, size_t outlen)
-{
-    if (!in || !out || outlen == 0) return 0;
-
-    size_t j = 0;
-    int in_space = 1; /* trim leading spaces */
-
-    for (size_t i = 0; in[i] != '\0'; i++) {
-        unsigned char c = (unsigned char)in[i];
-
-        if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f') {
-            if (!in_space) {
-                if (j + 1 >= outlen) break;
-                out[j++] = ' ';
-                in_space = 1;
-            }
-            continue;
-        }
-
-        /* lowercase ASCII */
-        if (c >= 'A' && c <= 'Z') c = (unsigned char)(c - 'A' + 'a');
-
-        if (j + 1 >= outlen) break;
-        out[j++] = (char)c;
-        in_space = 0;
-    }
-
-    /* trim trailing space */
-    if (j > 0 && out[j - 1] == ' ') j--;
-
-    out[j] = '\0';
-    return j;
-}
-
 /* HMAC-SHA512(key, msg) -> hex string */
 static void electrum_hmac_sha512_hex(const unsigned char* key, size_t keylen,
                                      const unsigned char* msg, size_t msglen,
@@ -133,16 +95,16 @@ int dogecoin_mnemonic_is_electrum_seed(const char* mnemonic, uint32_t* out_versi
 {
     if (!mnemonic) return -1;
 
-    /* NFKD normalize (same utf8proc_NFKD used elsewhere in bip39) */
-    uint8_t *norm = (uint8_t *)utf8proc_NFKD((const utf8proc_uint8_t *)mnemonic);
-    if (!norm) return -1;
+    /* NFKD + casefold in a single utf8proc_map call */
+    utf8proc_uint8_t *norm = NULL;
+    utf8proc_ssize_t norm_ret = utf8proc_map(
+        (const utf8proc_uint8_t *)mnemonic, 0, &norm,
+        (utf8proc_option_t)(UTF8PROC_NULLTERM | UTF8PROC_STABLE |
+                            UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT |
+                            UTF8PROC_CASEFOLD));
+    if (norm_ret < 0 || !norm) return -1;
 
-    /* lowercase in-place (Electrum normalizes to lowercase before HMAC) */
-    for (size_t i = 0; norm[i]; i++) {
-        if (norm[i] >= 'A' && norm[i] <= 'Z') norm[i] = norm[i] - 'A' + 'a';
-    }
-
-    size_t seed_len = strlen((const char *)norm);
+    size_t seed_len = (size_t)norm_ret;
 
     char mac_hex[129];
     electrum_hmac_sha512_hex((const unsigned char*)"Seed version", strlen("Seed version"),
@@ -192,19 +154,19 @@ int dogecoin_seed_from_electrum_mnemonic(const char* mnemonic, const char* passp
         passphrase = "";
     }
 
-    /* NFKD normalize (same utf8proc_NFKD used elsewhere in bip39) */
-    uint8_t *norm = (uint8_t *)utf8proc_NFKD((const utf8proc_uint8_t *)mnemonic);
-    if (!norm) {
+    /* NFKD + casefold in a single utf8proc_map call */
+    utf8proc_uint8_t *norm = NULL;
+    utf8proc_ssize_t norm_ret = utf8proc_map(
+        (const utf8proc_uint8_t *)mnemonic, 0, &norm,
+        (utf8proc_option_t)(UTF8PROC_NULLTERM | UTF8PROC_STABLE |
+                            UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT |
+                            UTF8PROC_CASEFOLD));
+    if (norm_ret < 0 || !norm) {
         fprintf(stderr, "ERROR: failed to NFKD-normalize electrum mnemonic\n");
         return -1;
     }
 
-    /* lowercase in-place (Electrum normalizes to lowercase before PBKDF2) */
-    for (size_t i = 0; norm[i]; i++) {
-        if (norm[i] >= 'A' && norm[i] <= 'Z') norm[i] = norm[i] - 'A' + 'a';
-    }
-
-    size_t seed_len = strlen((const char *)norm);
+    size_t seed_len = (size_t)norm_ret;
 
     size_t salt_len = strlen("electrum") + strlen(passphrase);
     char* salt = malloc(salt_len + 1);
@@ -258,10 +220,24 @@ static int electrum_v1_decode_mnemonic(const char* mnemonic,
 {
     if (!mnemonic || !seed16_out) return -1;
 
-    /* normalize: lowercase + collapse whitespace */
+    /* NFKD + casefold in a single utf8proc_map call */
+    utf8proc_uint8_t *norm = NULL;
+    utf8proc_ssize_t norm_ret = utf8proc_map(
+        (const utf8proc_uint8_t *)mnemonic, 0, &norm,
+        (utf8proc_option_t)(UTF8PROC_NULLTERM | UTF8PROC_STABLE |
+                            UTF8PROC_DECOMPOSE | UTF8PROC_COMPAT |
+                            UTF8PROC_CASEFOLD));
+    if (norm_ret < 0 || !norm) return -1;
+
+    /* copy to mutable stack buffer for strtok_r */
     char buf[MAX_MNEMONIC_STRING_SIZE];
     dogecoin_mem_zero(buf, sizeof(buf));
-    if (electrum_prepare_seed_ascii(mnemonic, buf, sizeof(buf)) == 0) return -1;
+    if ((size_t)norm_ret >= sizeof(buf)) {
+        dogecoin_free(norm);
+        return -1;
+    }
+    memcpy(buf, norm, (size_t)norm_ret + 1);
+    dogecoin_free(norm);
 
     /* parse 12 words */
     uint16_t idx[ELECTRUM_V1_WORDS];
