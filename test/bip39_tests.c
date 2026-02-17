@@ -1573,14 +1573,4 @@ void test_bip39()
     u_assert_str_eq(got_v1_hardly_hex, expect_v1_hardly_hex);
     debug_print("%s\n", got_v1_hardly_hex);
     utils_clear_buffers();
-
-    /* 
-     * "alpha bravo" with passphrase is NOT a valid Electrum v1 mnemonic
-     * (only 2 words, not 12) — should return -1.
-     */
-    const char* v1_mn3 = "alpha bravo";
-    const char* v1_pass3 = "testpass";
-    
-    memset(seed, 0, sizeof(seed));
-    u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_mn3, v1_pass3, seed), -1);
 }

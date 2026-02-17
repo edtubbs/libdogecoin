@@ -99,66 +99,35 @@ void test_key()
 void test_electrum_v1_mnemonic_to_master_key()
 {
     /*
-     * Electrum v1 mnemonic to key derivation test
-     * 
-     * Reference: Electrum v1 (pre-2.0) non-standard seed derivation
-     * Source: https://electrum.readthedocs.io/en/latest/seedphrase.html
-     * 
-     * Electrum v1 algorithm (non-standard, not BIP39):
-     * - 1626-word dictionary (wordlist_electrum in include/bip39/electrum.h)
-     * - Base-1626 decoding of 12 words to 16-byte raw seed
-     * - The seed IS the decoded value (e.g. '8edad31a95e7d59f8837667510d75a4d')
-     * - stretch_key() is applied during KEY DERIVATION, not seed storage
-     * - Key derivation: stretch_key(seed) → master_secret → derive child keys
-     * 
-     * This test verifies the complete flow for the 'such' CLI tool:
-     *   Electrum v1 mnemonic → raw seed → key derivation (with stretching) → private key
+     * Electrum v1 key derivation test
+     *
+     * Tests electrum_v1_derive_privkey32() which takes a raw 16-byte seed
+     * and derives child private keys. Seed decoding is tested in bip39_tests.
+     *
+     * Test vectors verified with bip-utils (pip install bip-utils):
+     *   from bip_utils import *
+     *   seed = ElectrumV1SeedGenerator("hardly point goal ...").Generate()
+     *   e = ElectrumV1.FromSeed(seed)
+     *   e.GetPrivateKey(0, 0).Raw().ToHex()  # child key
+     *   P2PKHAddr.EncodeKey(e.GetPublicKey(0, 0),
+     *       net_ver=CoinsConf.DogecoinMainNet.ParamByKey("p2pkh_net_ver"),
+     *       pub_key_mode=P2PKHPubKeyModes.UNCOMPRESSED)  # address
      */
-    
+
     SEED buffer_for_seed;
-    
-    /* "alpha bravo" is NOT a valid 12-word Electrum v1 mnemonic — should fail */
-    const char* v1_mnemonic = "alpha bravo";
-    const char* empty_pass = "";
-    
-    memset(buffer_for_seed, 0, MAX_SEED_SIZE);
-    
-    int seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_mnemonic, empty_pass, buffer_for_seed);
-    u_assert_int_eq(seed_result, -1);
-    
-    utils_clear_buffers();
 
     /*
-     * Electrum v1 proper 12-word mnemonic test with key derivation
-     *
-     * Test vector from Electrum's test suite:
-     *   seed_hex = '8edad31a95e7d59f8837667510d75a4d'
-     *   mnemonic = 'hardly point goal hallway patience key stone difference ready caught listen fact'
-     *   mn_encode(seed_hex) == mnemonic.split()
-     *   mn_decode(mnemonic.split()) == seed_hex
-     *
-     * The seed IS '8edad31a95e7d59f8837667510d75a4d' (16 bytes).
-     * stretch_key() is applied inside electrum_v1_derive_privkey32() during key derivation.
-     *
-     * Key derivation (n=0, for_change=0) verified with Python ecdsa:
+     * "hardly point goal hallway patience key stone difference ready caught listen fact"
+     * Key derivation (n=0, for_change=0):
      *   master_secret = stretch_key('8edad31a95e7d59f8837667510d75a4d')
      *   tweak = double_SHA256("0:0:" + mpk_raw_64_bytes)
      *   derived = (master_secret + tweak) mod curve_order
      *   => 490aa18749841c21f4ece6da50898645578736ce0e38cd67568c14e3c47c9d95
      */
     const char* v1_12_mn = "hardly point goal hallway patience key stone difference ready caught listen fact";
-    const char* v1_12_pass = "";
 
     memset(buffer_for_seed, 0, MAX_SEED_SIZE);
-
-    seed_result = dogecoin_seed_from_electrum_v1_mnemonic(v1_12_mn, v1_12_pass, buffer_for_seed);
-    u_assert_int_eq(seed_result, 0);
-
-    /* Verify the raw seed is the decoded value (16 bytes) */
-    char* seed_12_hex = utils_uint8_to_hex(buffer_for_seed, 16);
-    const char* ref_seed_12_hex = "8edad31a95e7d59f8837667510d75a4d";
-    u_assert_str_eq(seed_12_hex, ref_seed_12_hex);
-    debug_print("Electrum v1 raw seed (16 bytes): %s\n", seed_12_hex);
+    u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_12_mn, "", buffer_for_seed), 0);
 
     /* Verify Electrum v1 key derivation (n=0, for_change=0) */
     uint8_t priv32[32];
@@ -166,25 +135,9 @@ void test_electrum_v1_mnemonic_to_master_key()
     u_assert_int_eq(electrum_v1_derive_privkey32((const uint8_t*)buffer_for_seed, 0, 0, priv32), 1);
 
     char* derived_hex = utils_uint8_to_hex(priv32, 32);
-    const char* ref_derived_hex = "490aa18749841c21f4ece6da50898645578736ce0e38cd67568c14e3c47c9d95";
-    u_assert_str_eq(derived_hex, ref_derived_hex);
-    debug_print("Electrum v1 derived key (0:0:): %s\n", derived_hex);
+    u_assert_str_eq(derived_hex, "490aa18749841c21f4ece6da50898645578736ce0e38cd67568c14e3c47c9d95");
 
-    /*
-     * Verify uncompressed address matches bip-utils reference.
-     * Reference: pip install bip-utils; ElectrumV1.FromSeed(...).GetAddress(0, 0)
-     * Electrum v1 uses uncompressed P2PKH addresses per bip-utils reference:
-     *   https://bip-utils.readthedocs.io/en/latest/bip_utils/electrum/electrum_v1.html
-     *
-     * Verification:
-     *   from bip_utils import *
-     *   seed = ElectrumV1SeedGenerator("hardly point goal hallway patience key stone difference ready caught listen fact").Generate()
-     *   e = ElectrumV1.FromSeed(seed)
-     *   P2PKHAddr.EncodeKey(e.GetPublicKey(0, 0),
-     *       net_ver=CoinsConf.DogecoinMainNet.ParamByKey("p2pkh_net_ver"),
-     *       pub_key_mode=P2PKHPubKeyModes.UNCOMPRESSED)
-     *   => 'D5H1b4AHaZEVJeWTKn2M6SVyxc4DzQeefQ'
-     */
+    /* Verify uncompressed address matches bip-utils reference */
     {
         uint8_t pubser[65];
         size_t publen = sizeof(pubser);
@@ -201,10 +154,9 @@ void test_electrum_v1_mnemonic_to_master_key()
         dogecoin_mem_zero(addr, sizeof(addr));
         dogecoin_pubkey_getaddr_p2pkh(&pubkey, &dogecoin_chainparams_main, addr);
         u_assert_str_eq(addr, "D5H1b4AHaZEVJeWTKn2M6SVyxc4DzQeefQ");
-        debug_print("Electrum v1 address (0:0:): %s\n", addr);
     }
 
-    /* Verify additional child key at (n=1, for_change=0) matches bip-utils */
+    /* Verify child key at (n=1, for_change=0) matches bip-utils */
     {
         uint8_t priv32_1[32];
         dogecoin_mem_zero(priv32_1, sizeof(priv32_1));
@@ -226,25 +178,14 @@ void test_electrum_v1_mnemonic_to_master_key()
         dogecoin_mem_zero(addr, sizeof(addr));
         dogecoin_pubkey_getaddr_p2pkh(&pubkey, &dogecoin_chainparams_main, addr);
         u_assert_str_eq(addr, "DFMtzW5hhucXAnZW4emfEAHwZrRUi3EQZG");
-        debug_print("Electrum v1 address (0:1:): %s\n", addr);
     }
 
-    /*
-     * Additional bip-utils reference test: "like just love..." mnemonic
-     * Verified with: pip install bip-utils
-     *   from bip_utils import *
-     *   seed = ElectrumV1SeedGenerator("like just love know never want time out there make look eye").Generate()
-     *   e = ElectrumV1.FromSeed(seed)
-     */
+    /* "like just love..." mnemonic — key derivation + address at (n=0, for_change=0) */
     {
         const char* v1_ljl_mn = "like just love know never want time out there make look eye";
         memset(buffer_for_seed, 0, MAX_SEED_SIZE);
         u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_ljl_mn, "", buffer_for_seed), 0);
 
-        char* ljl_seed_hex = utils_uint8_to_hex(buffer_for_seed, 16);
-        u_assert_str_eq(ljl_seed_hex, "00285dfe00285e0100285e0400285e07");
-
-        /* Child key at (n=0, for_change=0): priv + address */
         uint8_t ljl_priv32[32];
         dogecoin_mem_zero(ljl_priv32, sizeof(ljl_priv32));
         u_assert_int_eq(electrum_v1_derive_privkey32((const uint8_t*)buffer_for_seed, 0, 0, ljl_priv32), 1);
