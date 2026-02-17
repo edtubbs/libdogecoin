@@ -192,7 +192,6 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     // SMPV default off
     client->smpv_ctx = NULL;
     client->smpv_enabled = false;
-    client->last_known_tip_height = -1;
 
     return client;
 }
@@ -823,19 +822,15 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         client->nodegroup->log_write_cb("Connected %d headers\n", connected_headers);
         client->nodegroup->log_write_cb("Chaintip at height %d\n", chaintip->height);
 
-        /* Update SMPV confirmations if tip height changed */
+        /* Update SMPV confirmations for new tip height */
         if (client->smpv_enabled && client->smpv_ctx) {
-            int32_t current_height = (int32_t)chaintip->height;
-            if (client->last_known_tip_height != current_height) {
-                dogecoin_smpv_update_tx_status(
-                    (dogecoin_smpv_client*)client->smpv_ctx,
-                    NULL,
-                    true,
-                    NULL,
-                    (uint32_t)current_height
-                );
-                client->last_known_tip_height = current_height;
-            }
+            dogecoin_smpv_update_tx_status(
+                (dogecoin_smpv_client*)client->smpv_ctx,
+                NULL,
+                true,
+                NULL,
+                (uint32_t)chaintip->height
+            );
         }
 
         if (client->header_message_processed && client->header_message_processed(client, node, chaintip) == false)
