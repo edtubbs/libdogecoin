@@ -672,7 +672,7 @@ static void print_usage()
     printf("falcon_verify (requires -k <falcon_public_key_hex> -x <message_hex> -s <signature_hex>),\n");
     printf("falcon_commit (requires -k <falcon_public_key_hex> -s <signature_hex>),\n");
 #endif
-    printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <commitment_hex_64_chars>)\n");
+    printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <falcon_commitment_hex>)\n");
     printf("\nExamples: \n");
     printf("Generate a testnet private ec keypair wif/hex:\n");
     printf("> such -c generate_private_key\n\n");
@@ -1787,7 +1787,7 @@ int main(int argc, char* argv[])
         }
     #endif
     else if (strcmp(cmd, "falcon_add_commit_tx") == 0) {
-        // ./such -c falcon_add_commit_tx -x <raw_tx_hex> -s <commitment_hex_64_chars>
+        // ./such -c falcon_add_commit_tx -x <raw_tx_hex> -s <falcon_commitment_hex>
         if (!txhex || !scripthex) {
             return showError("Missing tx hex or commitment hex (use -x, -s)\n");
         }
@@ -1795,7 +1795,7 @@ int main(int argc, char* argv[])
             return showError("Raw transaction hex length must be even\n");
         }
         if (strlen(scripthex) != 64) {
-            return showError("Commitment must be exactly 32 bytes (64 hex chars)\n");
+            return showError("Commitment must be exactly 32 bytes (64 hex characters)\n");
         }
         for (size_t i = 0; i < strlen(scripthex); i++) {
             if (!isxdigit((unsigned char)scripthex[i])) {

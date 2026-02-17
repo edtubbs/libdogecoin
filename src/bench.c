@@ -751,13 +751,30 @@ static void print_analysis(void) {
         }
     }
 
-    /* Summary recommendation */
+    benchmark_result *falcon_cmt = find_result("Falcon512-cmt");
+    benchmark_result *opret_cmt = find_result("OPRET-32");
+    benchmark_result *dilith2_ver = find_result("Dilith2-ver");
+
+    /* Summary (derived from measured results above) */
     printf("\n--- Summary ---\n");
-    printf("For quantum-resistant signatures on Dogecoin:\n");
-    printf("• Falcon-512 offers the best balance of speed and security\n");
-    printf("• Verification is nearly as fast as classical signatures\n");
-    printf("• SPHINCS+ provides conservative hash-based security at much lower speed\n");
-    printf("• All PQC signatures use OP_RETURN commits for off-chain verification\n");
+    printf("Measured benchmark takeaways:\n");
+    if (falcon_ver && secp_ver && secp_ver->avgTime > 0.0) {
+        printf("• Falcon512 verify vs secp verify: %.2fx (%.6f vs %.6f sec)\n",
+               falcon_ver->avgTime / secp_ver->avgTime, falcon_ver->avgTime, secp_ver->avgTime);
+    }
+    if (dilith2_ver && falcon_ver && falcon_ver->avgTime > 0.0) {
+        printf("• Dilith2 verify vs Falcon512 verify: %.2fx (%.6f vs %.6f sec)\n",
+               dilith2_ver->avgTime / falcon_ver->avgTime, dilith2_ver->avgTime, falcon_ver->avgTime);
+    }
+    if (sphincs_s_sig && falcon_sig && falcon_sig->avgTime > 0.0) {
+        printf("• SPHINCS128s sign vs Falcon512 sign: %.0fx (%.6f vs %.6f sec)\n",
+               sphincs_s_sig->avgTime / falcon_sig->avgTime, sphincs_s_sig->avgTime, falcon_sig->avgTime);
+    }
+    if (falcon_cmt && opret_cmt && opret_cmt->avgTime > 0.0) {
+        printf("• Falcon commit hash vs OP_RETURN script build: %.2fx (%.6f vs %.6f sec)\n",
+               falcon_cmt->avgTime / opret_cmt->avgTime, falcon_cmt->avgTime, opret_cmt->avgTime);
+    }
+    printf("• OP_RETURN commitments are benchmarked above as on-chain/off-chain bridging primitives\n");
 }
 
 /* ---- main ---- */
