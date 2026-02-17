@@ -84,8 +84,6 @@ typedef struct {
     uint32_t confirmed_count;
     uint32_t unconfirmed_count;
     uint64_t last_seen_ts;
-    uint32_t synced_to_tip_height;      /* Height confirmations were last calculated for */
-    dogecoin_bool needs_revalidation;   /* Flag indicating confirmations may be stale */
 } dogecoin_smpv_client;
 
 /* Callback function type for transaction notifications */

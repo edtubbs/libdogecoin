@@ -52,8 +52,6 @@ dogecoin_smpv_client* dogecoin_smpv_client_new(const dogecoin_chainparams* chain
     client->confirmed_count = 0;
     client->unconfirmed_count = 0;
     client->last_seen_ts = 0;
-    client->synced_to_tip_height = 0;
-    client->needs_revalidation = false;
 
     return client;
 }
@@ -426,16 +424,11 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
     /* Tip tick: recalculate all confirmations based on provided height */
     if (!txid) {
         uint32_t reference_height = block_height;
-        
-        /* Detect potential reorg: if new height is less than what we're synced to */
-        if (reference_height < client->synced_to_tip_height) {
-            client->needs_revalidation = true;
-        }
-        
+
         for (uint32_t idx = 0; idx < client->mempool_tx_count; idx++) {
             dogecoin_smpv_tx* entry = &client->mempool_txs[idx];
             if (!entry->is_confirmed || entry->block_height == 0) continue;
-            
+
             if (reference_height >= entry->block_height) {
                 entry->confirmations = (reference_height - entry->block_height) + 1;
             } else {
@@ -443,10 +436,7 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
                 entry->confirmations = 0;
             }
         }
-        
-        /* Update sync state */
-        client->synced_to_tip_height = reference_height;
-        client->needs_revalidation = false;
+
         client->last_update_time = time(NULL);
         return;
     }
