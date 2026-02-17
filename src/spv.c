@@ -679,12 +679,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 deser_skip(buf, consumedlength);
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
                 
-                // Check for Falcon commit in OP_RETURN for off-chain verification
+                // Validate Falcon commit in canonical OP_RETURN form (6a20 + 32 bytes)
                 uint8_t falcon_commit_data[32];
                 if (dogecoin_tx_extract_falcon512_commit(tx, falcon_commit_data)) {
                     char commit_hex[65];
                     utils_bin_to_hex(falcon_commit_data, 32, commit_hex);
-                    client->nodegroup->log_write_cb("[falcon-commit] Found at height=%d txpos=%u commit=%s\n", 
+                    client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s\n",
                                                      pindex->height, i, commit_hex);
                 }
                 

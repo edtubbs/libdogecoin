@@ -77,7 +77,7 @@ dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_
         const unsigned char* p = (const unsigned char*)o->script_pubkey->str;
         size_t n = o->script_pubkey->len;
 
-        if (n >= 34 && p[0] == 0x6a && p[1] == 32) {
+        if (n == 34 && p[0] == 0x6a && p[1] == 32) {
             memcpy(out32, p + 2, 32);
             return true;
         }
