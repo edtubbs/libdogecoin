@@ -229,5 +229,43 @@ void test_electrum_v1_mnemonic_to_master_key()
         debug_print("Electrum v1 address (0:1:): %s\n", addr);
     }
 
+    /*
+     * Additional bip-utils reference test: "like just love..." mnemonic
+     * Verified with: pip install bip-utils
+     *   from bip_utils import *
+     *   seed = ElectrumV1SeedGenerator("like just love know never want time out there make look eye").Generate()
+     *   e = ElectrumV1.FromSeed(seed)
+     */
+    {
+        const char* v1_ljl_mn = "like just love know never want time out there make look eye";
+        memset(buffer_for_seed, 0, MAX_SEED_SIZE);
+        u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_ljl_mn, "", buffer_for_seed), 0);
+
+        char* ljl_seed_hex = utils_uint8_to_hex(buffer_for_seed, 16);
+        u_assert_str_eq(ljl_seed_hex, "00285dfe00285e0100285e0400285e07");
+
+        /* Child key at (n=0, for_change=0): priv + address */
+        uint8_t ljl_priv32[32];
+        dogecoin_mem_zero(ljl_priv32, sizeof(ljl_priv32));
+        u_assert_int_eq(electrum_v1_derive_privkey32((const uint8_t*)buffer_for_seed, 0, 0, ljl_priv32), 1);
+
+        char* ljl_derived = utils_uint8_to_hex(ljl_priv32, 32);
+        u_assert_str_eq(ljl_derived, "b9a83170bfc2a80219d3d4b789acf145792a3470c440e767741de054e3484bb2");
+
+        uint8_t ljl_pub[65];
+        size_t ljl_publen = sizeof(ljl_pub);
+        dogecoin_ecc_get_pubkey(ljl_priv32, ljl_pub, &ljl_publen, false);
+
+        dogecoin_pubkey ljl_pubkey;
+        dogecoin_pubkey_init(&ljl_pubkey);
+        memcpy(ljl_pubkey.pubkey, ljl_pub, 65);
+        ljl_pubkey.compressed = false;
+
+        char ljl_addr[P2PKHLEN];
+        dogecoin_mem_zero(ljl_addr, sizeof(ljl_addr));
+        dogecoin_pubkey_getaddr_p2pkh(&ljl_pubkey, &dogecoin_chainparams_main, ljl_addr);
+        u_assert_str_eq(ljl_addr, "DJqkqMLLkio821TrxpZxUDhVFaSDR7VeWz");
+    }
+
     utils_clear_buffers();
 }
