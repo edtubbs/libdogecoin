@@ -79,6 +79,7 @@ typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 #elif defined(__GNUC__) || defined(__clang__)
 #define DOGECOIN_THREAD_LOCAL __thread
 #else
+/* Fallback for compilers without TLS support. */
 #define DOGECOIN_THREAD_LOCAL
 #endif
 
