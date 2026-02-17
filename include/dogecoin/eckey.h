@@ -47,7 +47,7 @@ typedef struct eckey {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-static eckey *keys = NULL;
+static DOGECOIN_THREAD_LOCAL eckey *keys = NULL;
 #pragma GCC diagnostic pop
 
 // instantiates a new eckey

@@ -462,7 +462,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
     // If in header or block sync state, request headers or blocks from the node with the longest chain
     if ((client->stateflags & SPV_HEADER_SYNC_FLAG) == SPV_HEADER_SYNC_FLAG || (client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG)
     {
-        dogecoin_node *node_with_longest_chain = NULL;
+        unsigned int tip_height = client->headers_db->getchaintip(client->headers_db_ctx)->height;
         unsigned int longest_chain_height = 0;
         for(i = 0; i < client->nodegroup->nodes->len; ++i)
         {
@@ -472,15 +472,23 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 if (check_node->bestknownheight > longest_chain_height)
                 {
                     longest_chain_height = check_node->bestknownheight;
-                    node_with_longest_chain = check_node;
                 }
             }
         }
 
-        // Request headers or blocks from the node with the longest chain
-        if (node_with_longest_chain != NULL) {
-            dogecoin_net_spv_node_request_headers_or_blocks(node_with_longest_chain, (client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG);
-            new_headers_available = true;
+        // Request headers or blocks from all nodes with the longest chain.
+        if (longest_chain_height > tip_height) {
+            for(i = 0; i < client->nodegroup->nodes->len; ++i)
+            {
+                dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
+                if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
+                    check_node->version_handshake &&
+                    check_node->bestknownheight == longest_chain_height)
+                {
+                    dogecoin_net_spv_node_request_headers_or_blocks(check_node, (client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG);
+                    new_headers_available = true;
+                }
+            }
         }
     }
 
@@ -496,7 +504,6 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 if (check_node->bestknownheight > client->headers_db->getchaintip(client->headers_db_ctx)->height) {
                     dogecoin_net_spv_node_request_headers_or_blocks(check_node, false);
                     new_headers_available = true;
-                    break;
                 } else if (check_node->bestknownheight == client->headers_db->getchaintip(client->headers_db_ctx)->height) {
                     nodes_at_same_height++;
                 }

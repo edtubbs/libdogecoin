@@ -176,7 +176,7 @@ static struct option long_options[] = {
         {"regtest", no_argument, NULL, 'r'},
         {"ips", no_argument, NULL, 'i'},
         {"debug", no_argument, NULL, 'd'},
-        {"maxnodes", no_argument, NULL, 'm'},
+        {"maxnodes", required_argument, NULL, 'm'},
         {"mnemonic", no_argument, NULL, 'n'},
         {"pass_phrase", no_argument, NULL, 's'},
         {"dbfile", no_argument, NULL, 'f'},

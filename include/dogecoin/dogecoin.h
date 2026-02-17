@@ -73,6 +73,16 @@ typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 #endif
 
 #if defined(_MSC_VER)
+#define DOGECOIN_THREAD_LOCAL __declspec(thread)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#define DOGECOIN_THREAD_LOCAL _Thread_local
+#elif defined(__GNUC__) || defined(__clang__)
+#define DOGECOIN_THREAD_LOCAL __thread
+#else
+#define DOGECOIN_THREAD_LOCAL
+#endif
+
+#if defined(_MSC_VER)
     #define DISABLE_WARNING_PUSH           __pragma(warning( push ))
     #define DISABLE_WARNING_POP            __pragma(warning( pop ))
     #define DISABLE_WARNING(warningNumber) __pragma(warning( disable : warningNumber ))
