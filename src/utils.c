@@ -89,8 +89,8 @@
 #include <unistd.h>
 #endif
 
-static uint8_t buffer_hex_to_uint8[TO_UINT8_HEX_BUF_LEN];
-static char buffer_uint8_to_hex[TO_UINT8_HEX_BUF_LEN];
+static DOGECOIN_THREAD_LOCAL uint8_t buffer_hex_to_uint8[TO_UINT8_HEX_BUF_LEN];
+static DOGECOIN_THREAD_LOCAL char buffer_uint8_to_hex[TO_UINT8_HEX_BUF_LEN];
 
 
 /**

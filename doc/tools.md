@@ -356,6 +356,10 @@ Below are some examples on how to use the `sendtx` tool in practice.
 
 To use `spvnode`, execute it from the top level of the Libdogecoin directory. Start the tool by running `./spvnode` followed by the `scan` command. There are several flags that can be used to customize the behavior of `spvnode`:
 
+For TPM/encryption test flows, configure libdogecoin with `--enable-test-passwd` before building:
+
+    ./configure --enable-test-passwd
+
 Each flag is accompanied by a description and usage example. To view the version of `spvnode`, simply run:
 
     ./spvnode -v
@@ -378,7 +382,7 @@ To utilize checkpoints for faster initial sync, apply the -p flag:
 | `-r`, `--regtest` | Regtest Mode | No | Activate regtest network: `./spvnode -r scan` |
 | `-i`, `--ips` | Initial Peers | Yes | Specify initial peers: `./spvnode -i 127.0.0.1:22556 scan` |
 | `-d`, `--debug` | Debug Mode | No | Enable debug output: `./spvnode -d scan` |
-| `-m`, `--maxnodes` | Max Peers | No | Set max peers: `./spvnode -m 8 scan` |
+| `-m`, `--maxnodes` | Max Peers | Yes | Set max peers: `./spvnode -m 8 scan` |
 | `-a`, `--address` | Address | Yes | Use address: `./spvnode -a "your address here" scan` |
 | `-n`, `--mnemonic` | Mnemonic Seed | Yes | Use BIP39 mnemonic: `./spvnode -n "your mnemonic here" scan` |
 | `-s`, `--pass_phrase` | Passphrase | No | Passphrase for BIP39 seed: `./spvnode -s scan` |
@@ -395,6 +399,8 @@ To utilize checkpoints for faster initial sync, apply the -p flag:
 | `-z`, `--daemon` | Daemon Mode | No | Run as a daemon: `./spvnode -z scan` |
 | `-u`, `--http_server` | Enable HTTP | No | Enabled HTTP: `./spvnode -u 127.0.0.1:8080 scan` |
 | `-x`, `--smpv` | Enable SMPV | No | Enabled SMPV: `./spvnode -x scan` |
+
+`spvnode` uses libevent threading support and can request headers from multiple peers in parallel.
 
 ### Commands
 

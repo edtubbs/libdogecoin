@@ -274,9 +274,7 @@ if test "x$with_net" = xyes; then
   AC_CHECK_LIB([event],[main],EVENT_LIBS=-levent,AC_MSG_ERROR(libevent missing))
   AC_CHECK_LIB([event_core],[main],EVENT_CORE_LIBS=-levent_core,AC_MSG_ERROR(libevent_core missing),[-levent_core])
   AC_CHECK_LIB([event_extra],[main],EVENT_EXTRA_LIBS=-levent_extra,AC_MSG_ERROR(libevent_extra missing))
-  if test "$host" = "mingw"; then
-    AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
-  fi
+  AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
   LIBS="$LIBS $EVENT_LIBS $EVENT_CORE_LIBS $EVENT_EXTRA_LIBS $EVENT_PTHREADS_LIBS"
 fi
 

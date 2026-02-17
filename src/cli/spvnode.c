@@ -51,6 +51,7 @@
 
 #include <event2/buffer.h>
 #include <event2/http.h>
+#include <event2/thread.h>
 
 #if defined(HAVE_CONFIG_H)
 #include "libdogecoin-config.h"
@@ -207,7 +208,7 @@ static void print_version() {
  */
 static void print_usage() {
     print_version();
-    printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m[--maxpeers] <int>) (-f <headersfile|0 for in mem only>) \
+    printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m|--maxnodes <int>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
 (-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
 (-u|--http_server <ip:port>) (-x|--smpv) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
@@ -414,6 +415,17 @@ int main(int argc, char* argv[]) {
         }
 
     if (strcmp(data, "scan") == 0) {
+#if defined(WIN32)
+        if (evthread_use_windows_threads() != 0) {
+            fprintf(stderr, "Failed to initialize event threading\n");
+            return EXIT_FAILURE;
+        }
+#else
+        if (evthread_use_pthreads() != 0) {
+            fprintf(stderr, "Failed to initialize event threading\n");
+            return EXIT_FAILURE;
+        }
+#endif
         dogecoin_ecc_start();
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, (dbfile && (dbfile[0] == '0' || (strlen(dbfile) > 1 && dbfile[0] == 'n' && dbfile[0] == 'o'))) ? true : false, use_checkpoint, full_sync, maxnodes, http_server);
         if (http_server) {

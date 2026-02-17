@@ -333,10 +333,10 @@ sendtx_CPPFLAGS = -I$(top_srcdir)/src
 sendtx_LDFLAGS = -static
 
 inst_PROGRAMS += spvnode
-spvnode_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+spvnode_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ASM_LIB_FILES)
 spvnode_SOURCES = \
     src/cli/spvnode.c
-spvnode_CFLAGS = $(libdogecoin_la_CFLAGS)
+spvnode_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 spvnode_CPPFLAGS = -I$(top_srcdir)/src
 spvnode_LDFLAGS = -static
 endif
