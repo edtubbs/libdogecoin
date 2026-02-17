@@ -208,25 +208,6 @@ int dogecoin_seed_from_electrum_mnemonic(const char* mnemonic, const char* passp
  * Electrum v1 (pre-v2) seed support (minimal, additive)
  */
 
-/* v1 helper: SHA256(stretched || seed) in a loop */
-static void electrum_v1_stretch(unsigned char out32[SHA256_DIGEST_LENGTH],
-                                const unsigned char seed32[SHA256_DIGEST_LENGTH])
-{
-    unsigned char x[SHA256_DIGEST_LENGTH];
-    memcpy(x, seed32, SHA256_DIGEST_LENGTH);
-
-    for (int i = 0; i < 100000; i++) {
-        unsigned char buf[SHA256_DIGEST_LENGTH * 2];
-        memcpy(buf, x, SHA256_DIGEST_LENGTH);
-        memcpy(buf + SHA256_DIGEST_LENGTH, seed32, SHA256_DIGEST_LENGTH);
-        sha256_raw(buf, sizeof(buf), x);
-        dogecoin_mem_zero(buf, sizeof(buf));
-    }
-
-    memcpy(out32, x, SHA256_DIGEST_LENGTH);
-    dogecoin_mem_zero(x, sizeof(x));
-}
-
 /*
  * Find word index in Electrum v1 wordlist.
  * Returns index 0-1625, or -1 if not found.
@@ -333,93 +314,39 @@ static int electrum_v1_encode_mnemonic(const unsigned char seed16[ELECTRUM_V1_SE
 
 
 /*
- * Derive Electrum v1 seed from 12-word mnemonic.
+ * Decode Electrum v1 seed from 12-word mnemonic.
  *
- * For proper Electrum v1 mnemonics (12 words from 1626-word list):
- * 1. Decode mnemonic to 16-byte seed using base-1626
- * 2. Convert to hex string
- * 3. Apply passphrase: SHA256(hex_seed + (" " + passphrase if non-empty))
- * 4. Stretch: repeat 100000 times: stretched = SHA256(stretched + seed)
+ * Decodes a valid 12-word Electrum v1 mnemonic (from the 1626-word list)
+ * to a 16-byte seed using base-1626. The raw decoded seed is stored in
+ * seed[0..15] and the remaining bytes are zeroed.
  *
- * Note: Electrum v1 produces 32 bytes. We copy into seed[0..31] and zero seed[32..63].
+ * In original Electrum v1, the seed is the raw decoded value (e.g.
+ * '8edad31a95e7d59f8837667510d75a4d'). The stretch_key() operation is
+ * applied later during key derivation, not during seed storage.
+ *
+ * Returns 0 on success, -1 if the mnemonic is not a valid Electrum v1 mnemonic.
  */
 int dogecoin_seed_from_electrum_v1_mnemonic(const char* mnemonic, const char* passphrase, SEED seed)
 {
+    (void)passphrase; /* unused in Electrum v1 seed decoding */
     memset(seed, 0, MAX_SEED_SIZE);
 
     if (!mnemonic || !seed) {
         return -1;
     }
 
-    if (passphrase == NULL) {
-        passphrase = "";
-    }
-
-    /* Step 1: Decode 12-word mnemonic to 16-byte seed */
+    /* Decode 12-word mnemonic to 16-byte seed */
     unsigned char seed16[ELECTRUM_V1_SEED_BYTES];
     dogecoin_mem_zero(seed16, sizeof(seed16));
 
     if (electrum_v1_decode_mnemonic(mnemonic, seed16) != 0) {
-        /* Not a valid Electrum v1 mnemonic - fall back to direct hash */
-        /* This handles the old get_root_seed_electrum_v1 behavior */
-        size_t mnemonic_len = strlen(mnemonic);
-        size_t passphrase_len = strlen(passphrase);
-        size_t needs_space = (passphrase_len > 0) ? 1 : 0;
-        size_t total_len = mnemonic_len + needs_space + passphrase_len;
-
-        char* combined = malloc(total_len + 1);
-        if (!combined) {
-            return -1;
-        }
-
-        combined[0] = '\0';
-        strcat(combined, mnemonic);
-        if (passphrase_len > 0) {
-            strcat(combined, " ");
-            strcat(combined, passphrase);
-        }
-
-        unsigned char seed32[SHA256_DIGEST_LENGTH];
-        dogecoin_mem_zero(seed32, sizeof(seed32));
-        sha256_raw((const unsigned char*)combined, strlen(combined), seed32);
-
-        unsigned char stretched32[SHA256_DIGEST_LENGTH];
-        dogecoin_mem_zero(stretched32, sizeof(stretched32));
-        electrum_v1_stretch(stretched32, seed32);
-
-        memcpy_safe(seed, stretched32, SHA256_DIGEST_LENGTH);
-
-        dogecoin_mem_zero(combined, total_len + 1);
-        dogecoin_mem_zero(seed32, sizeof(seed32));
-        dogecoin_mem_zero(stretched32, sizeof(stretched32));
-        dogecoin_free(combined);
-        return 0;
+        return -1; /* Not a valid Electrum v1 mnemonic */
     }
 
-    /* Step 2: Convert decoded seed to hex string */
-    char seed_hex[33];
-    for (int i = 0; i < ELECTRUM_V1_SEED_BYTES; i++) {
-        sprintf(seed_hex + i*2, "%02x", seed16[i]);
-    }
-    seed_hex[32] = '\0';
+    /* Store the raw decoded 16-byte seed directly */
+    memcpy(seed, seed16, ELECTRUM_V1_SEED_BYTES);
 
-    /* Step 3: Stretch the hex seed directly (no pre-hash).
-     * Electrum v1 passes the hex string bytes to stretch_key() directly:
-     *   oldseed = hex_seed; seed = oldseed
-     *   repeat 100000: seed = SHA256(seed + oldseed)
-     * The passphrase is NOT used in v1 seed derivation. */
-    unsigned char stretched32[SHA256_DIGEST_LENGTH];
-    dogecoin_mem_zero(stretched32, sizeof(stretched32));
-    electrum_v1_stretch(stretched32, (const unsigned char*)seed_hex);
-
-    /* Place stretched seed in output */
-    memcpy_safe(seed, stretched32, SHA256_DIGEST_LENGTH);
-
-    /* Clean up */
     dogecoin_mem_zero(seed16, sizeof(seed16));
-    dogecoin_mem_zero(seed_hex, sizeof(seed_hex));
-    dogecoin_mem_zero(stretched32, sizeof(stretched32));
-
     return 0;
 }
 

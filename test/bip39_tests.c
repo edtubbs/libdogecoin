@@ -1404,21 +1404,12 @@ void test_bip39()
     debug_print("%s\n", got_e2_hex);
     utils_clear_buffers();
 
-    /* Electrum v1 (pre-v2) */
+    /* Electrum v1 (pre-v2) - "alpha bravo" is NOT a valid 12-word v1 mnemonic */
     const char* v1_mn = "alpha bravo";
     const char* v1_pass = "";
 
     memset(seed, 0, sizeof(seed));
-    u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_mn, v1_pass, seed), 0);
-
-    const char* expect_v1_hex =
-        "d46b151636c4b8dfe628364198808d25e83c0ba21bc0bab094357094ef0b537d"
-        "0000000000000000000000000000000000000000000000000000000000000000";
-
-    char* got_v1_hex = utils_uint8_to_hex(seed, 64);
-    u_assert_str_eq(got_v1_hex, expect_v1_hex);
-    debug_print("%s\n", got_v1_hex);
-    utils_clear_buffers();
+    u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_mn, v1_pass, seed), -1);
 
     /* 
      * Additional Electrum v2 test vectors with external verification
@@ -1533,11 +1524,11 @@ void test_bip39()
      * 
      * VERIFICATION - "like just love..." is a VALID Electrum v1 mnemonic:
      *   - All 12 words are at indices 0-11 in the Electrum v1 wordlist
-     *   - Decodes to 16-byte seed: 00285dfe00285e0100285e0400285e07
-     *   - Hex string "00285dfe00285e0100285e0400285e07" is hashed and stretched
-     *   - This produces: d11e7e95635e37239d6552824587675e7b0581414191dcc94bcc04c5b0e206ec
+     *   - Decodes to raw 16-byte seed: 00285dfe00285e0100285e0400285e07
+     *   - The seed IS the decoded value (no stretching in seed storage)
+     *   - stretch_key() is applied during key derivation, not here
      * 
-     * Note: This mnemonic uses the proper base-1626 decoding path, NOT the fallback.
+     * Note: This mnemonic uses the proper base-1626 decoding path.
      */
     const char* v1_twelve_word_mnemonic = "like just love know never want time out there make look eye";
     const char* v1_pass2 = "";
@@ -1545,14 +1536,13 @@ void test_bip39()
     memset(seed, 0, sizeof(seed));
     u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_twelve_word_mnemonic, v1_pass2, seed), 0);
 
-    /* Expected: Electrum v1 stretched seed (32 bytes + 32 zero bytes)
-     * Electrum v1 stretches the hex string bytes directly (no pre-hash):
-     *   oldseed = hex_seed; seed = oldseed; repeat 100000: seed = SHA256(seed + oldseed)
-     * Verification command:
-     *   python3 -c "s=b'00285dfe00285e0100285e0400285e07'; x=s; exec('import hashlib\\nx=hashlib.sha256(x+s).digest();'*100000); print(x.hex())"
-     */
+    /* Expected: Raw decoded 16-byte seed (+ 48 zero bytes)
+     * In Electrum v1, the seed is simply the decoded hex value.
+     * Verified: mn_decode("like just love know never want time out there make look eye")
+     *   == '00285dfe00285e0100285e0400285e07' */
     const char* expect_v1_12_hex =
-        "2fcbb0d72534b910ccdc08e5440b84993311ffbd5b1658222c68b867f0d94645"
+        "00285dfe00285e0100285e0400285e07"
+        "00000000000000000000000000000000"
         "0000000000000000000000000000000000000000000000000000000000000000";
 
     char* got_v1_12_hex = utils_uint8_to_hex(seed, 64);
@@ -1565,9 +1555,8 @@ void test_bip39()
      *   seed = '8edad31a95e7d59f8837667510d75a4d'
      *   mn_encode(seed) == 'hardly point goal hallway patience key stone difference ready caught listen fact'
      *   mn_decode(words) == seed
-     * 
-     * Verification command:
-     *   python3 -c "s=b'8edad31a95e7d59f8837667510d75a4d'; x=s; exec('import hashlib\\nx=hashlib.sha256(x+s).digest();'*100000); print(x.hex())"
+     *
+     * The seed IS '8edad31a95e7d59f8837667510d75a4d' — the raw decoded value.
      */
     const char* v1_hardly_mnemonic = "hardly point goal hallway patience key stone difference ready caught listen fact";
     const char* v1_pass_hardly = "";
@@ -1576,7 +1565,8 @@ void test_bip39()
     u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_hardly_mnemonic, v1_pass_hardly, seed), 0);
 
     const char* expect_v1_hardly_hex =
-        "64ea202eb1941a971e8a9af7b4caae1cbde9890103092ac57ce68ec5d9314213"
+        "8edad31a95e7d59f8837667510d75a4d"
+        "00000000000000000000000000000000"
         "0000000000000000000000000000000000000000000000000000000000000000";
 
     char* got_v1_hardly_hex = utils_uint8_to_hex(seed, 64);
@@ -1585,32 +1575,12 @@ void test_bip39()
     utils_clear_buffers();
 
     /* 
-     * Electrum v1 with passphrase test
-     * 
-     * Verification command:
-     *   python3 -c "import hashlib; s=hashlib.sha256(b'alpha bravo testpass').digest(); st=s; exec('st=hashlib.sha256(st+s).digest();'*100000); print(st.hex())"
-     * 
-     * When passphrase is provided, it's appended with a space:
-     *   combined = mnemonic + " " + passphrase
-     *   seed = SHA256(combined)
-     *   stretched = 100,000 iterations of SHA256(stretched + seed)
-     * 
-     * Test vector verified with Python hashlib.sha256 (can be independently verified)
+     * "alpha bravo" with passphrase is NOT a valid Electrum v1 mnemonic
+     * (only 2 words, not 12) — should return -1.
      */
     const char* v1_mn3 = "alpha bravo";
     const char* v1_pass3 = "testpass";
     
     memset(seed, 0, sizeof(seed));
-    u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_mn3, v1_pass3, seed), 0);
-
-    /* Expected: Electrum v1 stretched seed with passphrase (32 bytes + 32 zero bytes)
-     * Verified with Python hashlib.sha256 stretching - independently verifiable */
-    const char* expect_v1_pass_hex =
-        "d51554cccc286493f510b8c2a4104e4132562518a5db4ec5e8a3325dff8234ee"
-        "0000000000000000000000000000000000000000000000000000000000000000";
-
-    char* got_v1_pass_hex = utils_uint8_to_hex(seed, 64);
-    u_assert_str_eq(got_v1_pass_hex, expect_v1_pass_hex);
-    debug_print("%s\n", got_v1_pass_hex);
-    utils_clear_buffers();
+    u_assert_int_eq(dogecoin_seed_from_electrum_v1_mnemonic(v1_mn3, v1_pass3, seed), -1);
 }
