@@ -1441,6 +1441,7 @@ int main(int argc, char* argv[])
 
             /* Electrum v1 uses uncompressed WIF (no 0x01 suffix) per bip-utils reference */
             uint8_t wif_payload[33];
+            dogecoin_mem_zero(wif_payload, sizeof(wif_payload));
             wif_payload[0] = chain->b58prefix_secret_address;
             memcpy(&wif_payload[1], priv32, 32);
             dogecoin_base58_encode_check(wif_payload, 33, wifstr, wiflen);
