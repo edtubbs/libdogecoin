@@ -28,10 +28,16 @@
 
 #include <dogecoin/bip37.h>
 #include <dogecoin/protocol.h>
+#include <dogecoin/random.h>
 #include <dogecoin/spv.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/vector.h>
 
+/**
+ * Serialize a compactSize integer into a caller-provided buffer.
+ *
+ * @return Number of bytes written to @p out.
+ */
 static size_t bip37_write_varint(uint64_t val, uint8_t out[9])
 {
     if (val < 0xfdULL) {
@@ -62,6 +68,46 @@ static size_t bip37_write_varint(uint64_t val, uint8_t out[9])
     out[7] = (uint8_t)((val >> 48) & 0xff);
     out[8] = (uint8_t)((val >> 56) & 0xff);
     return 9;
+}
+
+/**
+ * MurmurHash3 (x86 32-bit) used by BIP37 bloom filters.
+ */
+static uint32_t bip37_murmur3(const uint8_t* key, size_t len, uint32_t seed)
+{
+    uint32_t h = seed;
+    size_t i = 0;
+    for (; i + 4 <= len; i += 4) {
+        uint32_t k = key[i] | (key[i + 1] << 8) | (key[i + 2] << 16) | (key[i + 3] << 24);
+        k *= 0xcc9e2d51u;
+        k = (k << 15) | (k >> 17);
+        k *= 0x1b873593u;
+        h ^= k;
+        h = (h << 13) | (h >> 19);
+        h = h * 5 + 0xe6546b64u;
+    }
+
+    uint32_t k = 0;
+    switch (len - i) {
+        case 3: k ^= key[i + 2] << 16; /* fall through */
+        case 2: k ^= key[i + 1] << 8;  /* fall through */
+        case 1: k ^= key[i];
+    }
+
+    if (len - i > 0) {
+        k *= 0xcc9e2d51u;
+        k = (k << 15) | (k >> 17);
+        k *= 0x1b873593u;
+        h ^= k;
+    }
+
+    h ^= (uint32_t)len;
+    h ^= h >> 16;
+    h *= 0x85ebca6bu;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35u;
+    h ^= h >> 16;
+    return h;
 }
 
 /**
@@ -119,6 +165,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
             st[sp].parentMatch = (flags[bitsUsed >> 3] >> (bitsUsed & 7)) & 1;
             bitsUsed++;
 
+            /* Leaf node, or an internal node that does not match: consume one hash. */
             if (st[sp].height == 0 || st[sp].parentMatch == 0) {
                 if (hashesUsed >= hashCount) { ok_extract = false; break; }
                 memcpy(ret, hashes + (hashesUsed * 32), 32);
@@ -135,6 +182,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                 continue;
             }
 
+            /* Internal matched node: recurse into left child first. */
             st[sp].stage = 1;
             sp++;
             st[sp].height = st[sp - 1].height - 1;
@@ -152,6 +200,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
             uint32_t rightPos = st[sp].pos * 2 + 1;
 
             if ((uint64_t)rightPos < width) {
+                /* Right child exists: recurse into it. */
                 st[sp].stage = 2;
                 sp++;
                 st[sp].height = st[sp - 1].height - 1;
@@ -161,6 +210,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                 have_ret = false;
                 continue;
             } else {
+                /* Right child absent at this width, duplicate left hash. */
                 uint8_t buf64[64];
                 memcpy(buf64, st[sp].left, 32);
                 memcpy(buf64 + 32, st[sp].left, 32);
@@ -172,6 +222,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
         }
 
         if (st[sp].stage == 2) {
+            /* Combine left and right child hashes and bubble up. */
             if (!have_ret) { ok_extract = false; break; }
             uint8_t buf64[64];
             memcpy(buf64, st[sp].left, 32);
@@ -187,6 +238,71 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     }
 
     return (ok_extract && have_ret && memcmp(ret, header_merkle, 32) == 0);
+}
+
+/**
+ * Create a fixed-size BIP37 bloom filter using protocol maximums.
+ *
+ * This helper avoids floating-point sizing logic and mirrors the existing
+ * CLI behavior of using maximum size/hash-function limits.
+ */
+dogecoin_bip37_filter* dogecoin_bip37_filter_new(uint32_t tweak, uint8_t flags)
+{
+    dogecoin_bip37_filter* filter = (dogecoin_bip37_filter*)dogecoin_calloc(1, sizeof(dogecoin_bip37_filter));
+    if (!filter) return NULL;
+
+    filter->data_len = 36000;     /* BIP37 max filter size in bytes */
+    filter->n_hash_funcs = 50;    /* BIP37 max hash function count */
+    filter->data = (uint8_t*)dogecoin_calloc(filter->data_len, 1);
+    if (!filter->data) {
+        dogecoin_free(filter);
+        return NULL;
+    }
+    if (tweak) {
+        filter->n_tweak = tweak;
+    } else {
+        /* Use secure RNG for tweak when caller doesn't provide one. */
+        uint8_t tweak_bytes[4];
+        if (!dogecoin_random_bytes(tweak_bytes, sizeof(tweak_bytes), 0)) {
+            dogecoin_bip37_filter_free(filter);
+            return NULL;
+        }
+        filter->n_tweak = (uint32_t)tweak_bytes[0]
+                        | ((uint32_t)tweak_bytes[1] << 8)
+                        | ((uint32_t)tweak_bytes[2] << 16)
+                        | ((uint32_t)tweak_bytes[3] << 24);
+    }
+    filter->n_flags = flags;
+    return filter;
+}
+
+/**
+ * Add an element to a BIP37 bloom filter.
+ *
+ * @return true when input was accepted and bits were updated.
+ */
+dogecoin_bool dogecoin_bip37_filter_add(dogecoin_bip37_filter* filter,
+                                        const uint8_t* data,
+                                        size_t data_len)
+{
+    if (!filter || !filter->data || !data || data_len == 0 || filter->data_len == 0) return false;
+
+    for (uint32_t i = 0; i < filter->n_hash_funcs; i++) {
+        uint32_t seed = i * 0xfba4c795u + filter->n_tweak;
+        uint32_t idx = bip37_murmur3(data, data_len, seed) % (uint32_t)(filter->data_len * 8);
+        filter->data[idx / 8] |= (1u << (idx % 8));
+    }
+    return true;
+}
+
+/**
+ * Free a BIP37 bloom filter allocated by dogecoin_bip37_filter_new.
+ */
+void dogecoin_bip37_filter_free(dogecoin_bip37_filter* filter)
+{
+    if (!filter) return;
+    if (filter->data) dogecoin_free(filter->data);
+    dogecoin_free(filter);
 }
 
 /**
@@ -330,6 +446,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterload(
     return true;
 }
 
+/**
+ * Send a BIP37 filteradd message to all connected, handshaked peers.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
     dogecoin_spv_client* client,
     const uint8_t* data,
@@ -370,6 +489,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
     return true;
 }
 
+/**
+ * Clear local BIP37 filter state and send filterclear to active peers.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterclear(dogecoin_spv_client* client)
 {
     if (!client) return false;

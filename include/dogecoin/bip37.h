@@ -34,6 +34,15 @@ struct dogecoin_node_;
 /* Callback used for each matched leaf txid while traversing a merkleblock. */
 typedef dogecoin_bool (*dogecoin_bip37_match_cb)(const uint8_t txid[32], uint32_t pos, void* ctx);
 
+/* Fixed-size BIP37 bloom filter container used by CLI/SPV helpers. */
+typedef struct dogecoin_bip37_filter_ {
+    uint8_t* data;
+    size_t data_len;
+    uint32_t n_hash_funcs;
+    uint32_t n_tweak;
+    uint8_t n_flags;
+} dogecoin_bip37_filter;
+
 LIBDOGECOIN_BEGIN_DECL
 
 dogecoin_bool dogecoin_bip37_send_filterload(struct dogecoin_node_* node,
@@ -57,6 +66,15 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                                                      const uint8_t header_merkle[32],
                                                      dogecoin_bip37_match_cb on_match,
                                                      void* match_ctx);
+
+/* Allocate a fixed-size BIP37 bloom filter (uses protocol max size/hash count). */
+dogecoin_bip37_filter* dogecoin_bip37_filter_new(uint32_t tweak, uint8_t flags);
+/* Add a data item (address hash/outpoint/script fragment) to the bloom filter. */
+dogecoin_bool dogecoin_bip37_filter_add(dogecoin_bip37_filter* filter,
+                                        const uint8_t* data,
+                                        size_t data_len);
+/* Free a bloom filter previously allocated by dogecoin_bip37_filter_new. */
+void dogecoin_bip37_filter_free(dogecoin_bip37_filter* filter);
 
 LIBDOGECOIN_END_DECL
 
