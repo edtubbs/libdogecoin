@@ -65,8 +65,8 @@
 #define DOGECOIN_KOINU_PER_COIN 100000000ULL
 /* Dogecoin block subsidy has been 10,000 DOGE for years; good for 24h stats */
 #define DOGECOIN_CURRENT_SUBSIDY_KOINU (10000ULL * DOGECOIN_KOINU_PER_COIN)
-
-static size_t spv_write_varint(uint64_t val, uint8_t out[9]);
+#define SPV_VARINT_MAX_LEN 9 /* compactSize max bytes; we reserve max for simple one-pass allocation */
+#define SPV_FILTERLOAD_FIXED_FIELDS_LEN 9 /* 4-byte nHashFuncs + 4-byte nTweak + 1-byte flags */
 
 /* Build and send filterload directly from SPV/network context. */
 static dogecoin_bool spv_send_filterload_to_node(dogecoin_node* node,
@@ -78,73 +78,25 @@ static dogecoin_bool spv_send_filterload_to_node(dogecoin_node* node,
 {
     if (!node || !filter || filter_len == 0) return false;
 
-    uint8_t vi[9];
-    size_t vi_len = spv_write_varint((uint64_t)filter_len, vi);
-
-    size_t payload_len = vi_len + (size_t)filter_len + 4 + 4 + 1;
-    uint8_t* payload = (uint8_t*)dogecoin_calloc(1, payload_len);
+    cstring* payload = cstr_new_sz((size_t)filter_len + SPV_VARINT_MAX_LEN + SPV_FILTERLOAD_FIXED_FIELDS_LEN);
     if (!payload) return false;
 
-    size_t off = 0;
-    memcpy(payload + off, vi, vi_len); off += vi_len;
-    memcpy(payload + off, filter, filter_len); off += filter_len;
-
-    payload[off + 0] = (uint8_t)(nHashFuncs & 0xff);
-    payload[off + 1] = (uint8_t)((nHashFuncs >> 8) & 0xff);
-    payload[off + 2] = (uint8_t)((nHashFuncs >> 16) & 0xff);
-    payload[off + 3] = (uint8_t)((nHashFuncs >> 24) & 0xff);
-    off += 4;
-
-    payload[off + 0] = (uint8_t)(nTweak & 0xff);
-    payload[off + 1] = (uint8_t)((nTweak >> 8) & 0xff);
-    payload[off + 2] = (uint8_t)((nTweak >> 16) & 0xff);
-    payload[off + 3] = (uint8_t)((nTweak >> 24) & 0xff);
-    off += 4;
-
-    payload[off] = flags;
+    ser_varlen(payload, filter_len);
+    ser_bytes(payload, filter, filter_len);
+    ser_u32(payload, nHashFuncs);
+    ser_u32(payload, nTweak);
+    ser_bytes(payload, &flags, 1);
 
     cstring* msg = dogecoin_p2p_message_new(
         node->nodegroup->chainparams->netmagic,
         DOGECOIN_MSG_FILTERLOAD,
-        payload,
-        (uint32_t)payload_len
+        (const uint8_t*)payload->str,
+        payload->len
     );
     dogecoin_node_send(node, msg);
     cstr_free(msg, true);
-    dogecoin_free(payload);
+    cstr_free(payload, true);
     return true;
-}
-
-static size_t spv_write_varint(uint64_t val, uint8_t out[9])
-{
-    if (val < 0xfdULL) {
-        out[0] = (uint8_t)val;
-        return 1;
-    }
-    if (val <= 0xffffULL) {
-        out[0] = 0xfd;
-        out[1] = (uint8_t)(val & 0xff);
-        out[2] = (uint8_t)((val >> 8) & 0xff);
-        return 3;
-    }
-    if (val <= 0xffffffffULL) {
-        out[0] = 0xfe;
-        out[1] = (uint8_t)(val & 0xff);
-        out[2] = (uint8_t)((val >> 8) & 0xff);
-        out[3] = (uint8_t)((val >> 16) & 0xff);
-        out[4] = (uint8_t)((val >> 24) & 0xff);
-        return 5;
-    }
-    out[0] = 0xff;
-    out[1] = (uint8_t)(val & 0xff);
-    out[2] = (uint8_t)((val >> 8) & 0xff);
-    out[3] = (uint8_t)((val >> 16) & 0xff);
-    out[4] = (uint8_t)((val >> 24) & 0xff);
-    out[5] = (uint8_t)((val >> 32) & 0xff);
-    out[6] = (uint8_t)((val >> 40) & 0xff);
-    out[7] = (uint8_t)((val >> 48) & 0xff);
-    out[8] = (uint8_t)((val >> 56) & 0xff);
-    return 9;
 }
 
 static const unsigned int HEADERS_MAX_RESPONSE_TIME = 120;
@@ -1530,15 +1482,11 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
     if (!client || !data || data_len == 0) return false;
     if (!client->nodegroup || !client->nodegroup->nodes) return true;
 
-    uint8_t vi[9];
-    size_t vi_len = spv_write_varint((uint64_t)data_len, vi);
-
-    size_t payload_len = vi_len + (size_t)data_len;
-    uint8_t* payload = (uint8_t*)dogecoin_calloc(1, payload_len);
+    cstring* payload = cstr_new_sz((size_t)data_len + SPV_VARINT_MAX_LEN);
     if (!payload) return false;
 
-    memcpy(payload, vi, vi_len);
-    memcpy(payload + vi_len, data, data_len);
+    ser_varlen(payload, data_len);
+    ser_bytes(payload, data, data_len);
 
     for (unsigned int i = 0; i < (unsigned int)client->nodegroup->nodes->len; i++) {
         dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, i);
@@ -1548,14 +1496,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
         cstring* msg = dogecoin_p2p_message_new(
             n->nodegroup->chainparams->netmagic,
             DOGECOIN_MSG_FILTERADD,
-            payload,
-            (uint32_t)payload_len
+            (const uint8_t*)payload->str,
+            payload->len
         );
         dogecoin_node_send(n, msg);
         cstr_free(msg, true);
     }
 
-    dogecoin_free(payload);
+    cstr_free(payload, true);
 
     if (client->nodegroup && client->nodegroup->log_write_cb)
         client->nodegroup->log_write_cb("[spv] sent filteradd (len=%u)\n", data_len);
