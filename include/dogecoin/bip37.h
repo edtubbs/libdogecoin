@@ -30,7 +30,6 @@
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/serialize.h>
 
-struct dogecoin_node_;
 /* Callback used for each matched leaf txid while traversing a merkleblock. */
 typedef dogecoin_bool (*dogecoin_bip37_match_cb)(const uint8_t txid[32], uint32_t pos, void* ctx);
 
@@ -44,13 +43,6 @@ typedef struct dogecoin_bip37_filter_ {
 } dogecoin_bip37_filter;
 
 LIBDOGECOIN_BEGIN_DECL
-
-dogecoin_bool dogecoin_bip37_send_filterload(struct dogecoin_node_* node,
-                                             const uint8_t* filter,
-                                             uint32_t filter_len,
-                                             uint32_t nHashFuncs,
-                                             uint32_t nTweak,
-                                             uint8_t flags);
 
 dogecoin_bool dogecoin_bip37_build_filtered_getdata_payload(const struct const_buffer* inv_payload,
                                                             uint8_t** out_payload,
@@ -66,6 +58,20 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                                                      const uint8_t header_merkle[32],
                                                      dogecoin_bip37_match_cb on_match,
                                                      void* match_ctx);
+
+dogecoin_bool dogecoin_bip37_merkle_extract_match_tree(uint32_t nTx,
+                                                       const uint8_t* hashes,
+                                                       uint32_t hashCount,
+                                                       const uint8_t* flags,
+                                                       uint32_t flags_len,
+                                                       const uint8_t header_merkle[32],
+                                                       void** match_tree,
+                                                       uint32_t* match_pending);
+
+dogecoin_bool dogecoin_bip37_merkle_match_consume(void** match_tree,
+                                                  uint32_t* match_pending,
+                                                  const uint8_t txid[32],
+                                                  uint32_t* out_pos);
 
 /* Allocate a fixed-size BIP37 bloom filter (uses protocol max size/hash count). */
 dogecoin_bip37_filter* dogecoin_bip37_filter_new(uint32_t tweak, uint8_t flags);

@@ -27,11 +27,10 @@
 #include <string.h>
 
 #include <dogecoin/bip37.h>
+#include <dogecoin/hash.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/random.h>
-#include <dogecoin/spv.h>
 #include <dogecoin/utils.h>
-#include <dogecoin/vector.h>
 
 /**
  * Serialize a compactSize integer into a caller-provided buffer.
@@ -108,6 +107,51 @@ static uint32_t bip37_murmur3(const uint8_t* key, size_t len, uint32_t seed)
     h *= 0xc2b2ae35u;
     h ^= h >> 16;
     return h;
+}
+
+typedef struct bip37_merkle_match_ {
+    uint256_t txid;
+    uint32_t pos;
+    dogecoin_bool consumed;
+} bip37_merkle_match;
+
+static int bip37_merkle_match_cmp(const void* a, const void* b)
+{
+    const bip37_merkle_match* ma = (const bip37_merkle_match*)a;
+    const bip37_merkle_match* mb = (const bip37_merkle_match*)b;
+    return memcmp(ma->txid, mb->txid, 32);
+}
+
+typedef struct bip37_merkle_collect_ctx_ {
+    void** match_tree;
+    uint32_t* match_pending;
+} bip37_merkle_collect_ctx;
+
+/* Callback bridge used by bip37 merkle traversal to collect matched txids. */
+static dogecoin_bool bip37_merkle_collect_match(const uint8_t txid[32], uint32_t pos, void* ctx)
+{
+    bip37_merkle_collect_ctx* c = (bip37_merkle_collect_ctx*)ctx;
+    if (!c || !c->match_tree || !c->match_pending) return false;
+
+    bip37_merkle_match* m = (bip37_merkle_match*)dogecoin_calloc(1, sizeof(bip37_merkle_match));
+    if (!m) return false;
+
+    memcpy(m->txid, txid, 32);
+    m->pos = pos;
+    m->consumed = false;
+
+    dogecoin_btree_node_t* nn = (dogecoin_btree_node_t*)dogecoin_btree_tsearch(
+        m, c->match_tree, bip37_merkle_match_cmp);
+    if (!nn) {
+        dogecoin_free(m);
+        return false;
+    }
+    if (nn->key != m) {
+        dogecoin_free(m);
+    } else {
+        (*c->match_pending)++;
+    }
+    return true;
 }
 
 /**
@@ -240,6 +284,56 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     return (ok_extract && have_ret && memcmp(ret, header_merkle, 32) == 0);
 }
 
+dogecoin_bool dogecoin_bip37_merkle_extract_match_tree(uint32_t nTx,
+                                                       const uint8_t* hashes,
+                                                       uint32_t hashCount,
+                                                       const uint8_t* flags,
+                                                       uint32_t flags_len,
+                                                       const uint8_t header_merkle[32],
+                                                       void** match_tree,
+                                                       uint32_t* match_pending)
+{
+    if (!match_tree || !match_pending) return false;
+    *match_pending = 0;
+
+    bip37_merkle_collect_ctx ctx;
+    ctx.match_tree = match_tree;
+    ctx.match_pending = match_pending;
+
+    return dogecoin_bip37_traverse_merkle_matches(nTx,
+                                                  hashes,
+                                                  hashCount,
+                                                  flags,
+                                                  flags_len,
+                                                  header_merkle,
+                                                  bip37_merkle_collect_match,
+                                                  &ctx);
+}
+
+dogecoin_bool dogecoin_bip37_merkle_match_consume(void** match_tree,
+                                                  uint32_t* match_pending,
+                                                  const uint8_t txid[32],
+                                                  uint32_t* out_pos)
+{
+    if (!match_tree || !*match_tree || !match_pending || !txid) return false;
+
+    bip37_merkle_match key;
+    memset(&key, 0, sizeof(key));
+    memcpy(key.txid, txid, 32);
+
+    dogecoin_btree_node_t* found = (dogecoin_btree_node_t*)dogecoin_btree_tfind(
+        &key, (void* const*)match_tree, bip37_merkle_match_cmp);
+    if (!found || !found->key) return false;
+
+    bip37_merkle_match* m = (bip37_merkle_match*)found->key;
+    if (m->consumed) return false;
+
+    m->consumed = true;
+    if (*match_pending > 0) (*match_pending)--;
+    if (out_pos) *out_pos = m->pos;
+    return true;
+}
+
 /**
  * Create a fixed-size BIP37 bloom filter using protocol maximums.
  *
@@ -306,56 +400,6 @@ void dogecoin_bip37_filter_free(dogecoin_bip37_filter* filter)
 }
 
 /**
- * Build and send a BIP37 filterload message to a peer.
- *
- * @return true if the message was built and queued for send, false otherwise.
- */
-dogecoin_bool dogecoin_bip37_send_filterload(struct dogecoin_node_* node,
-                                             const uint8_t* filter,
-                                             uint32_t filter_len,
-                                             uint32_t nHashFuncs,
-                                             uint32_t nTweak,
-                                             uint8_t flags)
-{
-    if (!node || !filter || filter_len == 0) return false;
-
-    uint8_t vi[9];
-    size_t vi_len = bip37_write_varint((uint64_t)filter_len, vi);
-    size_t payload_len = vi_len + (size_t)filter_len + 4 + 4 + 1;
-    uint8_t* payload = (uint8_t*)dogecoin_calloc(1, payload_len);
-    if (!payload) return false;
-
-    size_t off = 0;
-    memcpy(payload + off, vi, vi_len); off += vi_len;
-    memcpy(payload + off, filter, filter_len); off += filter_len;
-
-    payload[off + 0] = (uint8_t)(nHashFuncs & 0xff);
-    payload[off + 1] = (uint8_t)((nHashFuncs >> 8) & 0xff);
-    payload[off + 2] = (uint8_t)((nHashFuncs >> 16) & 0xff);
-    payload[off + 3] = (uint8_t)((nHashFuncs >> 24) & 0xff);
-    off += 4;
-
-    payload[off + 0] = (uint8_t)(nTweak & 0xff);
-    payload[off + 1] = (uint8_t)((nTweak >> 8) & 0xff);
-    payload[off + 2] = (uint8_t)((nTweak >> 16) & 0xff);
-    payload[off + 3] = (uint8_t)((nTweak >> 24) & 0xff);
-    off += 4;
-
-    payload[off] = flags;
-
-    cstring* msg = dogecoin_p2p_message_new(
-        node->nodegroup->chainparams->netmagic,
-        DOGECOIN_MSG_FILTERLOAD,
-        payload,
-        (uint32_t)payload_len
-    );
-    dogecoin_node_send(node, msg);
-    cstr_free(msg, true);
-    dogecoin_free(payload);
-    return true;
-}
-
-/**
  * Rewrite a getdata/inv payload so BLOCK entries become FILTERED_BLOCK entries.
  *
  * Used when a bloom filter is active and the SPV client wants merkleblock+tx
@@ -404,128 +448,5 @@ dogecoin_bool dogecoin_bip37_build_filtered_getdata_payload(const struct const_b
     *out_payload = out;
     *out_len = (uint32_t)off;
     *item_count = n;
-    return true;
-}
-
-LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterload(
-    dogecoin_spv_client* client,
-    const uint8_t* filter,
-    uint32_t filter_len,
-    uint32_t nHashFuncs,
-    uint32_t nTweak,
-    uint8_t flags)
-{
-    if (!client || !filter || filter_len == 0) return false;
-
-    if (client->bloom_filter) {
-        dogecoin_free(client->bloom_filter);
-        client->bloom_filter = NULL;
-    }
-
-    client->bloom_filter = (uint8_t*)dogecoin_calloc(filter_len, 1);
-    if (!client->bloom_filter) return false;
-
-    memcpy(client->bloom_filter, filter, filter_len);
-    client->bloom_filter_len = filter_len;
-    client->bloom_nhashfunc = nHashFuncs;
-    client->bloom_ntweak = nTweak;
-    client->bloom_flags = flags;
-
-    if (!client->nodegroup || !client->nodegroup->nodes) return true;
-
-    for (unsigned int i = 0; i < (unsigned int)client->nodegroup->nodes->len; i++) {
-        dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, i);
-        if (!n) continue;
-        if (((n->state & NODE_CONNECTED) != NODE_CONNECTED) || !n->version_handshake) continue;
-        dogecoin_bip37_send_filterload(n, filter, filter_len, nHashFuncs, nTweak, flags);
-    }
-
-    if (client->nodegroup && client->nodegroup->log_write_cb)
-        client->nodegroup->log_write_cb("[spv] filterload set (len=%u)\n", filter_len);
-
-    return true;
-}
-
-/**
- * Send a BIP37 filteradd message to all connected, handshaked peers.
- */
-LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
-    dogecoin_spv_client* client,
-    const uint8_t* data,
-    uint32_t data_len)
-{
-    if (!client || !data || data_len == 0) return false;
-    if (!client->nodegroup || !client->nodegroup->nodes) return true;
-
-    uint8_t vi[9];
-    size_t vi_len = bip37_write_varint((uint64_t)data_len, vi);
-    size_t payload_len = vi_len + (size_t)data_len;
-    uint8_t* payload = (uint8_t*)dogecoin_calloc(1, payload_len);
-    if (!payload) return false;
-
-    memcpy(payload, vi, vi_len);
-    memcpy(payload + vi_len, data, data_len);
-
-    for (unsigned int i = 0; i < (unsigned int)client->nodegroup->nodes->len; i++) {
-        dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, i);
-        if (!n) continue;
-        if (((n->state & NODE_CONNECTED) != NODE_CONNECTED) || !n->version_handshake) continue;
-
-        cstring* msg = dogecoin_p2p_message_new(
-            n->nodegroup->chainparams->netmagic,
-            DOGECOIN_MSG_FILTERADD,
-            payload,
-            (uint32_t)payload_len
-        );
-        dogecoin_node_send(n, msg);
-        cstr_free(msg, true);
-    }
-
-    dogecoin_free(payload);
-
-    if (client->nodegroup && client->nodegroup->log_write_cb)
-        client->nodegroup->log_write_cb("[spv] sent filteradd (len=%u)\n", data_len);
-
-    return true;
-}
-
-/**
- * Clear local BIP37 filter state and send filterclear to active peers.
- */
-LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterclear(dogecoin_spv_client* client)
-{
-    if (!client) return false;
-
-    if (client->bloom_filter) {
-        dogecoin_free(client->bloom_filter);
-        client->bloom_filter = NULL;
-    }
-    client->bloom_filter_len = 0;
-    client->bloom_nhashfunc = 0;
-    client->bloom_ntweak = 0;
-    client->bloom_flags = 0;
-
-    if (!client->nodegroup || !client->nodegroup->nodes) return true;
-
-    for (unsigned int i = 0; i < (unsigned int)client->nodegroup->nodes->len; i++) {
-        dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, i);
-        if (!n) continue;
-        if (((n->state & NODE_CONNECTED) != NODE_CONNECTED) || !n->version_handshake) continue;
-
-        cstring* payload = cstr_new_sz(0);
-        cstring* msg = dogecoin_p2p_message_new(
-            n->nodegroup->chainparams->netmagic,
-            DOGECOIN_MSG_FILTERCLEAR,
-            payload->str,
-            payload->len
-        );
-        cstr_free(payload, true);
-        dogecoin_node_send(n, msg);
-        cstr_free(msg, true);
-    }
-
-    if (client->nodegroup && client->nodegroup->log_write_cb)
-        client->nodegroup->log_write_cb("[spv] sent filterclear\n");
-
     return true;
 }
