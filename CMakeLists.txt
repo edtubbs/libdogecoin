@@ -271,6 +271,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/block.c
     src/buffer.c
     src/chacha20.c
+    src/context.c
     src/cstr.c
     src/ctaes.c
     src/ecc.c

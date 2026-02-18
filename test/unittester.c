@@ -51,6 +51,7 @@ extern void test_cstr();
 extern void test_ecc();
 extern void test_hash();
 extern void test_key();
+extern void test_context_keypair_ex();
 extern void test_koinu();
 extern void test_memory();
 extern void test_moon();
@@ -136,6 +137,7 @@ int main()
     u_run_test(test_ecc);
     u_run_test(test_hash);
     u_run_test(test_key);
+    u_run_test(test_context_keypair_ex);
     u_run_test(test_koinu);
     u_run_test(test_memory);
     u_run_test(test_moon);

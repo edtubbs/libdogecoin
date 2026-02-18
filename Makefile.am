@@ -90,6 +90,7 @@ libdogecoin_la_SOURCES = \
     src/block.c \
     src/buffer.c \
     src/chacha20.c \
+    src/context.c \
     src/chainparams.c \
     src/cstr.c \
     src/ctaes.c \

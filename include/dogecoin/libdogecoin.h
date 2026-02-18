@@ -66,6 +66,20 @@ typedef struct dogecoin_checkpoint_ {
     uint32_t target;
 } dogecoin_checkpoint;
 
+struct dogecoin_transaction_context;
+struct dogecoin_eckey_context;
+typedef struct dogecoin_context_ {
+    const dogecoin_chainparams* chain_params;
+    struct dogecoin_transaction_context* tx_ctx;
+    struct dogecoin_eckey_context* key_ctx;
+    void* ecc_ctx;
+    void* rng_state;
+    int enable_net;
+    int error_code;
+    uint32_t refcount;
+    char last_error[256];
+} dogecoin_context;
+
 extern const dogecoin_chainparams dogecoin_chainparams_main;
 extern const dogecoin_chainparams dogecoin_chainparams_test;
 extern const dogecoin_chainparams dogecoin_chainparams_regtest;
@@ -76,6 +90,17 @@ extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[18];
 
 const dogecoin_chainparams* chain_from_b58_prefix(const char* address);
 int chain_from_b58_prefix_bool(char* address);
+
+dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enable_net);
+void dogecoin_context_acquire(dogecoin_context* ctx);
+void dogecoin_context_release(dogecoin_context* ctx);
+const dogecoin_chainparams* dogecoin_context_get_chainparams(const dogecoin_context* ctx);
+struct dogecoin_transaction_context* dogecoin_context_get_transaction_context(dogecoin_context* ctx);
+struct dogecoin_eckey_context* dogecoin_context_get_eckey_context(dogecoin_context* ctx);
+void dogecoin_context_set_error(dogecoin_context* ctx, int code, const char* msg);
+int dogecoin_context_get_error_code(const dogecoin_context* ctx);
+const char* dogecoin_context_get_error(const dogecoin_context* ctx);
+int dogecoin_generate_keypair_ex(dogecoin_context* ctx, char* wif, size_t* wif_size, char* addr, size_t* addr_size);
 
 /* basic address functions: return 1 if succesful
    ----------------------------------------------
