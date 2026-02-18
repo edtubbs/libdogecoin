@@ -383,6 +383,7 @@ To utilize checkpoints for faster initial sync, apply the -p flag:
 | `-i`, `--ips` | Initial Peers | Yes | Specify initial peers: `./spvnode -i 127.0.0.1:22556 scan` |
 | `-d`, `--debug` | Debug Mode | No | Enable debug output: `./spvnode -d scan` |
 | `-m`, `--maxnodes` | Max Peers | Yes | Set max peers: `./spvnode -m 8 scan` |
+| `-o`, `--workers` | Worker Threads | Yes | Set worker threads: `./spvnode -o 4 scan` |
 | `-a`, `--address` | Address | Yes | Use address: `./spvnode -a "your address here" scan` |
 | `-n`, `--mnemonic` | Mnemonic Seed | Yes | Use BIP39 mnemonic: `./spvnode -n "your mnemonic here" scan` |
 | `-s`, `--pass_phrase` | Passphrase | No | Passphrase for BIP39 seed: `./spvnode -s scan` |
@@ -400,7 +401,7 @@ To utilize checkpoints for faster initial sync, apply the -p flag:
 | `-u`, `--http_server` | Enable HTTP | No | Enabled HTTP: `./spvnode -u 127.0.0.1:8080 scan` |
 | `-x`, `--smpv` | Enable SMPV | No | Enabled SMPV: `./spvnode -x scan` |
 
-`spvnode` currently runs a single libevent runloop thread. It enables libevent threading support and can request headers from multiple peers in parallel over asynchronous network I/O.
+`spvnode` uses a libevent runloop plus worker threads for header-processing callbacks (`--workers`). It enables libevent threading support and can request headers from multiple peers in parallel over asynchronous network I/O.
 
 Note: libdogecoin is not entirely thread-safe yet. Some legacy APIs still rely on shared/global registries, so independent contexts/TLS-backed state are still needed in those areas for full thread-safety.
 

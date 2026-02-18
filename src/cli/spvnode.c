@@ -35,9 +35,12 @@
 
 #ifndef _MSC_VER
 #include <getopt.h>
+#include <pthread.h>
 #include <unistd.h>
 #else
 #include <win/wingetopt.h>
+#define HAVE_STRUCT_TIMESPEC
+#include <win/pthread.h>
 #endif
 
 #include <ctype.h>
@@ -171,6 +174,143 @@ become_daemon(int flags)
 }
 #endif
 
+typedef struct spv_work_item_ {
+    int height;
+    time_t timestamp;
+    struct spv_work_item_* next;
+} spv_work_item;
+
+typedef struct spv_worker_pool_ {
+    pthread_t* threads;
+    int workers;
+    int created_workers;
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    spv_work_item* head;
+    spv_work_item* tail;
+    dogecoin_bool stop;
+    dogecoin_bool running;
+} spv_worker_pool;
+
+static spv_worker_pool g_worker_pool = {0};
+
+static void spv_print_header_tip(int height, time_t timestamp)
+{
+    char timestr[32];
+#ifdef _WIN32
+    ctime_s(timestr, sizeof(timestr), &timestamp);
+#else
+    ctime_r(&timestamp, timestr);
+#endif
+    printf("New headers tip height %d from %s\n", height, timestr);
+}
+
+static void* spv_worker_thread(void* arg)
+{
+    UNUSED(arg);
+    while (true) {
+        pthread_mutex_lock(&g_worker_pool.mutex);
+        while (!g_worker_pool.stop && g_worker_pool.head == NULL) {
+            pthread_cond_wait(&g_worker_pool.cond, &g_worker_pool.mutex);
+        }
+        if (g_worker_pool.stop && g_worker_pool.head == NULL) {
+            pthread_mutex_unlock(&g_worker_pool.mutex);
+            break;
+        }
+        spv_work_item* item = g_worker_pool.head;
+        g_worker_pool.head = item->next;
+        if (g_worker_pool.head == NULL) {
+            g_worker_pool.tail = NULL;
+        }
+        pthread_mutex_unlock(&g_worker_pool.mutex);
+        spv_print_header_tip(item->height, item->timestamp);
+        dogecoin_free(item);
+    }
+    return NULL;
+}
+
+static void spv_worker_pool_stop(void)
+{
+    if (!g_worker_pool.running) {
+        return;
+    }
+    pthread_mutex_lock(&g_worker_pool.mutex);
+    g_worker_pool.stop = true;
+    pthread_cond_broadcast(&g_worker_pool.cond);
+    pthread_mutex_unlock(&g_worker_pool.mutex);
+
+    for (int i = 0; i < g_worker_pool.created_workers; i++) {
+        pthread_join(g_worker_pool.threads[i], NULL);
+    }
+
+    while (g_worker_pool.head) {
+        spv_work_item* item = g_worker_pool.head;
+        g_worker_pool.head = item->next;
+        dogecoin_free(item);
+    }
+    g_worker_pool.tail = NULL;
+    pthread_mutex_destroy(&g_worker_pool.mutex);
+    pthread_cond_destroy(&g_worker_pool.cond);
+    dogecoin_free(g_worker_pool.threads);
+    memset(&g_worker_pool, 0, sizeof(g_worker_pool));
+}
+
+static dogecoin_bool spv_worker_pool_start(int workers)
+{
+    if (workers <= 1) {
+        return true;
+    }
+    g_worker_pool.threads = dogecoin_calloc(workers, sizeof(*g_worker_pool.threads));
+    if (!g_worker_pool.threads) {
+        return false;
+    }
+    g_worker_pool.workers = workers;
+    g_worker_pool.created_workers = 0;
+    g_worker_pool.stop = false;
+    g_worker_pool.running = true;
+    if (pthread_mutex_init(&g_worker_pool.mutex, NULL) != 0) {
+        spv_worker_pool_stop();
+        return false;
+    }
+    if (pthread_cond_init(&g_worker_pool.cond, NULL) != 0) {
+        spv_worker_pool_stop();
+        return false;
+    }
+
+    for (int i = 0; i < workers; i++) {
+        if (pthread_create(&g_worker_pool.threads[i], NULL, spv_worker_thread, NULL) != 0) {
+            spv_worker_pool_stop();
+            return false;
+        }
+        g_worker_pool.created_workers++;
+    }
+    return true;
+}
+
+static dogecoin_bool spv_worker_pool_enqueue(int height, time_t timestamp)
+{
+    if (!g_worker_pool.running) {
+        return false;
+    }
+    spv_work_item* item = dogecoin_calloc(1, sizeof(*item));
+    if (!item) {
+        return false;
+    }
+    item->height = height;
+    item->timestamp = timestamp;
+
+    pthread_mutex_lock(&g_worker_pool.mutex);
+    if (g_worker_pool.tail) {
+        g_worker_pool.tail->next = item;
+    } else {
+        g_worker_pool.head = item;
+    }
+    g_worker_pool.tail = item;
+    pthread_cond_signal(&g_worker_pool.cond);
+    pthread_mutex_unlock(&g_worker_pool.mutex);
+    return true;
+}
+
 /* This is a list of all the options that can be used with the program. */
 static struct option long_options[] = {
         {"testnet", no_argument, NULL, 't'},
@@ -178,6 +318,7 @@ static struct option long_options[] = {
         {"ips", no_argument, NULL, 'i'},
         {"debug", no_argument, NULL, 'd'},
         {"maxnodes", required_argument, NULL, 'm'},
+        {"workers", required_argument, NULL, 'o'},
         {"mnemonic", no_argument, NULL, 'n'},
         {"pass_phrase", no_argument, NULL, 's'},
         {"dbfile", no_argument, NULL, 'f'},
@@ -209,7 +350,7 @@ static void print_version() {
  */
 static void print_usage() {
     print_version();
-    printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m|--maxnodes <int>) (-f <headersfile|0 for in mem only>) \
+    printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m|--maxnodes <int>) (-o|--workers <int>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
 (-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
 (-u|--http_server <ip:port>) (-x|--smpv) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
@@ -270,7 +411,9 @@ dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_* client, 
     UNUSED(node);
     if (newtip) {
         time_t timestamp = client->headers_db->getchaintip(client->headers_db_ctx)->header.timestamp;
-        printf("New headers tip height %d from %s\n", newtip->height, ctime(&timestamp));
+        if (!spv_worker_pool_enqueue(newtip->height, timestamp)) {
+            spv_print_header_tip(newtip->height, timestamp);
+        }
         }
     return true;
     }
@@ -309,6 +452,7 @@ int main(int argc, char* argv[]) {
     char* ips = 0;
     dogecoin_bool debug = false;
     int maxnodes = 10;
+    int workers = 1;
     char* dbfile = 0;
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
     char* address = NULL;
@@ -339,7 +483,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xv", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:o:n:f:y:u:w:h:a:lbpzkj:xv", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -361,6 +505,11 @@ int main(int argc, char* argv[]) {
                     break;
                 case 'm':
                     maxnodes = (int)strtol(optarg, (char**)NULL, 10);
+                    break;
+                case 'o':
+                    workers = (int)strtol(optarg, (char**)NULL, 10);
+                    if (workers < 1) workers = 1;
+                    if (workers > 64) workers = 64;
                     break;
                 case 'n':
                     mnemonic_in = optarg;
@@ -431,8 +580,10 @@ int main(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
 #endif
-        if (debug) {
-            printf("spvnode uses a single event loop thread with libevent threading enabled.\n");
+        if (debug) printf("spvnode workers: %d\n", workers);
+        if (!spv_worker_pool_start(workers)) {
+            fprintf(stderr, "Failed to start worker thread pool\n");
+            return EXIT_FAILURE;
         }
         dogecoin_ecc_start();
         dogecoin_bool headers_memonly = (dbfile != NULL) && (!strcmp(dbfile, "0") || !strcmp(dbfile, "no"));
@@ -471,6 +622,7 @@ int main(int argc, char* argv[]) {
                 dogecoin_free(pass);
                 }
             dogecoin_spv_client_free(client);
+            spv_worker_pool_stop();
             dogecoin_ecc_stop();
             return EXIT_FAILURE;
         }
@@ -559,6 +711,7 @@ int main(int argc, char* argv[]) {
             dogecoin_wallet_free(wallet);
 #endif
             }
+        spv_worker_pool_stop();
         dogecoin_ecc_stop();
     } else if (strcmp(data, "sanity") == 0) {
 #if WITH_WALLET
