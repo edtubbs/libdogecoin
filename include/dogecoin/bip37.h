@@ -31,6 +31,7 @@
 #include <dogecoin/serialize.h>
 
 struct dogecoin_node_;
+/* Callback used for each matched leaf txid while traversing a merkleblock. */
 typedef dogecoin_bool (*dogecoin_bip37_match_cb)(const uint8_t txid[32], uint32_t pos, void* ctx);
 
 LIBDOGECOIN_BEGIN_DECL
@@ -47,6 +48,7 @@ dogecoin_bool dogecoin_bip37_build_filtered_getdata_payload(const struct const_b
                                                             uint32_t* out_len,
                                                             uint32_t* item_count);
 
+/* Traverse/verify partial merkle tree and report matched tx leaves via callback. */
 dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                                                      const uint8_t* hashes,
                                                      uint32_t hashCount,

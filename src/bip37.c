@@ -64,6 +64,15 @@ static size_t bip37_write_varint(uint64_t val, uint8_t out[9])
     return 9;
 }
 
+/**
+ * Traverse a BIP37 partial merkle tree and verify the calculated root.
+ *
+ * The function follows the same depth-first walk as Bitcoin Core's
+ * TraverseAndExtract logic. For every matched leaf (tx hash where the
+ * parent bit is set), it invokes @p on_match with the txid and leaf position.
+ *
+ * @return true when traversal succeeds and calculated root equals header_merkle.
+ */
 dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                                                      const uint8_t* hashes,
                                                      uint32_t hashCount,
@@ -180,6 +189,11 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     return (ok_extract && have_ret && memcmp(ret, header_merkle, 32) == 0);
 }
 
+/**
+ * Build and send a BIP37 filterload message to a peer.
+ *
+ * @return true if the message was built and queued for send, false otherwise.
+ */
 dogecoin_bool dogecoin_bip37_send_filterload(struct dogecoin_node_* node,
                                              const uint8_t* filter,
                                              uint32_t filter_len,
@@ -225,6 +239,12 @@ dogecoin_bool dogecoin_bip37_send_filterload(struct dogecoin_node_* node,
     return true;
 }
 
+/**
+ * Rewrite a getdata/inv payload so BLOCK entries become FILTERED_BLOCK entries.
+ *
+ * Used when a bloom filter is active and the SPV client wants merkleblock+tx
+ * responses instead of full blocks.
+ */
 dogecoin_bool dogecoin_bip37_build_filtered_getdata_payload(const struct const_buffer* inv_payload,
                                                             uint8_t** out_payload,
                                                             uint32_t* out_len,

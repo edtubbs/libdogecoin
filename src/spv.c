@@ -83,6 +83,7 @@ typedef struct spv_merkle_collect_ctx_ {
     dogecoin_spv_client* client;
 } spv_merkle_collect_ctx;
 
+/* Callback bridge used by bip37 merkle traversal to collect matched txids. */
 static dogecoin_bool spv_merkle_collect_match(const uint8_t txid[32], uint32_t pos, void* ctx)
 {
     spv_merkle_collect_ctx* c = (spv_merkle_collect_ctx*)ctx;
