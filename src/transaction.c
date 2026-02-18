@@ -35,8 +35,7 @@
 #include <dogecoin/utils.h>
 
 static dogecoin_transaction_context* default_transaction_context(void) {
-    /* Legacy wrapper context (not thread-safe): prefer explicit *_ts APIs for concurrent use. */
-    static dogecoin_transaction_context default_ctx = {0};
+    static DOGECOIN_THREAD_LOCAL dogecoin_transaction_context default_ctx = {0};
     return &default_ctx;
 }
 
@@ -1135,29 +1134,4 @@ int sign_transaction_w_privkey_ex(int  txindex,
     int ok = sign_transaction_ex(txindex, script_pubkey, privkey, buf, buf_cap);
     dogecoin_free(script_pubkey);
     return ok;
-}
-
-/* _ex_ts aliases for _ex APIs (non-breaking migration path) */
-int get_raw_transaction_ex_ts(int txindex, char* buf, size_t buf_cap) {
-    return get_raw_transaction_ex(txindex, buf, buf_cap);
-}
-
-int sign_raw_transaction_ex_ts(int inputindex, const char* incomingrawtx, char* signedrawtx, size_t* signed_size, const char* scripthex, int sighashtype, const char* privkey) {
-    return sign_raw_transaction_ex(inputindex, incomingrawtx, signedrawtx, signed_size, scripthex, sighashtype, privkey);
-}
-
-int finalize_transaction_ex_ts(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress, char* buf, size_t buf_cap) {
-    return finalize_transaction_ex(txindex, destinationaddress, subtractedfee, out_dogeamount_for_verification, changeaddress, buf, buf_cap);
-}
-
-int sign_indexed_raw_transaction_ex_ts(int txindex, int inputindex, const char* scripthex, int sighashtype, const char* privkey, char* buf, size_t buf_cap) {
-    return sign_indexed_raw_transaction_ex(txindex, inputindex, scripthex, sighashtype, privkey, buf, buf_cap);
-}
-
-int sign_transaction_ex_ts(int txindex, const char* script_pubkey, const char* privkey, char* buf, size_t buf_cap) {
-    return sign_transaction_ex(txindex, script_pubkey, privkey, buf, buf_cap);
-}
-
-int sign_transaction_w_privkey_ex_ts(int txindex, const char* privkey, char* buf, size_t buf_cap) {
-    return sign_transaction_w_privkey_ex(txindex, privkey, buf, buf_cap);
 }

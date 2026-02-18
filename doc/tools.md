@@ -401,7 +401,7 @@ To utilize checkpoints for faster initial sync, apply the -p flag:
 
 `spvnode` uses a libevent runloop plus worker threads for header-processing callbacks (`--workers`). It enables libevent threading support and can request headers from multiple peers in parallel over asynchronous network I/O.
 
-Note: `_ts` APIs are the thread-safe API surface to target. Legacy APIs are kept for compatibility and are not advertised as formally thread-safe. Formal thread-safety guarantees for every API path depend on deeper context ownership semantics across all modules.
+Note: `_ts` APIs are used where explicit context ownership is required for thread safety. If a function can be made thread-safe without changing parameters, the original API name is preferred. Formal thread-safety guarantees for every API path still depend on deeper context ownership semantics across all modules.
 
 ### Commands
 

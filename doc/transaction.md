@@ -31,9 +31,9 @@
 
 The high level 'essential' API provided by libdogecoin for working with simple transactions revolve around a structure defined as a `working_transaction` which is comprised of an index as an integer meant for retrieval, a dogecoin_tx 'transaction' structure as seen above, and finally a UT_hash_handle which stores our working_transaction struct in a hash table (using Troy D. Hanson's uthash library: see ./include/dogecoin/uthash.h and visit https://troydhanson.github.io/uthash/ for more information) which allow us to generate multiple transactions per "session". This `working_transaction` structure is defined as such:
 
-For non-breaking migration, `_ex_ts` aliases are available for `_ex` transaction buffer APIs (for example `sign_raw_transaction_ex_ts` alongside `sign_raw_transaction_ex`). Existing `_ex` names remain available and `_ex_ts` names are compatibility aliases.
+Buffered `_ex` transaction APIs are retained as the primary API surface (for example `sign_raw_transaction_ex`). Where thread safety can be provided without changing parameters, the original API is preferred over adding extra aliases.
 
-Thread-safety policy: `_ts` APIs are the thread-safe APIs to use for new integrations. Legacy names (including `_ex` and non-`_ts`) are compatibility entrypoints and are not advertised as formally thread-safe.
+Thread-safety policy: `_ts` APIs are used when explicit context ownership is required. For APIs that can be made thread-safe without signature changes, the original API names are used directly.
 
 ```C
 typedef struct working_transaction {
