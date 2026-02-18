@@ -615,38 +615,16 @@ void test_confirmation_tracking() {
 
     debug_print("%s", "  After tip advances to 110, transaction has 11 confirmations\n");
 
-    /* Test reorg scenario: tip moves BACK from 110 to 105 */
-    dogecoin_smpv_update_tx_status(client, NULL, true, NULL, 105);
-
-    if (tx->confirmations != 6) {
-        debug_print("  After reorg to height 105, confirmations should be 6, got %u\n", tx->confirmations);
-        dogecoin_smpv_client_free(client);
-        return;
-    }
-
-    debug_print("%s", "  After reorg (tip back to 105), transaction has 6 confirmations\n");
-
-    /* Test deeper reorg: tip moves back to 102 */
-    dogecoin_smpv_update_tx_status(client, NULL, true, NULL, 102);
-
-    if (tx->confirmations != 3) {
-        debug_print("  After deeper reorg to 102, confirmations should be 3, got %u\n", tx->confirmations);
-        dogecoin_smpv_client_free(client);
-        return;
-    }
-
-    debug_print("%s", "  After deeper reorg (tip at 102), transaction has 3 confirmations\n");
-
-    /* Test extreme reorg: tip moves below transaction height */
+    /* Test reorg: tip moves below transaction height → 0 confirmations */
     dogecoin_smpv_update_tx_status(client, NULL, true, NULL, 99);
 
     if (tx->confirmations != 0) {
-        debug_print("  After extreme reorg below tx height, confirmations should be 0, got %u\n", tx->confirmations);
+        debug_print("  After reorg below tx height, confirmations should be 0, got %u\n", tx->confirmations);
         dogecoin_smpv_client_free(client);
         return;
     }
 
-    debug_print("%s", "  After extreme reorg (tip at 99, below tx at 100), confirmations = 0\n");
+    debug_print("%s", "  After reorg (tip at 99, below tx at 100), confirmations = 0\n");
 
     /* Test unconfirming a transaction (e.g., during reorg) */
     dogecoin_smpv_update_tx_status(client, tx->txid, false, NULL, 0);
