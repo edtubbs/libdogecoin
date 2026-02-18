@@ -194,6 +194,7 @@ static struct option long_options[] = {
         {"http_server", required_argument, NULL, 'u'},
         {"smpv", no_argument, NULL, 'x'},
         {"daemon", no_argument, NULL, 'z'},
+        {"version", no_argument, NULL, 'v'},
         {NULL, 0, NULL, 0} };
 
 /**
@@ -326,6 +327,10 @@ int main(int argc, char* argv[]) {
     int file_num = NO_FILE;
     dogecoin_bool smpv_cli_enable = false;
 
+    if (argc == 2 && (!strcmp(argv[1], "-v") || !strcmp(argv[1], "--version"))) {
+        print_version();
+        exit(EXIT_SUCCESS);
+    }
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
         print_usage();
@@ -334,7 +339,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:x", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xv", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
