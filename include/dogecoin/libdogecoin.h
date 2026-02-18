@@ -520,11 +520,6 @@ typedef struct eckey {
     UT_hash_handle hh;
 } eckey;
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-static DOGECOIN_THREAD_LOCAL eckey *keys = NULL;
-#pragma GCC diagnostic pop
-
 // instantiates a new eckey
 eckey* new_eckey();
 

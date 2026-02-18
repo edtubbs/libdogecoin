@@ -173,8 +173,17 @@ void print_transactions()
  * @return Nothing.
  */
 void count_transactions() {
-    int temp = HASH_COUNT(default_transaction_context()->transactions);
+    int temp = get_transaction_count();
     printf("there are %d transactions\n", temp);
+}
+
+int get_transaction_count(void) {
+    return get_transaction_count_ts(default_transaction_context());
+}
+
+int get_transaction_count_ts(dogecoin_transaction_context* ctx) {
+    if (!ctx) return 0;
+    return HASH_COUNT(ctx->transactions);
 }
 
 /**

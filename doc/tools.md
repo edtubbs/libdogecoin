@@ -4,6 +4,8 @@
 
 If you are looking to just explore the functionality of Libdogecoin without building a complicated project yourself, look no further than the CLI tools provided in this repo. The first tool, `such`, is an interactive CLI application that allows you to perform all Essential address and transaction operations with prompts to guide you through the process. The second tool, `sendtx`, handles the process of broadcasting a transaction built using Libdogecoin to eventually push it onto the blockchain. The third tool, `spvnode`, run a Simple Payment Verification (SPV) node for the Dogecoin blockchain. It enables users to interact with the Dogecoin network, verify transactions and stay in sync with the blockchain.
 
+`_ts` variants (`such_ts`, `sendtx_ts`, `spvnode_ts`) are also built for compatibility with context-backed/thread-safe API migration paths.
+
 This document goes over the usage of these tools along with examples of how to use them.
 
 ## The `such` Tool

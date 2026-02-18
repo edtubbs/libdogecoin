@@ -49,11 +49,6 @@ typedef struct dogecoin_eckey_context {
     eckey* keys;
 } dogecoin_eckey_context;
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-static DOGECOIN_THREAD_LOCAL eckey *keys = NULL;
-#pragma GCC diagnostic pop
-
 // instantiates a new eckey
 LIBDOGECOIN_API eckey* new_eckey(dogecoin_bool is_testnet);
 LIBDOGECOIN_API eckey* new_eckey_ts(dogecoin_eckey_context* ctx, dogecoin_bool is_testnet);

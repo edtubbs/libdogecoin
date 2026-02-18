@@ -49,10 +49,6 @@ typedef struct dogecoin_transaction_context {
     working_transaction* transactions;
 } dogecoin_transaction_context;
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-variable"
-static DOGECOIN_THREAD_LOCAL working_transaction *transactions = NULL;
-#pragma GCC diagnostic pop
 // instantiates a new transaction
 LIBDOGECOIN_API working_transaction* new_transaction();
 LIBDOGECOIN_API working_transaction* new_transaction_ts(dogecoin_transaction_context* ctx);
@@ -72,6 +68,8 @@ LIBDOGECOIN_API void remove_all_ts(dogecoin_transaction_context* ctx);
 LIBDOGECOIN_API void print_transactions();
 
 LIBDOGECOIN_API void count_transactions();
+LIBDOGECOIN_API int get_transaction_count(void);
+LIBDOGECOIN_API int get_transaction_count_ts(dogecoin_transaction_context* ctx);
 
 LIBDOGECOIN_API int by_id();
 
