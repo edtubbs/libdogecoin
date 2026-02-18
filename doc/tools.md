@@ -358,10 +358,6 @@ Below are some examples on how to use the `sendtx` tool in practice.
 
 To use `spvnode`, execute it from the top level of the Libdogecoin directory. Start the tool by running `./spvnode` followed by the `scan` command. There are several flags that can be used to customize the behavior of `spvnode`:
 
-For TPM/encryption test flows, configure libdogecoin with `--enable-test-passwd` before building:
-
-    ./configure --enable-test-passwd
-
 Each flag is accompanied by a description and usage example. To view the version of `spvnode`, simply run:
 
     ./spvnode -v

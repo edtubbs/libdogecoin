@@ -567,7 +567,7 @@ void test_transaction()
     u_assert_true(finalize_transaction_ex(working_transaction_index, "DGKhMhaagCrpQuzuKQoZsGYnCsw8f2DuBq", "0.08679272", "97687.23256696", "DMVMYSajAj7qQ7L6D81KiGxTMx8mrB9cgc", txhex_large, sizeof(txhex_large)) > 0);
     u_assert_str_not_eq(txhex_large, "");
     char txhex_large_ts[TXHEXMAXLEN + 1];
-    u_assert_true(finalize_transaction_ts(working_transaction_index, "DGKhMhaagCrpQuzuKQoZsGYnCsw8f2DuBq", "0.08679272", "97687.23256696", "DMVMYSajAj7qQ7L6D81KiGxTMx8mrB9cgc", txhex_large_ts, sizeof(txhex_large_ts)) > 0);
+    u_assert_true(finalize_transaction_ex_ts(working_transaction_index, "DGKhMhaagCrpQuzuKQoZsGYnCsw8f2DuBq", "0.08679272", "97687.23256696", "DMVMYSajAj7qQ7L6D81KiGxTMx8mrB9cgc", txhex_large_ts, sizeof(txhex_large_ts)) > 0);
     u_assert_str_eq(txhex_large_ts, txhex_large);
 
     // get_raw_transaction_ex must produce identical hex
@@ -576,7 +576,7 @@ void test_transaction()
     u_assert_true(len2 > 0);
     u_assert_str_eq(buf2, txhex_large);
     char buf2_ts[TXHEXMAXLEN + 1];
-    int len2_ts = get_raw_transaction_ts(working_transaction_index, buf2_ts, sizeof(buf2_ts));
+    int len2_ts = get_raw_transaction_ex_ts(working_transaction_index, buf2_ts, sizeof(buf2_ts));
     u_assert_true(len2_ts > 0);
     u_assert_str_eq(buf2_ts, txhex_large);
 
@@ -584,7 +584,7 @@ void test_transaction()
     size_t need2 = 0;
     u_assert_int_eq(sign_raw_transaction_ex(0, txhex_large, NULL, &need2, utxo_scriptpubkey, 1, private_key_wif), 1);
     size_t need2_ts = 0;
-    u_assert_int_eq(sign_raw_transaction_ts(0, txhex_large, NULL, &need2_ts, utxo_scriptpubkey, 1, private_key_wif), 1);
+    u_assert_int_eq(sign_raw_transaction_ex_ts(0, txhex_large, NULL, &need2_ts, utxo_scriptpubkey, 1, private_key_wif), 1);
     u_assert_int_eq((int)need2_ts, (int)need2);
 
     char* out2 = malloc(need2);
@@ -593,7 +593,7 @@ void test_transaction()
     u_assert_true(strlen(out2) > 0);
     char* out2_ts = malloc(need2_ts);
     u_assert_not_null(out2_ts);
-    u_assert_int_eq(sign_raw_transaction_ts(0, txhex_large, out2_ts, &need2_ts, utxo_scriptpubkey, 1, private_key_wif), 1);
+    u_assert_int_eq(sign_raw_transaction_ex_ts(0, txhex_large, out2_ts, &need2_ts, utxo_scriptpubkey, 1, private_key_wif), 1);
     u_assert_str_eq(out2_ts, out2);
     dogecoin_free(out2);
     dogecoin_free(out2_ts);
@@ -603,7 +603,7 @@ void test_transaction()
     u_assert_true(sign_indexed_raw_transaction_ex(working_transaction_index, 0, utxo_scriptpubkey, 1, private_key_wif, buf3, sizeof(buf3)));
     u_assert_str_eq(buf3, get_raw_transaction(working_transaction_index));
     char buf3_ts[TXHEXMAXLEN + 1];
-    u_assert_true(sign_indexed_raw_transaction_ts(working_transaction_index, 0, utxo_scriptpubkey, 1, private_key_wif, buf3_ts, sizeof(buf3_ts)));
+    u_assert_true(sign_indexed_raw_transaction_ex_ts(working_transaction_index, 0, utxo_scriptpubkey, 1, private_key_wif, buf3_ts, sizeof(buf3_ts)));
     u_assert_str_eq(buf3_ts, get_raw_transaction(working_transaction_index));
 
     // sign all remaining inputs in one shot
@@ -611,7 +611,7 @@ void test_transaction()
     u_assert_true(sign_transaction_ex(working_transaction_index, utxo_scriptpubkey, private_key_wif, buf4, sizeof(buf4)));
     u_assert_str_eq(buf4, get_raw_transaction(working_transaction_index));
     char buf4_ts[TXHEXMAXLEN + 1];
-    u_assert_true(sign_transaction_ts(working_transaction_index, utxo_scriptpubkey, private_key_wif, buf4_ts, sizeof(buf4_ts)));
+    u_assert_true(sign_transaction_ex_ts(working_transaction_index, utxo_scriptpubkey, private_key_wif, buf4_ts, sizeof(buf4_ts)));
     u_assert_str_eq(buf4_ts, get_raw_transaction(working_transaction_index));
 
     // convenience wrapper that does the same with just the priv-key
@@ -619,7 +619,7 @@ void test_transaction()
     u_assert_true(sign_transaction_w_privkey_ex(working_transaction_index, private_key_wif, buf5, sizeof(buf5)));
     u_assert_str_eq(buf5, get_raw_transaction(working_transaction_index));
     char buf5_ts[TXHEXMAXLEN + 1];
-    u_assert_true(sign_transaction_w_privkey_ts(working_transaction_index, private_key_wif, buf5_ts, sizeof(buf5_ts)));
+    u_assert_true(sign_transaction_w_privkey_ex_ts(working_transaction_index, private_key_wif, buf5_ts, sizeof(buf5_ts)));
     u_assert_str_eq(buf5_ts, get_raw_transaction(working_transaction_index));
 
 }

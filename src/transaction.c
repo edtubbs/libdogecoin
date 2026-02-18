@@ -1141,23 +1141,41 @@ int sign_transaction_w_privkey_ex(int  txindex,
 int get_raw_transaction_ts(int txindex, char* buf, size_t buf_cap) {
     return get_raw_transaction_ex(txindex, buf, buf_cap);
 }
+int get_raw_transaction_ex_ts(int txindex, char* buf, size_t buf_cap) {
+    return get_raw_transaction_ex(txindex, buf, buf_cap);
+}
 
 int sign_raw_transaction_ts(int inputindex, const char* incomingrawtx, char* signedrawtx, size_t* signed_size, const char* scripthex, int sighashtype, const char* privkey) {
+    return sign_raw_transaction_ex(inputindex, incomingrawtx, signedrawtx, signed_size, scripthex, sighashtype, privkey);
+}
+int sign_raw_transaction_ex_ts(int inputindex, const char* incomingrawtx, char* signedrawtx, size_t* signed_size, const char* scripthex, int sighashtype, const char* privkey) {
     return sign_raw_transaction_ex(inputindex, incomingrawtx, signedrawtx, signed_size, scripthex, sighashtype, privkey);
 }
 
 int finalize_transaction_ts(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress, char* buf, size_t buf_cap) {
     return finalize_transaction_ex(txindex, destinationaddress, subtractedfee, out_dogeamount_for_verification, changeaddress, buf, buf_cap);
 }
+int finalize_transaction_ex_ts(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress, char* buf, size_t buf_cap) {
+    return finalize_transaction_ex(txindex, destinationaddress, subtractedfee, out_dogeamount_for_verification, changeaddress, buf, buf_cap);
+}
 
 int sign_indexed_raw_transaction_ts(int txindex, int inputindex, const char* scripthex, int sighashtype, const char* privkey, char* buf, size_t buf_cap) {
+    return sign_indexed_raw_transaction_ex(txindex, inputindex, scripthex, sighashtype, privkey, buf, buf_cap);
+}
+int sign_indexed_raw_transaction_ex_ts(int txindex, int inputindex, const char* scripthex, int sighashtype, const char* privkey, char* buf, size_t buf_cap) {
     return sign_indexed_raw_transaction_ex(txindex, inputindex, scripthex, sighashtype, privkey, buf, buf_cap);
 }
 
 int sign_transaction_ts(int txindex, const char* script_pubkey, const char* privkey, char* buf, size_t buf_cap) {
     return sign_transaction_ex(txindex, script_pubkey, privkey, buf, buf_cap);
 }
+int sign_transaction_ex_ts(int txindex, const char* script_pubkey, const char* privkey, char* buf, size_t buf_cap) {
+    return sign_transaction_ex(txindex, script_pubkey, privkey, buf, buf_cap);
+}
 
 int sign_transaction_w_privkey_ts(int txindex, const char* privkey, char* buf, size_t buf_cap) {
+    return sign_transaction_w_privkey_ex(txindex, privkey, buf, buf_cap);
+}
+int sign_transaction_w_privkey_ex_ts(int txindex, const char* privkey, char* buf, size_t buf_cap) {
     return sign_transaction_w_privkey_ex(txindex, privkey, buf, buf_cap);
 }

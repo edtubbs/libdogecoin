@@ -433,26 +433,32 @@ void clear_transaction(int txindex);
 
 /* retrieve the raw transaction at (txindex) as a hex string (char*) in a buffer (buf) of size (buf_cap) */
 int get_raw_transaction_ex(int txindex, char* buf, size_t buf_cap);
+int get_raw_transaction_ex_ts(int txindex, char* buf, size_t buf_cap);
 int get_raw_transaction_ts(int txindex, char* buf, size_t buf_cap);
 
 /* sign a raw transaction in memory at (txindex), sign (inputindex) with (scripthex) of (sighashtype), with (privkey) in a buffer (signedrawtx) of size (signed_size) */
 int sign_raw_transaction_ex(int inputindex, const char* incomingrawtx, char* signedrawtx, size_t* signed_size, const char* scripthex, int sighashtype, const char* privkey);
+int sign_raw_transaction_ex_ts(int inputindex, const char* incomingrawtx, char* signedrawtx, size_t* signed_size, const char* scripthex, int sighashtype, const char* privkey);
 int sign_raw_transaction_ts(int inputindex, const char* incomingrawtx, char* signedrawtx, size_t* signed_size, const char* scripthex, int sighashtype, const char* privkey);
 
 /* finalize the transaction being worked on at (txindex), with the (destinationaddress) paying a fee of (subtractedfee) in a buffer (buf) of size (buf_cap) */
 int finalize_transaction_ex(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress, char* buf, size_t buf_cap);
+int finalize_transaction_ex_ts(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress, char* buf, size_t buf_cap);
 int finalize_transaction_ts(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress, char* buf, size_t buf_cap);
 
 /* sign and store one vin of the working tx at (txindex); writes signed hex into (buf) with capacity (buf_cap) */
 int sign_indexed_raw_transaction_ex(int txindex, int inputindex, const char* scripthex, int sighashtype, const char* privkey, char* buf, size_t buf_cap);
+int sign_indexed_raw_transaction_ex_ts(int txindex, int inputindex, const char* scripthex, int sighashtype, const char* privkey, char* buf, size_t buf_cap);
 int sign_indexed_raw_transaction_ts(int txindex, int inputindex, const char* scripthex, int sighashtype, const char* privkey, char* buf, size_t buf_cap);
 
 /* sign all inputs of the working tx at (txindex) with (script_pubkey)/(privkey); writes signed hex into (buf) with capacity (buf_cap) */
 int sign_transaction_ex(int txindex, const char* script_pubkey, const char* privkey, char* buf, size_t buf_cap);
+int sign_transaction_ex_ts(int txindex, const char* script_pubkey, const char* privkey, char* buf, size_t buf_cap);
 int sign_transaction_ts(int txindex, const char* script_pubkey, const char* privkey, char* buf, size_t buf_cap);
 
 /* convenience wrapper: sign a single-key p2pkh tx at (txindex) using (privkey); writes signed hex into (buf) with capacity (buf_cap) */
 int sign_transaction_w_privkey_ex(int txindex, const char* privkey, char* buf, size_t buf_cap);
+int sign_transaction_w_privkey_ex_ts(int txindex, const char* privkey, char* buf, size_t buf_cap);
 int sign_transaction_w_privkey_ts(int txindex, const char* privkey, char* buf, size_t buf_cap);
 
 /* QR Code Generation Functions
