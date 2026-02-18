@@ -485,6 +485,7 @@ void test_error_handling() {
     }
 
     dogecoin_smpv_update_tx_status(client, NULL, true, NULL, 1);
+    dogecoin_smpv_tip_update(NULL, 1);
 
     debug_print("%s", "  NULL parameter operations handled gracefully\n");
 
@@ -593,7 +594,7 @@ void test_confirmation_tracking() {
     debug_print("%s", "  Transaction confirmed at block 100 (1 confirmation)\n");
 
     /* Simulate new blocks being added - tip advances to 105 */
-    dogecoin_smpv_update_tx_status(client, NULL, true, NULL, 105);
+    dogecoin_smpv_tip_update(client, 105);
 
     /* Verify confirmation count increased */
     if (tx->confirmations != 6) {
@@ -605,7 +606,7 @@ void test_confirmation_tracking() {
     debug_print("%s", "  After tip advances to 105, transaction has 6 confirmations\n");
 
     /* Simulate more blocks - tip advances to 110 */
-    dogecoin_smpv_update_tx_status(client, NULL, true, NULL, 110);
+    dogecoin_smpv_tip_update(client, 110);
 
     if (tx->confirmations != 11) {
         debug_print("  Confirmations should be 11, got %u\n", tx->confirmations);
@@ -616,7 +617,7 @@ void test_confirmation_tracking() {
     debug_print("%s", "  After tip advances to 110, transaction has 11 confirmations\n");
 
     /* Test reorg: tip moves below transaction height → 0 confirmations */
-    dogecoin_smpv_update_tx_status(client, NULL, true, NULL, 99);
+    dogecoin_smpv_tip_update(client, 99);
 
     if (tx->confirmations != 0) {
         debug_print("  After reorg below tx height, confirmations should be 0, got %u\n", tx->confirmations);

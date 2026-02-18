@@ -431,6 +431,28 @@ uint64_t dogecoin_smpv_get_tx_size(const dogecoin_tx* tx) {
     return size;
 }
 
+/* Recalculate all confirmation counts after a new tip */
+LIBDOGECOIN_API void dogecoin_smpv_tip_update(
+    dogecoin_smpv_client* client,
+    uint32_t tip_height
+) {
+    if (!client) return;
+
+    for (uint32_t idx = 0; idx < client->mempool_tx_count; idx++) {
+        dogecoin_smpv_tx* entry = &client->mempool_txs[idx];
+        if (!entry->is_confirmed || entry->block_height == 0) continue;
+
+        if (tip_height >= entry->block_height) {
+            entry->confirmations = (tip_height - entry->block_height) + 1;
+        } else {
+            /* Chain tip is now below this transaction's recorded height */
+            entry->confirmations = 0;
+        }
+    }
+
+    client->last_update_time = time(NULL);
+}
+
 /* Update transaction status */
 LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
     dogecoin_smpv_client* client,
@@ -439,27 +461,7 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
     const char* block_hash,
     uint32_t block_height
 ) {
-    if (!client) return;
-
-    /* Tip tick: recalculate all confirmations based on provided height */
-    if (!txid) {
-        uint32_t reference_height = block_height;
-
-        for (uint32_t idx = 0; idx < client->mempool_tx_count; idx++) {
-            dogecoin_smpv_tx* entry = &client->mempool_txs[idx];
-            if (!entry->is_confirmed || entry->block_height == 0) continue;
-
-            if (reference_height >= entry->block_height) {
-                entry->confirmations = (reference_height - entry->block_height) + 1;
-            } else {
-                /* Chain tip is now below this transaction's recorded height */
-                entry->confirmations = 0;
-            }
-        }
-
-        client->last_update_time = time(NULL);
-        return;
-    }
+    if (!client || !txid) return;
 
     /* find tx via hash lookup */
     dogecoin_smpv_tx* tx = dogecoin_smpv_get_tx(client, txid);

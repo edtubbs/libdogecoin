@@ -179,6 +179,12 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
     uint32_t block_height
 );
 
+/* Recalculate all confirmation counts after a new tip */
+LIBDOGECOIN_API void dogecoin_smpv_tip_update(
+    dogecoin_smpv_client* client,
+    uint32_t tip_height
+);
+
 /* Get mempool statistics */
 LIBDOGECOIN_API void dogecoin_smpv_get_stats(
     const dogecoin_smpv_client* client,

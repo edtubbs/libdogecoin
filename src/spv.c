@@ -703,13 +703,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             }
             client->last_block_total_tx_size = total_tx_size;
 
-            /* SMPV tip tick so confirmations increment after each new block */
+            /* SMPV: recalculate confirmations for the new tip height */
             if (client->smpv_enabled && client->smpv_ctx) {
-                dogecoin_smpv_update_tx_status(
+                dogecoin_smpv_tip_update(
                     (dogecoin_smpv_client*)client->smpv_ctx,
-                    NULL,
-                    true,
-                    NULL,
                     (uint32_t)pindex->height
                 );
             }
