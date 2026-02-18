@@ -79,6 +79,36 @@ static int spv_merkle_match_cmp(const void* a, const void* b)
     return memcmp(ma->txid, mb->txid, 32);
 }
 
+typedef struct spv_merkle_collect_ctx_ {
+    dogecoin_spv_client* client;
+} spv_merkle_collect_ctx;
+
+static dogecoin_bool spv_merkle_collect_match(const uint8_t txid[32], uint32_t pos, void* ctx)
+{
+    spv_merkle_collect_ctx* c = (spv_merkle_collect_ctx*)ctx;
+    if (!c || !c->client) return false;
+
+    spv_merkle_match* m = (spv_merkle_match*)dogecoin_calloc(1, sizeof(spv_merkle_match));
+    if (!m) return false;
+
+    memcpy(m->txid, txid, 32);
+    m->pos = pos;
+    m->consumed = false;
+
+    dogecoin_btree_node_t* nn = (dogecoin_btree_node_t*)dogecoin_btree_tsearch(
+        m, &c->client->merkle_match_tree, spv_merkle_match_cmp);
+    if (!nn) {
+        dogecoin_free(m);
+        return false;
+    }
+    if (nn->key != m) {
+        dogecoin_free(m);
+    } else {
+        c->client->merkle_match_pending++;
+    }
+    return true;
+}
+
 static const unsigned int HEADERS_MAX_RESPONSE_TIME = 120;
 static const unsigned int MIN_TIME_DELTA_FOR_STATE_CHECK = 5;
 static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
@@ -1034,142 +1064,16 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             return;
         }
 
-        /* compute tree height */
-        uint32_t height = 0;
-        while (1) {
-            uint64_t width = ((uint64_t)nTx + ((1ULL << height) - 1ULL)) >> height;
-            if (width <= 1) break;
-            height++;
-            if (height > 32) break;
-        }
-        if (height > 32) {
-            dogecoin_free(flags);
-            dogecoin_free(hashes);
-            if (!is_historical) {
-                if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                    dogecoin_free(pindex);
-                }
-            }
-            client->nodegroup->log_write_cb("Merkleblock height too large (node %d)\n", node->nodeid);
-            node->state &= ~NODE_BLOCKSYNC;
-            node->nodegroup->node_connection_state_changed_cb(node);
-            return;
-        }
-
-        /* TraverseAndExtract (inline) */
-        uint32_t bitsUsed = 0;
-        uint32_t hashesUsed = 0;
-
-        struct {
-            uint32_t height;
-            uint32_t pos;
-            uint8_t stage;       // 0=enter, 1=after-left, 2=after-right
-            uint8_t parentMatch;
-            uint256_t left;
-        } st[64];
-
-        int sp = 0;
-        st[0].height = height;
-        st[0].pos = 0;
-        st[0].stage = 0;
-        st[0].parentMatch = 0;
-
-        uint256_t ret;
-        dogecoin_bool have_ret = false;
-        dogecoin_bool ok_extract = true;
-
-        while (sp >= 0) {
-            if (st[sp].stage == 0) {
-                if (bitsUsed >= (uint32_t)flags_len * 8U) { ok_extract = false; break; }
-                st[sp].parentMatch = (flags[bitsUsed >> 3] >> (bitsUsed & 7)) & 1;
-                bitsUsed++;
-
-                if (st[sp].height == 0 || st[sp].parentMatch == 0) {
-                    if (hashesUsed >= hashCount) { ok_extract = false; break; }
-                    memcpy(ret, hashes[hashesUsed], 32);
-                    hashesUsed++;
-                    have_ret = true;
-
-                    if (st[sp].height == 0 && st[sp].parentMatch) {
-                        spv_merkle_match* m = (spv_merkle_match*)dogecoin_calloc(1, sizeof(spv_merkle_match));
-                        if (!m) { ok_extract = false; break; }
-
-                        memcpy(m->txid, ret, 32);
-                        m->pos = st[sp].pos;
-                        m->consumed = false;
-
-                        dogecoin_btree_node_t* nn = (dogecoin_btree_node_t*)dogecoin_btree_tsearch(
-                            m, &client->merkle_match_tree, spv_merkle_match_cmp);
-                        if (!nn) {
-                            dogecoin_free(m);
-                            ok_extract = false;
-                            break;
-                        }
-                        if (nn->key != m) {
-                            dogecoin_free(m);
-                        } else {
-                            client->merkle_match_pending++;
-                        }
-                    }
-
-                    sp--;
-                    continue;
-                }
-
-                st[sp].stage = 1;
-                sp++;
-                st[sp].height = st[sp - 1].height - 1;
-                st[sp].pos = st[sp - 1].pos * 2;
-                st[sp].stage = 0;
-                st[sp].parentMatch = 0;
-                continue;
-            }
-
-            if (st[sp].stage == 1) {
-                if (!have_ret) { ok_extract = false; break; }
-                memcpy(st[sp].left, ret, 32);
-
-                uint64_t width = ((uint64_t)nTx + ((1ULL << (st[sp].height - 1)) - 1ULL)) >> (st[sp].height - 1);
-                uint32_t rightPos = st[sp].pos * 2 + 1;
-
-                if ((uint64_t)rightPos < width) {
-                    st[sp].stage = 2;
-                    sp++;
-                    st[sp].height = st[sp - 1].height - 1;
-                    st[sp].pos = rightPos;
-                    st[sp].stage = 0;
-                    st[sp].parentMatch = 0;
-                    have_ret = false;
-                    continue;
-                } else {
-                    uint8_t buf64[64];
-                    memcpy(buf64, st[sp].left, 32);
-                    memcpy(buf64 + 32, st[sp].left, 32);
-                    dogecoin_hash(buf64, 64, ret);
-                    have_ret = true;
-
-                    sp--;
-                    continue;
-                }
-            }
-
-            if (st[sp].stage == 2) {
-                if (!have_ret) { ok_extract = false; break; }
-                uint8_t buf64[64];
-                memcpy(buf64, st[sp].left, 32);
-                memcpy(buf64 + 32, ret, 32);
-                dogecoin_hash(buf64, 64, ret);
-                have_ret = true;
-
-                sp--;
-                continue;
-            }
-
-            ok_extract = false;
-            break;
-        }
-
-        if (!ok_extract || !have_ret || memcmp(ret, header_merkle, 32) != 0) {
+        spv_merkle_collect_ctx collect_ctx;
+        collect_ctx.client = client;
+        if (!dogecoin_bip37_traverse_merkle_matches(nTx,
+                                                    (const uint8_t*)hashes,
+                                                    hashCount,
+                                                    flags,
+                                                    flags_len,
+                                                    header_merkle,
+                                                    spv_merkle_collect_match,
+                                                    &collect_ctx)) {
             if (client->merkle_match_tree) {
                 dogecoin_btree_tdestroy(client->merkle_match_tree, dogecoin_free);
                 client->merkle_match_tree = NULL;

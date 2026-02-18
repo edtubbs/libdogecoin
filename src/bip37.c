@@ -64,6 +64,122 @@ static size_t bip37_write_varint(uint64_t val, uint8_t out[9])
     return 9;
 }
 
+dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
+                                                     const uint8_t* hashes,
+                                                     uint32_t hashCount,
+                                                     const uint8_t* flags,
+                                                     uint32_t flags_len,
+                                                     const uint8_t header_merkle[32],
+                                                     dogecoin_bip37_match_cb on_match,
+                                                     void* match_ctx)
+{
+    if (!hashes || !flags || !header_merkle || hashCount == 0 || flags_len == 0) return false;
+
+    uint32_t height = 0;
+    while (1) {
+        uint64_t width = ((uint64_t)nTx + ((1ULL << height) - 1ULL)) >> height;
+        if (width <= 1) break;
+        height++;
+        if (height > 32) return false;
+    }
+
+    uint32_t bitsUsed = 0;
+    uint32_t hashesUsed = 0;
+
+    struct {
+        uint32_t height;
+        uint32_t pos;
+        uint8_t stage;
+        uint8_t parentMatch;
+        uint256_t left;
+    } st[64];
+
+    int sp = 0;
+    st[0].height = height;
+    st[0].pos = 0;
+    st[0].stage = 0;
+    st[0].parentMatch = 0;
+
+    uint256_t ret;
+    dogecoin_bool have_ret = false;
+    dogecoin_bool ok_extract = true;
+
+    while (sp >= 0) {
+        if (st[sp].stage == 0) {
+            if (bitsUsed >= (uint32_t)flags_len * 8U) { ok_extract = false; break; }
+            st[sp].parentMatch = (flags[bitsUsed >> 3] >> (bitsUsed & 7)) & 1;
+            bitsUsed++;
+
+            if (st[sp].height == 0 || st[sp].parentMatch == 0) {
+                if (hashesUsed >= hashCount) { ok_extract = false; break; }
+                memcpy(ret, hashes + (hashesUsed * 32), 32);
+                hashesUsed++;
+                have_ret = true;
+
+                if (st[sp].height == 0 && st[sp].parentMatch && on_match &&
+                    !on_match(ret, st[sp].pos, match_ctx)) {
+                    ok_extract = false;
+                    break;
+                }
+
+                sp--;
+                continue;
+            }
+
+            st[sp].stage = 1;
+            sp++;
+            st[sp].height = st[sp - 1].height - 1;
+            st[sp].pos = st[sp - 1].pos * 2;
+            st[sp].stage = 0;
+            st[sp].parentMatch = 0;
+            continue;
+        }
+
+        if (st[sp].stage == 1) {
+            if (!have_ret) { ok_extract = false; break; }
+            memcpy(st[sp].left, ret, 32);
+
+            uint64_t width = ((uint64_t)nTx + ((1ULL << (st[sp].height - 1)) - 1ULL)) >> (st[sp].height - 1);
+            uint32_t rightPos = st[sp].pos * 2 + 1;
+
+            if ((uint64_t)rightPos < width) {
+                st[sp].stage = 2;
+                sp++;
+                st[sp].height = st[sp - 1].height - 1;
+                st[sp].pos = rightPos;
+                st[sp].stage = 0;
+                st[sp].parentMatch = 0;
+                have_ret = false;
+                continue;
+            } else {
+                uint8_t buf64[64];
+                memcpy(buf64, st[sp].left, 32);
+                memcpy(buf64 + 32, st[sp].left, 32);
+                dogecoin_hash(buf64, 64, ret);
+                have_ret = true;
+                sp--;
+                continue;
+            }
+        }
+
+        if (st[sp].stage == 2) {
+            if (!have_ret) { ok_extract = false; break; }
+            uint8_t buf64[64];
+            memcpy(buf64, st[sp].left, 32);
+            memcpy(buf64 + 32, ret, 32);
+            dogecoin_hash(buf64, 64, ret);
+            have_ret = true;
+            sp--;
+            continue;
+        }
+
+        ok_extract = false;
+        break;
+    }
+
+    return (ok_extract && have_ret && memcmp(ret, header_merkle, 32) == 0);
+}
+
 dogecoin_bool dogecoin_bip37_send_filterload(struct dogecoin_node_* node,
                                              const uint8_t* filter,
                                              uint32_t filter_len,

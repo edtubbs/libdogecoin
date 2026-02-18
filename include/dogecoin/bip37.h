@@ -31,6 +31,7 @@
 #include <dogecoin/serialize.h>
 
 struct dogecoin_node_;
+typedef dogecoin_bool (*dogecoin_bip37_match_cb)(const uint8_t txid[32], uint32_t pos, void* ctx);
 
 LIBDOGECOIN_BEGIN_DECL
 
@@ -45,6 +46,15 @@ dogecoin_bool dogecoin_bip37_build_filtered_getdata_payload(const struct const_b
                                                             uint8_t** out_payload,
                                                             uint32_t* out_len,
                                                             uint32_t* item_count);
+
+dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
+                                                     const uint8_t* hashes,
+                                                     uint32_t hashCount,
+                                                     const uint8_t* flags,
+                                                     uint32_t flags_len,
+                                                     const uint8_t header_merkle[32],
+                                                     dogecoin_bip37_match_cb on_match,
+                                                     void* match_ctx);
 
 LIBDOGECOIN_END_DECL
 
