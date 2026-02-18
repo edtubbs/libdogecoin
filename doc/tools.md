@@ -403,7 +403,7 @@ To utilize checkpoints for faster initial sync, apply the -p flag:
 
 `spvnode` uses a libevent runloop plus worker threads for header-processing callbacks (`--workers`). It enables libevent threading support and can request headers from multiple peers in parallel over asynchronous network I/O.
 
-Note: libdogecoin is not entirely thread-safe yet. Formal thread-safety guarantees for every API path still depend on deeper context ownership semantics across all modules. Some legacy APIs still rely on shared/global registries, so independent contexts/TLS-backed state are still needed in those areas for full thread-safety.
+Note: libdogecoin is not entirely thread-safe yet. Formal thread-safety guarantees for every API path depend on deeper context ownership semantics across all modules. Some legacy APIs still rely on shared/global registries, so independent contexts/TLS-backed state are still needed in those areas for full thread-safety.
 
 ### Commands
 
