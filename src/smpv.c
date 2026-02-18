@@ -32,6 +32,10 @@
 #include <dogecoin/serialize.h>
 #include <dogecoin/hash.h>
 #include <dogecoin/cstr.h>
+#ifndef HASH_BLOOM
+/* Enable uthash bloom pre-checks for SMPV index lookups with a small bitmap. */
+#define HASH_BLOOM 16
+#endif
 #include <dogecoin/map.h>
 
 typedef struct smpv_watcher_index_entry_ {
