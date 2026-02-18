@@ -67,8 +67,10 @@ extern void test_sha_hmac();
 extern void test_signmsg();
 extern void test_smpv();
 extern void test_signmsg_ext();
+extern void test_signmsg_ts_contexts();
 extern void test_tpm();
 extern void test_transaction();
+extern void test_transaction_ts_contexts();
 extern void test_tx_serialization();
 extern void test_tx_sighash();
 extern void test_tx_sighash_ext();
@@ -149,11 +151,13 @@ int main()
     u_run_test(test_sha_hmac);
     u_run_test(test_signmsg);
     u_run_test(test_signmsg_ext);
+    u_run_test(test_signmsg_ts_contexts);
     u_run_test(test_smpv);
 #ifndef USE_OPTEE // TPM is not supported in OPTEE
     u_run_test(test_tpm);
 #endif
     u_run_test(test_transaction);
+    u_run_test(test_transaction_ts_contexts);
     u_run_test(test_tx_serialization);
     u_run_test(test_invalid_tx_deser);
     u_run_test(test_tx_sign);

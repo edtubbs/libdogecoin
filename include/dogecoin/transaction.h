@@ -45,20 +45,29 @@ typedef struct working_transaction {
     UT_hash_handle hh;
 } working_transaction;
 
+typedef struct dogecoin_transaction_context {
+    working_transaction* transactions;
+} dogecoin_transaction_context;
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 static DOGECOIN_THREAD_LOCAL working_transaction *transactions = NULL;
 #pragma GCC diagnostic pop
 // instantiates a new transaction
 LIBDOGECOIN_API working_transaction* new_transaction();
+LIBDOGECOIN_API working_transaction* new_transaction_ts(dogecoin_transaction_context* ctx);
 
 LIBDOGECOIN_API void add_transaction(working_transaction *working_tx);
+LIBDOGECOIN_API void add_transaction_ts(dogecoin_transaction_context* ctx, working_transaction *working_tx);
 
 LIBDOGECOIN_API working_transaction* find_transaction(int idx);
+LIBDOGECOIN_API working_transaction* find_transaction_ts(dogecoin_transaction_context* ctx, int idx);
 
 LIBDOGECOIN_API void remove_transaction(working_transaction *working_tx);
+LIBDOGECOIN_API void remove_transaction_ts(dogecoin_transaction_context* ctx, working_transaction *working_tx);
 
 LIBDOGECOIN_API void remove_all();
+LIBDOGECOIN_API void remove_all_ts(dogecoin_transaction_context* ctx);
 
 LIBDOGECOIN_API void print_transactions();
 
@@ -73,6 +82,10 @@ LIBDOGECOIN_API const char *get_raw_tx(const char *prompt_tx);
 LIBDOGECOIN_API const char *get_private_key(const char *prompt_key);
 
 LIBDOGECOIN_API int start_transaction(); // #returns  an index of a transaction to build in memory.  (1, 2, etc) ..
+LIBDOGECOIN_API int start_transaction_ts(dogecoin_transaction_context* ctx);
+
+LIBDOGECOIN_API dogecoin_transaction_context* dogecoin_transaction_context_new(void);
+LIBDOGECOIN_API void dogecoin_transaction_context_free(dogecoin_transaction_context* ctx);
 
 LIBDOGECOIN_API int save_raw_transaction(int txindex, const char* hexadecimal_transaction);
 

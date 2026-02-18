@@ -599,3 +599,27 @@ void test_transaction()
     u_assert_str_eq(buf5, get_raw_transaction(working_transaction_index));
 
 }
+
+void test_transaction_ts_contexts() {
+    dogecoin_transaction_context* ctx1 = dogecoin_transaction_context_new();
+    dogecoin_transaction_context* ctx2 = dogecoin_transaction_context_new();
+    u_assert_true(ctx1 != NULL);
+    u_assert_true(ctx2 != NULL);
+
+    int tx1 = start_transaction_ts(ctx1);
+    int tx2 = start_transaction_ts(ctx2);
+    u_assert_int_eq(tx1, 1);
+    u_assert_int_eq(tx2, 1);
+
+    working_transaction* wtx1 = find_transaction_ts(ctx1, tx1);
+    working_transaction* wtx2 = find_transaction_ts(ctx2, tx2);
+    u_assert_true(wtx1 != NULL);
+    u_assert_true(wtx2 != NULL);
+
+    u_assert_true(wtx1 != wtx2);
+
+    remove_transaction_ts(ctx1, wtx1);
+    remove_transaction_ts(ctx2, wtx2);
+    dogecoin_transaction_context_free(ctx1);
+    dogecoin_transaction_context_free(ctx2);
+}
