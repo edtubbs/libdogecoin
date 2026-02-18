@@ -1,0 +1,128 @@
+<pre>
+  BIP: ?
+  Layer: Consensus (soft fork)
+  Title: Post-Quantum Signature Commitments
+  Author: Ed Tubbs <ectubbs@gmail.com>
+  Status: Draft
+  Type: Standards Track
+  Created: 2026-02-18
+  License: BSD-3-Clause
+</pre>
+
+==Introduction==
+
+===Abstract===
+
+This document proposes a staged path for introducing post-quantum (PQ) signature support.
+In the initial stage, a PQ signature commitment is embedded in transaction outputs using a canonical OP_RETURN pattern to enable immediate interoperability and chain-level observability without a consensus change.
+In a later stage, this proposal is intended to migrate from OP_RETURN commitments to a dedicated reserved opcode path (for example via OP_SUCCESSx-based soft fork design), enabling native script-level validation semantics and stronger on-chain composability.
+
+The current implementation focus is Falcon-512 commitment publication and SPV-side commitment validation during block scan.
+This document is written in standard BIP format and can be adapted to a DIP process if/when a formal DIP track is preferred.
+
+===Copyright===
+
+This BIP is licensed under the BSD 3-clause license.
+
+===Motivation===
+
+Bitcoin-family systems require a migration strategy for post-quantum cryptographic primitives that:
+
+# works with existing transaction relay and wallet infrastructure;
+# is deployable before introducing new consensus opcodes; and
+# supports incremental hardening from commitment-only publication toward full script validation semantics.
+
+An OP_RETURN commitment-first model provides a low-friction deployment mechanism while ecosystem tooling matures.
+A reserved-opcode follow-up provides a path toward first-class script integration once consensus and implementation readiness are established.
+
+===Rationale===
+
+The design is intentionally staged:
+
+* '''Phase 1 (Now):''' publish a 32-byte commitment (derived from PQ verification material) in canonical OP_RETURN form.
+* '''Phase 2 (Future):''' define and activate a dedicated script opcode path to validate PQ signatures in script execution, replacing commitment-only signaling.
+
+This balances deployability and safety:
+
+* avoids immediate consensus risk;
+* enables ecosystem measurement and operational validation via tooling (including SPV scanning); and
+* creates a clean upgrade target for native script verification.
+
+This direction is related to broader PQ discussions, including BIP 360, but is focused here on practical incremental deployment of signature commitments and an explicit migration path to opcode-based verification.
+
+==Specification==
+
+===Phase 1: OP_RETURN Commitment Encoding===
+
+For Phase 1, PQ commitments are encoded in outputs using canonical script form:
+
+<source>
+0x6a 0x20 <32-byte-commitment>
+</source>
+
+Where:
+
+* <code>0x6a</code> is OP_RETURN
+* <code>0x20</code> is push-32
+* payload is exactly 32 bytes
+
+Non-canonical encodings are invalid for commitment interpretation under this proposal.
+
+Commitment derivation for Falcon-512 stage implementations is:
+
+<source>
+commitment32 = SHA256(falcon_public_key_bytes || falcon_signature_bytes)
+</source>
+
+Implementations MAY support additional PQ schemes in future revisions, but MUST preserve canonical on-chain encoding rules.
+
+===Phase 1: SPV Validation Behavior===
+
+SPV implementations should:
+
+* parse transactions in scanned blocks;
+* detect canonical PQ commitment scripts;
+* treat only canonical encodings as valid commitments; and
+* surface deterministic commitment logs/telemetry for downstream verification workflows.
+
+===Phase 2: Reserved Opcode Upgrade Path===
+
+This proposal reserves a follow-up soft-fork design track to migrate from OP_RETURN signaling to native script validation semantics using a reserved opcode approach.
+The Phase 2 document is expected to define:
+
+* exact opcode assignment path;
+* witness/program format for PQ verification data;
+* script evaluation and failure semantics; and
+* activation/deployment process.
+
+==Backwards Compatibility==
+
+Phase 1 is backward-compatible because OP_RETURN outputs are already standard and spendability semantics are unchanged.
+Legacy nodes continue to relay and index transactions as usual.
+
+Phase 2 is expected to be a consensus soft fork and must be specified with full backwards-compatibility and activation analysis in a successor BIP.
+
+==Security Considerations==
+
+Phase 1 commitments provide publication and detectability, not script-level PQ enforcement.
+Users must not interpret commitment publication alone as equivalent to consensus-enforced PQ signature validity.
+
+Canonical encoding requirements are mandatory to avoid ambiguous parsing and commitment spoofing via non-standard script shapes.
+
+==Reference Implementation==
+
+Current reference behavior exists in libdogecoin components that:
+
+* generate Falcon-512 commitments;
+* embed commitments in OP_RETURN outputs; and
+* validate/detect canonical commitments during SPV scanning.
+
+==Deployment==
+
+Phase 1 can be deployed immediately in wallets, tooling, and SPV infrastructure without consensus change.
+
+Phase 2 requires a separate consensus-track proposal and activation plan.
+
+==Acknowledgements==
+
+Thanks to the broader Bitcoin and Dogecoin post-quantum research community, including prior art discussions such as BIP 360.
