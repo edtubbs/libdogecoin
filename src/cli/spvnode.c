@@ -205,6 +205,7 @@ static void spv_print_header_tip(int height, time_t timestamp)
     printf("New headers tip height %d from %s\n", height, timestr);
 }
 
+#ifndef _MSC_VER
 static void* spv_worker_thread(void* arg)
 {
     UNUSED(arg);
@@ -310,6 +311,29 @@ static dogecoin_bool spv_worker_pool_enqueue(int height, time_t timestamp)
     pthread_mutex_unlock(&g_worker_pool.mutex);
     return true;
 }
+#else
+static void spv_worker_pool_stop(void)
+{
+    g_worker_pool.running = false;
+}
+
+static dogecoin_bool spv_worker_pool_start(int workers)
+{
+    UNUSED(workers);
+    static dogecoin_bool warned = false;
+    if (!warned) {
+        fprintf(stderr, "spvnode: worker threads are disabled for this MSVC build; using single-threaded callback processing.\n");
+        warned = true;
+    }
+    return true;
+}
+
+static dogecoin_bool spv_worker_pool_enqueue(int height, time_t timestamp)
+{
+    spv_print_header_tip(height, timestamp);
+    return true;
+}
+#endif
 
 /* This is a list of all the options that can be used with the program. */
 static struct option long_options[] = {
