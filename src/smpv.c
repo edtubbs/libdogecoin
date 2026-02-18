@@ -239,9 +239,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_process_tx(
     smpv_tx->block_hash    = NULL;
     smpv_tx->block_height  = 0;
 
-    /* if we already have this tx in mempool, skip re-processing (can happen if multiple nodes send us the same tx)
-     * note: this is a simple linear search, but mempool sizes are expected to be small and this is just a best-effort deduplication
-     */
+    /* skip if we already have this tx (dedup across multiple peer announcements) */
     if (dogecoin_smpv_get_tx(client, smpv_tx->txid) != NULL) {
         client->last_seen_ts = client->last_update_time = time(NULL);
         dogecoin_free(bin);
