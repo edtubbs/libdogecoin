@@ -67,7 +67,7 @@ typedef struct dogecoin_utxo_ {
 
 DISABLE_WARNING_PUSH
 DISABLE_WARNING(-Wunused-variable)
-static dogecoin_utxo* utxos = NULL;
+static DOGECOIN_THREAD_LOCAL dogecoin_utxo* utxos = NULL;
 DISABLE_WARNING_POP
 
 /** wallet init options */
