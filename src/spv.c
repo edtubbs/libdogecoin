@@ -665,6 +665,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
                 deser_skip(buf, consumedlength);
 
+                // SMPV step 1: match each block tx against mempool;
+                // only txs already tracked in the mempool get confirmed
                 if (client->smpv_enabled && client->smpv_ctx) {
                     uint256_t h;
                     dogecoin_dblhash(tx_raw, consumedlength, h);
@@ -703,7 +705,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             }
             client->last_block_total_tx_size = total_tx_size;
 
-            /* SMPV: recalculate confirmations for the new tip height */
+            // SMPV step 2: recalculate confirmation counts for all
+            // previously confirmed txs based on the new tip height
             if (client->smpv_enabled && client->smpv_ctx) {
                 dogecoin_smpv_tip_update(
                     (dogecoin_smpv_client*)client->smpv_ctx,
