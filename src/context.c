@@ -5,8 +5,6 @@
  */
 
 #include <dogecoin/libdogecoin.h>
-#include <dogecoin/eckey.h>
-#include <dogecoin/transaction.h>
 #include <dogecoin/mem.h>
 
 static void dogecoin_context_zero_error(dogecoin_context* ctx)
@@ -23,14 +21,8 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
     ctx->chain_params = testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
     ctx->enable_net = enable_net ? 1 : 0;
     ctx->refcount = 1;
-    ctx->tx_ctx = dogecoin_transaction_context_new();
-    ctx->key_ctx = dogecoin_eckey_context_new();
-    if (!ctx->tx_ctx || !ctx->key_ctx) {
-        dogecoin_transaction_context_free(ctx->tx_ctx);
-        dogecoin_eckey_context_free(ctx->key_ctx);
-        dogecoin_free(ctx);
-        return NULL;
-    }
+    ctx->tx_ctx = NULL;
+    ctx->key_ctx = NULL;
     dogecoin_context_zero_error(ctx);
     return ctx;
 }
@@ -48,8 +40,6 @@ void dogecoin_context_release(dogecoin_context* ctx)
         ctx->refcount--;
         return;
     }
-    dogecoin_transaction_context_free(ctx->tx_ctx);
-    dogecoin_eckey_context_free(ctx->key_ctx);
     dogecoin_free(ctx);
 }
 
@@ -99,15 +89,15 @@ int dogecoin_generate_keypair_ex(dogecoin_context* ctx, char* wif, size_t* wif_s
     }
 
     const dogecoin_bool is_testnet = (ctx->chain_params != &dogecoin_chainparams_main);
-    int key_idx = start_key_ts(ctx->key_ctx, is_testnet);
-    eckey* key = find_eckey_ts(ctx->key_ctx, key_idx);
-    if (key_idx <= 0 || !key) {
+    char tmp_wif[PRIVKEYWIFLEN] = {0};
+    char tmp_addr[P2PKHLEN] = {0};
+    if (!generatePrivPubKeypair(tmp_wif, tmp_addr, is_testnet)) {
         dogecoin_context_set_error(ctx, -2, "key generation failed");
         return false;
     }
 
-    size_t wif_need = strlen(key->private_key_wif) + 1;
-    size_t addr_need = strlen((char*)key->address) + 1;
+    size_t wif_need = strlen(tmp_wif) + 1;
+    size_t addr_need = strlen(tmp_addr) + 1;
     dogecoin_context_zero_error(ctx);
     if (!wif || !addr) {
         *wif_size = wif_need;
@@ -121,8 +111,8 @@ int dogecoin_generate_keypair_ex(dogecoin_context* ctx, char* wif, size_t* wif_s
         return false;
     }
 
-    memcpy(wif, key->private_key_wif, wif_need);
-    memcpy(addr, key->address, addr_need);
+    memcpy(wif, tmp_wif, wif_need);
+    memcpy(addr, tmp_addr, addr_need);
     *wif_size = wif_need;
     *addr_size = addr_need;
     return true;
