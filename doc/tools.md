@@ -400,7 +400,9 @@ To utilize checkpoints for faster initial sync, apply the -p flag:
 | `-u`, `--http_server` | Enable HTTP | No | Enabled HTTP: `./spvnode -u 127.0.0.1:8080 scan` |
 | `-x`, `--smpv` | Enable SMPV | No | Enabled SMPV: `./spvnode -x scan` |
 
-`spvnode` uses libevent threading support and can request headers from multiple peers in parallel.
+`spvnode` currently runs a single libevent runloop thread. It enables libevent threading support and can request headers from multiple peers in parallel over asynchronous network I/O.
+
+Note: libdogecoin is not entirely thread-safe yet. Some legacy APIs still rely on shared/global registries, so independent contexts/TLS-backed state are still needed in those areas for full thread-safety.
 
 ### Commands
 
