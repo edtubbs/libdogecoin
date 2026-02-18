@@ -34,7 +34,8 @@
 #include <dogecoin/utils.h>
 
 static dogecoin_eckey_context* default_eckey_context(void) {
-    static DOGECOIN_THREAD_LOCAL dogecoin_eckey_context default_ctx = {0};
+    /* Legacy wrapper context (not thread-safe): prefer explicit *_ts APIs for concurrent use. */
+    static dogecoin_eckey_context default_ctx = {0};
     return &default_ctx;
 }
 

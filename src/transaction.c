@@ -35,7 +35,8 @@
 #include <dogecoin/utils.h>
 
 static dogecoin_transaction_context* default_transaction_context(void) {
-    static DOGECOIN_THREAD_LOCAL dogecoin_transaction_context default_ctx = {0};
+    /* Legacy wrapper context (not thread-safe): prefer explicit *_ts APIs for concurrent use. */
+    static dogecoin_transaction_context default_ctx = {0};
     return &default_ctx;
 }
 

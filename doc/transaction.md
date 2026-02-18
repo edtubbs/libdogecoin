@@ -33,6 +33,8 @@ The high level 'essential' API provided by libdogecoin for working with simple t
 
 For non-breaking migration, `_ts` aliases are available for `_ex` transaction buffer APIs (for example `sign_raw_transaction_ts` alongside `sign_raw_transaction_ex`). Existing `_ex` names remain available and `_ts` names are compatibility aliases.
 
+Thread-safety policy: `_ts` APIs are the thread-safe APIs to use for new integrations. Legacy names (including `_ex` and non-`_ts`) are compatibility entrypoints and are not advertised as formally thread-safe.
+
 ```C
 typedef struct working_transaction {
     int index;
