@@ -35,6 +35,9 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/random.h>
 #include <dogecoin/sha2.h>
+#ifndef UTF8PROC_STATIC
+#define UTF8PROC_STATIC
+#endif
 #include <dogecoin/utf8proc.h>
 
 #ifdef _WIN32
