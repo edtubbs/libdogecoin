@@ -670,19 +670,19 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 if (client->smpv_enabled && client->smpv_ctx) {
                     uint256_t h;
                     dogecoin_dblhash(tx_raw, consumedlength, h);
-                    char* txid_hex = utils_uint8_to_hex((const uint8_t*)h, 32);
-                    if (txid_hex) {
-                        utils_reverse_hex(txid_hex, 64);
-                        char txid_copy[65];
-                        memcpy(txid_copy, txid_hex, 65);
-                        dogecoin_smpv_update_tx_status(
-                            (dogecoin_smpv_client*)client->smpv_ctx,
-                            txid_copy,
-                            true,
-                            hash_to_string(pindex->hash),
-                            (uint32_t)pindex->height
-                        );
-                    }
+                    char txid_hex[65];
+                    utils_bin_to_hex((unsigned char*)h, 32, txid_hex);
+                    utils_reverse_hex(txid_hex, 64);
+                    char block_hash_hex[65];
+                    utils_bin_to_hex((unsigned char*)pindex->hash, 32, block_hash_hex);
+                    utils_reverse_hex(block_hash_hex, 64);
+                    dogecoin_smpv_update_tx_status(
+                        (dogecoin_smpv_client*)client->smpv_ctx,
+                        txid_hex,
+                        true,
+                        block_hash_hex,
+                        (uint32_t)pindex->height
+                    );
                 }
 
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
