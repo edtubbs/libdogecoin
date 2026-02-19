@@ -334,6 +334,30 @@ dogecoin_bool dogecoin_bip37_merkle_match_consume(void** match_tree,
     return true;
 }
 
+static dogecoin_bool bip37_walk_merkle_matches(const dogecoin_btree_node_t* node,
+                                               dogecoin_bip37_match_info_cb cb,
+                                               void* ctx)
+{
+    if (!node) return true;
+    if (!bip37_walk_merkle_matches(node->left, cb, ctx)) return false;
+
+    if (cb && node->key) {
+        const bip37_merkle_match* m = (const bip37_merkle_match*)node->key;
+        if (!cb(m->txid, m->pos, m->consumed, ctx)) return false;
+    }
+
+    if (!bip37_walk_merkle_matches(node->right, cb, ctx)) return false;
+    return true;
+}
+
+dogecoin_bool dogecoin_bip37_merkle_for_each_match(void* match_tree,
+                                                   dogecoin_bip37_match_info_cb cb,
+                                                   void* ctx)
+{
+    if (!match_tree || !cb) return false;
+    return bip37_walk_merkle_matches((const dogecoin_btree_node_t*)match_tree, cb, ctx);
+}
+
 /**
  * Create a fixed-size BIP37 bloom filter using protocol maximums.
  *

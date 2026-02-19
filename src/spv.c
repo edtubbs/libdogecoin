@@ -67,6 +67,7 @@
 #define DOGECOIN_CURRENT_SUBSIDY_KOINU (10000ULL * DOGECOIN_KOINU_PER_COIN)
 #define SPV_VARINT_MAX_LEN 9 /* compactSize max bytes; we reserve max for simple one-pass allocation */
 #define SPV_FILTERLOAD_FIXED_FIELDS_LEN 9 /* 4-byte nHashFuncs + 4-byte nTweak + 1-byte flags */
+#define SPV_TXID_HEX_LEN 65 /* 32-byte hash => 64 hex chars + NUL */
 
 /* Build and send filterload directly from SPV/network context. */
 static dogecoin_bool spv_send_filterload_to_node(dogecoin_node* node,
@@ -96,6 +97,24 @@ static dogecoin_bool spv_send_filterload_to_node(dogecoin_node* node,
     dogecoin_node_send(node, msg);
     cstr_free(msg, true);
     cstr_free(payload, true);
+    return true;
+}
+
+typedef struct spv_merkle_log_ctx_ {
+    dogecoin_spv_client* client;
+    const dogecoin_blockindex* pindex;
+} spv_merkle_log_ctx;
+
+static dogecoin_bool spv_log_merkle_match(const uint8_t txid[32], uint32_t pos, dogecoin_bool consumed, void* ctx)
+{
+    spv_merkle_log_ctx* c = (spv_merkle_log_ctx*)ctx;
+    if (!c || !c->client || !c->client->nodegroup || !c->client->nodegroup->log_write_cb) return false;
+
+    char txid_hex[SPV_TXID_HEX_LEN];
+    utils_bin_to_hex((unsigned char*)txid, 32, txid_hex);
+    int match_height = c->pindex ? (int)c->pindex->height : -1;
+    c->client->nodegroup->log_write_cb("[merkle][decode] block_height=%d txid=%s pos=%u consumed=%d\n",
+        match_height, txid_hex, pos, consumed ? 1 : 0);
     return true;
 }
 
@@ -1095,6 +1114,13 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
         client->merkle_match_active = (client->merkle_match_pending > 0);
         client->merkle_match_blockindex = pindex;
+
+        if (client->merkle_match_pending > 0 && client->nodegroup && client->nodegroup->log_write_cb) {
+            spv_merkle_log_ctx log_ctx;
+            log_ctx.client = client;
+            log_ctx.pindex = pindex;
+            dogecoin_bip37_merkle_for_each_match(client->merkle_match_tree, spv_log_merkle_match, &log_ctx);
+        }
 
         /* Update rescan progress counters. */
         client->rescan_total++;
