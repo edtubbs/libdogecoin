@@ -209,6 +209,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->bloom_nhashfunc = 0;
     client->bloom_ntweak = 0;
     client->bloom_flags = 0;
+    client->bloom_filter_debug_dump = NULL;
 
     // merkleblock -> matched tx state (btree keyed by txid)
     client->merkle_match_tree = NULL;
@@ -312,6 +313,10 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
     client->bloom_nhashfunc = 0;
     client->bloom_ntweak = 0;
     client->bloom_flags = 0;
+    if (client->bloom_filter_debug_dump) {
+        dogecoin_free(client->bloom_filter_debug_dump);
+        client->bloom_filter_debug_dump = NULL;
+    }
 
     if (client->merkle_match_tree) {
         dogecoin_btree_tdestroy(client->merkle_match_tree, dogecoin_free);
@@ -912,6 +917,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
     if (strcmp(hdr->command, DOGECOIN_MSG_MERKLEBLOCK) == 0) {
         dogecoin_bool connected = false;
+        if (client->bloom_filter_debug_dump && client->nodegroup && client->nodegroup->log_write_cb) {
+            client->nodegroup->log_write_cb("%s", client->bloom_filter_debug_dump);
+        }
 
         /* connect header first (advances buf past 80-byte header) */
         const unsigned char* merkleblock_start = (const unsigned char*)buf->p;

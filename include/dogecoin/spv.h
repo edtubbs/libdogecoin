@@ -90,6 +90,7 @@ typedef struct dogecoin_spv_client_
     uint32_t bloom_nhashfunc;
     uint32_t bloom_ntweak;
     uint8_t  bloom_flags;
+    char*    bloom_filter_debug_dump;
 
    /* merkleblock -> matched tx state
       stored as a btree keyed by txid so tx lookup is O(log n) */
