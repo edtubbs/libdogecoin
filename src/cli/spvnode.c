@@ -506,7 +506,6 @@ int main(int argc, char* argv[]) {
                         char* pubkeyhash_hex = utils_uint8_to_hex((const uint8_t*)waddr->pubkeyhash, sizeof(uint160_t));
                         snprintf(line, sizeof(line), "[spv][debug]  - address(pubkeyhash): %s\n",
                                  pubkeyhash_hex ? pubkeyhash_hex : "(null)");
-                        if (pubkeyhash_hex) dogecoin_free(pubkeyhash_hex);
                     }
                     cstr_append_buf(filter_debug, line, strlen(line));
                 }
@@ -525,7 +524,6 @@ int main(int argc, char* argv[]) {
                     char line[SPV_FILTER_DEBUG_TX_LINE_LEN];
                     snprintf(line, sizeof(line), "[spv][debug]  - txid: %s vout: %d block_height: %d\n",
                              txid_hex ? txid_hex : "(null)", utxo->vout, utxo->height);
-                    if (txid_hex) dogecoin_free(txid_hex);
                     cstr_append_buf(filter_debug, line, strlen(line));
                 }
             }
