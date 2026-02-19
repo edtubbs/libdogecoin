@@ -65,13 +65,14 @@ dogecoin_bool dogecoin_falcon512_commit_bytes(const uint8_t* pk, size_t pk_len,
 dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t* commit32) {
     if (!tx || !commit32) return false;
 
-    // script: OP_RETURN (0x6a) PUSHDATA(32) <32 bytes>
-    cstring* spk = cstr_new_sz(1 + 1 + 32);
+    // script: OP_RETURN (0x6a) PUSHDATA(36) "FLC1" <32 bytes>
+    cstring* spk = cstr_new_sz(1 + 1 + DOGECOIN_PQC_FALCON_PUSH_TOTAL);
     uint8_t opret = 0x6a;
-    uint8_t push  = 32;
+    uint8_t push  = DOGECOIN_PQC_FALCON_PUSH_TOTAL;
 
     cstr_append_buf(spk, &opret, 1);
     cstr_append_buf(spk, &push, 1);
+    cstr_append_buf(spk, (const uint8_t*)DOGECOIN_PQC_FALCON_TAG, DOGECOIN_PQC_FALCON_TAG_LEN);
     cstr_append_buf(spk, commit32, 32);
 
     dogecoin_tx_out* out = dogecoin_tx_out_new();
@@ -89,17 +90,20 @@ dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t* c
 dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_t* out32) {
     if (!tx || !out32) return false;
 
-    // Look for the first vout whose script matches: 6a 20 <32 bytes>
+    // Look for the first vout whose script matches: 6a 24 "FLC1" <32 bytes>
     for (unsigned i = 0; i < tx->vout->len; ++i) {
         const dogecoin_tx_out* o = vector_idx(tx->vout, i);
-        if (!o || !o->script_pubkey || o->script_pubkey->len < (1 + 1 + 32))
+        if (!o || !o->script_pubkey || o->script_pubkey->len < (1 + 1 + DOGECOIN_PQC_FALCON_PUSH_TOTAL))
             continue;
 
         const unsigned char* p = (const unsigned char*)o->script_pubkey->str;
         size_t n = o->script_pubkey->len;
 
-        if (n == 34 && p[0] == 0x6a && p[1] == 32) {
-            memcpy(out32, p + 2, 32);
+        if (n == (1 + 1 + DOGECOIN_PQC_FALCON_PUSH_TOTAL) &&
+            p[0] == 0x6a &&
+            p[1] == DOGECOIN_PQC_FALCON_PUSH_TOTAL &&
+            memcmp(p + 2, DOGECOIN_PQC_FALCON_TAG, DOGECOIN_PQC_FALCON_TAG_LEN) == 0) {
+            memcpy(out32, p + 2 + DOGECOIN_PQC_FALCON_TAG_LEN, 32);
             return true;
         }
     }

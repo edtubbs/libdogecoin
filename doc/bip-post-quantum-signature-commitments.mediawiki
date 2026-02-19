@@ -54,17 +54,18 @@ This direction is related to broader PQ discussions, including BIP 360, but is f
 
 ===Phase 1: OP_RETURN Commitment Encoding===
 
-For Phase 1, PQ commitments are encoded in outputs using canonical script form:
+For Phase 1, Falcon commitments are encoded in outputs using canonical tagged script form:
 
 <source>
-0x6a 0x20 <32-byte-commitment>
+0x6a 0x24 0x464c4331 <32-byte-commitment>
 </source>
 
 Where:
 
 * <code>0x6a</code> is OP_RETURN
-* <code>0x20</code> is push-32
-* payload is exactly 32 bytes
+* <code>0x24</code> is push-36
+* <code>0x464c4331</code> is the Falcon identifier (<code>"FLC1"</code> in ASCII)
+* payload is exactly 4-byte tag + 32-byte commitment
 
 Non-canonical encodings are invalid for commitment interpretation under this proposal.
 
@@ -74,8 +75,7 @@ For implementation namespace clarity, libdogecoin defines a Falcon identifier co
 DOGECOIN_PQC_FALCON_TAG = "FLC1"
 </source>
 
-Future encoding revisions MAY include explicit tag carriage in script payloads.
-Current consensus-neutral Phase 1 interoperability in this proposal remains canonical <code>OP_RETURN 0x20 <32-byte-commitment></code>.
+Current consensus-neutral Phase 1 interoperability in this proposal remains canonical <code>OP_RETURN 0x24 0x464c4331 <32-byte-commitment></code>.
 
 Commitment derivation for Falcon-512 stage implementations is:
 
@@ -90,7 +90,7 @@ Implementations MAY support additional PQ schemes in future revisions, but MUST 
 SPV implementations should:
 
 * parse transactions in scanned blocks;
-* detect canonical PQ commitment scripts;
+* detect canonical tagged Falcon commitment scripts;
 * treat only canonical encodings as valid commitments; and
 * surface deterministic commitment logs/telemetry for downstream verification workflows.
 

@@ -263,7 +263,7 @@ monitor_spvnode() {
     echo "  - Track wallet activity for: $TESTNET_ADDR"
     echo "  - Download and scan blocks in full mode"
     echo "  - Detect Falcon commitments"
-    echo "  - Log: [falcon-commit] Found at height=X txpos=Y commit=$FALCON_COMMIT"
+    echo "  - Log: [falcon-commit] Valid at height=X txpos=Y commit=$FALCON_COMMIT"
     echo ""
     
     warning "SPV sync may take time. Be patient!"

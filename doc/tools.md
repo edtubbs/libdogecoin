@@ -571,7 +571,7 @@ MESSAGE_HEX=$(echo -n "Testnet proof $(date)" | xxd -p | tr -d '\n')
 
 6. **Build and broadcast transaction** with OP_RETURN containing the commitment:
 ```
-OP_RETURN script: 6a20<commitment_hex>
+OP_RETURN script: 6a24464c4331<commitment_hex>
 ```
 
 7. **Monitor with SPV node**:
@@ -580,7 +580,7 @@ OP_RETURN script: 6a20<commitment_hex>
 ```
 The SPV node will detect and log Falcon commitments:
 ```
-[falcon-commit] Found at height=4567890 txpos=2 commit=a1b2c3d4...
+[falcon-commit] Valid at height=4567890 txpos=2 commit=a1b2c3d4...
 ```
 
 8. **Verify off-chain**: Anyone with the public key, message, and signature can:

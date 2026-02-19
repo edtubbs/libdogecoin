@@ -1777,7 +1777,7 @@ int main(int argc, char* argv[])
         printf("commitment:  %s\n", commit_hex);
         printf("length:      32 bytes\n");
         printf("\nThis commitment can be included in an OP_RETURN output:\n");
-        printf("OP_RETURN script: 6a20%s\n", commit_hex);
+        printf("OP_RETURN script: 6a24464c4331%s\n", commit_hex);
         printf("\nTo verify off-chain:\n");
         printf("1. Get the full signature from the signer\n");
         printf("2. Recompute: commit = SHA256(public_key || signature)\n");

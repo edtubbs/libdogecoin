@@ -679,7 +679,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 deser_skip(buf, consumedlength);
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
                 
-                // Validate Falcon commit in canonical OP_RETURN form (6a20 + 32 bytes)
+                // Validate Falcon commit in canonical tagged OP_RETURN form (6a24 + "FLC1" + 32 bytes)
                 uint8_t falcon_commit_data[32];
                 if (dogecoin_tx_extract_falcon512_commit(tx, falcon_commit_data)) {
                     char commit_hex[65];
