@@ -11,6 +11,11 @@ void test_context_keypair_ex()
 {
     dogecoin_context* ctx = dogecoin_context_new(false, false);
     u_assert_true(ctx != NULL);
+    u_assert_true(dogecoin_context_get_chainparams(ctx) == &dogecoin_chainparams_main);
+    u_assert_true(dogecoin_context_get_transaction_context(ctx) != NULL);
+    u_assert_true(dogecoin_context_get_eckey_context(ctx) != NULL);
+    u_assert_true(dogecoin_context_get_ecc_context(ctx) != NULL);
+    u_assert_true(dogecoin_context_get_rng_state(ctx) != NULL);
 
     size_t wif_size = 0;
     size_t addr_size = 0;

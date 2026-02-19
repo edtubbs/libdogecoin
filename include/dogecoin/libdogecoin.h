@@ -97,6 +97,8 @@ void dogecoin_context_release(dogecoin_context* ctx);
 const dogecoin_chainparams* dogecoin_context_get_chainparams(const dogecoin_context* ctx);
 struct dogecoin_transaction_context* dogecoin_context_get_transaction_context(dogecoin_context* ctx);
 struct dogecoin_eckey_context* dogecoin_context_get_eckey_context(dogecoin_context* ctx);
+void* dogecoin_context_get_ecc_context(dogecoin_context* ctx);
+void* dogecoin_context_get_rng_state(dogecoin_context* ctx);
 void dogecoin_context_set_error(dogecoin_context* ctx, int code, const char* msg);
 int dogecoin_context_get_error_code(const dogecoin_context* ctx);
 const char* dogecoin_context_get_error(const dogecoin_context* ctx);
