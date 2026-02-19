@@ -68,6 +68,15 @@ Where:
 
 Non-canonical encodings are invalid for commitment interpretation under this proposal.
 
+For implementation namespace clarity, libdogecoin defines a Falcon identifier constant:
+
+<source>
+DOGECOIN_PQC_FALCON_TAG = "FLC1"
+</source>
+
+Future encoding revisions MAY include explicit tag carriage in script payloads.
+Current consensus-neutral Phase 1 interoperability in this proposal remains canonical <code>OP_RETURN 0x20 <32-byte-commitment></code>.
+
 Commitment derivation for Falcon-512 stage implementations is:
 
 <source>
