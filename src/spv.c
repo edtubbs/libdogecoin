@@ -61,8 +61,8 @@
 #include <dogecoin/pqc_falcon.h>
 #include <event2/event.h>
 
-/* Optional liboqs (Falcon-only) presence check; compile with -DUSE_OQS */
-#ifdef USE_OQS
+/* Optional liboqs (Falcon-only) presence check; compile with -DUSE_LIBOQS */
+#ifdef USE_LIBOQS
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
@@ -167,7 +167,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
         client->nodegroup->log_write_cb = net_write_log_printf;
     }
 
-#ifdef USE_OQS
+#ifdef USE_LIBOQS
     // Log what Falcon variants are present at runtime (minimal, no hard dependency).
     if (client->nodegroup && client->nodegroup->log_write_cb) {
         client->nodegroup->log_write_cb(

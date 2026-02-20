@@ -536,8 +536,9 @@ static void secp_sign_bench(benchmark_context *ctx) {
     if (!primed) { make_valid_privkey(sk); primed = 1; }
 
     uint8_t msg32[32]; make_msg32(ctx->input, msg32);
+    uint256_t msg_hash; memcpy(msg_hash, msg32, 32);
     unsigned char sigder[80]; size_t siglen = sizeof(sigder);
-    (void)dogecoin_ecc_sign(sk, msg32, sigder, &siglen);
+    (void)dogecoin_ecc_sign(sk, msg_hash, sigder, &siglen);
     ctx->end = gettimedouble(); ctx->endCycles = perf_cpucycles();
     ctx->totalTime += ctx->end - ctx->start; ctx->totalCycles += ctx->endCycles - ctx->startCycles;
 }
@@ -547,18 +548,20 @@ static void secp_verify_bench(benchmark_context *ctx) {
     static int primed = 0;
     static uint8_t pk[33]; static size_t pklen = 33;
     static uint8_t msg32[32];
+    static uint256_t msg_hash = {0};
     static unsigned char sigder[80]; static size_t siglen = 0;
 
     if (!primed) {
         uint8_t sk[32]; make_valid_privkey(sk);
         pklen = 33; dogecoin_ecc_get_pubkey(sk, pk, &pklen, true);
         make_msg32(ctx->input, msg32);
+        memcpy(msg_hash, msg32, 32);
         siglen = sizeof(sigder);
-        (void)dogecoin_ecc_sign(sk, msg32, sigder, &siglen);
+        (void)dogecoin_ecc_sign(sk, msg_hash, sigder, &siglen);
         primed = 1;
     }
 
-    (void)dogecoin_ecc_verify_sig(pk, true, msg32, sigder, siglen);
+    (void)dogecoin_ecc_verify_sig(pk, true, msg_hash, sigder, siglen);
     ctx->end = gettimedouble(); ctx->endCycles = perf_cpucycles();
     ctx->totalTime += ctx->end - ctx->start; ctx->totalCycles += ctx->endCycles - ctx->startCycles;
 }
