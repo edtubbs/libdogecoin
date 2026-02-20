@@ -289,7 +289,12 @@ static int spv_filter_oldest_utxo_height = 0;
  * @param client The client object.
  */
 void spv_sync_completed(dogecoin_spv_client* client) {
-    int tip_height = client->headers_db->getchaintip(client->headers_db_ctx)->height;
+    dogecoin_blockindex* tip = client->headers_db->getchaintip(client->headers_db_ctx);
+    int tip_height = tip->height;
+    int available_start_height = tip_height;
+    dogecoin_blockindex* cursor = tip;
+    while (cursor && cursor->prev) cursor = cursor->prev;
+    if (cursor) available_start_height = (int)cursor->height;
     printf("Sync completed, at height %d\n", tip_height);
 
     /* If a bloom filter is active, request filtered blocks from the last
@@ -303,6 +308,12 @@ void spv_sync_completed(dogecoin_spv_client* client) {
             request_depth = (tip_height - spv_filter_oldest_utxo_height) + 1;
             printf("[spv] Requesting historical filtered blocks for UTXO discovery from height %d to %d (depth=%d)...\n",
                    spv_filter_oldest_utxo_height, tip_height, request_depth);
+            if (spv_filter_oldest_utxo_height < available_start_height) {
+                printf("[spv][warn] Oldest wallet UTXO height %d is older than locally available headers start %d.\n",
+                       spv_filter_oldest_utxo_height, available_start_height);
+                printf("[spv][warn] Historical matches before %d cannot be found until headers are synced from that range (disable checkpoint and rebuild headers).\n",
+                       available_start_height);
+            }
         } else {
             printf("[spv] Requesting historical filtered blocks for UTXO discovery (checkpoint/genesis to tip)...\n");
         }
