@@ -57,6 +57,9 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                                                      const uint8_t* flags,
                                                      uint32_t flags_len,
                                                      const uint8_t header_merkle[32],
+                                                     const uint8_t block_hash[32],
+                                                     int block_height,
+                                                     const char* filter_debug_dump,
                                                      dogecoin_bip37_match_cb on_match,
                                                      void* match_ctx);
 
@@ -66,6 +69,9 @@ dogecoin_bool dogecoin_bip37_merkle_extract_match_tree(uint32_t nTx,
                                                        const uint8_t* flags,
                                                        uint32_t flags_len,
                                                        const uint8_t header_merkle[32],
+                                                       const uint8_t block_hash[32],
+                                                       int block_height,
+                                                       const char* filter_debug_dump,
                                                        void** match_tree,
                                                        uint32_t* match_pending);
 

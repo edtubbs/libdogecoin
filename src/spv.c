@@ -1087,6 +1087,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                       flags,
                                                       flags_len,
                                                       header_merkle,
+                                                      (const uint8_t*)pindex->hash,
+                                                      (int)pindex->height,
+                                                      client->bloom_filter_debug_dump,
                                                       &client->merkle_match_tree,
                                                       &client->merkle_match_pending)) {
             if (client->merkle_match_tree) {
