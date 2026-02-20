@@ -32,6 +32,13 @@
 #include <dogecoin/random.h>
 #include <dogecoin/utils.h>
 
+static void bip37_hash_to_hex(const uint8_t hash[32], char out_hex[65])
+{
+    unsigned char tmp[32];
+    memcpy(tmp, hash, 32);
+    utils_bin_to_hex(tmp, 32, out_hex);
+}
+
 /**
  * MurmurHash3 (x86 32-bit) used by BIP37 bloom filters.
  */
@@ -109,9 +116,13 @@ static dogecoin_bool bip37_merkle_collect_match(const uint8_t txid[32], uint32_t
         dogecoin_free(m);
         return false;
     }
+    char txid_hex[65];
+    bip37_hash_to_hex(txid, txid_hex);
     if (nn->key != m) {
+        debug_print("[bip37][collect] duplicate txid=%s pos=%u\n", txid_hex, pos);
         dogecoin_free(m);
     } else {
+        debug_print("[bip37][collect] insert txid=%s pos=%u\n", txid_hex, pos);
         (*c->match_pending)++;
     }
     return true;
@@ -144,6 +155,8 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
         height++;
         if (height > 32) return false;
     }
+    debug_print("[bip37][traverse] start nTx=%u hashCount=%u flags_len=%u tree_height=%u\n",
+                nTx, hashCount, flags_len, height);
 
     uint32_t bitsUsed = 0;
     uint32_t hashesUsed = 0;
@@ -170,6 +183,8 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
         if (st[sp].stage == 0) {
             if (bitsUsed >= (uint32_t)flags_len * 8U) { ok_extract = false; break; }
             st[sp].parentMatch = (flags[bitsUsed >> 3] >> (bitsUsed & 7)) & 1;
+            debug_print("[bip37][traverse] visit h=%u pos=%u parentMatch=%u bitsUsed=%u hashesUsed=%u\n",
+                        st[sp].height, st[sp].pos, st[sp].parentMatch, bitsUsed, hashesUsed);
             bitsUsed++;
 
             /* Leaf node, or an internal node that does not match: consume one hash. */
@@ -183,6 +198,11 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                     !on_match(ret, st[sp].pos, match_ctx)) {
                     ok_extract = false;
                     break;
+                }
+                if (st[sp].height == 0 && st[sp].parentMatch) {
+                    char txid_hex[65];
+                    bip37_hash_to_hex(ret, txid_hex);
+                    debug_print("[bip37][traverse] matched leaf txid=%s pos=%u\n", txid_hex, st[sp].pos);
                 }
 
                 sp--;
@@ -243,8 +263,10 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
         ok_extract = false;
         break;
     }
-
-    return (ok_extract && have_ret && memcmp(ret, header_merkle, 32) == 0);
+    dogecoin_bool ok = (ok_extract && have_ret && memcmp(ret, header_merkle, 32) == 0);
+    debug_print("[bip37][traverse] done ok=%d bitsUsed=%u hashesUsed=%u\n",
+                ok, bitsUsed, hashesUsed);
+    return ok;
 }
 
 dogecoin_bool dogecoin_bip37_merkle_extract_match_tree(uint32_t nTx,
