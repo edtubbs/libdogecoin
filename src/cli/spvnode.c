@@ -77,6 +77,11 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/wallet.h>
 
+/* "[spv][debug]  - address(pubkeyhash): " + hex/hash/address + newline */
+#define SPV_FILTER_DEBUG_ADDR_LINE_LEN 160
+/* "[spv][debug]  - txid: " + 64hex + " vout: " + int + " block_height: " + int + newline */
+#define SPV_FILTER_DEBUG_TX_LINE_LEN 220
+
 #ifndef WIN32
 #define BD_NO_CHDIR          01 /* Don't chdir ("/") */
 #define BD_NO_CLOSE_FILES    02 /* Don't close all open files */
@@ -85,10 +90,6 @@
 #define BD_NO_UMASK0        010 /* Don't do a umask(0) */
 #define BD_MAX_CLOSE       8192 /* Max file descriptors to close if
                                    sysconf(_SC_OPEN_MAX) is indeterminate */
-/* "[spv][debug]  - address(pubkeyhash): " + hex/hash/address + newline */
-#define SPV_FILTER_DEBUG_ADDR_LINE_LEN 160
-/* "[spv][debug]  - txid: " + 64hex + " vout: " + int + " block_height: " + int + newline */
-#define SPV_FILTER_DEBUG_TX_LINE_LEN 220
 
 int // returns 0 on success -1 on error
 become_daemon(int flags)
