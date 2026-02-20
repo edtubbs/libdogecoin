@@ -2,8 +2,8 @@
 
  The MIT License (MIT)
 
- Copyright (c) 2022-2026 bluezr
- Copyright (c) 2023-2026 The Dogecoin Foundation
+ Copyright (c) 2026 edtubbs
+ Copyright (c) 2026 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
