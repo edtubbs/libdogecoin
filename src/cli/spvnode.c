@@ -281,6 +281,7 @@ dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_* client, 
     }
 
 static dogecoin_bool quit_when_synced = true;
+static int spv_filter_oldest_utxo_height = 0;
 /**
  * When the sync is complete, print a message and either exit or wait for new blocks or relevant
  * transactions
@@ -288,7 +289,8 @@ static dogecoin_bool quit_when_synced = true;
  * @param client The client object.
  */
 void spv_sync_completed(dogecoin_spv_client* client) {
-    printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
+    int tip_height = client->headers_db->getchaintip(client->headers_db_ctx)->height;
+    printf("Sync completed, at height %d\n", tip_height);
 
     /* If a bloom filter is active, request filtered blocks from the last
        checkpoint to tip to discover UTXOs. Per BIP37, the peer responds
@@ -296,8 +298,15 @@ void spv_sync_completed(dogecoin_spv_client* client) {
        transactions include the matched TXs, while non-matching blocks
        come back with 0 matched transactions. */
     if (client->bloom_filter && client->bloom_filter_len > 0) {
-        printf("[spv] Requesting historical filtered blocks for UTXO discovery (checkpoint to tip)...\n");
-        dogecoin_net_spv_request_filtered_history(client, 0); /* 0 = scan all available blocks back to checkpoint */
+        int request_depth = 0; /* 0 = scan all available blocks back to checkpoint/genesis in current headers chain */
+        if (spv_filter_oldest_utxo_height > 0 && tip_height >= spv_filter_oldest_utxo_height) {
+            request_depth = (tip_height - spv_filter_oldest_utxo_height) + 1;
+            printf("[spv] Requesting historical filtered blocks for UTXO discovery from height %d to %d (depth=%d)...\n",
+                   spv_filter_oldest_utxo_height, tip_height, request_depth);
+        } else {
+            printf("[spv] Requesting historical filtered blocks for UTXO discovery (checkpoint/genesis to tip)...\n");
+        }
+        dogecoin_net_spv_request_filtered_history(client, request_depth);
     }
 
     if (quit_when_synced) {
@@ -515,6 +524,12 @@ int main(int argc, char* argv[]) {
             dogecoin_utxo* utxo;
             dogecoin_utxo* tmp;
             HASH_ITER(hh, wallet->utxos, utxo, tmp) {
+                /* Only confirmed chain heights (>0) are useful for historical scan bounds. */
+                if (utxo->height > 0 &&
+                    (spv_filter_oldest_utxo_height == 0 || utxo->height < spv_filter_oldest_utxo_height)) {
+                    spv_filter_oldest_utxo_height = utxo->height;
+                }
+
                 /* Add txid itself so historical funding transactions can match. */
                 dogecoin_bip37_filter_add(filter, utxo->txid, 32);
 
