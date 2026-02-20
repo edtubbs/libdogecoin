@@ -63,7 +63,14 @@
 
 /* Optional liboqs (Falcon-only) presence check; compile with -DUSE_OQS */
 #ifdef USE_OQS
-#include <oqs/oqs.h>
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+#include <oqs/sig.h>
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #endif
 
 #define DOGECOIN_KOINU_PER_COIN 100000000ULL

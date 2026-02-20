@@ -34,7 +34,14 @@
 #include <dogecoin/pqc_falcon.h>
 
 #ifdef USE_LIBOQS
-#include <oqs/oqs.h>
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+#include <oqs/sig.h>
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #endif
 
 /* ---------- Helpers (compile even without liboqs) ---------- */

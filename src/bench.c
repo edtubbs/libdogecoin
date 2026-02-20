@@ -267,7 +267,14 @@ static void falcon512_commit_bytes_bench(benchmark_context *ctx) {
 }
 
 /* ---- Other PQC Algorithms (Dilithium, SPHINCS+) ---- */
-#include <oqs/oqs.h>
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+#include <oqs/sig.h>
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 /* Generic PQC benchmark helper */
 typedef struct {
