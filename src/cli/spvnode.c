@@ -515,6 +515,10 @@ int main(int argc, char* argv[]) {
             dogecoin_utxo* utxo;
             dogecoin_utxo* tmp;
             HASH_ITER(hh, wallet->utxos, utxo, tmp) {
+                /* Add txid itself so historical funding transactions can match. */
+                dogecoin_bip37_filter_add(filter, utxo->txid, 32);
+
+                /* Add outpoint so spending transactions can match later. */
                 uint8_t outpoint[36];
                 memcpy(outpoint, utxo->txid, 32);
                 uint32_t vout_le = htole32(utxo->vout);
