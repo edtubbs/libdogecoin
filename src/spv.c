@@ -1415,46 +1415,25 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
         if (batch > batch_max) batch = batch_max;
 
         /* Build getdata payload: varint(count) + count * (uint32 type + uint256 hash) */
-        size_t payload_sz = 9 + (size_t)batch * 36;
-        uint8_t* payload = (uint8_t*)dogecoin_calloc(1, payload_sz);
+        cstring* payload = cstr_new_sz(9 + (size_t)batch * 36);
         if (!payload) break;
 
-        size_t off = 0;
-        /* write varint */
-        uint64_t vv = (uint64_t)batch;
-        if (vv < 0xfdULL) {
-            payload[off++] = (uint8_t)vv;
-        } else if (vv <= 0xffffULL) {
-            payload[off++] = 0xfd;
-            payload[off++] = (uint8_t)(vv & 0xff);
-            payload[off++] = (uint8_t)((vv >> 8) & 0xff);
-        } else {
-            payload[off++] = 0xfe;
-            payload[off++] = (uint8_t)(vv & 0xff);
-            payload[off++] = (uint8_t)((vv >> 8) & 0xff);
-            payload[off++] = (uint8_t)((vv >> 16) & 0xff);
-            payload[off++] = (uint8_t)((vv >> 24) & 0xff);
-        }
+        ser_varlen(payload, (uint32_t)batch);
 
         int bi;
         for (bi = 0; bi < batch; bi++) {
             uint32_t type = DOGECOIN_INV_TYPE_FILTERED_BLOCK;
-            payload[off + 0] = (uint8_t)(type & 0xff);
-            payload[off + 1] = (uint8_t)((type >> 8) & 0xff);
-            payload[off + 2] = (uint8_t)((type >> 16) & 0xff);
-            payload[off + 3] = (uint8_t)((type >> 24) & 0xff);
-            off += 4;
-            memcpy(payload + off, block_ptrs[sent + bi]->hash, 32);
-            off += 32;
+            ser_u32(payload, type);
+            ser_bytes(payload, block_ptrs[sent + bi]->hash, 32);
         }
 
         cstring *p2p_msg = dogecoin_p2p_message_new(
             peer->nodegroup->chainparams->netmagic,
             DOGECOIN_MSG_GETDATA,
-            payload, (uint32_t)off);
+            (const uint8_t*)payload->str, payload->len);
         dogecoin_node_send(peer, p2p_msg);
         cstr_free(p2p_msg, true);
-        dogecoin_free(payload);
+        cstr_free(payload, true);
 
         sent += batch;
     }

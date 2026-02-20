@@ -33,43 +33,6 @@
 #include <dogecoin/utils.h>
 
 /**
- * Serialize a compactSize integer into a caller-provided buffer.
- *
- * @return Number of bytes written to @p out.
- */
-static size_t bip37_write_varint(uint64_t val, uint8_t out[9])
-{
-    if (val < 0xfdULL) {
-        out[0] = (uint8_t)val;
-        return 1;
-    }
-    if (val <= 0xffffULL) {
-        out[0] = 0xfd;
-        out[1] = (uint8_t)(val & 0xff);
-        out[2] = (uint8_t)((val >> 8) & 0xff);
-        return 3;
-    }
-    if (val <= 0xffffffffULL) {
-        out[0] = 0xfe;
-        out[1] = (uint8_t)(val & 0xff);
-        out[2] = (uint8_t)((val >> 8) & 0xff);
-        out[3] = (uint8_t)((val >> 16) & 0xff);
-        out[4] = (uint8_t)((val >> 24) & 0xff);
-        return 5;
-    }
-    out[0] = 0xff;
-    out[1] = (uint8_t)(val & 0xff);
-    out[2] = (uint8_t)((val >> 8) & 0xff);
-    out[3] = (uint8_t)((val >> 16) & 0xff);
-    out[4] = (uint8_t)((val >> 24) & 0xff);
-    out[5] = (uint8_t)((val >> 32) & 0xff);
-    out[6] = (uint8_t)((val >> 40) & 0xff);
-    out[7] = (uint8_t)((val >> 48) & 0xff);
-    out[8] = (uint8_t)((val >> 56) & 0xff);
-    return 9;
-}
-
-/**
  * MurmurHash3 (x86 32-bit) used by BIP37 bloom filters.
  */
 static uint32_t bip37_murmur3(const uint8_t* key, size_t len, uint32_t seed)
@@ -444,15 +407,15 @@ dogecoin_bool dogecoin_bip37_build_filtered_getdata_payload(const struct const_b
     uint32_t n = 0;
     if (!deser_varlen(&n, &inv)) return false;
 
-    uint8_t* out = (uint8_t*)dogecoin_calloc(1, inv_payload->len);
+    cstring* out = cstr_new_sz(inv_payload->len);
     if (!out) return false;
+    ser_varlen(out, n);
 
-    size_t off = bip37_write_varint((uint64_t)n, out);
     for (uint32_t i = 0; i < n; i++) {
         uint32_t type = 0;
         uint256_t h;
         if (!deser_u32(&type, &inv) || !deser_u256(h, &inv)) {
-            dogecoin_free(out);
+            cstr_free(out, true);
             return false;
         }
 
@@ -460,17 +423,18 @@ dogecoin_bool dogecoin_bip37_build_filtered_getdata_payload(const struct const_b
             type = DOGECOIN_INV_TYPE_FILTERED_BLOCK;
         }
 
-        out[off + 0] = (uint8_t)(type & 0xff);
-        out[off + 1] = (uint8_t)((type >> 8) & 0xff);
-        out[off + 2] = (uint8_t)((type >> 16) & 0xff);
-        out[off + 3] = (uint8_t)((type >> 24) & 0xff);
-        off += 4;
-        memcpy(out + off, h, 32);
-        off += 32;
+        ser_u32(out, type);
+        ser_u256(out, h);
     }
 
-    *out_payload = out;
-    *out_len = (uint32_t)off;
+    *out_payload = (uint8_t*)dogecoin_calloc(1, out->len);
+    if (!*out_payload) {
+        cstr_free(out, true);
+        return false;
+    }
+    memcpy(*out_payload, out->str, out->len);
+    *out_len = (uint32_t)out->len;
     *item_count = n;
+    cstr_free(out, true);
     return true;
 }
