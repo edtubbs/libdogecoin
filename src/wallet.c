@@ -695,20 +695,23 @@ void dogecoin_wallet_scrape_utxos(dogecoin_wallet* wallet, dogecoin_wtx* wtx) {
         }
     }
 
+    vector_t* addrs = NULL;
+    if (wallet->waddr_vector->len) {
+        addrs = vector_new(1, free);
+        dogecoin_wallet_get_addresses(wallet, addrs);
+    }
+
     size_t j = 0;
     // iterate through vout's:
     for (; j < wtx->tx->vout->len; j++) {
         dogecoin_tx_out* tx_out = vector_idx(wtx->tx->vout, j);
         // populate address vector_t if script_pubkey exists:
-        if (wallet->waddr_vector->len && tx_out->script_pubkey->len) {
+        if (addrs && tx_out->script_pubkey->len) {
             char p2pkh_from_script_pubkey[P2PKHLEN];
             // convert script pubkey hash to p2pkh address:
             if (!dogecoin_pubkey_hash_to_p2pkh_address(tx_out->script_pubkey->str, tx_out->script_pubkey->len, p2pkh_from_script_pubkey, wallet->chain)) {
                 printf("failed to convert pubkey hash to p2pkh address!\n");
             }
-            vector_t* addrs = vector_new(1, free);
-            // grab all addresses in vector_t:
-            dogecoin_wallet_get_addresses(wallet, addrs);
             unsigned int i, g;
             // loop through addresses:
             for (i = 0; i < addrs->len; i++) {
@@ -770,9 +773,9 @@ void dogecoin_wallet_scrape_utxos(dogecoin_wallet* wallet, dogecoin_wtx* wtx) {
                     }
                 }
             }
-            vector_free(addrs, true);
         }
     }
+    if (addrs) vector_free(addrs, true);
 
     // update the wallet with the new utxos:
     wallet->utxos = utxos;
@@ -983,7 +986,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
         }
     }
     else {
-        const uint32_t tx_progress_interval = 10000;
+        const uint32_t tx_progress_interval = 50;
         uint32_t tx_loaded_count = 0;
         dogecoin_bool tx_loading_announced = false;
         // check file-header-magic, version and genesis
@@ -1032,11 +1035,15 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 if (!dogecoin_wallet_load_transaction(wallet, reclen)) return false;
                 tx_loaded_count++;
                 if ((tx_loaded_count % tx_progress_interval) == 0) {
-                    printf("%u transactions loaded\n", tx_loaded_count);
+                    printf("\r%u transactions loaded", tx_loaded_count);
+                    fflush(stdout);
                 }
             } else {
                 fseek(wallet->dbfile, reclen, SEEK_CUR);
             }
+        }
+        if (tx_loading_announced && ((tx_loaded_count % tx_progress_interval) != 0)) {
+            printf("\n");
         }
         if (tx_loading_announced && ((tx_loaded_count % tx_progress_interval) != 0)) {
             printf("%u transactions loaded\n", tx_loaded_count);
