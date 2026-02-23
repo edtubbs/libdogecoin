@@ -34,9 +34,7 @@
 
 static void bip37_hash_to_hex(const uint8_t hash[32], char out_hex[65])
 {
-    unsigned char tmp[32];
-    memcpy(tmp, hash, 32);
-    utils_bin_to_hex(tmp, 32, out_hex);
+    utils_bin_to_hex(hash, 32, out_hex);
     out_hex[64] = '\0';
 }
 

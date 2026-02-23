@@ -524,9 +524,10 @@ int main(int argc, char* argv[]) {
                     if (dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, chain, addr, sizeof(addr))) {
                         snprintf(line, sizeof(line), "[spv][debug]  - address: %s\n", addr);
                     } else {
-                        char* pubkeyhash_hex = utils_uint8_to_hex((const uint8_t*)waddr->pubkeyhash, sizeof(uint160_t));
+                        char pubkeyhash_hex[sizeof(uint160_t) * 2 + 1];
+                        utils_bin_to_hex(waddr->pubkeyhash, sizeof(uint160_t), pubkeyhash_hex);
                         snprintf(line, sizeof(line), "[spv][debug]  - address(pubkeyhash): %s\n",
-                                 pubkeyhash_hex ? pubkeyhash_hex : "(null)");
+                                 pubkeyhash_hex);
                     }
                     cstr_append_buf(filter_debug, line, strlen(line));
                 }
@@ -551,10 +552,11 @@ int main(int argc, char* argv[]) {
                 memcpy(outpoint + 32, &vout_le, 4);
                 dogecoin_bip37_filter_add(filter, outpoint, 36);
                 if (filter_debug) {
-                    char* txid_hex = utils_uint8_to_hex(utxo->txid, sizeof(utxo->txid));
+                    char txid_hex[sizeof(utxo->txid) * 2 + 1];
+                    utils_bin_to_hex(utxo->txid, sizeof(utxo->txid), txid_hex);
                     char line[SPV_FILTER_DEBUG_TX_LINE_LEN];
                     snprintf(line, sizeof(line), "[spv][debug]  - txid: %s vout: %d block_height: %d\n",
-                             txid_hex ? txid_hex : "(null)", utxo->vout, utxo->height);
+                             txid_hex, utxo->vout, utxo->height);
                     cstr_append_buf(filter_debug, line, strlen(line));
                 }
             }
