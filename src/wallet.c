@@ -983,6 +983,9 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
         }
     }
     else {
+        const uint32_t tx_progress_interval = 10000;
+        uint32_t tx_loaded_count = 0;
+        dogecoin_bool tx_loading_announced = false;
         // check file-header-magic, version and genesis
         uint8_t buf[sizeof(file_hdr_magic)+sizeof(current_version)+sizeof(uint256_t)];
         if ((uint32_t)buffer.st_size < (uint32_t)(sizeof(buf)) || fread(buf, sizeof(buf), 1, wallet->dbfile) != 1 || memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)))
@@ -1022,10 +1025,21 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
             } else if (rectype == WALLET_DB_REC_TYPE_ADDR) {
                 if (!dogecoin_wallet_load_address(wallet)) return false;
             } else if (rectype == WALLET_DB_REC_TYPE_TX) {
+                if (!tx_loading_announced) {
+                    printf("Loading wallet transactions from disk...\n");
+                    tx_loading_announced = true;
+                }
                 if (!dogecoin_wallet_load_transaction(wallet, reclen)) return false;
+                tx_loaded_count++;
+                if ((tx_loaded_count % tx_progress_interval) == 0) {
+                    printf("%u transactions loaded\n", tx_loaded_count);
+                }
             } else {
                 fseek(wallet->dbfile, reclen, SEEK_CUR);
             }
+        }
+        if (tx_loading_announced && ((tx_loaded_count % tx_progress_interval) != 0)) {
+            printf("%u transactions loaded\n", tx_loaded_count);
         }
     }
 
