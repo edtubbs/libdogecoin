@@ -19,6 +19,7 @@
 #include <dogecoin/transaction.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
 
 /*
@@ -636,5 +637,28 @@ void test_transaction()
     dogecoin_free(pk);
     dogecoin_free(sk);
     dogecoin_free(sig);
+
+    // optional Dilithium2 OP_RETURN commit test
+    uint8_t *dpk = NULL, *dsk = NULL, *dsig = NULL;
+    size_t dpk_len = 0, dsk_len = 0, dsig_len = 0;
+
+    u_assert_true(dogecoin_dilithium2_keypair(&dpk, &dpk_len, &dsk, &dsk_len));
+    u_assert_true(dogecoin_dilithium2_sign(dsk, dsk_len, msg, sizeof msg, &dsig, &dsig_len));
+    u_assert_true(dogecoin_dilithium2_verify(dpk, dpk_len, msg, sizeof msg, dsig, dsig_len));
+
+    uint8_t dcommit32[32];
+    u_assert_true(dogecoin_dilithium2_commit_bytes(dpk, dpk_len, dsig, dsig_len, dcommit32));
+
+    dogecoin_tx* dtxc = dogecoin_tx_new();
+    u_assert_true(dogecoin_tx_add_dilithium2_commit(dtxc, dcommit32));
+
+    uint8_t dextracted[32];
+    u_assert_true(dogecoin_tx_extract_dilithium2_commit(dtxc, dextracted));
+    u_assert_true(memcmp(dextracted, dcommit32, 32) == 0);
+
+    dogecoin_tx_free(dtxc);
+    dogecoin_free(dpk);
+    dogecoin_free(dsk);
+    dogecoin_free(dsig);
 #endif
 }

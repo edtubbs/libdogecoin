@@ -58,6 +58,7 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/vector.h>
+#include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
 #include <event2/event.h>
 
@@ -689,10 +690,17 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 // Validate Falcon commit in canonical tagged OP_RETURN form (6a24 + "FLC1" + 32 bytes)
                 uint8_t falcon_commit_data[32];
                 if (dogecoin_tx_extract_falcon512_commit(tx, falcon_commit_data)) {
-                    char commit_hex[65];
-                    utils_bin_to_hex(falcon_commit_data, 32, commit_hex);
+                    char falcon_commit_hex[65];
+                    utils_bin_to_hex(falcon_commit_data, 32, falcon_commit_hex);
                     client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s\n",
-                                                     pindex->height, i, commit_hex);
+                                                     pindex->height, i, falcon_commit_hex);
+                }
+                uint8_t dilithium_commit_data[32];
+                if (dogecoin_tx_extract_dilithium2_commit(tx, dilithium_commit_data)) {
+                    char dilithium_commit_hex[65];
+                    utils_bin_to_hex(dilithium_commit_data, 32, dilithium_commit_hex);
+                    client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s\n",
+                                                     pindex->height, i, dilithium_commit_hex);
                 }
                 
                 total_tx_size += consumedlength;

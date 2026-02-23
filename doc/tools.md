@@ -34,6 +34,10 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - falcon_sign (requires --enable-liboqs)
 - falcon_verify (requires --enable-liboqs)
 - falcon_commit (requires --enable-liboqs)
+- dilithium2_keygen (requires --enable-liboqs)
+- dilithium2_sign (requires --enable-liboqs)
+- dilithium2_verify (requires --enable-liboqs)
+- dilithium2_commit (requires --enable-liboqs)
 
 So an example run of `such` could be something like this:
 ```
@@ -483,6 +487,10 @@ The `such` tool includes support for Falcon-512 post-quantum signatures and comm
 | falcon_sign | -p, -x | Signs a message with Falcon-512 secret key. Returns signature (~660 bytes) |
 | falcon_verify | -k, -x, -s | Verifies a Falcon-512 signature against a message and public key |
 | falcon_commit | -k, -s | Generates a 32-byte SHA256 commitment from public key and signature for OP_RETURN |
+| dilithium2_keygen | None | Generates a Dilithium2/ML-DSA-44 keypair |
+| dilithium2_sign | -p, -x | Signs a message with Dilithium2 secret key |
+| dilithium2_verify | -k, -x, -s | Verifies a Dilithium2 signature against a message and public key |
+| dilithium2_commit | -k, -s | Generates a 32-byte SHA256 commitment from public key and signature for OP_RETURN |
 
 ### Flag Usage for Falcon Commands
 
