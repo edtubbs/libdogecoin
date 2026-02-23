@@ -587,6 +587,23 @@ static benchmark_result* find_result(const char *name) {
     return NULL;
 }
 
+static dogecoin_bool is_pqc_result_name(const char *name) {
+    if (!name) return false;
+    return (strncmp(name, "Falcon", 6) == 0 ||
+            strncmp(name, "Dilith", 6) == 0 ||
+            strncmp(name, "SPHNCS", 6) == 0);
+}
+
+static benchmark_result* fastest_pqc_for_suffix(const char *suffix) {
+    benchmark_result *best = NULL;
+    for (int i = 0; i < num_results; i++) {
+        if (!is_pqc_result_name(results[i].name)) continue;
+        if (!strstr(results[i].name, suffix)) continue;
+        if (!best || results[i].avgTime < best->avgTime) best = &results[i];
+    }
+    return best;
+}
+
 /* Print performance analysis and rankings */
 static void print_analysis(void) {
     if (num_results == 0) return;
@@ -654,6 +671,18 @@ static void print_analysis(void) {
         }
         printf("\n");
     }
+
+    /* Quick digest to reduce cognitive load from full ranking dump */
+    printf("--- Quick Digest ---\n");
+    benchmark_result *fast_kp = fastest_pqc_for_suffix("-kp");
+    benchmark_result *fast_sig = fastest_pqc_for_suffix("-sig");
+    benchmark_result *fast_ver = fastest_pqc_for_suffix("-ver");
+    benchmark_result *fast_cmt = fastest_pqc_for_suffix("-cmt");
+    if (fast_kp) printf("• Fastest PQC keygen:      %-12s (%.6f sec)\n", fast_kp->name, fast_kp->avgTime);
+    if (fast_sig) printf("• Fastest PQC signing:     %-12s (%.6f sec)\n", fast_sig->name, fast_sig->avgTime);
+    if (fast_ver) printf("• Fastest PQC verify:      %-12s (%.6f sec)\n", fast_ver->name, fast_ver->avgTime);
+    if (fast_cmt) printf("• Fastest PQC commitment:  %-12s (%.6f sec)\n", fast_cmt->name, fast_cmt->avgTime);
+    printf("\n");
 
     /* Key comparisons */
     printf("--- Key Performance Comparisons ---\n");
@@ -785,6 +814,17 @@ static void print_analysis(void) {
                falcon_cmt->avgTime / opret_cmt->avgTime, falcon_cmt->avgTime, opret_cmt->avgTime);
     }
     printf("• OP_RETURN commitments are benchmarked above as on-chain/off-chain bridging primitives\n");
+
+    /* Security-strength characteristic table for quick PQC comparison context */
+    printf("\n--- Security-Strength Characteristics (NIST categories) ---\n");
+    printf("  %-14s %-12s %-s\n", "Algorithm", "Category", "Approx. classical security");
+    if (find_result("Falcon512-kp"))   printf("  %-14s %-12s %-s\n", "Falcon-512", "Level 1", "~128-bit");
+    if (find_result("Dilith2-kp"))     printf("  %-14s %-12s %-s\n", "Dilithium2", "Level 2", "~128-bit");
+    if (find_result("Dilith3-kp"))     printf("  %-14s %-12s %-s\n", "Dilithium3", "Level 3", "~192-bit");
+    if (find_result("Dilith5-kp"))     printf("  %-14s %-12s %-s\n", "Dilithium5", "Level 5", "~256-bit");
+    if (find_result("SPHNCS128s-kp"))  printf("  %-14s %-12s %-s\n", "SPHINCS128s", "Level 1", "~128-bit");
+    if (find_result("SPHNCS128f-kp"))  printf("  %-14s %-12s %-s\n", "SPHINCS128f", "Level 1", "~128-bit");
+    printf("  Note: These are algorithm strength targets, separate from measured throughput above.\n");
 }
 
 /* ---- main ---- */
