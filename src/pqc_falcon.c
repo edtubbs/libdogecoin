@@ -222,30 +222,4 @@ dogecoin_bool dogecoin_falcon512_verify(const uint8_t* pk, size_t pk_len,
     return st == OQS_SUCCESS;
 }
 
-#else /* !USE_LIBOQS */
-
-/* Stubs when liboqs is not compiled in */
-dogecoin_bool dogecoin_falcon512_keypair(uint8_t** pk, size_t* pk_len,
-                                         uint8_t** sk, size_t* sk_len)
-{
-    (void)pk; (void)pk_len; (void)sk; (void)sk_len;
-    return false;
-}
-
-dogecoin_bool dogecoin_falcon512_sign(const uint8_t* sk, size_t sk_len,
-                                      const uint8_t* msg, size_t msg_len,
-                                      uint8_t** sig_out, size_t* sig_len)
-{
-    (void)sk; (void)sk_len; (void)msg; (void)msg_len; (void)sig_out; (void)sig_len;
-    return false;
-}
-
-dogecoin_bool dogecoin_falcon512_verify(const uint8_t* pk, size_t pk_len,
-                                        const uint8_t* msg, size_t msg_len,
-                                        const uint8_t* sig, size_t sig_len)
-{
-    (void)pk; (void)pk_len; (void)msg; (void)msg_len; (void)sig; (void)sig_len;
-    return false;
-}
-
 #endif /* USE_LIBOQS */

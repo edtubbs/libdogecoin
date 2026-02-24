@@ -44,8 +44,9 @@ LIBDOGECOIN_BEGIN_DECL
 /*
  * Generate a Falcon-512 keypair.
  */
+#ifdef USE_LIBOQS
 LIBDOGECOIN_API dogecoin_bool dogecoin_falcon512_keypair(uint8_t** pk, size_t* pk_len,
-                                                         uint8_t** sk, size_t* sk_len);
+                                                          uint8_t** sk, size_t* sk_len);
 
 /*
  * Sign a message with Falcon-512.
@@ -60,6 +61,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_falcon512_sign(const uint8_t* sk, size_t 
 LIBDOGECOIN_API dogecoin_bool dogecoin_falcon512_verify(const uint8_t* pk, size_t pk_len,
                                                         const uint8_t* msg, size_t msg_len,
                                                         const uint8_t* sig, size_t sig_len);
+#endif
 
 /*
  * Compute commit = SHA256(pk || sig).

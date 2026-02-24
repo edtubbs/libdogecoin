@@ -41,6 +41,7 @@ LIBDOGECOIN_BEGIN_DECL
 #define DOGECOIN_PQC_DILITHIUM_COMMIT_LEN 32
 #define DOGECOIN_PQC_DILITHIUM_PUSH_TOTAL (DOGECOIN_PQC_DILITHIUM_TAG_LEN + DOGECOIN_PQC_DILITHIUM_COMMIT_LEN)
 
+#ifdef USE_LIBOQS
 LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_keypair(uint8_t** pk, size_t* pk_len,
                                                            uint8_t** sk, size_t* sk_len);
 LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_sign(const uint8_t* sk, size_t sk_len,
@@ -49,6 +50,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_sign(const uint8_t* sk, size_t
 LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_verify(const uint8_t* pk, size_t pk_len,
                                                           const uint8_t* msg, size_t msg_len,
                                                           const uint8_t* sig, size_t sig_len);
+#endif
 
 LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_commit_bytes(const uint8_t* pk, size_t pk_len,
                                                                 const uint8_t* signature, size_t signature_len,

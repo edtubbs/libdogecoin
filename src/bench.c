@@ -44,6 +44,8 @@
 #include <dogecoin/dogecoin.h>    /* brings public API, incl. ECC */
 #include <dogecoin/sha2.h>
 #include <dogecoin/scrypt.h>
+#include <dogecoin/hash.h>
+#include <dogecoin/rmd160.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/random.h>
@@ -197,19 +199,27 @@ static void scrypt_bench(benchmark_context *ctx) {
     ctx->totalCycles += ctx->endCycles - ctx->startCycles;
 }
 
-/* ---- OP_RETURN commit (32 bytes) using tx helpers ---- */
+static void hash256_bench(benchmark_context *ctx) {
+    uint256_t h;
+    dogecoin_dblhash(ctx->input, BUFFER_SIZE, h);
+    ctx->end = gettimedouble();
+    ctx->endCycles = perf_cpucycles();
+    ctx->totalTime += ctx->end - ctx->start;
+    ctx->totalCycles += ctx->endCycles - ctx->startCycles;
+}
 
-static void opret_commit_bench(benchmark_context *ctx) {
-    uint8_t commit[32];
-    for (int i = 0; i < 32; ++i) commit[i] = (uint8_t)i;
+static void sha512_bench(benchmark_context *ctx) {
+    uint8_t h512[SHA512_DIGEST_LENGTH];
+    sha512_raw(ctx->input, BUFFER_SIZE, h512);
+    ctx->end = gettimedouble();
+    ctx->endCycles = perf_cpucycles();
+    ctx->totalTime += ctx->end - ctx->start;
+    ctx->totalCycles += ctx->endCycles - ctx->startCycles;
+}
 
-    dogecoin_tx* tx = dogecoin_tx_new();
-    dogecoin_tx_add_falcon512_commit(tx, commit);
-
-    uint8_t out[32];
-    (void)dogecoin_tx_extract_falcon512_commit(tx, out);
-    dogecoin_tx_free(tx);
-
+static void rmd160_bench(benchmark_context *ctx) {
+    uint8_t h160[20];
+    rmd160(ctx->input, BUFFER_SIZE, h160);
     ctx->end = gettimedouble();
     ctx->endCycles = perf_cpucycles();
     ctx->totalTime += ctx->end - ctx->start;
@@ -619,7 +629,6 @@ static void print_analysis(void) {
     /* Define category groups */
     const char *categories[][3] = {
         {"Hash Algorithms", "hash", NULL},
-        {"OP_RETURN Commits", "commit", NULL},
         {"Classical ECC (secp256k1)", "ecc-keypair", "ecc-sign,ecc-verify"},
         {"PQC Key Generation", "pqc-keypair", NULL},
         {"PQC Signing", "pqc-sign", NULL},
@@ -627,7 +636,7 @@ static void print_analysis(void) {
         {"PQC Commits", "pqc-commit", NULL}
     };
     
-    for (int cat = 0; cat < 7; cat++) {
+    for (int cat = 0; cat < 6; cat++) {
         const char *cat_name = categories[cat][0];
         const char *cat_prefix = categories[cat][1];
         
@@ -791,7 +800,6 @@ static void print_analysis(void) {
     }
 
     benchmark_result *falcon_cmt = find_result("Falcon512-cmt");
-    benchmark_result *opret_cmt = find_result("OPRET-32");
     benchmark_result *dilith2_ver = find_result("Dilith2-ver");
 
     /* Summary (derived from measured results above) */
@@ -809,15 +817,12 @@ static void print_analysis(void) {
         printf("• SPHINCS128s sign vs Falcon512 sign: %.0fx (%.6f vs %.6f sec)\n",
                sphincs_s_sig->avgTime / falcon_sig->avgTime, sphincs_s_sig->avgTime, falcon_sig->avgTime);
     }
-    if (falcon_cmt && opret_cmt && opret_cmt->avgTime > 0.0) {
-        printf("• Falcon commit hash vs OP_RETURN script build: %.2fx (%.6f vs %.6f sec)\n",
-               falcon_cmt->avgTime / opret_cmt->avgTime, falcon_cmt->avgTime, opret_cmt->avgTime);
-    }
-    printf("• OP_RETURN commitments are benchmarked above as on-chain/off-chain bridging primitives\n");
+    printf("• Tagged PQC commitments are benchmarked in the PQC Commits section above\n");
 
     /* Security-strength characteristic table for quick PQC comparison context */
     printf("\n--- Security-Strength Characteristics (NIST categories) ---\n");
     printf("  %-14s %-12s %-s\n", "Algorithm", "Category", "Approx. classical security");
+    if (find_result("secp-kp"))        printf("  %-14s %-12s %-s\n", "secp256k1", "N/A", "~128-bit (ECDLP, non-PQC)");
     if (find_result("Falcon512-kp"))   printf("  %-14s %-12s %-s\n", "Falcon-512", "Level 1", "~128-bit");
     if (find_result("Dilith2-kp"))     printf("  %-14s %-12s %-s\n", "Dilithium2", "Level 2", "~128-bit");
     if (find_result("Dilith3-kp"))     printf("  %-14s %-12s %-s\n", "Dilithium3", "Level 3", "~192-bit");
@@ -841,11 +846,10 @@ int main(void) {
     /* baselines */
     printf("\n--- Classical Baselines ---\n");
     run_benchmark(sha256_bench,       "SHA256", "hash");
+    run_benchmark(hash256_bench,      "HASH256", "hash");
+    run_benchmark(sha512_bench,       "SHA512", "hash");
+    run_benchmark(rmd160_bench,       "RMD160", "hash");
     run_benchmark(scrypt_bench,       "Scrypt", "hash");
-
-    /* commit embed/extract */
-    printf("\n--- OP_RETURN Commit (for off-chain SPV verification) ---\n");
-    run_benchmark(opret_commit_bench, "OPRET-32", "commit");
 
     /* secp256k1 via ECC module - classical baseline for comparison */
     printf("\n--- secp256k1 (Classical ECC Baseline) ---\n");
