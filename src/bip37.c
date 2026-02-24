@@ -91,12 +91,22 @@ typedef struct bip37_merkle_collect_ctx_ {
 } bip37_merkle_collect_ctx;
 
 typedef struct bip37_traverse_state_ {
+    uint32_t depth;
     uint32_t height;
     uint32_t pos;
     uint8_t stage;
     uint8_t parentMatch;
     uint256_t left;
 } bip37_traverse_state;
+
+static int bip37_traverse_state_cmp(const void* a, const void* b)
+{
+    const bip37_traverse_state* sa = (const bip37_traverse_state*)a;
+    const bip37_traverse_state* sb = (const bip37_traverse_state*)b;
+    if (sa->depth < sb->depth) return -1;
+    if (sa->depth > sb->depth) return 1;
+    return 0;
+}
 
 /* Callback bridge used by bip37 merkle traversal to collect matched txids. */
 static dogecoin_bool bip37_merkle_collect_match(const uint8_t txid[32], uint32_t pos, void* ctx)
@@ -181,18 +191,17 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     uint32_t hashesUsed = 0;
     uint32_t matchedLeaves = 0;
 
-    vector_t* st = vector_new(height + 1, dogecoin_free);
-    if (!st) return false;
+    void* st = NULL;
+    int sp = 0;
     bip37_traverse_state* root = (bip37_traverse_state*)dogecoin_calloc(1, sizeof(bip37_traverse_state));
-    if (!root) {
-        vector_free(st, true);
-        return false;
-    }
+    if (!root) return false;
+    root->depth = 0;
     root->height = height;
     root->pos = 0;
-    if (!vector_add(st, root)) {
+    dogecoin_btree_node_t* root_node = (dogecoin_btree_node_t*)dogecoin_btree_tsearch(
+        root, &st, bip37_traverse_state_cmp);
+    if (!root_node || root_node->key != root) {
         dogecoin_free(root);
-        vector_free(st, true);
         return false;
     }
 
@@ -200,8 +209,13 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     dogecoin_bool have_ret = false;
     dogecoin_bool ok_extract = true;
 
-    while (st->len > 0) {
-        bip37_traverse_state* cur = (bip37_traverse_state*)vector_idx(st, st->len - 1);
+    bip37_traverse_state key;
+    memset(&key, 0, sizeof(key));
+    while (sp >= 0) {
+        key.depth = (uint32_t)sp;
+        dogecoin_btree_node_t* cur_node = (dogecoin_btree_node_t*)dogecoin_btree_tfind(
+            &key, &st, bip37_traverse_state_cmp);
+        bip37_traverse_state* cur = cur_node ? (bip37_traverse_state*)cur_node->key : NULL;
         if (!cur) { ok_extract = false; break; }
 
         if (cur->stage == 0) {
@@ -240,7 +254,9 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                     debug_print("[bip37][traverse] matched leaf txid=%s pos=%u\n", txid_hex, cur->pos);
                 }
 
-                vector_remove_idx(st, st->len - 1);
+                dogecoin_btree_tdelete(cur, &st, bip37_traverse_state_cmp);
+                dogecoin_free(cur);
+                sp--;
                 continue;
             }
 
@@ -248,13 +264,18 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
             cur->stage = 1;
             bip37_traverse_state* child = (bip37_traverse_state*)dogecoin_calloc(1, sizeof(bip37_traverse_state));
             if (!child) { ok_extract = false; break; }
+            uint32_t child_depth = (uint32_t)(sp + 1);
+            child->depth = child_depth;
             child->height = cur->height - 1;
             child->pos = cur->pos * 2;
-            if (!vector_add(st, child)) {
+            dogecoin_btree_node_t* child_node = (dogecoin_btree_node_t*)dogecoin_btree_tsearch(
+                child, &st, bip37_traverse_state_cmp);
+            if (!child_node || child_node->key != child) {
                 dogecoin_free(child);
                 ok_extract = false;
                 break;
             }
+            sp++;
             continue;
         }
 
@@ -270,14 +291,19 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                 cur->stage = 2;
                 bip37_traverse_state* child = (bip37_traverse_state*)dogecoin_calloc(1, sizeof(bip37_traverse_state));
                 if (!child) { ok_extract = false; break; }
+                uint32_t child_depth = (uint32_t)(sp + 1);
+                child->depth = child_depth;
                 child->height = cur->height - 1;
                 child->pos = rightPos;
-                if (!vector_add(st, child)) {
+                dogecoin_btree_node_t* child_node = (dogecoin_btree_node_t*)dogecoin_btree_tsearch(
+                    child, &st, bip37_traverse_state_cmp);
+                if (!child_node || child_node->key != child) {
                     dogecoin_free(child);
                     ok_extract = false;
                     break;
                 }
                 have_ret = false;
+                sp++;
                 continue;
             } else {
                 /* Right child absent at this width, duplicate left hash. */
@@ -286,7 +312,9 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                 memcpy(buf64 + 32, cur->left, 32);
                 dogecoin_hash(buf64, 64, ret);
                 have_ret = true;
-                vector_remove_idx(st, st->len - 1);
+                dogecoin_btree_tdelete(cur, &st, bip37_traverse_state_cmp);
+                dogecoin_free(cur);
+                sp--;
                 continue;
             }
         }
@@ -299,7 +327,9 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
             memcpy(buf64 + 32, ret, 32);
             dogecoin_hash(buf64, 64, ret);
             have_ret = true;
-            vector_remove_idx(st, st->len - 1);
+            dogecoin_btree_tdelete(cur, &st, bip37_traverse_state_cmp);
+            dogecoin_free(cur);
+            sp--;
             continue;
         }
 
@@ -320,7 +350,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
         debug_print("[bip37][traverse] no matched leaves for block_height=%d block_hash=%s with current filter context\n",
                     block_height, block_hash_hex);
     }
-    vector_free(st, true);
+    dogecoin_btree_tdestroy(st, dogecoin_free);
     return ok;
 }
 
