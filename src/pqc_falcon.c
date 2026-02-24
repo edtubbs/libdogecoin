@@ -44,7 +44,7 @@
 #endif
 #endif
 
-/* ---------- Helpers (compile even without liboqs) ---------- */
+/* Helpers (compile even without liboqs) */
 
 static inline void sha256_pk_msg(uint8_t out32[32],
                                  const uint8_t* pk, size_t pk_len,
@@ -57,7 +57,7 @@ static inline void sha256_pk_msg(uint8_t out32[32],
     sha256_finalize(&ctx, out32);
 }
 
-/* ---------- Public API ---------- */
+/* Public API */
 
 dogecoin_bool dogecoin_falcon512_commit_bytes(const uint8_t* pk, size_t pk_len,
                                               const uint8_t* msg, size_t msg_len,
