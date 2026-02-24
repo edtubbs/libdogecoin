@@ -17,7 +17,7 @@ This document proposes a staged path for introducing post-quantum (PQ) signature
 In the initial stage, a PQ signature commitment is embedded in transaction outputs using a canonical OP_RETURN pattern to enable immediate interoperability and chain-level observability without a consensus change.
 In a later stage, this proposal is intended to migrate from OP_RETURN commitments to a dedicated reserved opcode path (for example via OP_SUCCESSx-based soft fork design), enabling native script-level validation semantics and stronger on-chain composability.
 
-The current implementation focus is Falcon-512 commitment publication and SPV-side commitment validation during block scan.
+The current implementation focus is Falcon-512 and Dilithium2 commitment publication and SPV-side commitment validation during block scan.
 This document is written in standard BIP format and can be adapted to a DIP process if/when a formal DIP track is preferred.
 
 ===Copyright===
@@ -54,10 +54,12 @@ This direction is related to broader PQ discussions, including BIP 360, but is f
 
 ===Phase 1: OP_RETURN Commitment Encoding===
 
-For Phase 1, Falcon commitments are encoded in outputs using canonical tagged script form:
+For Phase 1, PQ commitments are encoded in outputs using canonical tagged script form.
+Current libdogecoin tagged variants are:
 
 <source>
-0x6a 0x24 0x464c4331 <32-byte-commitment>
+Falcon-512:  0x6a 0x24 0x464c4331 <32-byte-commitment>   ; "FLC1"
+Dilithium2:  0x6a 0x24 0x44494c32 <32-byte-commitment>   ; "DIL2"
 </source>
 
 Where:
@@ -65,22 +67,24 @@ Where:
 * <code>0x6a</code> is OP_RETURN
 * <code>0x24</code> is push-36
 * <code>0x464c4331</code> is the Falcon identifier (<code>"FLC1"</code> in ASCII)
+* <code>0x44494c32</code> is the Dilithium2 identifier (<code>"DIL2"</code> in ASCII)
 * payload is exactly 4-byte tag + 32-byte commitment
 
 Non-canonical encodings are invalid for commitment interpretation under this proposal.
 
-For implementation namespace clarity, libdogecoin defines a Falcon identifier constant:
+For implementation namespace clarity, libdogecoin defines identifier constants:
 
 <source>
 DOGECOIN_PQC_FALCON_TAG = "FLC1"
+DOGECOIN_PQC_DILITHIUM_TAG = "DIL2"
 </source>
 
-Current consensus-neutral Phase 1 interoperability in this proposal remains canonical <code>OP_RETURN 0x24 0x464c4331 <32-byte-commitment></code>.
+Current consensus-neutral Phase 1 interoperability in this proposal remains canonical tagged <code>OP_RETURN 0x24 <tag4> <32-byte-commitment></code>.
 
-Commitment derivation for Falcon-512 stage implementations is:
+Commitment derivation for Falcon-512 and Dilithium2 stage implementations is:
 
 <source>
-commitment32 = SHA256(falcon_public_key_bytes || falcon_signature_bytes)
+commitment32 = SHA256(public_key_bytes || signature_bytes)
 </source>
 
 Implementations MAY support additional PQ schemes in future revisions, but MUST preserve canonical on-chain encoding rules.
@@ -90,7 +94,7 @@ Implementations MAY support additional PQ schemes in future revisions, but MUST 
 SPV implementations should:
 
 * parse transactions in scanned blocks;
-* detect canonical tagged Falcon commitment scripts;
+* detect canonical tagged Falcon and Dilithium2 commitment scripts;
 * treat only canonical encodings as valid commitments; and
 * surface deterministic commitment logs/telemetry for downstream verification workflows.
 
@@ -122,7 +126,7 @@ Canonical encoding requirements are mandatory to avoid ambiguous parsing and com
 
 Current reference behavior exists in libdogecoin components that:
 
-* generate Falcon-512 commitments;
+* generate Falcon-512 and Dilithium2 commitments;
 * embed commitments in OP_RETURN outputs; and
 * validate/detect canonical commitments during SPV scanning.
 
