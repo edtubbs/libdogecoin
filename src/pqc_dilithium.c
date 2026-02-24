@@ -44,6 +44,10 @@
 #endif
 #endif
 
+/*
+ * Helper hash primitive used by commitment builders.
+ * Computes SHA256(pk || msg) and writes a 32-byte digest to out32.
+ */
 static inline void sha256_pk_msg(uint8_t out32[32],
                                  const uint8_t* pk, size_t pk_len,
                                  const uint8_t* msg, size_t msg_len)
@@ -87,6 +91,7 @@ dogecoin_bool dogecoin_dilithium2_commit_bytes(const uint8_t* pk, size_t pk_len,
     return true;
 }
 
+/* Append tagged Dilithium2 commitment output (OP_RETURN "DIL2" || commit32). */
 dogecoin_bool dogecoin_tx_add_dilithium2_commit(dogecoin_tx* tx, const uint8_t* commit32) {
     if (!tx || !commit32) {
         return false;
@@ -115,6 +120,7 @@ dogecoin_bool dogecoin_tx_add_dilithium2_commit(dogecoin_tx* tx, const uint8_t* 
     return true;
 }
 
+/* Extract first canonical Dilithium2 commitment from tx outputs, if present. */
 dogecoin_bool dogecoin_tx_extract_dilithium2_commit(const dogecoin_tx* tx, uint8_t* out32) {
     if (!tx || !out32) {
         return false;
@@ -141,6 +147,7 @@ dogecoin_bool dogecoin_tx_extract_dilithium2_commit(const dogecoin_tx* tx, uint8
 
 #ifdef USE_LIBOQS
 
+/* Generate Dilithium2 (ML-DSA-44 compatible) key material. */
 dogecoin_bool dogecoin_dilithium2_keypair(uint8_t** pk, size_t* pk_len,
                                           uint8_t** sk, size_t* sk_len)
 {
@@ -181,6 +188,7 @@ dogecoin_bool dogecoin_dilithium2_keypair(uint8_t** pk, size_t* pk_len,
     return true;
 }
 
+/* Sign arbitrary message bytes with a Dilithium2 secret key. */
 dogecoin_bool dogecoin_dilithium2_sign(const uint8_t* sk, size_t sk_len,
                                        const uint8_t* msg, size_t msg_len,
                                        uint8_t** sig_out, size_t* sig_len)
@@ -220,6 +228,7 @@ dogecoin_bool dogecoin_dilithium2_sign(const uint8_t* sk, size_t sk_len,
     return true;
 }
 
+/* Verify a Dilithium2 signature for given message/public-key bytes. */
 dogecoin_bool dogecoin_dilithium2_verify(const uint8_t* pk, size_t pk_len,
                                          const uint8_t* msg, size_t msg_len,
                                          const uint8_t* sig, size_t sig_len)

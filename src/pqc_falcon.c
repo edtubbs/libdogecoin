@@ -46,6 +46,10 @@
 
 /* Helpers (compile even without liboqs) */
 
+/*
+ * Helper hash primitive used by commitment builders.
+ * Computes SHA256(pk || msg) and writes a 32-byte digest to out32.
+ */
 static inline void sha256_pk_msg(uint8_t out32[32],
                                  const uint8_t* pk, size_t pk_len,
                                  const uint8_t* msg, size_t msg_len)
@@ -134,6 +138,10 @@ dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_
     return false;
 }
 
+/*
+ * Convenience wrapper around dogecoin_tx_sighash() that returns a plain 32-byte
+ * output buffer suitable for PQ signature workflows.
+ */
 dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
                                     const cstring* fromPubKey,
                                     size_t in_num, int hashtype,
