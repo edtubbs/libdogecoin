@@ -1,4 +1,7 @@
-packages:=libevent liboqs
+packages:=libevent
+ifneq ($(filter 1 yes true y,$(ENABLE_LIBOQS)),)
+packages += liboqs
+endif
 native_packages := native_ccache
 
 wallet_packages=
@@ -17,4 +20,3 @@ darwin_native_packages+= native_clang
 endif
 
 endif
-
