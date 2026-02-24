@@ -1091,7 +1091,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                       (int)pindex->height,
                                                       client->bloom_filter_debug_dump,
                                                       &client->merkle_match_tree,
-                                                      &client->merkle_match_pending)) {
+                                                      &client->merkle_match_pending,
+                                                      client->nodegroup ? client->nodegroup->log_write_cb : NULL)) {
             if (client->merkle_match_tree) {
                 dogecoin_btree_tdestroy(client->merkle_match_tree, dogecoin_free);
                 client->merkle_match_tree = NULL;

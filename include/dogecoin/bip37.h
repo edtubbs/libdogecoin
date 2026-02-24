@@ -33,6 +33,7 @@
 /* Callback used for each matched leaf txid while traversing a merkleblock. */
 typedef dogecoin_bool (*dogecoin_bip37_match_cb)(const uint8_t txid[32], uint32_t pos, void* ctx);
 typedef dogecoin_bool (*dogecoin_bip37_match_info_cb)(const uint8_t txid[32], uint32_t pos, dogecoin_bool consumed, void* ctx);
+typedef int (*dogecoin_bip37_log_cb)(const char* fmt, ...);
 
 /* Fixed-size BIP37 bloom filter container used by CLI/SPV helpers. */
 typedef struct dogecoin_bip37_filter_ {
@@ -64,16 +65,17 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                                                      void* match_ctx);
 
 dogecoin_bool dogecoin_bip37_merkle_extract_match_tree(uint32_t nTx,
-                                                       const uint8_t* hashes,
-                                                       uint32_t hashCount,
-                                                       const uint8_t* flags,
-                                                       uint32_t flags_len,
-                                                       const uint8_t header_merkle[32],
-                                                       const uint8_t block_hash[32],
-                                                       int block_height,
-                                                       const char* filter_debug_dump,
-                                                       void** match_tree,
-                                                       uint32_t* match_pending);
+                                                         const uint8_t* hashes,
+                                                         uint32_t hashCount,
+                                                         const uint8_t* flags,
+                                                         uint32_t flags_len,
+                                                         const uint8_t header_merkle[32],
+                                                         const uint8_t block_hash[32],
+                                                         int block_height,
+                                                         const char* filter_debug_dump,
+                                                         void** match_tree,
+                                                          uint32_t* match_pending,
+                                                          dogecoin_bip37_log_cb log_cb);
 
 dogecoin_bool dogecoin_bip37_merkle_match_consume(void** match_tree,
                                                   uint32_t* match_pending,

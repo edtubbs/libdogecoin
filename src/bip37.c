@@ -88,6 +88,7 @@ static int bip37_merkle_match_cmp(const void* a, const void* b)
 typedef struct bip37_merkle_collect_ctx_ {
     void** match_tree;
     uint32_t* match_pending;
+    dogecoin_bip37_log_cb log_cb;
 } bip37_merkle_collect_ctx;
 
 typedef struct bip37_traverse_state_ {
@@ -131,10 +132,12 @@ static dogecoin_bool bip37_merkle_collect_match(const uint8_t txid[32], uint32_t
     utils_bin_to_hex(txid, 32, txid_hex);
     txid_hex[64] = '\0';
     if (nn->key != m) {
-        debug_print("[bip37][collect] duplicate txid=%s pos=%u\n", txid_hex, pos);
+        if (c->log_cb) c->log_cb("[bip37][collect] duplicate txid=%s pos=%u\n", txid_hex, pos);
+        else debug_print("[bip37][collect] duplicate txid=%s pos=%u\n", txid_hex, pos);
         dogecoin_free(m);
     } else {
-        debug_print("[bip37][collect] insert txid=%s pos=%u\n", txid_hex, pos);
+        if (c->log_cb) c->log_cb("[bip37][collect] insert txid=%s pos=%u\n", txid_hex, pos);
+        else debug_print("[bip37][collect] insert txid=%s pos=%u\n", txid_hex, pos);
         (*c->match_pending)++;
     }
     return true;
@@ -182,10 +185,8 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
 
     debug_print("[bip37][traverse] start block_height=%d block_hash=%s header_merkle=%s nTx=%u hashCount=%u flags_len=%u tree_height=%u\n",
                 block_height, block_hash_hex, merkle_hex, nTx, hashCount, flags_len, height);
-    if (filter_debug_dump && filter_debug_dump[0] != '\0') {
-        debug_print("%s", "[bip37][traverse] active filter context follows:\n");
-        debug_print("%s", filter_debug_dump);
-    }
+    /* Verbose filter dump logging moved to SPV logging path to reduce traverse noise. */
+    (void)filter_debug_dump;
 
     uint32_t bitsUsed = 0;
     uint32_t hashesUsed = 0;
@@ -221,23 +222,12 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
         if (cur->stage == 0) {
             if (bitsUsed >= (uint32_t)flags_len * 8U) { ok_extract = false; break; }
             cur->parentMatch = (flags[bitsUsed >> 3] >> (bitsUsed & 7)) & 1;
-            debug_print("[bip37][traverse] visit h=%u pos=%u parentMatch=%u bitsUsed=%u hashesUsed=%u\n",
-                        cur->height, cur->pos, cur->parentMatch, bitsUsed, hashesUsed);
             bitsUsed++;
 
             /* Leaf node, or an internal node that does not match: consume one hash. */
             if (cur->height == 0 || cur->parentMatch == 0) {
                 if (hashesUsed >= hashCount) { ok_extract = false; break; }
                 memcpy(ret, hashes + (hashesUsed * 32), 32);
-                char node_hash_hex[65];
-                utils_bin_to_hex(ret, 32, node_hash_hex);
-                node_hash_hex[64] = '\0';
-                debug_print("[bip37][traverse] consume hash=%s h=%u pos=%u parentMatch=%u\n",
-                            node_hash_hex, cur->height, cur->pos, cur->parentMatch);
-                if (cur->height > 0 && cur->parentMatch == 0) {
-                    debug_print("[bip37][traverse] prune subtree block_height=%d block_hash=%s h=%u pos=%u (no filter match under this branch)\n",
-                                block_height, block_hash_hex, cur->height, cur->pos);
-                }
                 hashesUsed++;
                 have_ret = true;
 
@@ -248,10 +238,6 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                 }
                 if (cur->height == 0 && cur->parentMatch) {
                     matchedLeaves++;
-                    char txid_hex[65];
-                    utils_bin_to_hex(ret, 32, txid_hex);
-                    txid_hex[64] = '\0';
-                    debug_print("[bip37][traverse] matched leaf txid=%s pos=%u\n", txid_hex, cur->pos);
                 }
 
                 dogecoin_btree_tdelete(cur, &st, bip37_traverse_state_cmp);
@@ -364,7 +350,8 @@ dogecoin_bool dogecoin_bip37_merkle_extract_match_tree(uint32_t nTx,
                                                        int block_height,
                                                        const char* filter_debug_dump,
                                                        void** match_tree,
-                                                       uint32_t* match_pending)
+                                                       uint32_t* match_pending,
+                                                       dogecoin_bip37_log_cb log_cb)
 {
     if (!match_tree || !match_pending) return false;
     *match_pending = 0;
@@ -372,6 +359,7 @@ dogecoin_bool dogecoin_bip37_merkle_extract_match_tree(uint32_t nTx,
     bip37_merkle_collect_ctx ctx;
     ctx.match_tree = match_tree;
     ctx.match_pending = match_pending;
+    ctx.log_cb = log_cb;
 
     dogecoin_bool ok = dogecoin_bip37_traverse_merkle_matches(nTx,
                                                                hashes,
@@ -388,11 +376,15 @@ dogecoin_bool dogecoin_bip37_merkle_extract_match_tree(uint32_t nTx,
         char block_hash_hex[65];
         utils_bin_to_hex(block_hash, 32, block_hash_hex);
         block_hash_hex[64] = '\0';
-        debug_print("[bip37][extract] block_height=%d block_hash=%s ok=%d match_pending=%u\n",
-                    block_height, block_hash_hex, ok, *match_pending);
+        if (log_cb) log_cb("[bip37][extract] block_height=%d block_hash=%s ok=%d match_pending=%u\n",
+                           block_height, block_hash_hex, ok, *match_pending);
+        else debug_print("[bip37][extract] block_height=%d block_hash=%s ok=%d match_pending=%u\n",
+                         block_height, block_hash_hex, ok, *match_pending);
     } else {
-        debug_print("[bip37][extract] block_height=%d ok=%d match_pending=%u\n",
-                    block_height, ok, *match_pending);
+        if (log_cb) log_cb("[bip37][extract] block_height=%d ok=%d match_pending=%u\n",
+                           block_height, ok, *match_pending);
+        else debug_print("[bip37][extract] block_height=%d ok=%d match_pending=%u\n",
+                         block_height, ok, *match_pending);
     }
     return ok;
 }
