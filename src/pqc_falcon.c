@@ -52,25 +52,34 @@ static inline void sha256_pk_msg(uint8_t out32[32],
 {
     sha256_context ctx;
     sha256_init(&ctx);
-    if (pk && pk_len) sha256_write(&ctx, pk, pk_len);
-    if (msg && msg_len) sha256_write(&ctx, msg, msg_len);
+    if (pk && pk_len) {
+        sha256_write(&ctx, pk, pk_len);
+    }
+    if (msg && msg_len) {
+        sha256_write(&ctx, msg, msg_len);
+    }
     sha256_finalize(&ctx, out32);
 }
 
 /* Public API */
 
+/* Computes a 32-byte Falcon commitment from public key and signature bytes. */
 dogecoin_bool dogecoin_falcon512_commit_bytes(const uint8_t* pk, size_t pk_len,
-                                              const uint8_t* msg, size_t msg_len,
-                                              uint8_t out32[32])
+                                               const uint8_t* msg, size_t msg_len,
+                                               uint8_t out32[32])
 {
-    if (!pk || !msg || !out32) return false;
+    if (!pk || !msg || !out32) {
+        return false;
+    }
     sha256_pk_msg(out32, pk, pk_len, msg, msg_len);
     return true;
 }
 
 /* Append OP_RETURN output with Falcon-512 commit */
 dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t* commit32) {
-    if (!tx || !commit32) return false;
+    if (!tx || !commit32) {
+        return false;
+    }
 
     // script: OP_RETURN (0x6a) PUSHDATA(36) "FLC1" <32 bytes>
     cstring* spk = cstr_new_sz(1 + 1 + DOGECOIN_PQC_FALCON_PUSH_TOTAL);
@@ -83,10 +92,16 @@ dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t* c
     cstr_append_buf(spk, commit32, 32);
 
     dogecoin_tx_out* out = dogecoin_tx_out_new();
-    if (!out) { cstr_free(spk, true); return false; }
+    if (!out) {
+        cstr_free(spk, true);
+        return false;
+    }
 
-    out->value = 0;               // OP_RETURN outputs are zero-value
-    if (out->script_pubkey) cstr_free(out->script_pubkey, true);
+    /* OP_RETURN outputs are zero-value by policy. */
+    out->value = 0;
+    if (out->script_pubkey) {
+        cstr_free(out->script_pubkey, true);
+    }
     out->script_pubkey = spk;
 
     vector_add(tx->vout, out);
@@ -95,7 +110,9 @@ dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t* c
 
 /* Extract Falcon-512 commit from tx */
 dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_t* out32) {
-    if (!tx || !out32) return false;
+    if (!tx || !out32) {
+        return false;
+    }
 
     // Look for the first vout whose script matches: 6a 24 "FLC1" <32 bytes>
     for (unsigned i = 0; i < tx->vout->len; ++i) {
@@ -122,7 +139,9 @@ dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
                                     size_t in_num, int hashtype,
                                     uint8_t out32[32])
 {
-    if (!tx_to || !fromPubKey || !out32) return false;
+    if (!tx_to || !fromPubKey || !out32) {
+        return false;
+    }
     uint256_t hash;
     if (!dogecoin_tx_sighash(tx_to, fromPubKey, in_num, hashtype, hash)) {
         return false;
@@ -137,10 +156,14 @@ dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
 dogecoin_bool dogecoin_falcon512_keypair(uint8_t** pk, size_t* pk_len,
                                          uint8_t** sk, size_t* sk_len)
 {
-    if (!pk || !pk_len || !sk || !sk_len) return false;
+    if (!pk || !pk_len || !sk || !sk_len) {
+        return false;
+    }
 
     OQS_SIG* alg = OQS_SIG_new(OQS_SIG_alg_falcon_512);
-    if (!alg) return false;
+    if (!alg) {
+        return false;
+    }
 
     uint8_t* pk_buf = (uint8_t*)dogecoin_malloc(alg->length_public_key);
     uint8_t* sk_buf = (uint8_t*)dogecoin_malloc(alg->length_secret_key);
@@ -159,10 +182,10 @@ dogecoin_bool dogecoin_falcon512_keypair(uint8_t** pk, size_t* pk_len,
         return false;
     }
 
-    *pk      = pk_buf;
-    *pk_len  = alg->length_public_key;
-    *sk      = sk_buf;
-    *sk_len  = alg->length_secret_key;
+    *pk = pk_buf;
+    *pk_len = alg->length_public_key;
+    *sk = sk_buf;
+    *sk_len = alg->length_secret_key;
 
     OQS_SIG_free(alg);
     return true;
@@ -173,10 +196,14 @@ dogecoin_bool dogecoin_falcon512_sign(const uint8_t* sk, size_t sk_len,
                                       const uint8_t* msg, size_t msg_len,
                                       uint8_t** sig_out, size_t* sig_len)
 {
-    if (!sk || !msg || !sig_out || !sig_len) return false;
+    if (!sk || !msg || !sig_out || !sig_len) {
+        return false;
+    }
 
     OQS_SIG* alg = OQS_SIG_new(OQS_SIG_alg_falcon_512);
-    if (!alg) return false;
+    if (!alg) {
+        return false;
+    }
 
     /* Optional length check */
     if (sk_len && sk_len != alg->length_secret_key) {
@@ -185,7 +212,10 @@ dogecoin_bool dogecoin_falcon512_sign(const uint8_t* sk, size_t sk_len,
     }
 
     uint8_t* sig_buf = (uint8_t*)dogecoin_malloc(alg->length_signature);
-    if (!sig_buf) { OQS_SIG_free(alg); return false; }
+    if (!sig_buf) {
+        OQS_SIG_free(alg);
+        return false;
+    }
 
     size_t outlen = 0;
     OQS_STATUS st = OQS_SIG_sign(alg, sig_buf, &outlen, msg, msg_len, sk);
@@ -206,10 +236,14 @@ dogecoin_bool dogecoin_falcon512_verify(const uint8_t* pk, size_t pk_len,
                                         const uint8_t* msg, size_t msg_len,
                                         const uint8_t* sig, size_t sig_len)
 {
-    if (!pk || !msg || !sig) return false;
+    if (!pk || !msg || !sig) {
+        return false;
+    }
 
     OQS_SIG* alg = OQS_SIG_new(OQS_SIG_alg_falcon_512);
-    if (!alg) return false;
+    if (!alg) {
+        return false;
+    }
 
     /* Optional length check */
     if (pk_len && pk_len != alg->length_public_key) {
