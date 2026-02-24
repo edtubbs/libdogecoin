@@ -103,9 +103,7 @@ libdogecoin_la_SOURCES = \
     src/mem.c \
     src/moon.c \
     src/pow.c \
-    src/pqc_dilithium.c \
     src/png.c \
-    src/pqc_falcon.c \
     src/jpeg.c \
     src/qrengine.c \
     src/qr.c \
@@ -125,6 +123,12 @@ libdogecoin_la_SOURCES = \
     src/utils.c \
     src/validation.c \
     src/vector.c
+
+if USE_LIBOQS
+libdogecoin_la_SOURCES += \
+    src/pqc_dilithium.c \
+    src/pqc_falcon.c
+endif
 
 # NASM assembler setup
 NASM = nasm

@@ -50,7 +50,6 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_sign(const uint8_t* sk, size_t
 LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_verify(const uint8_t* pk, size_t pk_len,
                                                           const uint8_t* msg, size_t msg_len,
                                                           const uint8_t* sig, size_t sig_len);
-#endif
 
 LIBDOGECOIN_API dogecoin_bool dogecoin_dilithium2_commit_bytes(const uint8_t* pk, size_t pk_len,
                                                                 const uint8_t* signature, size_t signature_len,
@@ -60,6 +59,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_tx_add_dilithium2_commit(dogecoin_tx* tx,
                                                                  const uint8_t commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_extract_dilithium2_commit(const dogecoin_tx* tx,
                                                                      uint8_t out_commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
+#endif
 
 LIBDOGECOIN_END_DECL
 

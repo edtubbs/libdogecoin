@@ -1904,6 +1904,7 @@ int main(int argc, char* argv[])
         dogecoin_free(pk); dogecoin_free(sig);
     }
     #endif
+#ifdef USE_LIBOQS
     else if (strcmp(cmd, "falcon_add_commit_tx") == 0) {
         // ./such -c falcon_add_commit_tx -x <raw_tx_hex> -s <falcon_commitment_hex>
         if (!txhex || !scripthex) {
@@ -1960,7 +1961,7 @@ int main(int argc, char* argv[])
         cstr_free(tx_with_commit, true);
         dogecoin_free(tx_with_commit_hex);
         dogecoin_tx_free(tx);
-        }
+    }
     else if (strcmp(cmd, "dilithium2_add_commit_tx") == 0) {
         if (!txhex || !scripthex) {
             return showError("Missing tx hex or commitment hex (use -x, -s)\n");
@@ -2015,6 +2016,7 @@ int main(int argc, char* argv[])
         dogecoin_free(tx_with_commit_hex);
         dogecoin_tx_free(tx);
     }
+#endif
     else {
         print_usage();
         return showError("Unknown command\n");

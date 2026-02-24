@@ -61,7 +61,6 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_falcon512_sign(const uint8_t* sk, size_t 
 LIBDOGECOIN_API dogecoin_bool dogecoin_falcon512_verify(const uint8_t* pk, size_t pk_len,
                                                         const uint8_t* msg, size_t msg_len,
                                                         const uint8_t* sig, size_t sig_len);
-#endif
 
 /*
  * Compute commit = SHA256(pk || sig).
@@ -89,6 +88,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
                                                     const cstring* fromPubKey,
                                                     size_t in_num, int hashtype,
                                                     uint8_t out32[32]);
+#endif
 
 LIBDOGECOIN_END_DECL
 
