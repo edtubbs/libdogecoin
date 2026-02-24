@@ -799,7 +799,6 @@ static void print_analysis(void) {
         }
     }
 
-    benchmark_result *falcon_cmt = find_result("Falcon512-cmt");
     benchmark_result *dilith2_ver = find_result("Dilith2-ver");
 
     /* Summary (derived from measured results above) */
@@ -817,9 +816,12 @@ static void print_analysis(void) {
         printf("• SPHINCS128s sign vs Falcon512 sign: %.0fx (%.6f vs %.6f sec)\n",
                sphincs_s_sig->avgTime / falcon_sig->avgTime, sphincs_s_sig->avgTime, falcon_sig->avgTime);
     }
-    printf("• Tagged PQC commitments are benchmarked in the PQC Commits section above\n");
+    if (falcon_ver || dilith2_ver || sphincs_s_sig) {
+        printf("• Tagged PQC commitments are benchmarked in the PQC Commits section above\n");
+    }
 
     /* Security-strength characteristic table for quick PQC comparison context */
+#ifdef USE_LIBOQS
     printf("\n--- Security-Strength Characteristics (NIST categories) ---\n");
     printf("  %-14s %-12s %-s\n", "Algorithm", "Category", "Approx. classical security");
     if (find_result("secp-kp"))        printf("  %-14s %-12s %-s\n", "secp256k1", "N/A", "~128-bit (ECDLP, non-PQC)");
@@ -830,6 +832,7 @@ static void print_analysis(void) {
     if (find_result("SPHNCS128s-kp"))  printf("  %-14s %-12s %-s\n", "SPHINCS128s", "Level 1", "~128-bit");
     if (find_result("SPHNCS128f-kp"))  printf("  %-14s %-12s %-s\n", "SPHINCS128f", "Level 1", "~128-bit");
     printf("  Note: These are algorithm strength targets, separate from measured throughput above.\n");
+#endif
 }
 
 /* ---- main ---- */
@@ -846,7 +849,7 @@ int main(void) {
     /* baselines */
     printf("\n--- Classical Baselines ---\n");
     run_benchmark(sha256_bench,       "SHA256", "hash");
-    run_benchmark(hash256_bench,      "HASH256", "hash");
+    run_benchmark(hash256_bench,      "SHA256D", "hash");
     run_benchmark(sha512_bench,       "SHA512", "hash");
     run_benchmark(rmd160_bench,       "RMD160", "hash");
     run_benchmark(scrypt_bench,       "Scrypt", "hash");
