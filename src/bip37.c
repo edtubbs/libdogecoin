@@ -32,12 +32,6 @@
 #include <dogecoin/random.h>
 #include <dogecoin/utils.h>
 
-static void bip37_hash_to_hex(const uint8_t hash[32], char out_hex[65])
-{
-    utils_bin_to_hex(hash, 32, out_hex);
-    out_hex[64] = '\0';
-}
-
 /**
  * MurmurHash3 (x86 32-bit) used by BIP37 bloom filters.
  */
@@ -116,7 +110,8 @@ static dogecoin_bool bip37_merkle_collect_match(const uint8_t txid[32], uint32_t
         return false;
     }
     char txid_hex[65];
-    bip37_hash_to_hex(txid, txid_hex);
+    utils_bin_to_hex(txid, 32, txid_hex);
+    txid_hex[64] = '\0';
     if (nn->key != m) {
         debug_print("[bip37][collect] duplicate txid=%s pos=%u\n", txid_hex, pos);
         dogecoin_free(m);
@@ -159,9 +154,13 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     }
     char block_hash_hex[65];
     char merkle_hex[65];
-    if (block_hash) bip37_hash_to_hex(block_hash, block_hash_hex);
+    if (block_hash) {
+        utils_bin_to_hex(block_hash, 32, block_hash_hex);
+        block_hash_hex[64] = '\0';
+    }
     else snprintf(block_hash_hex, sizeof(block_hash_hex), "(none)");
-    bip37_hash_to_hex(header_merkle, merkle_hex);
+    utils_bin_to_hex(header_merkle, 32, merkle_hex);
+    merkle_hex[64] = '\0';
 
     debug_print("[bip37][traverse] start block_height=%d block_hash=%s header_merkle=%s nTx=%u hashCount=%u flags_len=%u tree_height=%u\n",
                 block_height, block_hash_hex, merkle_hex, nTx, hashCount, flags_len, height);
@@ -205,7 +204,8 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                 if (hashesUsed >= hashCount) { ok_extract = false; break; }
                 memcpy(ret, hashes + (hashesUsed * 32), 32);
                 char node_hash_hex[65];
-                bip37_hash_to_hex(ret, node_hash_hex);
+                utils_bin_to_hex(ret, 32, node_hash_hex);
+                node_hash_hex[64] = '\0';
                 debug_print("[bip37][traverse] consume hash=%s h=%u pos=%u parentMatch=%u\n",
                             node_hash_hex, st[sp].height, st[sp].pos, st[sp].parentMatch);
                 if (st[sp].height > 0 && st[sp].parentMatch == 0) {
@@ -223,7 +223,8 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                 if (st[sp].height == 0 && st[sp].parentMatch) {
                     matchedLeaves++;
                     char txid_hex[65];
-                    bip37_hash_to_hex(ret, txid_hex);
+                    utils_bin_to_hex(ret, 32, txid_hex);
+                    txid_hex[64] = '\0';
                     debug_print("[bip37][traverse] matched leaf txid=%s pos=%u\n", txid_hex, st[sp].pos);
                 }
 
@@ -286,7 +287,10 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
         break;
     }
     char computed_merkle_hex[65];
-    if (have_ret) bip37_hash_to_hex(ret, computed_merkle_hex);
+    if (have_ret) {
+        utils_bin_to_hex(ret, 32, computed_merkle_hex);
+        computed_merkle_hex[64] = '\0';
+    }
     else snprintf(computed_merkle_hex, sizeof(computed_merkle_hex), "(none)");
     dogecoin_bool roots_equal = have_ret ? (memcmp(ret, header_merkle, 32) == 0) : false;
     dogecoin_bool ok = (ok_extract && have_ret && roots_equal);
@@ -331,7 +335,8 @@ dogecoin_bool dogecoin_bip37_merkle_extract_match_tree(uint32_t nTx,
                                                                &ctx);
     if (block_hash) {
         char block_hash_hex[65];
-        bip37_hash_to_hex(block_hash, block_hash_hex);
+        utils_bin_to_hex(block_hash, 32, block_hash_hex);
+        block_hash_hex[64] = '\0';
         debug_print("[bip37][extract] block_height=%d block_hash=%s ok=%d match_pending=%u\n",
                     block_height, block_hash_hex, ok, *match_pending);
     } else {
