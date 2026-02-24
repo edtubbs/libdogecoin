@@ -90,6 +90,14 @@ typedef struct bip37_merkle_collect_ctx_ {
     uint32_t* match_pending;
 } bip37_merkle_collect_ctx;
 
+typedef struct bip37_traverse_state_ {
+    uint32_t height;
+    uint32_t pos;
+    uint8_t stage;
+    uint8_t parentMatch;
+    uint256_t left;
+} bip37_traverse_state;
+
 /* Callback bridge used by bip37 merkle traversal to collect matched txids. */
 static dogecoin_bool bip37_merkle_collect_match(const uint8_t txid[32], uint32_t pos, void* ctx)
 {
@@ -173,113 +181,125 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     uint32_t hashesUsed = 0;
     uint32_t matchedLeaves = 0;
 
-    struct {
-        uint32_t height;
-        uint32_t pos;
-        uint8_t stage;
-        uint8_t parentMatch;
-        uint256_t left;
-    } st[64];
-
-    int sp = 0;
-    st[0].height = height;
-    st[0].pos = 0;
-    st[0].stage = 0;
-    st[0].parentMatch = 0;
+    vector_t* st = vector_new(height + 1, dogecoin_free);
+    if (!st) return false;
+    bip37_traverse_state* root = (bip37_traverse_state*)dogecoin_calloc(1, sizeof(bip37_traverse_state));
+    if (!root) {
+        vector_free(st, true);
+        return false;
+    }
+    root->height = height;
+    root->pos = 0;
+    if (!vector_add(st, root)) {
+        dogecoin_free(root);
+        vector_free(st, true);
+        return false;
+    }
 
     uint256_t ret;
     dogecoin_bool have_ret = false;
     dogecoin_bool ok_extract = true;
 
-    while (sp >= 0) {
-        if (st[sp].stage == 0) {
+    while (st->len > 0) {
+        bip37_traverse_state* cur = (bip37_traverse_state*)vector_idx(st, st->len - 1);
+        if (!cur) { ok_extract = false; break; }
+
+        if (cur->stage == 0) {
             if (bitsUsed >= (uint32_t)flags_len * 8U) { ok_extract = false; break; }
-            st[sp].parentMatch = (flags[bitsUsed >> 3] >> (bitsUsed & 7)) & 1;
+            cur->parentMatch = (flags[bitsUsed >> 3] >> (bitsUsed & 7)) & 1;
             debug_print("[bip37][traverse] visit h=%u pos=%u parentMatch=%u bitsUsed=%u hashesUsed=%u\n",
-                        st[sp].height, st[sp].pos, st[sp].parentMatch, bitsUsed, hashesUsed);
+                        cur->height, cur->pos, cur->parentMatch, bitsUsed, hashesUsed);
             bitsUsed++;
 
             /* Leaf node, or an internal node that does not match: consume one hash. */
-            if (st[sp].height == 0 || st[sp].parentMatch == 0) {
+            if (cur->height == 0 || cur->parentMatch == 0) {
                 if (hashesUsed >= hashCount) { ok_extract = false; break; }
                 memcpy(ret, hashes + (hashesUsed * 32), 32);
                 char node_hash_hex[65];
                 utils_bin_to_hex(ret, 32, node_hash_hex);
                 node_hash_hex[64] = '\0';
                 debug_print("[bip37][traverse] consume hash=%s h=%u pos=%u parentMatch=%u\n",
-                            node_hash_hex, st[sp].height, st[sp].pos, st[sp].parentMatch);
-                if (st[sp].height > 0 && st[sp].parentMatch == 0) {
+                            node_hash_hex, cur->height, cur->pos, cur->parentMatch);
+                if (cur->height > 0 && cur->parentMatch == 0) {
                     debug_print("[bip37][traverse] prune subtree block_height=%d block_hash=%s h=%u pos=%u (no filter match under this branch)\n",
-                                block_height, block_hash_hex, st[sp].height, st[sp].pos);
+                                block_height, block_hash_hex, cur->height, cur->pos);
                 }
                 hashesUsed++;
                 have_ret = true;
 
-                if (st[sp].height == 0 && st[sp].parentMatch && on_match &&
-                    !on_match(ret, st[sp].pos, match_ctx)) {
+                if (cur->height == 0 && cur->parentMatch && on_match &&
+                    !on_match(ret, cur->pos, match_ctx)) {
                     ok_extract = false;
                     break;
                 }
-                if (st[sp].height == 0 && st[sp].parentMatch) {
+                if (cur->height == 0 && cur->parentMatch) {
                     matchedLeaves++;
                     char txid_hex[65];
                     utils_bin_to_hex(ret, 32, txid_hex);
                     txid_hex[64] = '\0';
-                    debug_print("[bip37][traverse] matched leaf txid=%s pos=%u\n", txid_hex, st[sp].pos);
+                    debug_print("[bip37][traverse] matched leaf txid=%s pos=%u\n", txid_hex, cur->pos);
                 }
 
-                sp--;
+                vector_remove_idx(st, st->len - 1);
                 continue;
             }
 
             /* Internal matched node: recurse into left child first. */
-            st[sp].stage = 1;
-            sp++;
-            st[sp].height = st[sp - 1].height - 1;
-            st[sp].pos = st[sp - 1].pos * 2;
-            st[sp].stage = 0;
-            st[sp].parentMatch = 0;
+            cur->stage = 1;
+            bip37_traverse_state* child = (bip37_traverse_state*)dogecoin_calloc(1, sizeof(bip37_traverse_state));
+            if (!child) { ok_extract = false; break; }
+            child->height = cur->height - 1;
+            child->pos = cur->pos * 2;
+            if (!vector_add(st, child)) {
+                dogecoin_free(child);
+                ok_extract = false;
+                break;
+            }
             continue;
         }
 
-        if (st[sp].stage == 1) {
+        if (cur->stage == 1) {
             if (!have_ret) { ok_extract = false; break; }
-            memcpy(st[sp].left, ret, 32);
+            memcpy(cur->left, ret, 32);
 
-            uint64_t width = ((uint64_t)nTx + ((1ULL << (st[sp].height - 1)) - 1ULL)) >> (st[sp].height - 1);
-            uint32_t rightPos = st[sp].pos * 2 + 1;
+            uint64_t width = ((uint64_t)nTx + ((1ULL << (cur->height - 1)) - 1ULL)) >> (cur->height - 1);
+            uint32_t rightPos = cur->pos * 2 + 1;
 
             if ((uint64_t)rightPos < width) {
                 /* Right child exists: recurse into it. */
-                st[sp].stage = 2;
-                sp++;
-                st[sp].height = st[sp - 1].height - 1;
-                st[sp].pos = rightPos;
-                st[sp].stage = 0;
-                st[sp].parentMatch = 0;
+                cur->stage = 2;
+                bip37_traverse_state* child = (bip37_traverse_state*)dogecoin_calloc(1, sizeof(bip37_traverse_state));
+                if (!child) { ok_extract = false; break; }
+                child->height = cur->height - 1;
+                child->pos = rightPos;
+                if (!vector_add(st, child)) {
+                    dogecoin_free(child);
+                    ok_extract = false;
+                    break;
+                }
                 have_ret = false;
                 continue;
             } else {
                 /* Right child absent at this width, duplicate left hash. */
                 uint8_t buf64[64];
-                memcpy(buf64, st[sp].left, 32);
-                memcpy(buf64 + 32, st[sp].left, 32);
+                memcpy(buf64, cur->left, 32);
+                memcpy(buf64 + 32, cur->left, 32);
                 dogecoin_hash(buf64, 64, ret);
                 have_ret = true;
-                sp--;
+                vector_remove_idx(st, st->len - 1);
                 continue;
             }
         }
 
-        if (st[sp].stage == 2) {
+        if (cur->stage == 2) {
             /* Combine left and right child hashes and bubble up. */
             if (!have_ret) { ok_extract = false; break; }
             uint8_t buf64[64];
-            memcpy(buf64, st[sp].left, 32);
+            memcpy(buf64, cur->left, 32);
             memcpy(buf64 + 32, ret, 32);
             dogecoin_hash(buf64, 64, ret);
             have_ret = true;
-            sp--;
+            vector_remove_idx(st, st->len - 1);
             continue;
         }
 
@@ -300,6 +320,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
         debug_print("[bip37][traverse] no matched leaves for block_height=%d block_hash=%s with current filter context\n",
                     block_height, block_hash_hex);
     }
+    vector_free(st, true);
     return ok;
 }
 
