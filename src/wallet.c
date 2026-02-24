@@ -986,7 +986,7 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
         }
     }
     else {
-        const uint32_t tx_progress_interval = 50;
+        const uint32_t tx_progress_interval = 1;
         uint32_t tx_loaded_count = 0;
         dogecoin_bool tx_loading_announced = false;
         // check file-header-magic, version and genesis
@@ -1565,7 +1565,20 @@ void dogecoin_wallet_check_transaction(void *ctx, dogecoin_tx *tx, unsigned int 
     (void)(pos);
     dogecoin_wallet *wallet = (dogecoin_wallet *)ctx;
     if (dogecoin_wallet_is_mine(wallet, tx) || dogecoin_wallet_is_from_me(wallet, tx)) {
-        printf("\nFound relevant transaction!\n");
+        dogecoin_wtx find;
+        uint256_t txid;
+        char txid_hex[65];
+        memset(&find, 0, sizeof(find));
+        dogecoin_tx_hash(tx, txid);
+        dogecoin_hash_set(find.tx_hash_cache, txid);
+        if (dogecoin_btree_tfind(&find, &wallet->wtxes_rbtree, dogecoin_wtx_compare)) {
+            dogecoin_wallet_utxos_update_confirmations(pindex->height);
+            return;
+        }
+        utils_bin_to_hex(txid, DOGECOIN_HASH_LENGTH, txid_hex);
+        txid_hex[64] = '\0';
+        utils_reverse_hex(txid_hex, 64);
+        printf("Found new relevant transaction: %s\n", txid_hex);
         dogecoin_wtx* wtx = dogecoin_wallet_wtx_new();
         uint256_t blockhash;
         dogecoin_block_header_hash(&pindex->header, blockhash);
