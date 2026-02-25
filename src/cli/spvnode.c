@@ -200,6 +200,7 @@ static struct option long_options[] = {
         {"http_server", required_argument, NULL, 'u'},
         {"smpv", no_argument, NULL, 'x'},
         {"filtered_blocks", no_argument, NULL, 'g'},
+        {"select_checkpoint", no_argument, NULL, 'q'},
         {"daemon", no_argument, NULL, 'z'},
         {NULL, 0, NULL, 0} };
 
@@ -218,7 +219,7 @@ static void print_usage() {
     printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m[--maxpeers] <int>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
 (-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
-(-u|--http_server <ip:port>) (-x|--smpv) (-g|--filtered_blocks) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
+(-u|--http_server <ip:port>) (-x|--smpv) (-g|--filtered_blocks) (-q|--select_checkpoint) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
     printf("Supported commands:\n");
     printf("        scan      (scan blocks up to the tip, creates header.db file)\n");
     printf("\nExamples: \n");
@@ -283,7 +284,55 @@ dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_* client, 
 
 static dogecoin_bool quit_when_synced = true;
 static dogecoin_bool spv_enable_filtered_blocks = false;
+static dogecoin_bool spv_select_checkpoint = false;
 static int spv_filter_oldest_utxo_height = 0;
+
+static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogecoin_bool prompt)
+{
+    const dogecoin_checkpoint* checkpoints = NULL;
+    int count = 0;
+    int start = 0;
+    int latest = 0;
+    int selected = 0;
+    int i;
+
+    if (chain == &dogecoin_chainparams_main) {
+        checkpoints = dogecoin_mainnet_checkpoint_array;
+        count = (int)(sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]));
+    } else if (chain == &dogecoin_chainparams_test) {
+        checkpoints = dogecoin_testnet_checkpoint_array;
+        count = (int)(sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]));
+    } else {
+        return -1;
+    }
+
+    if (count <= 0) return -1;
+
+    start = (count > 12) ? (count - 12) : 0;
+    latest = count - 1;
+    selected = latest;
+
+    printf("[spv] Available checkpoints (last %d):\n", count - start);
+    for (i = start; i < count; i++) {
+        printf("  %2d) height %u\n", (i - start + 1), checkpoints[i].height);
+    }
+
+    if (!prompt) return selected;
+
+    printf("Select checkpoint [1-%d] (default %d): ", count - start, count - start);
+    fflush(stdout);
+    {
+        char input[32];
+        if (fgets(input, sizeof(input), stdin)) {
+            int choice = atoi(input);
+            if (choice >= 1 && choice <= (count - start)) {
+                selected = start + (choice - 1);
+            }
+        }
+    }
+
+    return selected;
+}
 /**
  * When the sync is complete, print a message and either exit or wait for new blocks or relevant
  * transactions
@@ -368,6 +417,7 @@ int main(int argc, char* argv[]) {
     char* http_server = NULL;
     int file_num = NO_FILE;
     dogecoin_bool smpv_cli_enable = false;
+    int selected_checkpoint_index = -1;
 
     if (argc <= 1 || strlen(argv[argc - 1]) == 0 || argv[argc - 1][0] == '-') {
         /* exit if no command was provided */
@@ -377,7 +427,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xg", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xgq", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -453,6 +503,10 @@ int main(int argc, char* argv[]) {
                     break;
                 case 'g':
                     spv_enable_filtered_blocks = true;
+                    break;
+                case 'q':
+                    spv_select_checkpoint = true;
+                    use_checkpoint = true;
                     break;
                 default:
                     print_usage();
@@ -636,6 +690,21 @@ int main(int argc, char* argv[]) {
             printf("Could not load or create headers database...aborting\n");
             ret = EXIT_FAILURE;
         } else {
+            if (spv_select_checkpoint) {
+                selected_checkpoint_index = spv_choose_checkpoint_index(chain, prompt);
+                if (selected_checkpoint_index >= 0) {
+                    const dogecoin_checkpoint* checkpoints = (chain == &dogecoin_chainparams_main) ?
+                        dogecoin_mainnet_checkpoint_array : dogecoin_testnet_checkpoint_array;
+                    uint256_t hash;
+                    utils_uint256_sethex((char*)checkpoints[selected_checkpoint_index].hash, (uint8_t*)&hash);
+                    client->headers_db->set_checkpoint_start(
+                        client->headers_db_ctx,
+                        hash,
+                        checkpoints[selected_checkpoint_index].height,
+                        (uint8_t*)client->chainparams->minimumchainwork);
+                    printf("[spv] Selected checkpoint height %u\n", checkpoints[selected_checkpoint_index].height);
+                }
+            }
             if (have_decl_daemon) {
 #if defined(HAVE_DECL_DAEMON) && !defined(WIN32)
                 const char *LOGNAME = "libdogecoin-spvnode";

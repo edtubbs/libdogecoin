@@ -298,16 +298,9 @@ dogecoin_bool dogecoin_bip37_merkle_extract_match_tree(uint32_t nTx,
                                                                filter_debug_dump,
                                                                bip37_merkle_collect_match,
                                                                &ctx);
-    if (block_hash) {
-        char block_hash_hex[65];
-        utils_bin_to_hex(block_hash, 32, block_hash_hex);
-        block_hash_hex[64] = '\0';
-        if (log_cb) log_cb("[bip37][extract] block_height=%d block_hash=%s ok=%d match_pending=%u\n",
-                           block_height, block_hash_hex, ok, *match_pending);
-    } else {
-        if (log_cb) log_cb("[bip37][extract] block_height=%d ok=%d match_pending=%u\n",
-                           block_height, ok, *match_pending);
-    }
+    (void)block_hash;
+    (void)block_height;
+    (void)log_cb;
     return ok;
 }
 

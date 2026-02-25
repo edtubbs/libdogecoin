@@ -376,6 +376,10 @@ To enable BIP37 filtered block mode (filterload + merkleblock history scan), app
 
     ./spvnode -g scan
 
+To choose a checkpoint start manually (last 12 shown), apply the -q flag:
+
+    ./spvnode -q scan
+
 | Flag | Name | Required Arg? | Usage |
 |------|------|---------------|-------|
 | `-t`, `--testnet` | Testnet Mode | No | Activate testnet: `./spvnode -t scan` |
@@ -400,6 +404,7 @@ To enable BIP37 filtered block mode (filterload + merkleblock history scan), app
 | `-u`, `--http_server` | Enable HTTP | No | Enabled HTTP: `./spvnode -u 127.0.0.1:8080 scan` |
 | `-x`, `--smpv` | Enable SMPV | No | Enabled SMPV: `./spvnode -x scan` |
 | `-g`, `--filtered_blocks` | Filtered Blocks | No | Enable BIP37 filtered blocks: `./spvnode -g scan` |
+| `-q`, `--select_checkpoint` | Select Checkpoint | No | Prompt for checkpoint start (defaults to latest when used with `-l`): `./spvnode -q scan` |
 
 ### Commands
 
