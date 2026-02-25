@@ -305,13 +305,19 @@ void spv_sync_completed(dogecoin_spv_client* client) {
     if (client->bloom_filter && client->bloom_filter_len > 0) {
         int request_depth = 0; /* 0 = scan all available blocks back to checkpoint/genesis in current headers chain */
         if (spv_filter_oldest_utxo_height > 0 && tip_height >= spv_filter_oldest_utxo_height) {
-            int effective_start_height = spv_filter_oldest_utxo_height;
-            if (effective_start_height < available_start_height) {
-                effective_start_height = available_start_height;
+            if (spv_filter_oldest_utxo_height < available_start_height) {
+                request_depth = 0; /* ask for all locally available history */
+                printf("[spv] Requesting historical filtered blocks for UTXO discovery from height %d to %d (depth=all available)...\n",
+                       available_start_height, tip_height);
+                printf("[spv][warn] Oldest wallet UTXO height %d is older than locally available headers start %d.\n",
+                       spv_filter_oldest_utxo_height, available_start_height);
+                printf("[spv][warn] Historical matches before %d cannot be found until headers are synced from that range (disable checkpoint and rebuild headers).\n",
+                       available_start_height);
+            } else {
+                request_depth = (tip_height - spv_filter_oldest_utxo_height) + 1;
+                printf("[spv] Requesting historical filtered blocks for UTXO discovery from height %d to %d (depth=%d)...\n",
+                       spv_filter_oldest_utxo_height, tip_height, request_depth);
             }
-            request_depth = (tip_height - effective_start_height) + 1;
-            printf("[spv] Requesting historical filtered blocks for UTXO discovery from height %d to %d (depth=%d)...\n",
-                   effective_start_height, tip_height, request_depth);
         } else {
             printf("[spv] Requesting historical filtered blocks for UTXO discovery (checkpoint/genesis to tip)...\n");
         }
