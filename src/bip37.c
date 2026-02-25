@@ -175,7 +175,8 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     st[0].height = height;
     st[0].pos = 0;
 
-    uint256_t ret;
+    uint256_t ret_buf;
+    const uint8_t* ret = NULL;
     dogecoin_bool have_ret = false;
     dogecoin_bool ok_extract = true;
 
@@ -190,7 +191,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
             /* Leaf node, or an internal node that does not match: consume one hash. */
             if (cur->height == 0 || cur->parentMatch == 0) {
                 if (hashesUsed >= hashCount) { ok_extract = false; break; }
-                memcpy(ret, hashes + (hashesUsed * 32), 32);
+                ret = hashes + (hashesUsed * 32);
                 hashesUsed++;
                 have_ret = true;
 
@@ -235,7 +236,8 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                 uint8_t buf64[64];
                 memcpy(buf64, cur->left, 32);
                 memcpy(buf64 + 32, cur->left, 32);
-                dogecoin_hash(buf64, 64, ret);
+                dogecoin_hash(buf64, 64, ret_buf);
+                ret = ret_buf;
                 have_ret = true;
                 sp--;
                 continue;
@@ -248,7 +250,8 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
             uint8_t buf64[64];
             memcpy(buf64, cur->left, 32);
             memcpy(buf64 + 32, ret, 32);
-            dogecoin_hash(buf64, 64, ret);
+            dogecoin_hash(buf64, 64, ret_buf);
+            ret = ret_buf;
             have_ret = true;
             sp--;
             continue;
