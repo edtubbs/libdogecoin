@@ -30,6 +30,7 @@
 #include <dogecoin/hash.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/random.h>
+#include <dogecoin/uthash.h>
 #include <dogecoin/utils.h>
 
 /**
@@ -98,16 +99,8 @@ typedef struct bip37_traverse_state_ {
     uint8_t stage;
     uint8_t parentMatch;
     uint256_t left;
+    UT_hash_handle hh;
 } bip37_traverse_state;
-
-static int bip37_traverse_state_cmp(const void* a, const void* b)
-{
-    const bip37_traverse_state* sa = (const bip37_traverse_state*)a;
-    const bip37_traverse_state* sb = (const bip37_traverse_state*)b;
-    if (sa->depth < sb->depth) return -1;
-    if (sa->depth > sb->depth) return 1;
-    return 0;
-}
 
 /* Callback bridge used by bip37 merkle traversal to collect matched txids. */
 static dogecoin_bool bip37_merkle_collect_match(const uint8_t txid[32], uint32_t pos, void* ctx)
@@ -179,31 +172,23 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     uint32_t bitsUsed = 0;
     uint32_t hashesUsed = 0;
 
-    void* st = NULL;
+    bip37_traverse_state* st = NULL;
     int sp = 0;
     bip37_traverse_state* root = (bip37_traverse_state*)dogecoin_calloc(1, sizeof(bip37_traverse_state));
     if (!root) return false;
     root->depth = 0;
     root->height = height;
     root->pos = 0;
-    dogecoin_btree_node_t* root_node = (dogecoin_btree_node_t*)dogecoin_btree_tsearch(
-        root, &st, bip37_traverse_state_cmp);
-    if (!root_node || root_node->key != root) {
-        dogecoin_free(root);
-        return false;
-    }
+    HASH_ADD(hh, st, depth, sizeof(uint32_t), root);
 
     uint256_t ret;
     dogecoin_bool have_ret = false;
     dogecoin_bool ok_extract = true;
 
-    bip37_traverse_state key;
-    memset(&key, 0, sizeof(key));
     while (sp >= 0) {
-        key.depth = (uint32_t)sp;
-        dogecoin_btree_node_t* cur_node = (dogecoin_btree_node_t*)dogecoin_btree_tfind(
-            &key, &st, bip37_traverse_state_cmp);
-        bip37_traverse_state* cur = cur_node ? (bip37_traverse_state*)cur_node->key : NULL;
+        uint32_t depth_key = (uint32_t)sp;
+        bip37_traverse_state* cur = NULL;
+        HASH_FIND(hh, st, &depth_key, sizeof(depth_key), cur);
         if (!cur) { ok_extract = false; break; }
 
         if (cur->stage == 0) {
@@ -223,7 +208,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                     ok_extract = false;
                     break;
                 }
-                dogecoin_btree_tdelete(cur, &st, bip37_traverse_state_cmp);
+                HASH_DEL(st, cur);
                 dogecoin_free(cur);
                 sp--;
                 continue;
@@ -237,13 +222,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
             child->depth = child_depth;
             child->height = cur->height - 1;
             child->pos = cur->pos * 2;
-            dogecoin_btree_node_t* child_node = (dogecoin_btree_node_t*)dogecoin_btree_tsearch(
-                child, &st, bip37_traverse_state_cmp);
-            if (!child_node || child_node->key != child) {
-                dogecoin_free(child);
-                ok_extract = false;
-                break;
-            }
+            HASH_ADD(hh, st, depth, sizeof(uint32_t), child);
             sp++;
             continue;
         }
@@ -264,13 +243,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                 child->depth = child_depth;
                 child->height = cur->height - 1;
                 child->pos = rightPos;
-                dogecoin_btree_node_t* child_node = (dogecoin_btree_node_t*)dogecoin_btree_tsearch(
-                    child, &st, bip37_traverse_state_cmp);
-                if (!child_node || child_node->key != child) {
-                    dogecoin_free(child);
-                    ok_extract = false;
-                    break;
-                }
+                HASH_ADD(hh, st, depth, sizeof(uint32_t), child);
                 have_ret = false;
                 sp++;
                 continue;
@@ -281,7 +254,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                 memcpy(buf64 + 32, cur->left, 32);
                 dogecoin_hash(buf64, 64, ret);
                 have_ret = true;
-                dogecoin_btree_tdelete(cur, &st, bip37_traverse_state_cmp);
+                HASH_DEL(st, cur);
                 dogecoin_free(cur);
                 sp--;
                 continue;
@@ -296,7 +269,7 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
             memcpy(buf64 + 32, ret, 32);
             dogecoin_hash(buf64, 64, ret);
             have_ret = true;
-            dogecoin_btree_tdelete(cur, &st, bip37_traverse_state_cmp);
+            HASH_DEL(st, cur);
             dogecoin_free(cur);
             sp--;
             continue;
@@ -307,7 +280,11 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     }
     dogecoin_bool roots_equal = have_ret ? (memcmp(ret, header_merkle, 32) == 0) : false;
     dogecoin_bool ok = (ok_extract && have_ret && roots_equal);
-    dogecoin_btree_tdestroy(st, dogecoin_free);
+    bip37_traverse_state *iter, *tmp;
+    HASH_ITER(hh, st, iter, tmp) {
+        HASH_DEL(st, iter);
+        dogecoin_free(iter);
+    }
     return ok;
 }
 
