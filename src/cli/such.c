@@ -665,14 +665,12 @@ static void print_usage()
     printf("bip32maintotest (-p <extended hd master key>),\n");
     printf("signmessage (-x '<message>' -p <private key>),\n");
     printf("verifymessage (-x '<message>' -s <signature (base64 encoded)> -k <address>),\n");
-    printf("transaction\n");
+    printf("transaction,\n");
 #ifdef USE_LIBOQS
-    printf("\nFalcon-512 Post-Quantum Crypto Commands:\n");
     printf("falcon_keygen (generates Falcon-512 keypair),\n");
     printf("falcon_sign (requires -p <falcon_secret_key_hex> -x <message_hex>),\n");
     printf("falcon_verify (requires -k <falcon_public_key_hex> -x <message_hex> -s <signature_hex>),\n");
     printf("falcon_commit (requires -k <falcon_public_key_hex> -s <signature_hex>),\n");
-    printf("\nDilithium2 Post-Quantum Crypto Commands:\n");
     printf("dilithium2_keygen (generates Dilithium2 keypair),\n");
     printf("dilithium2_sign (requires -p <dilithium2_secret_key_hex> -x <message_hex>),\n");
     printf("dilithium2_verify (requires -k <dilithium2_public_key_hex> -x <message_hex> -s <signature_hex>),\n");
