@@ -30,7 +30,6 @@
 #include <dogecoin/hash.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/random.h>
-#include <dogecoin/uthash.h>
 #include <dogecoin/utils.h>
 
 /**
@@ -93,13 +92,11 @@ typedef struct bip37_merkle_collect_ctx_ {
 } bip37_merkle_collect_ctx;
 
 typedef struct bip37_traverse_state_ {
-    uint32_t depth;
     uint32_t height;
     uint32_t pos;
     uint8_t stage;
     uint8_t parentMatch;
     uint256_t left;
-    UT_hash_handle hh;
 } bip37_traverse_state;
 
 /* Callback bridge used by bip37 merkle traversal to collect matched txids. */
@@ -172,24 +169,18 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     uint32_t bitsUsed = 0;
     uint32_t hashesUsed = 0;
 
-    bip37_traverse_state* st = NULL;
+    bip37_traverse_state st[64];
     int sp = 0;
-    bip37_traverse_state* root = (bip37_traverse_state*)dogecoin_calloc(1, sizeof(bip37_traverse_state));
-    if (!root) return false;
-    root->depth = 0;
-    root->height = height;
-    root->pos = 0;
-    HASH_ADD(hh, st, depth, sizeof(uint32_t), root);
+    memset(st, 0, sizeof(st));
+    st[0].height = height;
+    st[0].pos = 0;
 
     uint256_t ret;
     dogecoin_bool have_ret = false;
     dogecoin_bool ok_extract = true;
 
     while (sp >= 0) {
-        uint32_t depth_key = (uint32_t)sp;
-        bip37_traverse_state* cur = NULL;
-        HASH_FIND(hh, st, &depth_key, sizeof(depth_key), cur);
-        if (!cur) { ok_extract = false; break; }
+        bip37_traverse_state* cur = &st[sp];
 
         if (cur->stage == 0) {
             if (bitsUsed >= (uint32_t)flags_len * 8U) { ok_extract = false; break; }
@@ -208,22 +199,17 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                     ok_extract = false;
                     break;
                 }
-                HASH_DEL(st, cur);
-                dogecoin_free(cur);
                 sp--;
                 continue;
             }
 
             /* Internal matched node: recurse into left child first. */
             cur->stage = 1;
-            bip37_traverse_state* child = (bip37_traverse_state*)dogecoin_calloc(1, sizeof(bip37_traverse_state));
-            if (!child) { ok_extract = false; break; }
-            uint32_t child_depth = (uint32_t)(sp + 1);
-            child->depth = child_depth;
-            child->height = cur->height - 1;
-            child->pos = cur->pos * 2;
-            HASH_ADD(hh, st, depth, sizeof(uint32_t), child);
+            if ((sp + 1) >= (int)ARRAYLEN(st)) { ok_extract = false; break; }
             sp++;
+            memset(&st[sp], 0, sizeof(st[sp]));
+            st[sp].height = cur->height - 1;
+            st[sp].pos = cur->pos * 2;
             continue;
         }
 
@@ -237,15 +223,12 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
             if ((uint64_t)rightPos < width) {
                 /* Right child exists: recurse into it. */
                 cur->stage = 2;
-                bip37_traverse_state* child = (bip37_traverse_state*)dogecoin_calloc(1, sizeof(bip37_traverse_state));
-                if (!child) { ok_extract = false; break; }
-                uint32_t child_depth = (uint32_t)(sp + 1);
-                child->depth = child_depth;
-                child->height = cur->height - 1;
-                child->pos = rightPos;
-                HASH_ADD(hh, st, depth, sizeof(uint32_t), child);
+                if ((sp + 1) >= (int)ARRAYLEN(st)) { ok_extract = false; break; }
                 have_ret = false;
                 sp++;
+                memset(&st[sp], 0, sizeof(st[sp]));
+                st[sp].height = cur->height - 1;
+                st[sp].pos = rightPos;
                 continue;
             } else {
                 /* Right child absent at this width, duplicate left hash. */
@@ -254,8 +237,6 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
                 memcpy(buf64 + 32, cur->left, 32);
                 dogecoin_hash(buf64, 64, ret);
                 have_ret = true;
-                HASH_DEL(st, cur);
-                dogecoin_free(cur);
                 sp--;
                 continue;
             }
@@ -269,8 +250,6 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
             memcpy(buf64 + 32, ret, 32);
             dogecoin_hash(buf64, 64, ret);
             have_ret = true;
-            HASH_DEL(st, cur);
-            dogecoin_free(cur);
             sp--;
             continue;
         }
@@ -280,11 +259,6 @@ dogecoin_bool dogecoin_bip37_traverse_merkle_matches(uint32_t nTx,
     }
     dogecoin_bool roots_equal = have_ret ? (memcmp(ret, header_merkle, 32) == 0) : false;
     dogecoin_bool ok = (ok_extract && have_ret && roots_equal);
-    bip37_traverse_state *iter, *tmp;
-    HASH_ITER(hh, st, iter, tmp) {
-        HASH_DEL(st, iter);
-        dogecoin_free(iter);
-    }
     return ok;
 }
 
