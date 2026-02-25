@@ -50,13 +50,14 @@ static uint32_t bip37_murmur3(const uint8_t* key, size_t len, uint32_t seed)
     }
 
     uint32_t k = 0;
-    switch (len - i) {
+    size_t tail = len - i;
+    switch (tail) {
         case 3: k ^= key[i + 2] << 16; /* fall through */
         case 2: k ^= key[i + 1] << 8;  /* fall through */
         case 1: k ^= key[i];
     }
 
-    if (len - i > 0) {
+    if (tail != 0) {
         k *= 0xcc9e2d51u;
         k = (k << 15) | (k >> 17);
         k *= 0x1b873593u;
