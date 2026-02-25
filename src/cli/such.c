@@ -679,11 +679,6 @@ static void print_usage()
     printf("dilithium2_commit (requires -k <dilithium2_public_key_hex> -s <signature_hex>),\n");
     printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <falcon_commitment_hex>)\n");
     printf("dilithium2_add_commit_tx (requires -x <raw_tx_hex> -s <dilithium2_commitment_hex>)\n");
-    printf("\nPQC flag usage:\n");
-    printf("-p <secret_key_hex> (falcon_sign, dilithium2_sign)\n");
-    printf("-k <public_key_hex> (falcon_verify, falcon_commit, dilithium2_verify, dilithium2_commit)\n");
-    printf("-x <message_hex|raw_tx_hex> (falcon_sign/verify, dilithium2_sign/verify, *_add_commit_tx)\n");
-    printf("-s <signature_hex|commitment_hex> (falcon_verify/commit, dilithium2_verify/commit, *_add_commit_tx)\n");
 #endif
     printf("\nExamples: \n");
     printf("Generate a testnet private ec keypair wif/hex:\n");
