@@ -1568,20 +1568,30 @@ void dogecoin_wallet_check_transaction(void *ctx, dogecoin_tx *tx, unsigned int 
         dogecoin_wtx find;
         uint256_t txid;
         char txid_hex[65];
+        char block_hex[65];
         memset(&find, 0, sizeof(find));
         dogecoin_tx_hash(tx, txid);
         dogecoin_hash_set(find.tx_hash_cache, txid);
-        if (dogecoin_btree_tfind(&find, &wallet->wtxes_rbtree, dogecoin_wtx_compare)) {
-            dogecoin_wallet_utxos_update_confirmations(pindex->height);
-            return;
+        if (wallet->vec_wtxes) {
+            unsigned int i;
+            for (i = 0; i < wallet->vec_wtxes->len; i++) {
+                dogecoin_wtx* existing = vector_idx(wallet->vec_wtxes, i);
+                if (existing && memcmp(existing->tx_hash_cache, find.tx_hash_cache, sizeof(uint256_t)) == 0) {
+                    dogecoin_wallet_utxos_update_confirmations(pindex->height);
+                    return;
+                }
+            }
         }
         utils_bin_to_hex(txid, DOGECOIN_HASH_LENGTH, txid_hex);
         txid_hex[64] = '\0';
         utils_reverse_hex(txid_hex, 64);
-        printf("Found new relevant transaction: %s\n", txid_hex);
         dogecoin_wtx* wtx = dogecoin_wallet_wtx_new();
         uint256_t blockhash;
         dogecoin_block_header_hash(&pindex->header, blockhash);
+        utils_bin_to_hex(blockhash, DOGECOIN_HASH_LENGTH, block_hex);
+        block_hex[64] = '\0';
+        utils_reverse_hex(block_hex, 64);
+        printf("Found new relevant transaction: %s (block: %s height: %u)\n", txid_hex, block_hex, pindex->height);
         dogecoin_hash_set(wtx->blockhash, blockhash);
         wtx->height = pindex->height;
         dogecoin_tx_copy(wtx->tx, tx);
