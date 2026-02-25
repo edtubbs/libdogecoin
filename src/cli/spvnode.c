@@ -39,8 +39,7 @@
 #include <unistd.h>
 #else
 #include <win/wingetopt.h>
-#define HAVE_STRUCT_TIMESPEC
-#include <win/pthread.h>
+#include <windows.h>
 #endif
 
 #include <ctype.h>
@@ -181,11 +180,17 @@ typedef struct spv_work_item_ {
 } spv_work_item;
 
 typedef struct spv_worker_pool_ {
+#ifndef _MSC_VER
     pthread_t* threads;
-    int workers;
-    int created_workers;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
+#else
+    HANDLE* threads;
+    CRITICAL_SECTION mutex;
+    CONDITION_VARIABLE cond;
+#endif
+    int workers;
+    int created_workers;
     spv_work_item* head;
     spv_work_item* tail;
     dogecoin_bool stop;
@@ -301,6 +306,11 @@ static dogecoin_bool spv_worker_pool_enqueue(int height, time_t timestamp)
     item->timestamp = timestamp;
 
     pthread_mutex_lock(&g_worker_pool.mutex);
+    if (!g_worker_pool.running) {
+        pthread_mutex_unlock(&g_worker_pool.mutex);
+        dogecoin_free(item);
+        return false;
+    }
     if (g_worker_pool.tail) {
         g_worker_pool.tail->next = item;
     } else {
@@ -312,25 +322,123 @@ static dogecoin_bool spv_worker_pool_enqueue(int height, time_t timestamp)
     return true;
 }
 #else
+static DWORD WINAPI spv_worker_thread_msvc(LPVOID arg)
+{
+    UNUSED(arg);
+    while (true) {
+        EnterCriticalSection(&g_worker_pool.mutex);
+        while (!g_worker_pool.stop && g_worker_pool.head == NULL) {
+            SleepConditionVariableCS(&g_worker_pool.cond, &g_worker_pool.mutex, INFINITE);
+        }
+        if (g_worker_pool.stop && g_worker_pool.head == NULL) {
+            LeaveCriticalSection(&g_worker_pool.mutex);
+            break;
+        }
+        spv_work_item* item = g_worker_pool.head;
+        g_worker_pool.head = item->next;
+        if (g_worker_pool.head == NULL) {
+            g_worker_pool.tail = NULL;
+        }
+        LeaveCriticalSection(&g_worker_pool.mutex);
+        spv_print_header_tip(item->height, item->timestamp);
+        dogecoin_free(item);
+    }
+    return 0;
+}
+
 static void spv_worker_pool_stop(void)
 {
-    g_worker_pool.running = false;
+    if (!g_worker_pool.running) {
+        return;
+    }
+    EnterCriticalSection(&g_worker_pool.mutex);
+    g_worker_pool.stop = true;
+    WakeAllConditionVariable(&g_worker_pool.cond);
+    LeaveCriticalSection(&g_worker_pool.mutex);
+
+    for (int i = 0; i < g_worker_pool.created_workers; i++) {
+        WaitForSingleObject(g_worker_pool.threads[i], INFINITE);
+        CloseHandle(g_worker_pool.threads[i]);
+    }
+
+    EnterCriticalSection(&g_worker_pool.mutex);
+    while (g_worker_pool.head) {
+        spv_work_item* item = g_worker_pool.head;
+        g_worker_pool.head = item->next;
+        dogecoin_free(item);
+    }
+    g_worker_pool.tail = NULL;
+    LeaveCriticalSection(&g_worker_pool.mutex);
+
+    DeleteCriticalSection(&g_worker_pool.mutex);
+    dogecoin_free(g_worker_pool.threads);
+    memset(&g_worker_pool, 0, sizeof(g_worker_pool));
 }
 
 static dogecoin_bool spv_worker_pool_start(int workers)
 {
-    UNUSED(workers);
-    static dogecoin_bool warned = false;
-    if (!warned) {
-        fprintf(stderr, "spvnode: worker threads are disabled for this MSVC build; using single-threaded callback processing.\n");
-        warned = true;
+    if (workers <= 1) {
+        return true;
+    }
+    g_worker_pool.threads = dogecoin_calloc(workers, sizeof(*g_worker_pool.threads));
+    if (!g_worker_pool.threads) {
+        return false;
+    }
+    g_worker_pool.workers = workers;
+    g_worker_pool.created_workers = 0;
+    g_worker_pool.stop = false;
+    g_worker_pool.running = true;
+    InitializeCriticalSection(&g_worker_pool.mutex);
+    InitializeConditionVariable(&g_worker_pool.cond);
+
+    for (int i = 0; i < workers; i++) {
+        g_worker_pool.threads[i] = CreateThread(NULL, 0, spv_worker_thread_msvc, NULL, 0, NULL);
+        if (g_worker_pool.threads[i] == NULL) {
+            EnterCriticalSection(&g_worker_pool.mutex);
+            g_worker_pool.stop = true;
+            g_worker_pool.running = false;
+            WakeAllConditionVariable(&g_worker_pool.cond);
+            LeaveCriticalSection(&g_worker_pool.mutex);
+            for (int j = 0; j < g_worker_pool.created_workers; j++) {
+                WaitForSingleObject(g_worker_pool.threads[j], INFINITE);
+                CloseHandle(g_worker_pool.threads[j]);
+            }
+            DeleteCriticalSection(&g_worker_pool.mutex);
+            dogecoin_free(g_worker_pool.threads);
+            memset(&g_worker_pool, 0, sizeof(g_worker_pool));
+            return false;
+        }
+        g_worker_pool.created_workers++;
     }
     return true;
 }
 
 static dogecoin_bool spv_worker_pool_enqueue(int height, time_t timestamp)
 {
-    spv_print_header_tip(height, timestamp);
+    if (!g_worker_pool.running) {
+        return false;
+    }
+    spv_work_item* item = dogecoin_calloc(1, sizeof(*item));
+    if (!item) {
+        return false;
+    }
+    item->height = height;
+    item->timestamp = timestamp;
+
+    EnterCriticalSection(&g_worker_pool.mutex);
+    if (!g_worker_pool.running) {
+        LeaveCriticalSection(&g_worker_pool.mutex);
+        dogecoin_free(item);
+        return false;
+    }
+    if (g_worker_pool.tail) {
+        g_worker_pool.tail->next = item;
+    } else {
+        g_worker_pool.head = item;
+    }
+    g_worker_pool.tail = item;
+    WakeConditionVariable(&g_worker_pool.cond);
+    LeaveCriticalSection(&g_worker_pool.mutex);
     return true;
 }
 #endif
