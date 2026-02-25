@@ -578,6 +578,7 @@ static void secp_verify_bench(benchmark_context *ctx) {
 
 /* ---- Analysis and Ranking Functions ---- */
 
+#ifdef USE_LIBOQS
 /* Comparison function for sorting by average time (ascending) */
 static int compare_avg_time(const void *a, const void *b) {
     const benchmark_result *ra = (const benchmark_result *)a;
@@ -596,7 +597,6 @@ static benchmark_result* find_result(const char *name) {
     }
     return NULL;
 }
-
 static dogecoin_bool is_pqc_result_name(const char *name) {
     if (!name) return false;
     return (strncmp(name, "Falcon", 6) == 0 ||
@@ -834,6 +834,7 @@ static void print_analysis(void) {
     printf("  Note: These are algorithm strength targets, separate from measured throughput above.\n");
 #endif
 }
+#endif
 
 /* ---- main ---- */
 
