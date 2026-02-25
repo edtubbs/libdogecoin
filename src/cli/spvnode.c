@@ -291,7 +291,6 @@ static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogeco
 {
     const dogecoin_checkpoint* checkpoints = NULL;
     int count = 0;
-    int start = 0;
     int latest = 0;
     int selected = 0;
     int i;
@@ -308,25 +307,24 @@ static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogeco
 
     if (count <= 0) return -1;
 
-    start = (count > 12) ? (count - 12) : 0;
     latest = count - 1;
     selected = latest;
 
-    printf("[spv] Available checkpoints (last %d):\n", count - start);
-    for (i = start; i < count; i++) {
-        printf("  %2d) height %u\n", (i - start + 1), checkpoints[i].height);
+    printf("[spv] Available checkpoints (%d total):\n", count);
+    for (i = 0; i < count; i++) {
+        printf("  %2d) height %u\n", (i + 1), checkpoints[i].height);
     }
 
     if (!prompt) return selected;
 
-    printf("Select checkpoint [1-%d] (default %d): ", count - start, count - start);
+    printf("Select checkpoint [1-%d] (default %d): ", count, count);
     fflush(stdout);
     {
         char input[32];
         if (fgets(input, sizeof(input), stdin)) {
             int choice = atoi(input);
-            if (choice >= 1 && choice <= (count - start)) {
-                selected = start + (choice - 1);
+            if (choice >= 1 && choice <= count) {
+                selected = choice - 1;
             }
         }
     }

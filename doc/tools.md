@@ -376,7 +376,7 @@ To enable BIP37 filtered block mode (filterload + merkleblock history scan), app
 
     ./spvnode -g scan
 
-To choose a checkpoint start manually (last 12 shown), apply the -q flag:
+To choose a checkpoint start manually (all available checkpoints shown), apply the -q flag:
 
     ./spvnode -q scan
 
