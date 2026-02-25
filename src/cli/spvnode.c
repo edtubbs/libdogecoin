@@ -199,6 +199,7 @@ static struct option long_options[] = {
         {"master_key", no_argument, NULL, 'k'},
         {"http_server", required_argument, NULL, 'u'},
         {"smpv", no_argument, NULL, 'x'},
+        {"filtered_blocks", no_argument, NULL, 'g'},
         {"daemon", no_argument, NULL, 'z'},
         {NULL, 0, NULL, 0} };
 
@@ -217,7 +218,7 @@ static void print_usage() {
     printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m[--maxpeers] <int>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
 (-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
-(-u|--http_server <ip:port>) (-x|--smpv) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
+(-u|--http_server <ip:port>) (-x|--smpv) (-g|--filtered_blocks) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
     printf("Supported commands:\n");
     printf("        scan      (scan blocks up to the tip, creates header.db file)\n");
     printf("\nExamples: \n");
@@ -281,6 +282,7 @@ dogecoin_bool spv_header_message_processed(struct dogecoin_spv_client_* client, 
     }
 
 static dogecoin_bool quit_when_synced = true;
+static dogecoin_bool spv_enable_filtered_blocks = false;
 static int spv_filter_oldest_utxo_height = 0;
 /**
  * When the sync is complete, print a message and either exit or wait for new blocks or relevant
@@ -375,7 +377,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:x", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:n:f:y:u:w:h:a:lbpzkj:xg", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -449,6 +451,9 @@ int main(int argc, char* argv[]) {
                 case 'x':
                     smpv_cli_enable = true;
                     break;
+                case 'g':
+                    spv_enable_filtered_blocks = true;
+                    break;
                 default:
                     print_usage();
                     exit(EXIT_FAILURE);
@@ -503,8 +508,8 @@ int main(int argc, char* argv[]) {
             }
         print_utxos(wallet);
 
-        /* Initial BIP37 filter setup using filterload with fixed-size bloom */
-        if (wallet->waddr_vector->len > 0 || HASH_COUNT(wallet->utxos) > 0) {
+        /* Optional BIP37 filter setup using filterload with fixed-size bloom. */
+        if (spv_enable_filtered_blocks && (wallet->waddr_vector->len > 0 || HASH_COUNT(wallet->utxos) > 0)) {
             dogecoin_bip37_filter* filter = dogecoin_bip37_filter_new(0, 1); /* random tweak, UPDATE_ALL */
             cstring* filter_debug = NULL;
             if (!filter) {
@@ -590,8 +595,10 @@ int main(int argc, char* argv[]) {
             }
             if (filter_debug) cstr_free(filter_debug, true);
             dogecoin_bip37_filter_free(filter);
-        } else {
+        } else if (spv_enable_filtered_blocks) {
             printf("[spv] Empty wallet - no BIP37 filter set\n");
+        } else {
+            printf("[spv] Filtered block mode disabled (use -g/--filtered_blocks to enable)\n");
         }
 
         client->sync_transaction = dogecoin_wallet_check_transaction;
