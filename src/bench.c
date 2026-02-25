@@ -923,8 +923,10 @@ int main(void) {
     printf("%-16s %s\n", "SPHINCS+",     "skipped (liboqs disabled)");
 #endif
 
-    /* Print analysis and rankings */
+    /* Print detailed analysis only when PQC benchmarks are compiled in. */
+#ifdef USE_LIBOQS
     print_analysis();
+#endif
 
     printf("\n================================================================================================================================\n");
     printf("\nBuild Options:\n");
@@ -944,7 +946,9 @@ int main(void) {
     printf("    - SPHINCS+ (hash-based, conservative security)\n");
 #endif
     printf("  secp256k1 (classical ECC baseline)\n");
+#ifdef USE_LIBOQS
     printf("\nNote: All PQC algorithms use OP_RETURN commits for off-chain SPV verification\n");
+#endif
 
     dogecoin_ecc_stop();
     return 0;
