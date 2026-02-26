@@ -578,4 +578,4 @@ This script automates:
 - SPV monitoring instructions
 
 For protocol rationale/specification details, see:
-- `doc/bip-post-quantum-signature-commitments.mediawiki`
+- `doc/spec/bip-post-quantum-signature-commitments.mediawiki`
