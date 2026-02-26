@@ -1,0 +1,52 @@
+Run timestamp: 2026-02-26T04:10:21Z
+Funding note from user: address nhnJDiavC1YWU5SKVtTdJmGoVYDUtuYhnf has 10 DOGE
+Faucet note from user: https://faucet.doge.toys/ (no captcha)
+
+
+==========================================
+  Falcon-512 Testnet Integration Test
+==========================================
+
+[0;34m[INFO][0m Checking required tools...
+[0;32m[SUCCESS][0m All tools available
+[0;34m[INFO][0m Step 1: Generating testnet wallet...
+[0;32m[SUCCESS][0m Testnet wallet generated
+  Address: ne3sr5pzXQ5C752NAT9Tq6KuXrfdkPStzy
+  Private Key (WIF): cnMM4iS3aaft6WtxuMhHqCQj5JwwDxNNJ1ifxPKGLxSJtTnCvfoD
+  Public Key: 03e8d2d5f71b04a3734a702d440a112e0a4c6e009128532dd9d51d4218ee3fb83f
+[0;34m[INFO][0m Step 2: Getting testnet coins...
+
+==========================================
+  REQUEST TESTNET COINS
+==========================================
+
+Send testnet DOGE to: ne3sr5pzXQ5C752NAT9Tq6KuXrfdkPStzy
+
+Faucets:
+  1. https://faucet.doge.toys/
+  2. https://faucet.triangleplatform.com/dogecoin/testnet
+  3. https://dogecoin-faucet.ruan.dev/
+  4. Discord: Dogecoin community #testnet channel
+  5. Reddit: r/dogecoindev
+
+Note: some faucets require browser CAPTCHA or may rate-limit by IP.
+
+[1;33m[WARNING][0m Press Enter after you have received coins...
+[0;32m[SUCCESS][0m Assuming coins received. Continuing...
+[0;34m[INFO][0m Step 3: Generating Falcon-512 keypair...
+[0;32m[SUCCESS][0m Falcon-512 keypair generated
+  Public Key (1794 chars): 09be11ffe0382f620d3190d2788641a7c83f31a2132e8955f003b1137b244a54...
+  Secret Key (2562 chars): 59fbd1bdf04044ffa0830f7fff1430bf07d13cfc7ec11beec1ffe102f81e7bf4...
+[0;34m[INFO][0m Step 4: Signing message with Falcon-512...
+[0;34m[INFO][0m Message: Falcon-512 testnet test: 2026-02-26T04:10:21Z
+[0;34m[INFO][0m Message (hex): 46616c636f6e2d35313220746573746e657420746573743a20323032362d30322d32365430343a31303a32315a
+[0;32m[SUCCESS][0m Message signed
+  Signature (1308 chars): 39cd2f5f785c1dc4b974ab40e2f83aae65bef518f5eca4448762cc14aff16fa9...
+[0;34m[INFO][0m Step 5: Generating commitment...
+[0;32m[SUCCESS][0m Commitment generated
+  Commitment (32 bytes): 56f07db26baa5c8f82bbb6ea0ecb3b2a19cd7364d709bc68a8c1b0633e100c3f
+[0;34m[INFO][0m Step 6: Building transaction with OP_RETURN commit...
+Create an unsigned testnet transaction with such first:
+  ./such -c transaction
+
+Then paste the unsigned raw tx hex below.

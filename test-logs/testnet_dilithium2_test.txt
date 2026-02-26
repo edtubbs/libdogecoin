@@ -1,0 +1,24 @@
+Run timestamp: 2026-02-26T04:10:37Z
+Funding note from user: address nhnJDiavC1YWU5SKVtTdJmGoVYDUtuYhnf has 10 DOGE
+Faucet note from user: https://faucet.doge.toys/ (no captcha)
+
+
+==========================================
+  Dilithium2 Testnet Integration Test
+==========================================
+
+[0;34m[INFO][0m Checking required tools...
+[0;32m[SUCCESS][0m All tools available
+[0;34m[INFO][0m Generating testnet wallet...
+[0;32m[SUCCESS][0m Wallet ready: nVk8aMM2fFA6Rzo3JXJNY6m3YCXuNzn2VR
+
+Send testnet DOGE to: nVk8aMM2fFA6Rzo3JXJNY6m3YCXuNzn2VR
+Faucet: https://faucet.doge.toys/
+[1;33m[WARNING][0m Press Enter after funding the address...
+[0;34m[INFO][0m Generating Dilithium2 keypair...
+[0;32m[SUCCESS][0m Dilithium2 keypair generated
+[0;34m[INFO][0m Signing message with Dilithium2...
+[0;32m[SUCCESS][0m Message signed
+[0;34m[INFO][0m Generating Dilithium2 commitment...
+[0;32m[SUCCESS][0m Commitment generated: dcbe2547ecac2782817c9d254589a3f79f05457f83159d72c3f6bfd9ef261c58
+[0;34m[INFO][0m Build unsigned testnet tx with such, then paste hex below:
