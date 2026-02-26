@@ -336,9 +336,18 @@ void spv_sync_completed(dogecoin_spv_client* client) {
     dogecoin_blockindex* tip = client->headers_db->getchaintip(client->headers_db_ctx);
     int tip_height = tip->height;
     int available_start_height = tip_height;
+    int request_start_height;
+    int request_depth;
     dogecoin_blockindex* cursor = tip;
     while (cursor && cursor->prev) cursor = cursor->prev;
     if (cursor) available_start_height = (int)cursor->height;
+    request_start_height = available_start_height;
+    if (spv_filter_oldest_utxo_height > 0 && spv_filter_oldest_utxo_height > request_start_height) {
+        request_start_height = spv_filter_oldest_utxo_height;
+    }
+    if (request_start_height < 0) request_start_height = 0;
+    if (request_start_height > tip_height) request_start_height = tip_height;
+    request_depth = (tip_height - request_start_height) + 1;
     printf("Sync completed, at height %d\n", tip_height);
 
     /* If a bloom filter is active, request filtered blocks from the last
@@ -347,15 +356,39 @@ void spv_sync_completed(dogecoin_spv_client* client) {
        transactions include the matched TXs, while non-matching blocks
        come back with 0 matched transactions. */
     if (client->bloom_filter && client->bloom_filter_len > 0) {
-        printf("Requesting historical filtered blocks for UTXO discovery from height %d to %d...\n",
-               available_start_height, tip_height);
+        printf("Requesting historical filtered blocks for UTXO discovery from height %d to %d (starting from current checkpoint or genesis)...\n",
+               request_start_height, tip_height);
         if (spv_filter_oldest_utxo_height > 0 && spv_filter_oldest_utxo_height < available_start_height) {
+            const dogecoin_checkpoint* checkpoints = NULL;
+            int checkpoint_count = 0;
+            int i;
+            int suggested_checkpoint_height = available_start_height;
+
+            if (client->chainparams == &dogecoin_chainparams_main) {
+                checkpoints = dogecoin_mainnet_checkpoint_array;
+                checkpoint_count = (int)(sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]));
+            } else if (client->chainparams == &dogecoin_chainparams_test) {
+                checkpoints = dogecoin_testnet_checkpoint_array;
+                checkpoint_count = (int)(sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]));
+            }
+            if (checkpoints && checkpoint_count > 0) {
+                suggested_checkpoint_height = (int)checkpoints[0].height;
+                for (i = 0; i < checkpoint_count; i++) {
+                    if ((int)checkpoints[i].height <= spv_filter_oldest_utxo_height) {
+                        suggested_checkpoint_height = (int)checkpoints[i].height;
+                    } else {
+                        break;
+                    }
+                }
+            }
             printf("Warning: oldest wallet UTXO height %d is older than locally available headers start %d.\n",
                    spv_filter_oldest_utxo_height, available_start_height);
             printf("Warning: historical matches before %d cannot be found until headers are synced from that range (disable checkpoint and rebuild headers).\n",
                    available_start_height);
+            printf("Hint: rerun with -q/--select_checkpoint and choose a checkpoint at or before height %d (e.g. %d).\n",
+                   spv_filter_oldest_utxo_height, suggested_checkpoint_height);
         }
-        dogecoin_net_spv_request_filtered_history(client, 0);
+        dogecoin_net_spv_request_filtered_history(client, request_depth);
     }
 
     if (quit_when_synced) {
