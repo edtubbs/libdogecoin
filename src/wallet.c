@@ -1044,8 +1044,6 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
         }
         if (tx_loading_announced && ((tx_loaded_count % tx_progress_interval) != 0)) {
             printf("\n");
-        }
-        if (tx_loading_announced && ((tx_loaded_count % tx_progress_interval) != 0)) {
             printf("%u transactions loaded\n", tx_loaded_count);
         }
     }

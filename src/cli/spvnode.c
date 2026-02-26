@@ -311,7 +311,7 @@ static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogeco
     latest = count - 1;
     selected = latest;
 
-    printf("[spv] Available checkpoints (%d total):\n", count);
+    printf("Available checkpoints (%d total):\n", count);
     for (i = 0; i < count; i++) {
         printf("  %2d) height %u\n", (i + 1), checkpoints[i].height);
     }
@@ -357,19 +357,19 @@ void spv_sync_completed(dogecoin_spv_client* client) {
         if (spv_filter_oldest_utxo_height > 0 && tip_height >= spv_filter_oldest_utxo_height) {
             if (spv_filter_oldest_utxo_height < available_start_height) {
                 request_depth = 0; /* ask for all locally available history */
-                printf("[spv] Requesting historical filtered blocks for UTXO discovery from height %d to %d (depth=all available)...\n",
+                printf("Requesting historical filtered blocks for UTXO discovery from height %d to %d (depth=all available)...\n",
                        available_start_height, tip_height);
-                printf("[spv][warn] Oldest wallet UTXO height %d is older than locally available headers start %d.\n",
+                printf("Warning: oldest wallet UTXO height %d is older than locally available headers start %d.\n",
                        spv_filter_oldest_utxo_height, available_start_height);
-                printf("[spv][warn] Historical matches before %d cannot be found until headers are synced from that range (disable checkpoint and rebuild headers).\n",
+                printf("Warning: historical matches before %d cannot be found until headers are synced from that range (disable checkpoint and rebuild headers).\n",
                        available_start_height);
             } else {
                 request_depth = (tip_height - spv_filter_oldest_utxo_height) + 1;
-                printf("[spv] Requesting historical filtered blocks for UTXO discovery from height %d to %d (depth=%d)...\n",
+                printf("Requesting historical filtered blocks for UTXO discovery from height %d to %d (depth=%d)...\n",
                        spv_filter_oldest_utxo_height, tip_height, request_depth);
             }
         } else {
-            printf("[spv] Requesting historical filtered blocks for UTXO discovery (checkpoint/genesis to tip)...\n");
+            printf("Requesting historical filtered blocks for UTXO discovery (checkpoint/genesis to tip)...\n");
         }
         dogecoin_net_spv_request_filtered_history(client, request_depth);
     }
@@ -595,13 +595,13 @@ int main(int argc, char* argv[]) {
             dogecoin_bip37_filter* filter = dogecoin_bip37_filter_new(0, 1); /* random tweak, UPDATE_ALL */
             cstring* filter_debug = NULL;
             if (!filter) {
-                printf("[spv] Failed to initialize BIP37 bloom filter\n");
+                printf("Failed to initialize BIP37 bloom filter\n");
                 dogecoin_wallet_free(wallet);
                 dogecoin_spv_client_free(client);
                 dogecoin_ecc_stop();
                 return EXIT_FAILURE;
             }
-            if (debug) filter_debug = cstr_new("[spv][debug] Filter entries:\n");
+            if (debug) filter_debug = cstr_new("[debug] Filter entries:\n");
 
             unsigned int i;
             for (i = 0; i < wallet->waddr_vector->len; i++) {
@@ -613,11 +613,11 @@ int main(int argc, char* argv[]) {
                     char line[SPV_FILTER_DEBUG_ADDR_LINE_LEN];
                     dogecoin_mem_zero(addr, sizeof(addr));
                     if (dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, chain, addr, sizeof(addr))) {
-                        snprintf(line, sizeof(line), "[spv][debug]  - address: %s\n", addr);
+                        snprintf(line, sizeof(line), "[debug]  - address: %s\n", addr);
                     } else {
                         char pubkeyhash_hex[sizeof(uint160_t) * 2 + 1];
                         utils_bin_to_hex(waddr->pubkeyhash, sizeof(uint160_t), pubkeyhash_hex);
-                        snprintf(line, sizeof(line), "[spv][debug]  - address(pubkeyhash): %s\n",
+                        snprintf(line, sizeof(line), "[debug]  - address(pubkeyhash): %s\n",
                                  pubkeyhash_hex);
                     }
                     cstr_append_buf(filter_debug, line, strlen(line));
@@ -646,7 +646,7 @@ int main(int argc, char* argv[]) {
                     char txid_hex[sizeof(utxo->txid) * 2 + 1];
                     utils_bin_to_hex(utxo->txid, sizeof(utxo->txid), txid_hex);
                     char line[SPV_FILTER_DEBUG_TX_LINE_LEN];
-                    snprintf(line, sizeof(line), "[spv][debug]  - txid: %s vout: %d block_height: %d\n",
+                    snprintf(line, sizeof(line), "[debug]  - txid: %s vout: %d block_height: %d\n",
                              txid_hex, utxo->vout, utxo->height);
                     cstr_append_buf(filter_debug, line, strlen(line));
                 }
@@ -659,9 +659,9 @@ int main(int argc, char* argv[]) {
                                                                  filter->n_tweak,
                                                                  filter->n_flags);
             if (loaded) {
-                printf("[spv] Initial filterload sent (fixed max size, %u hash funcs)\n", filter->n_hash_funcs);
+                printf("Initial filterload sent (fixed max size, %u hash funcs)\n", filter->n_hash_funcs);
                 if (filter_debug) {
-                    printf("%s", filter_debug->str);
+                    debug_print("%s", filter_debug->str);
                     if (client->bloom_filter_debug_dump) {
                         dogecoin_free(client->bloom_filter_debug_dump);
                     }
@@ -669,18 +669,19 @@ int main(int argc, char* argv[]) {
                     if (client->bloom_filter_debug_dump) {
                         memcpy(client->bloom_filter_debug_dump, filter_debug->str, filter_debug->len);
                         client->bloom_filter_debug_dump[filter_debug->len] = '\0';
-                    } else
-                        printf("[spv][debug] Failed to store filter debug dump in client context\n");
+                    } else {
+                        debug_print("%s\n", "Failed to store filter debug dump in client context");
+                    }
                 }
             } else {
-                printf("[spv] Failed to send initial filterload\n");
+                printf("Failed to send initial filterload\n");
             }
             if (filter_debug) cstr_free(filter_debug, true);
             dogecoin_bip37_filter_free(filter);
         } else if (spv_enable_filtered_blocks) {
-            printf("[spv] Empty wallet - no BIP37 filter set\n");
+            printf("Empty wallet - no BIP37 filter set\n");
         } else {
-            printf("[spv] Filtered block mode disabled (use -g/--filtered_blocks to enable)\n");
+            printf("Filtered block mode disabled (use -g/--filtered_blocks to enable)\n");
         }
 
         client->sync_transaction = dogecoin_wallet_check_transaction;
@@ -730,7 +731,7 @@ int main(int argc, char* argv[]) {
                         hash,
                         checkpoints[selected_checkpoint_index].height,
                         (uint8_t*)client->chainparams->minimumchainwork);
-                    printf("[spv] Selected checkpoint height %u\n", checkpoints[selected_checkpoint_index].height);
+                    printf("Selected checkpoint height %u\n", checkpoints[selected_checkpoint_index].height);
                 }
             }
             if (have_decl_daemon) {
