@@ -81,13 +81,6 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx,
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx,
                                                                    uint8_t out_commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]);
 
-/*
- * Convenience wrapper returning a 32-byte SIGHASH for an input.
- */
-LIBDOGECOIN_API dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
-                                                    const cstring* fromPubKey,
-                                                    size_t in_num, int hashtype,
-                                                    uint8_t out32[32]);
 #endif
 
 LIBDOGECOIN_END_DECL

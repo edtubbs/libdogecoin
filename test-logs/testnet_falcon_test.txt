@@ -1,4 +1,5 @@
-Run timestamp: 2026-02-26T04:10:21Z
+Run timestamp: 2026-02-26T21:53:57Z
+Post-update rerun: implementation/doc alignment for tx-signature semantics
 Funding note from user: address nhnJDiavC1YWU5SKVtTdJmGoVYDUtuYhnf has 10 DOGE
 Faucet note from user: https://faucet.doge.toys/ (no captcha)
 
@@ -11,16 +12,16 @@ Faucet note from user: https://faucet.doge.toys/ (no captcha)
 [0;32m[SUCCESS][0m All tools available
 [0;34m[INFO][0m Step 1: Generating testnet wallet...
 [0;32m[SUCCESS][0m Testnet wallet generated
-  Address: ne3sr5pzXQ5C752NAT9Tq6KuXrfdkPStzy
-  Private Key (WIF): cnMM4iS3aaft6WtxuMhHqCQj5JwwDxNNJ1ifxPKGLxSJtTnCvfoD
-  Public Key: 03e8d2d5f71b04a3734a702d440a112e0a4c6e009128532dd9d51d4218ee3fb83f
+  Address: nfqThjoUVZt14ECVn1RKTTAaeAJoNAUew7
+  Private Key (WIF): cgvvgVMuhQtEmZLf9wUgNJMeKcwgc3vgzeu7ep7kh6FxKygDL8UG
+  Public Key: 031f9fb7e09a1a303be48a9f473ffbf03dbdd51141c7481db3eaab8f45ca52eb1d
 [0;34m[INFO][0m Step 2: Getting testnet coins...
 
 ==========================================
   REQUEST TESTNET COINS
 ==========================================
 
-Send testnet DOGE to: ne3sr5pzXQ5C752NAT9Tq6KuXrfdkPStzy
+Send testnet DOGE to: nfqThjoUVZt14ECVn1RKTTAaeAJoNAUew7
 
 Faucets:
   1. https://faucet.doge.toys/
@@ -35,16 +36,16 @@ Note: some faucets require browser CAPTCHA or may rate-limit by IP.
 [0;32m[SUCCESS][0m Assuming coins received. Continuing...
 [0;34m[INFO][0m Step 3: Generating Falcon-512 keypair...
 [0;32m[SUCCESS][0m Falcon-512 keypair generated
-  Public Key (1794 chars): 09be11ffe0382f620d3190d2788641a7c83f31a2132e8955f003b1137b244a54...
-  Secret Key (2562 chars): 59fbd1bdf04044ffa0830f7fff1430bf07d13cfc7ec11beec1ffe102f81e7bf4...
+  Public Key (1794 chars): 098738b9c21ea9271d85251a7850b839a03ed00b4e1aa472c917329f8a83491c...
+  Secret Key (2562 chars): 59242080ec2fbaf46fbcffc002180e03100fc2f81fff07e044144044fc403eff...
 [0;34m[INFO][0m Step 4: Signing message with Falcon-512...
-[0;34m[INFO][0m Message: Falcon-512 testnet test: 2026-02-26T04:10:21Z
-[0;34m[INFO][0m Message (hex): 46616c636f6e2d35313220746573746e657420746573743a20323032362d30322d32365430343a31303a32315a
+[0;34m[INFO][0m Message: Falcon-512 testnet test: 2026-02-26T21:53:57Z
+[0;34m[INFO][0m Message (hex): 46616c636f6e2d35313220746573746e657420746573743a20323032362d30322d32365432313a35333a35375a
 [0;32m[SUCCESS][0m Message signed
-  Signature (1308 chars): 39cd2f5f785c1dc4b974ab40e2f83aae65bef518f5eca4448762cc14aff16fa9...
+  Signature (1310 chars): 397ec6c4c5fa6674361fb2e8d67b8c21be5e36845fc8a989dc20dbafe7cff2dc...
 [0;34m[INFO][0m Step 5: Generating commitment...
 [0;32m[SUCCESS][0m Commitment generated
-  Commitment (32 bytes): 56f07db26baa5c8f82bbb6ea0ecb3b2a19cd7364d709bc68a8c1b0633e100c3f
+  Commitment (32 bytes): dae15bd05f6adbf9f8f77a05249242f07b40be6b31961515f4333a1ee65c0d37
 [0;34m[INFO][0m Step 6: Building transaction with OP_RETURN commit...
 Create an unsigned testnet transaction with such first:
   ./such -c transaction

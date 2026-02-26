@@ -668,12 +668,12 @@ static void print_usage()
     printf("transaction,\n");
 #ifdef USE_LIBOQS
     printf("falcon_keygen (generates Falcon-512 keypair),\n");
-    printf("falcon_sign (requires -p <falcon_secret_key_hex> -x <message_hex|tx_sighash32_hex>),\n");
-    printf("falcon_verify (requires -k <falcon_public_key_hex> -x <message_hex|tx_sighash32_hex> -s <signature_hex>),\n");
+    printf("falcon_sign (requires -p <falcon_secret_key_hex> -x <message_hex|tx_sighash_hex>),\n");
+    printf("falcon_verify (requires -k <falcon_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
     printf("falcon_commit (requires -k <falcon_public_key_hex> -s <signature_hex>),\n");
     printf("dilithium2_keygen (generates Dilithium2 keypair),\n");
-    printf("dilithium2_sign (requires -p <dilithium2_secret_key_hex> -x <message_hex|tx_sighash32_hex>),\n");
-    printf("dilithium2_verify (requires -k <dilithium2_public_key_hex> -x <message_hex|tx_sighash32_hex> -s <signature_hex>),\n");
+    printf("dilithium2_sign (requires -p <dilithium2_secret_key_hex> -x <message_hex|tx_sighash_hex>),\n");
+    printf("dilithium2_verify (requires -k <dilithium2_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
     printf("dilithium2_commit (requires -k <dilithium2_public_key_hex> -s <signature_hex>),\n");
     printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <falcon_commitment_hex>),\n");
     printf("dilithium2_add_commit_tx (requires -x <raw_tx_hex> -s <dilithium2_commitment_hex>),\n");
