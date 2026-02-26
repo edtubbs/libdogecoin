@@ -69,6 +69,7 @@ typedef struct dogecoin_spv_client_
     uint64_t last_block_size;
     uint64_t last_block_tx_count;
     uint64_t last_block_total_tx_size;
+    uint32_t next_headers_peer_cursor;
     spv_block_sample stats_ring[SPV_STATS_RING];
     int stats_ring_len;
     int stats_ring_head;

@@ -69,6 +69,7 @@ static const unsigned int MIN_TIME_DELTA_FOR_STATE_CHECK = 5;
 static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
+static const unsigned int MAX_HEADER_SYNC_CANDIDATES = 64;
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
@@ -188,6 +189,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->stats_fees_total = 0;
     client->stats_block_bytes_total = 0;
     client->start_ts = (uint64_t)time(NULL);
+    client->next_headers_peer_cursor = 0;
 
     // SMPV default off
     client->smpv_ctx = NULL;
@@ -463,6 +465,9 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
     {
         unsigned int longest_chain_height = 0;
         unsigned int request_count = 0;
+        size_t candidate_node_indices[MAX_HEADER_SYNC_CANDIDATES];
+        size_t candidate_len = 0;
+        dogecoin_bool candidate_overflow_logged = false;
         for(i = 0; i < client->nodegroup->nodes->len; ++i)
         {
             dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
@@ -475,8 +480,9 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
             }
         }
 
-        // Request headers or blocks from all nodes with the longest chain.
+        // Request headers or blocks from nodes with the longest chain.
         if (longest_chain_height > tip_height) {
+            dogecoin_bool request_blocks = (client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG;
             for(i = 0; i < client->nodegroup->nodes->len; ++i)
             {
                 dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
@@ -486,10 +492,26 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                     (check_node->state & NODE_HEADERSYNC) != NODE_HEADERSYNC &&
                     (check_node->state & NODE_BLOCKSYNC) != NODE_BLOCKSYNC)
                 {
-                    dogecoin_net_spv_node_request_headers_or_blocks(check_node, (client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG);
-                    new_headers_available = true;
-                    request_count++;
+                    if (request_blocks) {
+                        dogecoin_net_spv_node_request_headers_or_blocks(check_node, true);
+                        new_headers_available = true;
+                        request_count++;
+                    } else if (candidate_len < MAX_HEADER_SYNC_CANDIDATES) {
+                        candidate_node_indices[candidate_len++] = i;
+                    } else if (!candidate_overflow_logged) {
+                        client->nodegroup->log_write_cb("Header peer candidate overflow (max %u), truncating list\n", MAX_HEADER_SYNC_CANDIDATES);
+                        candidate_overflow_logged = true;
+                    }
                 }
+            }
+            if (!request_blocks && candidate_len > 0) {
+                size_t selected = candidate_node_indices[client->next_headers_peer_cursor % candidate_len];
+                dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
+                dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
+                client->next_headers_peer_cursor++;
+                new_headers_available = true;
+                request_count = 1;
+                client->nodegroup->log_write_cb("Requested next headers chunk from node %d (%zu candidate peers, tip=%u)\n", selected_node->nodeid, candidate_len, tip_height);
             }
             if (request_count > 0) {
                 client->nodegroup->log_write_cb("Requested headers/blocks from %u peer(s) at height %u (tip=%u)\n", request_count, longest_chain_height, tip_height);
