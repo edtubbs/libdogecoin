@@ -61,7 +61,6 @@
 #include <dogecoin/base58.h>
 #include <dogecoin/bip37.h>
 #include <dogecoin/bip39.h>
-#include <dogecoin/cstr.h>
 #include <dogecoin/ecc.h>
 #include <dogecoin/headersdb_file.h>
 #include <dogecoin/koinu.h>
@@ -77,11 +76,6 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/wallet.h>
-
-/* "[spv][debug]  - address(pubkeyhash): " + hex/hash/address + newline */
-#define SPV_FILTER_DEBUG_ADDR_LINE_LEN 160
-/* "[spv][debug]  - txid: " + 64hex + " vout: " + int + " block_height: " + int + newline */
-#define SPV_FILTER_DEBUG_TX_LINE_LEN 220
 
 #ifndef WIN32
 #define BD_NO_CHDIR          01 /* Don't chdir ("/") */
@@ -593,7 +587,6 @@ int main(int argc, char* argv[]) {
         /* Optional BIP37 filter setup using filterload with fixed-size bloom. */
         if (spv_enable_filtered_blocks && (wallet->waddr_vector->len > 0 || HASH_COUNT(wallet->utxos) > 0)) {
             dogecoin_bip37_filter* filter = dogecoin_bip37_filter_new(0, 1); /* random tweak, UPDATE_ALL */
-            cstring* filter_debug = NULL;
             if (!filter) {
                 printf("Failed to initialize BIP37 bloom filter\n");
                 dogecoin_wallet_free(wallet);
@@ -601,26 +594,21 @@ int main(int argc, char* argv[]) {
                 dogecoin_ecc_stop();
                 return EXIT_FAILURE;
             }
-            if (debug) filter_debug = cstr_new("[debug] Filter entries:\n");
+            debug_print("%s", "Filter entries:\n");
 
             unsigned int i;
             for (i = 0; i < wallet->waddr_vector->len; i++) {
                 dogecoin_wallet_addr* waddr = vector_idx(wallet->waddr_vector, i);
                 if (waddr->ignore) continue;
                 dogecoin_bip37_filter_add(filter, waddr->pubkeyhash, sizeof(uint160_t));
-                if (filter_debug) {
-                    char addr[P2PKHLEN];
-                    char line[SPV_FILTER_DEBUG_ADDR_LINE_LEN];
-                    dogecoin_mem_zero(addr, sizeof(addr));
-                    if (dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, chain, addr, sizeof(addr))) {
-                        snprintf(line, sizeof(line), "[debug]  - address: %s\n", addr);
-                    } else {
-                        char pubkeyhash_hex[sizeof(uint160_t) * 2 + 1];
-                        utils_bin_to_hex(waddr->pubkeyhash, sizeof(uint160_t), pubkeyhash_hex);
-                        snprintf(line, sizeof(line), "[debug]  - address(pubkeyhash): %s\n",
-                                 pubkeyhash_hex);
-                    }
-                    cstr_append_buf(filter_debug, line, strlen(line));
+                char addr[P2PKHLEN];
+                dogecoin_mem_zero(addr, sizeof(addr));
+                if (dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, chain, addr, sizeof(addr))) {
+                    debug_print("  - address: %s\n", addr);
+                } else {
+                    char pubkeyhash_hex[sizeof(uint160_t) * 2 + 1];
+                    utils_bin_to_hex(waddr->pubkeyhash, sizeof(uint160_t), pubkeyhash_hex);
+                    debug_print("  - address(pubkeyhash): %s\n", pubkeyhash_hex);
                 }
             }
 
@@ -642,14 +630,10 @@ int main(int argc, char* argv[]) {
                 uint32_t vout_le = htole32(utxo->vout);
                 memcpy(outpoint + 32, &vout_le, 4);
                 dogecoin_bip37_filter_add(filter, outpoint, 36);
-                if (filter_debug) {
-                    char txid_hex[sizeof(utxo->txid) * 2 + 1];
-                    utils_bin_to_hex(utxo->txid, sizeof(utxo->txid), txid_hex);
-                    char line[SPV_FILTER_DEBUG_TX_LINE_LEN];
-                    snprintf(line, sizeof(line), "[debug]  - txid: %s vout: %d block_height: %d\n",
-                             txid_hex, utxo->vout, utxo->height);
-                    cstr_append_buf(filter_debug, line, strlen(line));
-                }
+                char txid_hex[sizeof(utxo->txid) * 2 + 1];
+                utils_bin_to_hex(utxo->txid, sizeof(utxo->txid), txid_hex);
+                debug_print("  - txid: %s vout: %d block_height: %d\n",
+                            txid_hex, utxo->vout, utxo->height);
             }
 
             dogecoin_bool loaded = dogecoin_spv_client_filterload(client,
@@ -660,23 +644,9 @@ int main(int argc, char* argv[]) {
                                                                  filter->n_flags);
             if (loaded) {
                 printf("Initial filterload sent (fixed max size, %u hash funcs)\n", filter->n_hash_funcs);
-                if (filter_debug) {
-                    debug_print("%s", filter_debug->str);
-                    if (client->bloom_filter_debug_dump) {
-                        dogecoin_free(client->bloom_filter_debug_dump);
-                    }
-                    client->bloom_filter_debug_dump = dogecoin_calloc(1, filter_debug->len + 1);
-                    if (client->bloom_filter_debug_dump) {
-                        memcpy(client->bloom_filter_debug_dump, filter_debug->str, filter_debug->len);
-                        client->bloom_filter_debug_dump[filter_debug->len] = '\0';
-                    } else {
-                        debug_print("%s\n", "Failed to store filter debug dump in client context");
-                    }
-                }
             } else {
                 printf("Failed to send initial filterload\n");
             }
-            if (filter_debug) cstr_free(filter_debug, true);
             dogecoin_bip37_filter_free(filter);
         } else if (spv_enable_filtered_blocks) {
             printf("Empty wallet - no BIP37 filter set\n");
