@@ -342,9 +342,6 @@ void spv_sync_completed(dogecoin_spv_client* client) {
     while (cursor && cursor->prev) cursor = cursor->prev;
     if (cursor) available_start_height = (int)cursor->height;
     request_start_height = available_start_height;
-    if (spv_filter_oldest_utxo_height > 0 && spv_filter_oldest_utxo_height > request_start_height) {
-        request_start_height = spv_filter_oldest_utxo_height;
-    }
     if (request_start_height < 0) request_start_height = 0;
     if (request_start_height > tip_height) request_start_height = tip_height;
     request_depth = (tip_height - request_start_height) + 1;

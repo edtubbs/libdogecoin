@@ -411,12 +411,31 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_process_tx(
 
     dogecoin_free(bin);
 
-    /* push to mempool store */
+    /* Track only mempool transactions relevant to watched addresses. */
+    char* relevant_address = NULL;
+    if (!smpv_tx->decoded_tx ||
+        !dogecoin_smpv_is_tx_relevant(client, smpv_tx->decoded_tx, &relevant_address)) {
+        dogecoin_smpv_tx_free(smpv_tx);
+        return false;
+    }
+
+    /* Skip duplicates (same tx can be announced by multiple peers). */
+    if (smpv_tx->txid && dogecoin_smpv_get_tx(client, smpv_tx->txid)) {
+        if (relevant_address) dogecoin_free(relevant_address);
+        dogecoin_smpv_tx_free(smpv_tx);
+        return false;
+    }
+
+    /* push relevant tx to mempool store */
     client->mempool_txs = (dogecoin_smpv_tx*)realloc(
         client->mempool_txs,
         (client->mempool_tx_count + 1) * sizeof(dogecoin_smpv_tx)
     );
-    if (!client->mempool_txs) { dogecoin_smpv_tx_free(smpv_tx); return false; }
+    if (!client->mempool_txs) {
+        if (relevant_address) dogecoin_free(relevant_address);
+        dogecoin_smpv_tx_free(smpv_tx);
+        return false;
+    }
 
     client->mempool_txs[client->mempool_tx_count] = *smpv_tx; /* struct copy */
     dogecoin_free(smpv_tx);
@@ -428,16 +447,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_smpv_process_tx(
     client->last_seen_ts = client->last_update_time = time(NULL);
     if (client->unconfirmed_count < UINT32_MAX) client->unconfirmed_count++;
 
-    /* naive relevance: first watcher */
-    char* relevant_address = NULL;
-    if (client->watcher_count > 0 && client->watchers[0].address) {
-        size_t alen = strlen(client->watchers[0].address);
-        relevant_address = (char*)dogecoin_calloc(1, alen + 1);
-        if (relevant_address) {
-            strcpy(relevant_address, client->watchers[0].address);
-            client->watchers[0].tx_count++;
-        }
-    }
+    dogecoin_smpv_watcher* w = dogecoin_smpv_get_watcher(client, relevant_address);
+    if (w && w->tx_count < UINT32_MAX) w->tx_count++;
 
     if (callback) {
         callback(&client->mempool_txs[client->mempool_tx_count - 1],
