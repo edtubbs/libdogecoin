@@ -39,6 +39,8 @@
 #include <unistd.h>
 #else
 #include <win/wingetopt.h>
+#define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
 #include <windows.h>
 #endif
 
