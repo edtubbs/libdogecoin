@@ -380,6 +380,10 @@ To choose a checkpoint start manually (all available checkpoints shown), apply t
 
     ./spvnode -q scan
 
+For continuous debug scanning with checkpoint sync, HTTP server, explicit address watch, and SMPV enabled:
+
+    ./spvnode -c -d -p -u 127.0.0.1:8080 -a "DTZSTXecLmSXpRGSfht4tAMyqra1wsL7xb" -x scan
+
 | Flag | Name | Required Arg? | Usage |
 |------|------|---------------|-------|
 | `-t`, `--testnet` | Testnet Mode | No | Activate testnet: `./spvnode -t scan` |

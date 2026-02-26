@@ -67,6 +67,7 @@
 #include <dogecoin/koinu.h>
 #include <dogecoin/net.h>
 #include <dogecoin/seal.h>
+#include <dogecoin/smpv.h>
 #include <dogecoin/spv.h>
 #include <dogecoin/protocol.h>
 #include <dogecoin/random.h>
@@ -559,6 +560,35 @@ int main(int argc, char* argv[]) {
             dogecoin_free(pass);
             }
         print_utxos(wallet);
+
+        if (smpv_cli_enable && client->smpv_enabled && client->smpv_ctx) {
+            unsigned int i;
+            if (address && address[0] != '\0') {
+                size_t addr_len = strlen(address);
+                char* addr_copy = (char*)dogecoin_calloc(addr_len + 1, 1);
+                if (addr_copy) {
+                    memcpy(addr_copy, address, addr_len);
+                    char* saveptr = NULL;
+                    char* tok = strtok_r(addr_copy, " ", &saveptr);
+                    while (tok) {
+                        dogecoin_smpv_add_watcher((dogecoin_smpv_client*)client->smpv_ctx, tok);
+                        tok = strtok_r(NULL, " ", &saveptr);
+                    }
+                    dogecoin_free(addr_copy);
+                }
+            }
+
+            for (i = 0; i < wallet->waddr_vector->len; i++) {
+                dogecoin_wallet_addr* waddr = vector_idx(wallet->waddr_vector, i);
+                if (!waddr || waddr->ignore) continue;
+                {
+                    char waddr_str[P2PKHLEN];
+                    if (dogecoin_p2pkh_addr_from_hash160(waddr->pubkeyhash, chain, waddr_str, sizeof(waddr_str))) {
+                        dogecoin_smpv_add_watcher((dogecoin_smpv_client*)client->smpv_ctx, waddr_str);
+                    }
+                }
+            }
+        }
 
         /* Optional BIP37 filter setup using filterload with fixed-size bloom. */
         if (spv_enable_filtered_blocks && (wallet->waddr_vector->len > 0 || HASH_COUNT(wallet->utxos) > 0)) {
