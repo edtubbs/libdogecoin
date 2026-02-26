@@ -672,6 +672,14 @@ int main(int argc, char* argv[]) {
         char* header_prefix = (char*)chain->chainname;
         char* headersfile = NULL;
         dogecoin_bool response = false;
+        if (spv_enable_filtered_blocks && client->headers_db_ctx) {
+            dogecoin_headers_db* headers_db = (dogecoin_headers_db*)client->headers_db_ctx;
+            if (headers_db->max_hdr_in_mem > 0 &&
+                headers_db->max_hdr_in_mem < SPV_FILTERED_MIN_HEADERS_IN_MEM) {
+                headers_db->max_hdr_in_mem = SPV_FILTERED_MIN_HEADERS_IN_MEM;
+            }
+        }
+
         if (mnemonic_in) {
             // mnemonic was provided, so store headers in separate file
             char* wallet_type = "_mnemonic";
@@ -700,13 +708,6 @@ int main(int argc, char* argv[]) {
             printf("Could not load or create headers database...aborting\n");
             ret = EXIT_FAILURE;
         } else {
-            if (spv_enable_filtered_blocks && client->headers_db_ctx) {
-                dogecoin_headers_db* headers_db = (dogecoin_headers_db*)client->headers_db_ctx;
-                if (headers_db->max_hdr_in_mem > 0 &&
-                    headers_db->max_hdr_in_mem < SPV_FILTERED_MIN_HEADERS_IN_MEM) {
-                    headers_db->max_hdr_in_mem = SPV_FILTERED_MIN_HEADERS_IN_MEM;
-                }
-            }
             if (spv_select_checkpoint) {
                 selected_checkpoint_index = spv_choose_checkpoint_index(chain, prompt);
                 if (selected_checkpoint_index >= 0) {
