@@ -237,6 +237,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->merkle_match_blockindex = NULL;
     client->rescan_total = 0;
     client->rescan_matched = 0;
+    client->filtered_history_last_end_height = -1; /* -1 means no historical filtered range has been requested yet */
 
     if (http_server) {
         // split ip and port
@@ -1360,16 +1361,27 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     dogecoin_blockindex *tip = client->headers_db->getchaintip(client->headers_db_ctx);
     if (!tip) return;
 
-    /* depth <= 0 means "scan all available blocks (to checkpoint/genesis)". */
-    int max_depth = (depth > 0) ? depth : INT_MAX;
-
-    /* Count how many blocks are available via the prev chain. */
-    int total = 0;
+    int tip_height = (int)tip->height;
+    int start_height = tip_height;
     dogecoin_blockindex* cur = tip;
-    while (cur && total < max_depth) {
-        total++;
-        cur = cur->prev;
+
+    /* depth <= 0 means "scan all available blocks (to checkpoint/genesis)". */
+    if (depth > 0) {
+        start_height = tip_height - depth + 1;
+        if (start_height < 0) start_height = 0;
+    } else {
+        while (cur && cur->prev) cur = cur->prev;
+        if (cur) start_height = (int)cur->height;
+        cur = tip;
     }
+
+    /* Avoid re-requesting historical filtered blocks already requested in this process. */
+    if (client->filtered_history_last_end_height >= start_height) {
+        start_height = client->filtered_history_last_end_height + 1;
+    }
+    if (start_height > tip_height) return;
+
+    int total = (tip_height - start_height) + 1;
     if (total == 0) return;
 
     /* Find a connected peer to send the request to. */
@@ -1404,13 +1416,22 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     dogecoin_blockindex** block_ptrs = (dogecoin_blockindex**)dogecoin_calloc(total, sizeof(dogecoin_blockindex*));
     if (!block_ptrs) return;
 
-    /* Walk backward from tip, storing pointers so index 0 is oldest. */
+    /* Walk backward from tip, storing pointers so index 0 is oldest in requested range. */
     cur = tip;
     int idx = total - 1;
     while (cur && idx >= 0) {
+        if ((int)cur->height < start_height) break;
         block_ptrs[idx] = cur;
         idx--;
         cur = cur->prev;
+    }
+    if (idx >= 0) {
+        if (client->nodegroup->log_write_cb) {
+            client->nodegroup->log_write_cb("[spv] skipped historical filtered request due to incomplete local header range (start_height=%d, tip=%d)\n",
+                start_height, tip_height);
+        }
+        dogecoin_free(block_ptrs);
+        return;
     }
 
     /* Send in batches of batch_max, oldest first. */
@@ -1448,6 +1469,8 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
         client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) from node %d\n",
             total, start_height, end_height, peer->nodeid);
     }
+
+    client->filtered_history_last_end_height = tip_height;
 
     dogecoin_free(block_ptrs);
 }

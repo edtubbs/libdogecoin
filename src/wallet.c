@@ -590,7 +590,6 @@ void print_utxos(dogecoin_wallet* wallet) {
                 printf("address:        %s\n", utxo->address);
                 printf("script_pubkey:  %s\n", utxo->script_pubkey);
                 printf("amount:         %s\n", utxo->amount);
-                debug_print("confirmations:  %d\n", utxo->confirmations);
                 printf("height:         %d\n", utxo->height);
                 printf("spendable:      %d\n", utxo->spendable);
                 printf("solvable:       %d\n", utxo->solvable);
@@ -609,7 +608,6 @@ void print_utxos(dogecoin_wallet* wallet) {
                 printf("address:        %s\n", utxo->address);
                 printf("script_pubkey:  %s\n", utxo->script_pubkey);
                 printf("amount:         %s\n", utxo->amount);
-                debug_print("confirmations:  %d\n", utxo->confirmations);
                 printf("height:         %d\n", utxo->height);
                 printf("spendable:      %d\n", utxo->spendable);
                 printf("solvable:       %d\n", utxo->solvable);
