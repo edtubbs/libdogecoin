@@ -830,7 +830,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         {
             time_t lasttime = chaintip->header.timestamp;
             client->nodegroup->log_write_cb("chain size: %d, last time %s", chaintip->height, ctime(&lasttime));
-            dogecoin_net_spv_node_request_headers_or_blocks(node, false);
+            node->state &= ~NODE_HEADERSYNC;
+            dogecoin_net_spv_request_headers(client);
         }
     }
 
