@@ -382,8 +382,9 @@ void spv_sync_completed(dogecoin_spv_client* client) {
             }
             printf("Warning: oldest wallet UTXO height %d is older than locally available headers start %d.\n",
                    spv_filter_oldest_utxo_height, available_start_height);
-            printf("Warning: historical matches before %d cannot be found until headers are synced from that range (disable checkpoint and rebuild headers).\n",
+            printf("Warning: additional historical matches before %d cannot be discovered in this run until headers are synced from that range.\n",
                    available_start_height);
+            printf("Note: already-known wallet transactions from that older range are still retained and do not need to be re-requested.\n");
             printf("Hint: rerun with -q/--select_checkpoint and choose a checkpoint at or before height %d (e.g. %d).\n",
                    spv_filter_oldest_utxo_height, suggested_checkpoint_height);
         }
