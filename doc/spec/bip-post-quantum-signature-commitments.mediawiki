@@ -121,6 +121,18 @@ The implementation model in this proposal is:
 
 This means PQC proof is bound to the pre-anchor template transaction context, while on-chain publication is anchored in the final committed transaction.
 
+===Witness-Carried Commitment Alternative (Current Status)===
+
+A witness-carried commitment was considered to avoid pre-anchor circularity.
+However, for current libdogecoin/Dogecoin compatibility this proposal keeps OP_RETURN anchors because:
+
+* the core transaction model used here does not persist witness items in <code>dogecoin_tx</code> structures;
+* deserialization currently parses witness sections only transiently and drops them after read; and
+* serialization/signing flow is still defined around legacy non-segwit transaction data paths in this codebase.
+
+Accordingly, Phase 1 commitment publication remains canonical tagged OP_RETURN.
+Any witness-based commitment transport requires a dedicated follow-up design and implementation track.
+
 Current libdogecoin behavior is compatible with this model:
 
 * PQ sign APIs/CLI sign raw message bytes (<code>-x</code>), allowing callers to provide transaction sighash bytes directly.

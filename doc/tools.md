@@ -479,6 +479,7 @@ When using -n with a mnemonic, instead of main_wallet.db, spvnode will generate 
 > **Note**: These commands are only available when libdogecoin is built with `--enable-liboqs` flag.
 
 The `such` tool includes PQC commands for Falcon-512 and Dilithium2 commitments.
+Current Phase 1 commitment publication is OP_RETURN-tagged output based; witness-carried commitment transport is not supported in the present transaction model.
 
 ### Available Falcon Commands
 
