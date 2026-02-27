@@ -787,16 +787,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         unsigned int i;
         for (i = 0; i < amount_of_headers; i++)
         {
-            dogecoin_bool already_known = false;
-            struct const_buffer peek_buf = *buf;
-            dogecoin_block_header peek_header;
-            dogecoin_mem_zero(&peek_header, sizeof(peek_header));
-            if (dogecoin_block_header_deserialize(&peek_header, &peek_buf, client->chainparams, NULL)) {
-                uint256_t peek_hash;
-                if (dogecoin_block_header_hash(&peek_header, peek_hash)) {
-                    already_known = (dogecoin_headersdb_find((dogecoin_headers_db*)client->headers_db_ctx, peek_hash) != NULL);
-                }
-            }
             dogecoin_bool connected;
             dogecoin_blockindex *pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, false, &connected);
             if (!pindex)
@@ -809,7 +799,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
             if (!connected)
             {
-                if (already_known) {
+                dogecoin_bool header_exists_in_db = (dogecoin_headersdb_find((dogecoin_headers_db*)client->headers_db_ctx, pindex->hash) != NULL);
+                if (header_exists_in_db) {
+                    // Skip duplicate headers already in local headersdb from overlapping peer batches.
                     continue;
                 }
                 client->nodegroup->log_write_cb("Got invalid headers (not in sequence) from node %d\n", node->nodeid);
