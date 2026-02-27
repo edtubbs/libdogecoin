@@ -1,5 +1,5 @@
-Run timestamp: 2026-02-26T21:53:57Z
-Post-update rerun: implementation/doc alignment for tx-signature semantics
+Run timestamp: 2026-02-27T00:07:44Z
+Post-update rerun: tx_sighash32-based PQC commitment flow
 Funding note from user: address nhnJDiavC1YWU5SKVtTdJmGoVYDUtuYhnf has 10 DOGE
 Faucet note from user: https://faucet.doge.toys/ (no captcha)
 
@@ -12,16 +12,16 @@ Faucet note from user: https://faucet.doge.toys/ (no captcha)
 [0;32m[SUCCESS][0m All tools available
 [0;34m[INFO][0m Step 1: Generating testnet wallet...
 [0;32m[SUCCESS][0m Testnet wallet generated
-  Address: nfqThjoUVZt14ECVn1RKTTAaeAJoNAUew7
-  Private Key (WIF): cgvvgVMuhQtEmZLf9wUgNJMeKcwgc3vgzeu7ep7kh6FxKygDL8UG
-  Public Key: 031f9fb7e09a1a303be48a9f473ffbf03dbdd51141c7481db3eaab8f45ca52eb1d
+  Address: nj1WgRF4kQYSpNPwwWminQUo2oSs22WPi6
+  Private Key (WIF): ckWCcaQvj8TpSyJKVb9cj6Jhk9whXkfuYwxUASzhDUWQqPFFRJir
+  Public Key: 021bf81fb604690664a6d0913fa488089faa0a6d03b233cd8142bdc90e810cfadf
 [0;34m[INFO][0m Step 2: Getting testnet coins...
 
 ==========================================
   REQUEST TESTNET COINS
 ==========================================
 
-Send testnet DOGE to: nfqThjoUVZt14ECVn1RKTTAaeAJoNAUew7
+Send testnet DOGE to: nj1WgRF4kQYSpNPwwWminQUo2oSs22WPi6
 
 Faucets:
   1. https://faucet.doge.toys/
@@ -36,17 +36,9 @@ Note: some faucets require browser CAPTCHA or may rate-limit by IP.
 [0;32m[SUCCESS][0m Assuming coins received. Continuing...
 [0;34m[INFO][0m Step 3: Generating Falcon-512 keypair...
 [0;32m[SUCCESS][0m Falcon-512 keypair generated
-  Public Key (1794 chars): 098738b9c21ea9271d85251a7850b839a03ed00b4e1aa472c917329f8a83491c...
-  Secret Key (2562 chars): 59242080ec2fbaf46fbcffc002180e03100fc2f81fff07e044144044fc403eff...
-[0;34m[INFO][0m Step 4: Signing message with Falcon-512...
-[0;34m[INFO][0m Message: Falcon-512 testnet test: 2026-02-26T21:53:57Z
-[0;34m[INFO][0m Message (hex): 46616c636f6e2d35313220746573746e657420746573743a20323032362d30322d32365432313a35333a35375a
-[0;32m[SUCCESS][0m Message signed
-  Signature (1310 chars): 397ec6c4c5fa6674361fb2e8d67b8c21be5e36845fc8a989dc20dbafe7cff2dc...
-[0;34m[INFO][0m Step 5: Generating commitment...
-[0;32m[SUCCESS][0m Commitment generated
-  Commitment (32 bytes): dae15bd05f6adbf9f8f77a05249242f07b40be6b31961515f4333a1ee65c0d37
-[0;34m[INFO][0m Step 6: Building transaction with OP_RETURN commit...
+  Public Key (1794 chars): 09aa0969e9db9fb5167e93677adfd9a8b68ea9d05fa089d5c5391b8a66bdaafe...
+  Secret Key (2562 chars): 59ffd03d03de82ff5f42ebe142ffd23d0c3182004f012040bcf3befef80f440c...
+[0;34m[INFO][0m Step 4: Building transaction and deriving tx_sighash32...
 Create an unsigned testnet transaction with such first:
   ./such -c transaction
 

@@ -30,6 +30,7 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - signmessage
 - verify_message
 - transaction
+- tx_sighash32 (requires --enable-liboqs)
 - falcon_keygen (requires --enable-liboqs)
 - falcon_sign (requires --enable-liboqs)
 - falcon_verify (requires --enable-liboqs)
@@ -484,12 +485,13 @@ The `such` tool includes PQC commands for Falcon-512 and Dilithium2 commitments.
 | Command | Required Flags | Description |
 | - | - | - |
 | falcon_keygen | None | Generates a Falcon-512 keypair (public key: 897 bytes, secret key: 1281 bytes) |
-| falcon_sign | -p, -x | Signs a message with Falcon-512 secret key. Returns signature (~660 bytes) |
-| falcon_verify | -k, -x, -s | Verifies a Falcon-512 signature against a message and public key |
+| tx_sighash32 | -x, -s, -i, -h | Derives transaction input sighash32 used by signing flows |
+| falcon_sign | -p, -x | Signs message bytes (typically tx_sighash32 hex) with Falcon-512 secret key. Returns signature (~660 bytes) |
+| falcon_verify | -k, -x, -s | Verifies a Falcon-512 signature against message bytes and public key |
 | falcon_commit | -k, -s | Generates a 32-byte SHA256 commitment from public key and signature for OP_RETURN |
 | dilithium2_keygen | None | Generates a Dilithium2/ML-DSA-44 keypair |
-| dilithium2_sign | -p, -x | Signs a message with Dilithium2 secret key |
-| dilithium2_verify | -k, -x, -s | Verifies a Dilithium2 signature against a message and public key |
+| dilithium2_sign | -p, -x | Signs message bytes (typically tx_sighash32 hex) with Dilithium2 secret key |
+| dilithium2_verify | -k, -x, -s | Verifies a Dilithium2 signature against message bytes and public key |
 | dilithium2_commit | -k, -s | Generates a 32-byte SHA256 commitment from public key and signature for OP_RETURN |
 
 ### Flag Usage for Falcon Commands
@@ -514,24 +516,27 @@ Public Key (897 bytes): 0141...
 Secret Key (1281 bytes): 5014...
 ```
 
-#### Sign a message with Falcon-512:
+#### Derive transaction sighash32:
 ```bash
-# First, convert your message to hex
-MESSAGE_HEX=$(echo -n "Hello Dogecoin" | xxd -p | tr -d '\n')
+./such -c tx_sighash32 -x <unsigned_raw_tx_hex> -s <script_pubkey_hex> -i 0 -h 1
+```
 
-# Sign with Falcon secret key
+#### Sign tx_sighash32 with Falcon-512:
+```bash
+# Sign with Falcon secret key over tx_sighash32 hex
+MESSAGE_HEX=$(./such -c tx_sighash32 -x <unsigned_raw_tx_hex> -s <script_pubkey_hex> -i 0 -h 1 | awk '/tx_sighash32:/ {print $2}')
 ./such -c falcon_sign -p <secret_key_hex> -x $MESSAGE_HEX
 ```
 Output:
 ```
 Signing message with Falcon-512...
-Message (hex): 48656c6c6f20446f6765636f696e
+Message (hex): <tx_sighash32_hex>
 Signature (666 bytes): 3a7f...
 ```
 
 #### Verify a Falcon-512 signature:
 ```bash
-./such -c falcon_verify -k <public_key_hex> -x <message_hex> -s <signature_hex>
+./such -c falcon_verify -k <public_key_hex> -x <tx_sighash32_hex> -s <signature_hex>
 ```
 Output:
 ```

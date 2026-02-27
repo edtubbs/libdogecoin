@@ -138,6 +138,26 @@ dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_
     return false;
 }
 
+/*
+ * Convenience wrapper around dogecoin_tx_sighash() that returns the raw
+ * 32-byte digest bytes used by signing code paths.
+ */
+dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
+                                    const cstring* fromPubKey,
+                                    size_t in_num, int hashtype,
+                                    uint8_t out32[32])
+{
+    if (!tx_to || !fromPubKey || !out32) {
+        return false;
+    }
+    uint256_t hash;
+    if (!dogecoin_tx_sighash(tx_to, fromPubKey, in_num, hashtype, hash)) {
+        return false;
+    }
+    memcpy(out32, hash, 32);
+    return true;
+}
+
 #ifdef USE_LIBOQS
 
 /* Allocate and produce a Falcon-512 keypair */

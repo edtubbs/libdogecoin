@@ -54,9 +54,12 @@ check_tools() {
         fi
     done
     
-    # Check if built with liboqs
+    # Check if built with liboqs and tx_sighash helper
     if ! ./such -c help 2>&1 | grep -q falcon_keygen; then
         error "libdogecoin not built with liboqs support. Rebuild with --enable-liboqs"
+    fi
+    if ! ./such -c help 2>&1 | grep -q tx_sighash32; then
+        error "such missing tx_sighash32 command"
     fi
     
     success "All tools available"
@@ -141,61 +144,9 @@ FALCON_SK=$FALCON_SK
 EOF
 }
 
-# Step 4: Sign message with Falcon-512
-sign_message_falcon() {
-    info "Step 4: Signing message with Falcon-512..."
-    
-    # Create a timestamped message
-    MESSAGE="Falcon-512 testnet test: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    MESSAGE_HEX=$(echo -n "$MESSAGE" | xxd -p | tr -d '\n')
-    
-    info "Message: $MESSAGE"
-    info "Message (hex): $MESSAGE_HEX"
-    
-    # Sign with Falcon
-    ./such -c falcon_sign -p "$FALCON_SK" -x "$MESSAGE_HEX" > "$TMPDIR/falcon_sig.txt"
-    
-    FALCON_SIG=$(grep "^signature:" "$TMPDIR/falcon_sig.txt" | cut -d: -f2 | tr -d ' ')
-    
-    if [ -z "$FALCON_SIG" ]; then
-        error "Failed to sign message"
-    fi
-    
-    success "Message signed"
-    echo "  Signature (${#FALCON_SIG} chars): ${FALCON_SIG:0:64}..."
-    
-    # Save to file
-    cat >> "$TMPDIR/falcon_sig.txt" <<EOF
-MESSAGE=$MESSAGE
-MESSAGE_HEX=$MESSAGE_HEX
-FALCON_SIG=$FALCON_SIG
-EOF
-}
-
-# Step 5: Generate commitment
-generate_commitment() {
-    info "Step 5: Generating commitment..."
-    
-    ./such -c falcon_commit -k "$FALCON_PK" -s "$FALCON_SIG" > "$TMPDIR/falcon_commit.txt"
-    
-    FALCON_COMMIT=$(grep "^commitment:" "$TMPDIR/falcon_commit.txt" | cut -d: -f2 | tr -d ' ')
-    
-    if [ -z "$FALCON_COMMIT" ] || [ ${#FALCON_COMMIT} -ne 64 ]; then
-        error "Failed to generate commitment (expected 64 hex chars, got ${#FALCON_COMMIT})"
-    fi
-    
-    success "Commitment generated"
-    echo "  Commitment (32 bytes): $FALCON_COMMIT"
-    
-    # Save to file
-    cat >> "$TMPDIR/falcon_commit.txt" <<EOF
-FALCON_COMMIT=$FALCON_COMMIT
-EOF
-}
-
 # Step 6: Build transaction with OP_RETURN
 build_transaction() {
-    info "Step 6: Building transaction with OP_RETURN commit..."
+    info "Step 4: Building transaction and deriving tx_sighash32..."
     
     echo "Create an unsigned testnet transaction with such first:"
     echo "  ./such -c transaction"
@@ -203,6 +154,30 @@ build_transaction() {
     echo "Then paste the unsigned raw tx hex below."
     read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
     read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
+
+    SIGHASH_OUTPUT=$(./such -c tx_sighash32 -x "$RAW_UNSIGNED_TX" -s "$SCRIPT_PUBKEY" -i 0 -h 1)
+    TX_SIGHASH_HEX=$(echo "$SIGHASH_OUTPUT" | grep "^tx_sighash32:" | cut -d: -f2 | tr -d ' ')
+    if [ -z "$TX_SIGHASH_HEX" ] || [ ${#TX_SIGHASH_HEX} -ne 64 ]; then
+        echo "$SIGHASH_OUTPUT"
+        error "Failed to derive tx_sighash32 for PQC signing"
+    fi
+    success "Derived tx_sighash32: $TX_SIGHASH_HEX"
+
+    info "Step 5: Signing tx_sighash32 with Falcon-512..."
+    ./such -c falcon_sign -p "$FALCON_SK" -x "$TX_SIGHASH_HEX" > "$TMPDIR/falcon_sig.txt"
+    FALCON_SIG=$(grep "^signature:" "$TMPDIR/falcon_sig.txt" | cut -d: -f2 | tr -d ' ')
+    if [ -z "$FALCON_SIG" ]; then
+        error "Failed to sign tx_sighash32 with Falcon-512"
+    fi
+    success "Falcon signature generated from tx_sighash32"
+
+    info "Step 6: Generating commitment from Falcon signature..."
+    ./such -c falcon_commit -k "$FALCON_PK" -s "$FALCON_SIG" > "$TMPDIR/falcon_commit.txt"
+    FALCON_COMMIT=$(grep "^commitment:" "$TMPDIR/falcon_commit.txt" | cut -d: -f2 | tr -d ' ')
+    if [ -z "$FALCON_COMMIT" ] || [ ${#FALCON_COMMIT} -ne 64 ]; then
+        error "Failed to generate commitment (expected 64 hex chars, got ${#FALCON_COMMIT})"
+    fi
+    success "Commitment generated from tx-bound Falcon signature"
 
     ADD_COMMIT_OUTPUT=$(./such -c falcon_add_commit_tx -x "$RAW_UNSIGNED_TX" -s "$FALCON_COMMIT")
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
@@ -239,6 +214,9 @@ build_transaction() {
 RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
 TX_WITH_COMMIT=$TX_WITH_COMMIT
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
+TX_SIGHASH_HEX=$TX_SIGHASH_HEX
+FALCON_SIG=$FALCON_SIG
+FALCON_COMMIT=$FALCON_COMMIT
 SIGNED_TX=$SIGNED_TX
 OPRETURN_SCRIPT=6a20${FALCON_COMMIT}
 EOF
@@ -284,7 +262,7 @@ verify_commitment() {
     echo ""
     echo "1. Verify the signature:"
     echo "   ./such -c falcon_verify -k $FALCON_PK \\"
-    echo "                           -x $MESSAGE_HEX \\"
+    echo "                           -x $TX_SIGHASH_HEX \\"
     echo "                           -s $FALCON_SIG"
     echo ""
     echo "2. Regenerate commitment and compare:"
@@ -292,7 +270,7 @@ verify_commitment() {
     echo "   Expected: $FALCON_COMMIT"
     echo ""
     echo "3. If both match, you've proven:"
-    echo "   ✓ Message was signed with Falcon-512 private key"
+    echo "   ✓ Transaction sighash was signed with Falcon-512 private key"
     echo "   ✓ Commitment was published on testnet blockchain"
     echo "   ✓ Commitment can be verified without revealing full signature"
     echo ""
@@ -310,8 +288,6 @@ main() {
     generate_testnet_wallet
     get_testnet_coins
     generate_falcon_keypair
-    sign_message_falcon
-    generate_commitment
     build_transaction
     monitor_spvnode
     verify_commitment
@@ -326,8 +302,8 @@ main() {
     echo "Files:"
     echo "  - $TMPDIR/wallet.txt (testnet wallet)"
     echo "  - $TMPDIR/falcon_keys.txt (Falcon keypair)"
-    echo "  - $TMPDIR/falcon_sig.txt (signature)"
-    echo "  - $TMPDIR/falcon_commit.txt (commitment)"
+    echo "  - $TMPDIR/falcon_sig.txt (tx_sighash signature)"
+    echo "  - $TMPDIR/falcon_commit.txt (tx-bound commitment)"
     echo "  - $TMPDIR/tx_info.txt (transaction info)"
     echo ""
     

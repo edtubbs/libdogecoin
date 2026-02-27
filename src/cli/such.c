@@ -661,6 +661,9 @@ static void print_usage()
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
+#ifdef USE_LIBOQS
+    printf("tx_sighash32 (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type>),\n");
+#endif
     printf("comp2der (-s <compact signature>),\n");
     printf("bip32maintotest (-p <extended hd master key>),\n");
     printf("signmessage (-x '<message>' -p <private key>),\n");
@@ -1122,6 +1125,52 @@ int main(int argc, char* argv[])
             }
         dogecoin_tx_free(tx);
         }
+#ifdef USE_LIBOQS
+    else if (strcmp(cmd, "tx_sighash32") == 0) {
+        // ./such -c tx_sighash32 -x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type>
+        if (!txhex || !scripthex) {
+            return showError("Missing tx-hex or script-hex (use -x, -s)\n");
+        }
+
+        if (strlen(txhex) > 1024 * 100) { // don't accept tx larger than 100kb
+            return showError("tx too large (max 100kb)\n");
+        }
+
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex");
+        }
+        dogecoin_free(data_bin);
+
+        if ((size_t)inputindex >= tx->vin->len) {
+            dogecoin_tx_free(tx);
+            return showError("Inputindex out of range");
+        }
+
+        uint8_t* script_data = dogecoin_uint8_vla(strlen(scripthex) / 2 + 1);
+        utils_hex_to_bin(scripthex, script_data, strlen(scripthex), &outlen);
+        cstring* script = cstr_new_buf(script_data, outlen);
+        free(script_data);
+
+        uint8_t sighash32[32];
+        dogecoin_mem_zero(sighash32, sizeof(sighash32));
+        if (!dogecoin_tx_sighash32(tx, script, inputindex, sighashtype, sighash32)) {
+            cstr_free(script, true);
+            dogecoin_tx_free(tx);
+            return showError("Failed to compute tx sighash");
+        }
+
+        char* sighash_hex = utils_uint8_to_hex(sighash32, sizeof(sighash32));
+        printf("tx_sighash32: %s\n", sighash_hex);
+        cstr_free(script, true);
+        dogecoin_tx_free(tx);
+    }
+#endif
     else if (strcmp(cmd, "comp2der") == 0) {
         // ./such -c comp2der -s <compact signature>
         if (!scripthex || strlen(scripthex) != 128) {

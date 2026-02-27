@@ -97,8 +97,8 @@ To support transaction-level validation workflows, the PQ signature payload SHOU
 In practical terms, verifiers and signers should use:
 
 <source>
-message = tx_sighash(tx, scriptPubKey, input_index, hash_type)
-signature = PQ_SIGN(secret_key, message)
+message32 = dogecoin_tx_sighash32(tx, scriptPubKey, input_index, hash_type)
+signature = PQ_SIGN(secret_key, message32)
 commitment32 = SHA256(public_key_bytes || signature_bytes)
 </source>
 
@@ -108,7 +108,7 @@ Current libdogecoin behavior is compatible with this model:
 
 * PQ sign APIs/CLI sign raw message bytes (<code>-x</code>), allowing callers to provide transaction sighash bytes directly.
 * Existing secp signing flow in <code>such -c sign</code> is implemented via <code>dogecoin_tx_sign_input(...)</code> (ECC-backed), which internally uses the transaction sighash for authorization.
-* PQC transaction-binding workflows should use that same per-input transaction-digest context (the same message that secp signing authorizes), then publish the PQ commitment in OP_RETURN.
+* PQC transaction-binding workflows should use <code>dogecoin_tx_sighash32(...)</code> to derive that same per-input transaction-digest context, then publish the PQ commitment in OP_RETURN.
 * SPV Phase 1 still validates canonical commitment encoding only; full signature verification remains an off-chain verifier responsibility.
 
 Implementations MAY support additional PQ schemes in future revisions, but MUST preserve canonical on-chain encoding rules.
@@ -175,7 +175,7 @@ For transaction-binding assurance, validators should verify that revealed PQ sig
 Current reference behavior exists in libdogecoin components that:
 
 * sign raw transaction inputs using existing <code>dogecoin_tx_sign_input(...)</code> secp/ECC authorization flow;
-* derive transaction signing digests from the same signing path context for PQC off-chain signatures;
+* derive matching PQC signing messages with <code>dogecoin_tx_sighash32(...)</code>;
 * generate/verify Falcon-512 and Dilithium2 signatures over caller-provided message bytes;
 * derive commitments from PQ verification material (<code>SHA256(pubkey || signature)</code>);
 * append/extract canonical tagged commitments in transaction OP_RETURN outputs; and
@@ -183,7 +183,8 @@ Current reference behavior exists in libdogecoin components that:
 
 Current CLI wiring reflects this implementation model:
 
-* <code>such -c falcon_sign</code> / <code>dilithium2_sign</code> accept message bytes via <code>-x</code> (including tx sighash hex);
+* <code>such -c tx_sighash32</code> derives transaction-bound digest bytes for a selected input;
+* <code>such -c falcon_sign</code> / <code>dilithium2_sign</code> accept message bytes via <code>-x</code> (including tx_sighash32 hex);
 * <code>such -c falcon_commit</code> / <code>dilithium2_commit</code> derive commitment32 from public key + signature; and
 * <code>such -c falcon_add_commit_tx</code> / <code>dilithium2_add_commit_tx</code> attach canonical tagged commitments to raw tx outputs.
 

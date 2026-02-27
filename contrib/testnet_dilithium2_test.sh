@@ -36,6 +36,9 @@ check_tools() {
     if ! ./such -c help 2>&1 | grep -q dilithium2_keygen; then
         error "libdogecoin not built with Dilithium2 support. Rebuild with --enable-liboqs"
     fi
+    if ! ./such -c help 2>&1 | grep -q tx_sighash32; then
+        error "such missing tx_sighash32 command"
+    fi
     success "All tools available"
 }
 
@@ -70,13 +73,11 @@ generate_dilithium2_keypair() {
 }
 
 sign_message_dilithium2() {
-    info "Signing message with Dilithium2..."
-    MESSAGE="Dilithium2 testnet test: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    MESSAGE_HEX=$(echo -n "$MESSAGE" | xxd -p | tr -d '\n')
-    ./such -c dilithium2_sign -p "$DILITHIUM2_SK" -x "$MESSAGE_HEX" > "$TMPDIR/dilithium2_sig.txt"
+    info "Signing tx_sighash32 with Dilithium2..."
+    ./such -c dilithium2_sign -p "$DILITHIUM2_SK" -x "$TX_SIGHASH_HEX" > "$TMPDIR/dilithium2_sig.txt"
     DILITHIUM2_SIG=$(grep "^signature:" "$TMPDIR/dilithium2_sig.txt" | cut -d: -f2 | tr -d ' ')
-    [ -n "$DILITHIUM2_SIG" ] || error "Failed to sign message"
-    success "Message signed"
+    [ -n "$DILITHIUM2_SIG" ] || error "Failed to sign tx_sighash32"
+    success "tx_sighash32 signed"
 }
 
 generate_commitment() {
@@ -91,6 +92,14 @@ build_transaction() {
     info "Build unsigned testnet tx with such, then paste hex below:"
     read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
     read -p "Enter scriptPubKey hex for input 0: " SCRIPT_PUBKEY
+
+    SIGHASH_OUTPUT=$(./such -c tx_sighash32 -x "$RAW_UNSIGNED_TX" -s "$SCRIPT_PUBKEY" -i 0 -h 1)
+    TX_SIGHASH_HEX=$(echo "$SIGHASH_OUTPUT" | grep "^tx_sighash32:" | cut -d: -f2 | tr -d ' ')
+    [ -n "$TX_SIGHASH_HEX" ] || error "Failed to derive tx_sighash32"
+    [ "${#TX_SIGHASH_HEX}" -eq 64 ] || error "Invalid tx_sighash32 length"
+    info "tx_sighash32: $TX_SIGHASH_HEX"
+    sign_message_dilithium2
+    generate_commitment
 
     ADD_COMMIT_OUTPUT=$(./such -c dilithium2_add_commit_tx -x "$RAW_UNSIGNED_TX" -s "$DILITHIUM2_COMMIT")
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
@@ -120,7 +129,7 @@ monitor_spvnode() {
 
 verify_commitment() {
     info "Off-chain verification commands:"
-    echo "  ./such -c dilithium2_verify -k $DILITHIUM2_PK -x $MESSAGE_HEX -s $DILITHIUM2_SIG"
+    echo "  ./such -c dilithium2_verify -k $DILITHIUM2_PK -x $TX_SIGHASH_HEX -s $DILITHIUM2_SIG"
     echo "  ./such -c dilithium2_commit -k $DILITHIUM2_PK -s $DILITHIUM2_SIG"
     echo "  Expected: $DILITHIUM2_COMMIT"
 }
@@ -135,8 +144,6 @@ main() {
     generate_testnet_wallet
     get_testnet_coins
     generate_dilithium2_keypair
-    sign_message_dilithium2
-    generate_commitment
     build_transaction
     monitor_spvnode
     verify_commitment
