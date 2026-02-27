@@ -591,6 +591,7 @@ void print_utxos(dogecoin_wallet* wallet) {
                 printf("script_pubkey:  %s\n", utxo->script_pubkey);
                 printf("amount:         %s\n", utxo->amount);
                 printf("height:         %d\n", utxo->height);
+                printf("confirmations:  %d\n", utxo->confirmations);
                 printf("spendable:      %d\n", utxo->spendable);
                 printf("solvable:       %d\n", utxo->solvable);
                 wallet_total_u64 += coins_to_koinu_str(utxo->amount);
@@ -609,6 +610,7 @@ void print_utxos(dogecoin_wallet* wallet) {
                 printf("script_pubkey:  %s\n", utxo->script_pubkey);
                 printf("amount:         %s\n", utxo->amount);
                 printf("height:         %d\n", utxo->height);
+                printf("confirmations:  %d\n", utxo->confirmations);
                 printf("spendable:      %d\n", utxo->spendable);
                 printf("solvable:       %d\n", utxo->solvable);
                 wallet_total_u64 += coins_to_koinu_str(utxo->amount);
@@ -984,8 +986,8 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
         }
     }
     else {
-        const uint32_t tx_progress_interval = 1;
         uint32_t tx_loaded_count = 0;
+        uint32_t tx_last_reported_count = 0;
         dogecoin_bool tx_loading_announced = false;
         // check file-header-magic, version and genesis
         uint8_t buf[sizeof(file_hdr_magic)+sizeof(current_version)+sizeof(uint256_t)];
@@ -1032,16 +1034,19 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 }
                 if (!dogecoin_wallet_load_transaction(wallet, reclen)) return false;
                 tx_loaded_count++;
-                if ((tx_loaded_count % tx_progress_interval) == 0) {
+                if (wallet->vec_wtxes) {
+                    tx_loaded_count = (uint32_t)wallet->vec_wtxes->len;
+                }
+                if (tx_loaded_count != tx_last_reported_count) {
                     printf("\r%u transactions loaded", tx_loaded_count);
                     fflush(stdout);
+                    tx_last_reported_count = tx_loaded_count;
                 }
             } else {
                 fseek(wallet->dbfile, reclen, SEEK_CUR);
             }
         }
-        if (tx_loading_announced && ((tx_loaded_count % tx_progress_interval) != 0)) {
-            printf("\n");
+        if (tx_loading_announced) {
             printf("%u transactions loaded\n", tx_loaded_count);
         }
     }
