@@ -1,5 +1,5 @@
-Run timestamp: 2026-02-27T00:07:54Z
-Post-update rerun: tx_sighash32-based PQC commitment flow
+Run timestamp: 2026-02-27T20:46:35Z
+Post-update rerun: pre-anchor binding + tagged OP_RETURN details
 Funding note from user: address nhnJDiavC1YWU5SKVtTdJmGoVYDUtuYhnf has 10 DOGE
 Faucet note from user: https://faucet.doge.toys/ (no captcha)
 
@@ -11,9 +11,9 @@ Faucet note from user: https://faucet.doge.toys/ (no captcha)
 [0;34m[INFO][0m Checking required tools...
 [0;32m[SUCCESS][0m All tools available
 [0;34m[INFO][0m Generating testnet wallet...
-[0;32m[SUCCESS][0m Wallet ready: nYTVEntaoKXue7FfknRJ7pg2ptHRUKcCZp
+[0;32m[SUCCESS][0m Wallet ready: nrN7SRN1gsug7hxAgsHRU9wgdT42Z214pw
 
-Send testnet DOGE to: nYTVEntaoKXue7FfknRJ7pg2ptHRUKcCZp
+Send testnet DOGE to: nrN7SRN1gsug7hxAgsHRU9wgdT42Z214pw
 Faucet: https://faucet.doge.toys/
 [1;33m[WARNING][0m Press Enter after funding the address...
 [0;34m[INFO][0m Generating Dilithium2 keypair...

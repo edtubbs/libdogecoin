@@ -1,5 +1,5 @@
-Run timestamp: 2026-02-27T00:07:44Z
-Post-update rerun: tx_sighash32-based PQC commitment flow
+Run timestamp: 2026-02-27T20:46:27Z
+Post-update rerun: pre-anchor binding + tagged OP_RETURN details
 Funding note from user: address nhnJDiavC1YWU5SKVtTdJmGoVYDUtuYhnf has 10 DOGE
 Faucet note from user: https://faucet.doge.toys/ (no captcha)
 
@@ -12,16 +12,16 @@ Faucet note from user: https://faucet.doge.toys/ (no captcha)
 [0;32m[SUCCESS][0m All tools available
 [0;34m[INFO][0m Step 1: Generating testnet wallet...
 [0;32m[SUCCESS][0m Testnet wallet generated
-  Address: nj1WgRF4kQYSpNPwwWminQUo2oSs22WPi6
-  Private Key (WIF): ckWCcaQvj8TpSyJKVb9cj6Jhk9whXkfuYwxUASzhDUWQqPFFRJir
-  Public Key: 021bf81fb604690664a6d0913fa488089faa0a6d03b233cd8142bdc90e810cfadf
+  Address: nmGXCNeDTR1kGcA7x2yoocCbpWZkErEnJC
+  Private Key (WIF): cmd74scDh4XvfSFpZFAwnJVoD1gqJSmsqEehdJ4z1DVH9od1Uu52
+  Public Key: 025a0cf9bce1898f77a13cca4b528baa7f14dc02f63e37408366aae93cbd7b6b96
 [0;34m[INFO][0m Step 2: Getting testnet coins...
 
 ==========================================
   REQUEST TESTNET COINS
 ==========================================
 
-Send testnet DOGE to: nj1WgRF4kQYSpNPwwWminQUo2oSs22WPi6
+Send testnet DOGE to: nmGXCNeDTR1kGcA7x2yoocCbpWZkErEnJC
 
 Faucets:
   1. https://faucet.doge.toys/
@@ -36,8 +36,8 @@ Note: some faucets require browser CAPTCHA or may rate-limit by IP.
 [0;32m[SUCCESS][0m Assuming coins received. Continuing...
 [0;34m[INFO][0m Step 3: Generating Falcon-512 keypair...
 [0;32m[SUCCESS][0m Falcon-512 keypair generated
-  Public Key (1794 chars): 09aa0969e9db9fb5167e93677adfd9a8b68ea9d05fa089d5c5391b8a66bdaafe...
-  Secret Key (2562 chars): 59ffd03d03de82ff5f42ebe142ffd23d0c3182004f012040bcf3befef80f440c...
+  Public Key (1794 chars): 09475c3c29e71475a889ce88eed9af6adcfdb1191bf52b00a558635e4b86ad9c...
+  Secret Key (2562 chars): 5913e048104046ec2fc1e4007b1431000040be03cf82ffe188dc3f7af7fec2e8...
 [0;34m[INFO][0m Step 4: Building transaction and deriving tx_sighash32...
 Create an unsigned testnet transaction with such first:
   ./such -c transaction

@@ -109,6 +109,17 @@ build_transaction() {
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
     [ -n "$SIGNED_TX" ] || error "Failed to sign transaction"
 
+    cat > "$TMPDIR/tx_info.txt" <<EOF
+RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
+TX_WITH_COMMIT=$TX_WITH_COMMIT
+SCRIPT_PUBKEY=$SCRIPT_PUBKEY
+TX_SIGHASH_HEX=$TX_SIGHASH_HEX
+DILITHIUM2_SIG=$DILITHIUM2_SIG
+DILITHIUM2_COMMIT=$DILITHIUM2_COMMIT
+SIGNED_TX=$SIGNED_TX
+OPRETURN_SCRIPT=6a2444494c32${DILITHIUM2_COMMIT}
+EOF
+
     read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
         ./sendtx $TESTNET_FLAG "$SIGNED_TX"
@@ -132,6 +143,7 @@ verify_commitment() {
     echo "  ./such -c dilithium2_verify -k $DILITHIUM2_PK -x $TX_SIGHASH_HEX -s $DILITHIUM2_SIG"
     echo "  ./such -c dilithium2_commit -k $DILITHIUM2_PK -s $DILITHIUM2_SIG"
     echo "  Expected: $DILITHIUM2_COMMIT"
+    echo "  Note: tx_sighash32 is derived from pre-anchor transaction template bytes."
 }
 
 main() {

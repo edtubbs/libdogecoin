@@ -104,6 +104,23 @@ commitment32 = SHA256(public_key_bytes || signature_bytes)
 
 This keeps Phase 1 commitment publication consensus-neutral while still binding the off-chain PQ proof to a concrete transaction authorization digest.
 
+===Phase 1: Pre-Anchor Template Binding===
+
+Because the OP_RETURN commitment payload is itself derived from the PQ signature, implementers must avoid circular dependency between:
+
+* the digest being signed; and
+* the final transaction bytes carrying the commitment output.
+
+The implementation model in this proposal is:
+
+# derive <code>message32</code> from a deterministic '''pre-anchor transaction template''' (before commitment output is appended),
+# PQ-sign <code>message32</code>,
+# derive commitment32 from <code>pubkey || signature</code>,
+# append canonical tagged OP_RETURN commitment output, and
+# produce final spend-authorized transaction with existing secp signing path.
+
+This means PQC proof is bound to the pre-anchor template transaction context, while on-chain publication is anchored in the final committed transaction.
+
 Current libdogecoin behavior is compatible with this model:
 
 * PQ sign APIs/CLI sign raw message bytes (<code>-x</code>), allowing callers to provide transaction sighash bytes directly.

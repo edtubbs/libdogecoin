@@ -218,7 +218,7 @@ TX_SIGHASH_HEX=$TX_SIGHASH_HEX
 FALCON_SIG=$FALCON_SIG
 FALCON_COMMIT=$FALCON_COMMIT
 SIGNED_TX=$SIGNED_TX
-OPRETURN_SCRIPT=6a20${FALCON_COMMIT}
+OPRETURN_SCRIPT=6a24464c4331${FALCON_COMMIT}
 EOF
 }
 
@@ -270,7 +270,7 @@ verify_commitment() {
     echo "   Expected: $FALCON_COMMIT"
     echo ""
     echo "3. If both match, you've proven:"
-    echo "   ✓ Transaction sighash was signed with Falcon-512 private key"
+    echo "   ✓ Pre-anchor transaction template sighash was signed with Falcon-512 private key"
     echo "   ✓ Commitment was published on testnet blockchain"
     echo "   ✓ Commitment can be verified without revealing full signature"
     echo ""
