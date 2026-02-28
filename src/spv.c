@@ -70,9 +70,9 @@ static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 #define MAX_HEADER_SYNC_CANDIDATES 64
+/* Store a rolling lane cursor in node->hints low byte to diversify block locator trimming. */
 #define HEADER_LANE_HINT_MASK 0xFFU
-static const unsigned int MAX_PARALLEL_HEADER_REQUESTS = 4;
-static const unsigned int MAX_HEADER_LANES = 5;
+static const unsigned int MAX_PARALLEL_HEADER_REQUESTS = 5;
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
@@ -523,7 +523,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 for (size_t lane = 0; lane < max_parallel; lane++) {
                     size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
                     dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
-                    uint32_t lane_hint = (uint32_t)((client->next_headers_peer_cursor + lane) % MAX_HEADER_LANES);
+                    uint32_t lane_hint = (uint32_t)((client->next_headers_peer_cursor + lane) & HEADER_LANE_HINT_MASK);
                     selected_node->hints = lane_hint;
                     dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
                     client->nodegroup->log_write_cb("Requested next headers chunk from node %d (lane=%zu/%zu, locator_trim=%u, tip=%u)\n", selected_node->nodeid, lane + 1, max_parallel, lane_hint, tip_height);
@@ -588,7 +588,8 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
  */
 void dogecoin_net_spv_node_handshake_done(dogecoin_node *node)
 {
-    dogecoin_net_spv_request_headers((dogecoin_spv_client*)node->nodegroup->ctx);
+    /* Intentionally no immediate getheaders here; periodic scheduler batches peers into parallel lanes. */
+    UNUSED(node);
 }
 
 /**
@@ -803,6 +804,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         client->last_headersrequest_time = 0;
 
         unsigned int connected_headers = 0;
+        unsigned int duplicate_headers = 0;
+        unsigned int invalid_headers = 0;
         unsigned int i;
         for (i = 0; i < amount_of_headers; i++)
         {
@@ -821,9 +824,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 dogecoin_bool header_exists_in_db = (dogecoin_headersdb_find((dogecoin_headers_db*)client->headers_db_ctx, pindex->hash) != NULL);
                 if (header_exists_in_db) {
                     // Skip duplicate headers already in local headersdb from overlapping peer batches.
+                    duplicate_headers++;
                     continue;
                 }
                 client->nodegroup->log_write_cb("Got invalid headers (not in sequence) from node %d\n", node->nodeid);
+                invalid_headers++;
                 node->state &= ~NODE_HEADERSYNC;
                 node->nodegroup->node_connection_state_changed_cb(node);
                 dogecoin_free(pindex);
@@ -845,6 +850,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         dogecoin_blockindex *chaintip = client->headers_db->getchaintip(client->headers_db_ctx);
 
         client->nodegroup->log_write_cb("Connected %d headers\n", connected_headers);
+        client->nodegroup->log_write_cb("Headers batch stats node %d: connected=%u duplicate=%u invalid=%u total=%u\n", node->nodeid, connected_headers, duplicate_headers, invalid_headers, amount_of_headers);
         client->nodegroup->log_write_cb("Chaintip at height %d\n", chaintip->height);
 
         if (client->header_message_processed && client->header_message_processed(client, node, chaintip) == false)
