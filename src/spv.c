@@ -523,10 +523,10 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 for (size_t lane = 0; lane < max_parallel; lane++) {
                     size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
                     dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
-                    uint32_t lane_hint = (uint32_t)((client->next_headers_peer_cursor + lane) & HEADER_LANE_HINT_MASK);
+                    uint32_t lane_hint = (uint32_t)lane;
                     selected_node->hints = lane_hint;
                     dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
-                    client->nodegroup->log_write_cb("Requested next headers chunk from node %d (lane=%zu/%zu, locator_trim=%u, tip=%u)\n", selected_node->nodeid, lane + 1, max_parallel, lane_hint, tip_height);
+                    client->nodegroup->log_write_cb("Requested next headers chunk from node %d (lane=%zu/%zu, lane_trim_offset=%u, tip=%u)\n", selected_node->nodeid, lane + 1, max_parallel, lane_hint, tip_height);
                     new_headers_available = true;
                     request_count++;
                 }
