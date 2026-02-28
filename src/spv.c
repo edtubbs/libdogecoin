@@ -334,6 +334,11 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
         }
     }
 
+    /* Run scheduling from a single timer source to avoid duplicate fan-out from every connected node. */
+    if (!node->nodegroup || !node->nodegroup->nodes || node->nodegroup->nodes->len == 0 || vector_idx(node->nodegroup->nodes, 0) != node) {
+        return;
+    }
+
     if ((client->stateflags & SPV_HEADER_SYNC_FLAG) == SPV_HEADER_SYNC_FLAG)
     {
         client->last_headersrequest_time = 0;
