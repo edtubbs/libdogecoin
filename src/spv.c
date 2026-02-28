@@ -72,7 +72,35 @@ static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 #define MAX_HEADER_SYNC_CANDIDATES 64
 /* Store a rolling lane cursor in node->hints low byte to diversify block locator trimming. */
 #define HEADER_LANE_HINT_MASK 0xFFU
+#define HEADER_INVALID_STREAK_SHIFT 8
+#define HEADER_INVALID_STREAK_MASK (0xFFU << HEADER_INVALID_STREAK_SHIFT)
+static const unsigned int MAX_INVALID_STREAK_VALUE = 0xFFU;
+static const unsigned int INVALID_STREAK_SENTINEL = 0x100U;
 static const unsigned int MAX_PARALLEL_HEADER_REQUESTS = 5;
+
+static unsigned int spv_get_invalid_header_streak(const dogecoin_node* node)
+{
+    return (unsigned int)((node->hints & HEADER_INVALID_STREAK_MASK) >> HEADER_INVALID_STREAK_SHIFT);
+}
+
+static void spv_set_invalid_header_streak(dogecoin_node* node, unsigned int streak)
+{
+    if (streak > MAX_INVALID_STREAK_VALUE) streak = MAX_INVALID_STREAK_VALUE;
+    node->hints = (node->hints & ~HEADER_INVALID_STREAK_MASK) | (streak << HEADER_INVALID_STREAK_SHIFT);
+}
+
+static void spv_reset_invalid_header_streak(dogecoin_node* node)
+{
+    spv_set_invalid_header_streak(node, 0);
+}
+
+static unsigned int spv_increment_invalid_header_streak(dogecoin_node* node)
+{
+    unsigned int streak = spv_get_invalid_header_streak(node);
+    if (streak < MAX_INVALID_STREAK_VALUE) streak++;
+    spv_set_invalid_header_streak(node, streak);
+    return streak;
+}
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
@@ -511,6 +539,24 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
         // Request headers or blocks from nodes with the longest chain.
         if (longest_chain_height > tip_height) {
             dogecoin_bool request_blocks = (client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG;
+            unsigned int best_invalid_streak = INVALID_STREAK_SENTINEL;
+            if (!request_blocks) {
+                for(i = 0; i < client->nodegroup->nodes->len; ++i)
+                {
+                    dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
+                    if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
+                        check_node->version_handshake &&
+                        check_node->bestknownheight == longest_chain_height &&
+                        (check_node->state & NODE_HEADERSYNC) != NODE_HEADERSYNC &&
+                        (check_node->state & NODE_BLOCKSYNC) != NODE_BLOCKSYNC)
+                    {
+                        unsigned int streak = spv_get_invalid_header_streak(check_node);
+                        if (streak < best_invalid_streak) {
+                            best_invalid_streak = streak;
+                        }
+                    }
+                }
+            }
             for(i = 0; i < client->nodegroup->nodes->len; ++i)
             {
                 dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
@@ -524,7 +570,8 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                         dogecoin_net_spv_node_request_headers_or_blocks(check_node, true);
                         new_headers_available = true;
                         request_count++;
-                    } else if (candidate_len < MAX_HEADER_SYNC_CANDIDATES) {
+                    } else if (spv_get_invalid_header_streak(check_node) == best_invalid_streak &&
+                               candidate_len < MAX_HEADER_SYNC_CANDIDATES) {
                         candidate_node_indices[candidate_len++] = i;
                     } else if (!candidate_overflow_logged) {
                         client->nodegroup->log_write_cb("Header peer candidate overflow (max %u), truncating list\n", MAX_HEADER_SYNC_CANDIDATES);
@@ -538,7 +585,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                     size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
                     dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
                     uint32_t lane_hint = (uint32_t)lane;
-                    selected_node->hints = lane_hint;
+                    selected_node->hints = (selected_node->hints & ~HEADER_LANE_HINT_MASK) | lane_hint;
                     dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
                     client->nodegroup->log_write_cb("Requested next headers chunk from node %d (lane=%zu/%zu, lane_trim_offset=%u, tip=%u)\n", selected_node->nodeid, lane + 1, max_parallel, lane_hint, tip_height);
                     new_headers_available = true;
@@ -556,18 +603,44 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
     unsigned int nodes_at_same_height = 0;
     if (!new_headers_available && client->headers_db->getchaintip(client->headers_db_ctx)->header.timestamp < client->oldest_item_of_interest - (BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S) && client->stateflags == SPV_HEADER_SYNC_FLAG)
     {
+        unsigned int best_invalid_streak = INVALID_STREAK_SENTINEL;
+        size_t candidate_node_indices[MAX_HEADER_SYNC_CANDIDATES];
+        size_t candidate_len = 0;
+        for(i = 0; i < client->nodegroup->nodes->len; i++)
+        {
+            dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
+            if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) && check_node->version_handshake && check_node->bestknownheight > tip_height) {
+                unsigned int streak = spv_get_invalid_header_streak(check_node);
+                if (streak < best_invalid_streak) {
+                    best_invalid_streak = streak;
+                }
+            }
+        }
         for(i = 0; i < client->nodegroup->nodes->len; i++)
         {
             dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
             if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) && check_node->version_handshake)
             {
-                if (check_node->bestknownheight > tip_height) {
-                    dogecoin_net_spv_node_request_headers_or_blocks(check_node, false);
-                    new_headers_available = true;
+                if (check_node->bestknownheight > tip_height && spv_get_invalid_header_streak(check_node) == best_invalid_streak) {
+                    if (candidate_len < MAX_HEADER_SYNC_CANDIDATES) {
+                        candidate_node_indices[candidate_len++] = i;
+                    }
                 } else if (check_node->bestknownheight == tip_height) {
                     nodes_at_same_height++;
                 }
             }
+        }
+        if (candidate_len > 0) {
+            size_t max_parallel = candidate_len < MAX_PARALLEL_HEADER_REQUESTS ? candidate_len : MAX_PARALLEL_HEADER_REQUESTS;
+            for (size_t lane = 0; lane < max_parallel; lane++) {
+                size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
+                dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
+                uint32_t lane_hint = (uint32_t)lane;
+                selected_node->hints = (selected_node->hints & ~HEADER_LANE_HINT_MASK) | lane_hint;
+                dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
+                new_headers_available = true;
+            }
+            client->next_headers_peer_cursor += (uint32_t)max_parallel;
         }
     }
     if (!new_headers_available && (dogecoin_node_group_amount_of_connected_nodes(client->nodegroup, NODE_CONNECTED) > 0) && client->stateflags == SPV_FULLBLOCK_SYNC_FLAG) {
@@ -844,10 +917,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 client->nodegroup->log_write_cb("Got invalid headers (not in sequence) from node %d\n", node->nodeid);
                 invalid_headers++;
                 node->state &= ~NODE_HEADERSYNC;
-                dogecoin_node_misbehave(node);
+                unsigned int invalid_streak = spv_increment_invalid_header_streak(node);
+                client->nodegroup->log_write_cb("Node %d invalid header streak %u\n", node->nodeid, invalid_streak);
                 dogecoin_free(pindex);
                 break;
             } else {
+                spv_reset_invalid_header_streak(node);
                 if (client->header_connected) { client->header_connected(client); }
                 connected_headers++;
                 if (pindex->height >= node->bestknownheight - 5) {
