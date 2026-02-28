@@ -830,7 +830,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 client->nodegroup->log_write_cb("Got invalid headers (not in sequence) from node %d\n", node->nodeid);
                 invalid_headers++;
                 node->state &= ~NODE_HEADERSYNC;
-                node->nodegroup->node_connection_state_changed_cb(node);
+                dogecoin_node_misbehave(node);
                 dogecoin_free(pindex);
                 break;
             } else {
