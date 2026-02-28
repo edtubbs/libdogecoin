@@ -424,18 +424,27 @@ void dogecoin_net_spv_node_request_headers_or_blocks(dogecoin_node *node, dogeco
 {
     // request next headers
     vector_t *blocklocators = vector_new(1, free);
-    size_t locator_trim = 0;
+    size_t lane_trim_offset = 0;
     if (!blocks) {
-        locator_trim = (size_t)(node->hints & HEADER_LANE_HINT_MASK);
+        lane_trim_offset = (size_t)(node->hints & HEADER_LANE_HINT_MASK);
     }
 
     dogecoin_net_spv_fill_block_locator((dogecoin_spv_client *)node->nodegroup->ctx, blocklocators);
-    if (locator_trim > 0 && blocklocators->len > 1) {
+    if (lane_trim_offset > 0 && blocklocators->len > 1) {
         size_t removable = blocklocators->len - 1;
-        if (locator_trim > removable) {
-            locator_trim = removable;
+        if (lane_trim_offset > removable) {
+            lane_trim_offset = removable;
         }
-        vector_remove_range(blocklocators, 0, locator_trim);
+        vector_remove_range(blocklocators, 0, lane_trim_offset);
+    }
+    if (!blocks && blocklocators->len > 0) {
+        uint256_t* start_locator = vector_idx(blocklocators, 0);
+        if (start_locator) {
+            char locator_buf[DOGECOIN_HASH_LENGTH * 2 + 1];
+            const char* locator_str = hash_to_string(*start_locator);
+            memcpy_safe(locator_buf, locator_str, sizeof(locator_buf));
+            node->nodegroup->log_write_cb("Header request node %d: lane_trim_offset=%zu locator_count=%zu start_locator=%s\n", node->nodeid, lane_trim_offset, blocklocators->len, locator_buf);
+        }
     }
 
     cstring *getheader_msg = cstr_new_sz(256);
