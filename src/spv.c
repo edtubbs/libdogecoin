@@ -70,6 +70,9 @@ static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 #define MAX_HEADER_SYNC_CANDIDATES 64
+#define HEADER_LANE_HINT_MASK 0xFFU
+static const unsigned int MAX_PARALLEL_HEADER_REQUESTS = 4;
+static const unsigned int MAX_HEADER_LANES = 5;
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
@@ -421,8 +424,19 @@ void dogecoin_net_spv_node_request_headers_or_blocks(dogecoin_node *node, dogeco
 {
     // request next headers
     vector_t *blocklocators = vector_new(1, free);
+    size_t locator_trim = 0;
+    if (!blocks) {
+        locator_trim = (size_t)(node->hints & HEADER_LANE_HINT_MASK);
+    }
 
     dogecoin_net_spv_fill_block_locator((dogecoin_spv_client *)node->nodegroup->ctx, blocklocators);
+    if (locator_trim > 0 && blocklocators->len > 1) {
+        size_t removable = blocklocators->len - 1;
+        if (locator_trim > removable) {
+            locator_trim = removable;
+        }
+        vector_remove_range(blocklocators, 0, locator_trim);
+    }
 
     cstring *getheader_msg = cstr_new_sz(256);
     dogecoin_p2p_msg_getheaders(blocklocators, NULL, getheader_msg);
@@ -505,13 +519,18 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 }
             }
             if (!request_blocks && candidate_len > 0) {
-                size_t selected = candidate_node_indices[client->next_headers_peer_cursor % candidate_len];
-                dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
-                dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
-                client->next_headers_peer_cursor++;
-                new_headers_available = true;
-                request_count = 1;
-                client->nodegroup->log_write_cb("Requested next headers chunk from node %d (%zu candidate peers, tip=%u)\n", selected_node->nodeid, candidate_len, tip_height);
+                size_t max_parallel = candidate_len < MAX_PARALLEL_HEADER_REQUESTS ? candidate_len : MAX_PARALLEL_HEADER_REQUESTS;
+                for (size_t lane = 0; lane < max_parallel; lane++) {
+                    size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
+                    dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
+                    uint32_t lane_hint = (uint32_t)((client->next_headers_peer_cursor + lane) % MAX_HEADER_LANES);
+                    selected_node->hints = lane_hint;
+                    dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
+                    client->nodegroup->log_write_cb("Requested next headers chunk from node %d (lane=%zu/%zu, locator_trim=%u, tip=%u)\n", selected_node->nodeid, lane + 1, max_parallel, lane_hint, tip_height);
+                    new_headers_available = true;
+                    request_count++;
+                }
+                client->next_headers_peer_cursor += (uint32_t)max_parallel;
             }
             if (request_count > 0) {
                 client->nodegroup->log_write_cb("Requested headers/blocks from %u peer(s) at height %u (tip=%u)\n", request_count, longest_chain_height, tip_height);
