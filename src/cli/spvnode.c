@@ -284,12 +284,13 @@ static int spv_filter_oldest_utxo_height = 0;
 /* Keep enough headers in memory so filtered historical scans can start at checkpoint/genesis floor. */
 #define SPV_FILTERED_MIN_HEADERS_IN_MEM 50000U
 
-static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogecoin_bool prompt)
+static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogecoin_bool prompt, int max_height)
 {
     const dogecoin_checkpoint* checkpoints = NULL;
     int count = 0;
     int latest = 0;
     int selected = 0;
+    int default_idx = 0;
     int i;
 
     if (chain == &dogecoin_chainparams_main) {
@@ -306,6 +307,19 @@ static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogeco
 
     latest = count - 1;
     selected = latest;
+    default_idx = latest;
+
+    if (max_height >= 0) {
+        default_idx = 0;
+        for (i = 0; i < count; i++) {
+            if ((int)checkpoints[i].height <= max_height) {
+                default_idx = i;
+            } else {
+                break;
+            }
+        }
+        selected = default_idx;
+    }
 
     printf("Available checkpoints (%d total):\n", count);
     for (i = 0; i < count; i++) {
@@ -314,14 +328,20 @@ static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogeco
 
     if (!prompt) return selected;
 
-    printf("Select checkpoint [1-%d] (default %d): ", count, count);
+    printf("Select checkpoint [1-%d] (default %d): ", count, (default_idx + 1));
     fflush(stdout);
     {
         char input[32];
         if (fgets(input, sizeof(input), stdin)) {
             int choice = atoi(input);
             if (choice >= 1 && choice <= count) {
-                selected = choice - 1;
+                if (max_height >= 0 && (int)checkpoints[choice - 1].height > max_height) {
+                    printf("Selected checkpoint is newer than loaded headers start height %d, using default %u instead.\n",
+                           max_height, checkpoints[default_idx].height);
+                    selected = default_idx;
+                } else {
+                    selected = choice - 1;
+                }
             }
         }
     }
@@ -710,7 +730,16 @@ int main(int argc, char* argv[]) {
             ret = EXIT_FAILURE;
         } else {
             if (spv_select_checkpoint) {
-                selected_checkpoint_index = spv_choose_checkpoint_index(chain, prompt);
+                int loaded_start_height = -1;
+                dogecoin_blockindex* loaded_tip = client->headers_db->getchaintip(client->headers_db_ctx);
+                if (loaded_tip) {
+                    dogecoin_blockindex* start_cursor = loaded_tip;
+                    while (start_cursor && start_cursor->prev) start_cursor = start_cursor->prev;
+                    if (start_cursor && start_cursor->height > 0) {
+                        loaded_start_height = (int)start_cursor->height;
+                    }
+                }
+                selected_checkpoint_index = spv_choose_checkpoint_index(chain, prompt, (prompt ? loaded_start_height : -1));
                 if (selected_checkpoint_index >= 0) {
                     const dogecoin_checkpoint* checkpoints = (chain == &dogecoin_chainparams_main) ?
                         dogecoin_mainnet_checkpoint_array : dogecoin_testnet_checkpoint_array;
