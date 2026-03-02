@@ -127,6 +127,18 @@ typedef struct spv_header_parse_result_ {
 
 typedef struct spv_headers_pipeline_ctx_ spv_headers_pipeline_ctx;
 
+static dogecoin_node* spv_find_node_by_id(dogecoin_spv_client* client, int nodeid)
+{
+    size_t i;
+    for (i = 0; i < client->nodegroup->nodes->len; i++) {
+        dogecoin_node* node = vector_idx(client->nodegroup->nodes, i);
+        if (node && node->nodeid == nodeid) {
+            return node;
+        }
+    }
+    return NULL;
+}
+
 static dogecoin_bool spv_validate_headers_payload(uint32_t amount_of_headers, const uint8_t* payload, size_t payload_len, const dogecoin_chainparams* params)
 {
     /* Worker stage keeps prevalidation lightweight; authoritative parsing/validation occurs on commit. */
@@ -163,18 +175,6 @@ static void spv_free_header_parse_result(spv_header_parse_result* result)
     if (!result) return;
     dogecoin_free(result->payload);
     dogecoin_free(result);
-}
-
-static dogecoin_node* spv_find_node_by_id(dogecoin_spv_client* client, int nodeid)
-{
-    size_t i;
-    for (i = 0; i < client->nodegroup->nodes->len; i++) {
-        dogecoin_node* node = vector_idx(client->nodegroup->nodes, i);
-        if (node && node->nodeid == nodeid) {
-            return node;
-        }
-    }
-    return NULL;
 }
 
 static void* spv_headers_pipeline_worker(void* arg)
