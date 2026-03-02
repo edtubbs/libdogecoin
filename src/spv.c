@@ -126,25 +126,26 @@ typedef struct spv_header_parse_result_ {
 } spv_header_parse_result;
 
 typedef struct spv_headers_pipeline_ctx_ spv_headers_pipeline_ctx;
+static const size_t SPV_HEADER_WIRE_SIZE = 80U;
 
 static dogecoin_bool spv_validate_headers_payload(uint32_t amount_of_headers, const uint8_t* payload, size_t payload_len, const dogecoin_chainparams* params)
 {
+    /* Keep params in signature for future chain-specific prevalidation hooks. */
+    UNUSED(params);
     if (amount_of_headers == 0) return true;
-    if (!payload || !params) return false;
+    if (!payload) return false;
 
     struct const_buffer workbuf = { payload, payload_len };
     for (uint32_t i = 0; i < amount_of_headers; i++) {
-        dogecoin_blockindex tmp;
-        dogecoin_mem_zero(&tmp, sizeof(tmp));
-        if (!dogecoin_block_header_deserialize(&tmp.header, &workbuf, params, &tmp.chainwork)) {
+        /* Structural prevalidation only; full header deserialization happens on main-thread commit. */
+        uint8_t header_bytes[SPV_HEADER_WIRE_SIZE];
+        if (workbuf.len < SPV_HEADER_WIRE_SIZE || !deser_bytes(header_bytes, &workbuf, SPV_HEADER_WIRE_SIZE)) {
             return false;
         }
         uint32_t txcount = 0;
         if (!deser_varlen(&txcount, &workbuf) || txcount != 0) {
-            dogecoin_block_header_free(&tmp.header);
             return false;
         }
-        dogecoin_block_header_free(&tmp.header);
     }
     return (workbuf.len == 0);
 }
