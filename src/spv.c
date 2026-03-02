@@ -126,7 +126,6 @@ typedef struct spv_header_parse_result_ {
 } spv_header_parse_result;
 
 typedef struct spv_headers_pipeline_ctx_ spv_headers_pipeline_ctx;
-static const size_t SPV_HEADER_WIRE_SIZE = 80U;
 
 static dogecoin_bool spv_validate_headers_payload(uint32_t amount_of_headers, const uint8_t* payload, size_t payload_len, const dogecoin_chainparams* params)
 {
@@ -137,9 +136,9 @@ static dogecoin_bool spv_validate_headers_payload(uint32_t amount_of_headers, co
 
     struct const_buffer workbuf = { payload, payload_len };
     for (uint32_t i = 0; i < amount_of_headers; i++) {
-        /* Structural prevalidation only; full header deserialization happens on main-thread commit. */
-        uint8_t header_bytes[SPV_HEADER_WIRE_SIZE];
-        if (workbuf.len < SPV_HEADER_WIRE_SIZE || !deser_bytes(header_bytes, &workbuf, SPV_HEADER_WIRE_SIZE)) {
+        dogecoin_blockindex tmp;
+        dogecoin_mem_zero(&tmp, sizeof(tmp));
+        if (!dogecoin_block_header_deserialize(&tmp.header, &workbuf, params, &tmp.chainwork)) {
             return false;
         }
         uint32_t txcount = 0;
@@ -548,6 +547,8 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->stats_block_bytes_total = 0;
     client->start_ts = (uint64_t)time(NULL);
     client->next_headers_peer_cursor = 0;
+    client->header_no_progress_rounds = 0;
+    client->last_tip_height_observed = 0;
 
     // SMPV default off
     client->smpv_ctx = NULL;
@@ -850,6 +851,14 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
         return false;
     }
     unsigned int tip_height = chaintip->height;
+    if (client->last_tip_height_observed == tip_height) {
+        if (client->header_no_progress_rounds < 1024) {
+            client->header_no_progress_rounds++;
+        }
+    } else {
+        client->last_tip_height_observed = tip_height;
+        client->header_no_progress_rounds = 0;
+    }
     // If in header or block sync state, request headers or blocks from the node with the longest chain
     if ((client->stateflags & SPV_HEADER_SYNC_FLAG) == SPV_HEADER_SYNC_FLAG || (client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG)
     {
@@ -914,7 +923,15 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 }
             }
             if (!request_blocks && candidate_len > 0) {
-                size_t max_parallel = candidate_len < MAX_PARALLEL_HEADER_REQUESTS ? candidate_len : MAX_PARALLEL_HEADER_REQUESTS;
+                size_t max_parallel_cap = candidate_len < MAX_PARALLEL_HEADER_REQUESTS ? candidate_len : MAX_PARALLEL_HEADER_REQUESTS;
+                size_t max_parallel = max_parallel_cap;
+                if (max_parallel_cap > 1) {
+                    size_t progressive = (size_t)client->header_no_progress_rounds + 1;
+                    if (progressive < 1) progressive = 1;
+                    if (progressive < max_parallel) {
+                        max_parallel = progressive;
+                    }
+                }
                 for (size_t lane = 0; lane < max_parallel; lane++) {
                     size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
                     dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
@@ -965,7 +982,15 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
             }
         }
         if (candidate_len > 0) {
-            size_t max_parallel = candidate_len < MAX_PARALLEL_HEADER_REQUESTS ? candidate_len : MAX_PARALLEL_HEADER_REQUESTS;
+            size_t max_parallel_cap = candidate_len < MAX_PARALLEL_HEADER_REQUESTS ? candidate_len : MAX_PARALLEL_HEADER_REQUESTS;
+            size_t max_parallel = max_parallel_cap;
+            if (max_parallel_cap > 1) {
+                size_t progressive = (size_t)client->header_no_progress_rounds + 1;
+                if (progressive < 1) progressive = 1;
+                if (progressive < max_parallel) {
+                    max_parallel = progressive;
+                }
+            }
             for (size_t lane = 0; lane < max_parallel; lane++) {
                 size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
                 dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
