@@ -87,6 +87,28 @@ static dogecoin_bool smpv_rebuild_watcher_index(dogecoin_smpv_client* client)
     return true;
 }
 
+static dogecoin_bool smpv_watcher_index_add(dogecoin_smpv_client* client, uint32_t idx)
+{
+    if (!client || idx >= client->watcher_count) return false;
+    if (!client->watchers[idx].address) return false;
+
+    smpv_watcher_index_entry* head = (smpv_watcher_index_entry*)client->watcher_index;
+    smpv_watcher_index_entry* entry = NULL;
+    HASH_FIND_STR(head, client->watchers[idx].address, entry);
+    if (entry) {
+        entry->index = idx;
+        return true;
+    }
+
+    entry = (smpv_watcher_index_entry*)dogecoin_calloc(1, sizeof(*entry));
+    if (!entry) return false;
+    entry->address = client->watchers[idx].address;
+    entry->index = idx;
+    HASH_ADD_KEYPTR(hh, head, entry->address, strlen(entry->address), entry);
+    client->watcher_index = head;
+    return true;
+}
+
 static void smpv_clear_tx_index(dogecoin_smpv_client* client)
 {
     smpv_tx_index_entry* head = (smpv_tx_index_entry*)client->tx_index;
@@ -245,7 +267,9 @@ dogecoin_bool dogecoin_smpv_add_watcher(
     watcher->is_active = true;
     
     client->watcher_count++;
-    smpv_rebuild_watcher_index(client);
+    if (!smpv_watcher_index_add(client, client->watcher_count - 1)) {
+        smpv_rebuild_watcher_index(client);
+    }
     return true;
 }
 
@@ -302,6 +326,9 @@ dogecoin_smpv_watcher* dogecoin_smpv_get_watcher(
             client->watchers[entry->index].address &&
             strcmp(client->watchers[entry->index].address, address) == 0) {
             return &client->watchers[entry->index];
+        }
+        if ((uint32_t)HASH_COUNT(head) == client->watcher_count) {
+            return NULL;
         }
     }
 
@@ -499,6 +526,9 @@ dogecoin_smpv_tx* dogecoin_smpv_get_tx(
             client->mempool_txs[entry->index].txid &&
             strcmp(client->mempool_txs[entry->index].txid, txid) == 0) {
             return &client->mempool_txs[entry->index];
+        }
+        if ((uint32_t)HASH_COUNT(head) == client->mempool_tx_count) {
+            return NULL;
         }
     }
 
