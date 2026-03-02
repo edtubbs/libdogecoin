@@ -520,7 +520,6 @@ static dogecoin_bool smpv_tx_matches_address(const dogecoin_smpv_client* client,
         if (!out || !out->script_pubkey || out->script_pubkey->len == 0) continue;
 
         char out_address[P2PKHLEN];
-        dogecoin_mem_zero(out_address, sizeof(out_address));
         if (!dogecoin_tx_out_pubkey_hash_to_p2pkh_address(out, out_address, is_mainnet)) continue;
         if (strcmp(out_address, address) == 0) return true;
     }
@@ -540,7 +539,6 @@ static const char* smpv_tx_find_relevant_watcher_address(const dogecoin_smpv_cli
         if (!out || !out->script_pubkey || out->script_pubkey->len == 0) continue;
 
         char out_address[P2PKHLEN];
-        dogecoin_mem_zero(out_address, sizeof(out_address));
         if (!dogecoin_tx_out_pubkey_hash_to_p2pkh_address(out, out_address, is_mainnet)) continue;
 
         if (head) {
@@ -575,28 +573,28 @@ dogecoin_smpv_tx** dogecoin_smpv_get_address_txs(
     *tx_count = 0;
     if (!client->mempool_txs || client->mempool_tx_count == 0) return NULL;
 
-    size_t match_count = 0;
-    for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
-        if (!client->mempool_txs[i].decoded_tx) continue;
-        if (smpv_tx_matches_address(client, client->mempool_txs[i].decoded_tx, address)) {
-            match_count++;
-        }
-    }
-
-    if (match_count == 0) return NULL;
-
-    dogecoin_smpv_tx** matches = (dogecoin_smpv_tx**)dogecoin_calloc(match_count, sizeof(dogecoin_smpv_tx*));
+    size_t cap = (size_t)client->mempool_tx_count;
+    dogecoin_smpv_tx** matches = (dogecoin_smpv_tx**)dogecoin_calloc(cap, sizeof(dogecoin_smpv_tx*));
     if (!matches) return NULL;
 
-    size_t idx = 0;
+    size_t found = 0;
     for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
         if (!client->mempool_txs[i].decoded_tx) continue;
-        if (smpv_tx_matches_address(client, client->mempool_txs[i].decoded_tx, address)) {
-            matches[idx++] = &client->mempool_txs[i];
-        }
+        if (!smpv_tx_matches_address(client, client->mempool_txs[i].decoded_tx, address)) continue;
+        matches[found++] = &client->mempool_txs[i];
     }
 
-    *tx_count = match_count;
+    if (found == 0) {
+        dogecoin_free(matches);
+        return NULL;
+    }
+
+    if (found < cap) {
+        dogecoin_smpv_tx** shrink = (dogecoin_smpv_tx**)realloc(matches, found * sizeof(dogecoin_smpv_tx*));
+        if (shrink) matches = shrink;
+    }
+
+    *tx_count = found;
     return matches;
 }
 
