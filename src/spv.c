@@ -133,7 +133,8 @@ static dogecoin_bool spv_validate_headers_payload(uint32_t amount_of_headers, co
     UNUSED(params);
     if (amount_of_headers == 0) return true;
     if (!payload) return false;
-    return (payload_len > 0);
+    if (payload_len == 0) return false;
+    return (payload_len >= ((size_t)amount_of_headers * 81U));
 }
 
 #ifndef _WIN32
@@ -914,7 +915,6 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 size_t max_parallel = max_parallel_cap;
                 if (max_parallel_cap > 1) {
                     size_t progressive = (size_t)client->header_no_progress_rounds + 1;
-                    if (progressive < 1) progressive = 1;
                     if (progressive < max_parallel) {
                         max_parallel = progressive;
                     }
@@ -973,7 +973,6 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
             size_t max_parallel = max_parallel_cap;
             if (max_parallel_cap > 1) {
                 size_t progressive = (size_t)client->header_no_progress_rounds + 1;
-                if (progressive < 1) progressive = 1;
                 if (progressive < max_parallel) {
                     max_parallel = progressive;
                 }
