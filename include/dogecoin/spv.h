@@ -83,6 +83,7 @@ typedef struct dogecoin_spv_client_
 
     void* smpv_ctx;
     dogecoin_bool smpv_enabled;
+    void* headers_pipeline_ctx;
 
     /* callbacks */
     /* ========= */
