@@ -1405,17 +1405,25 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     int total = (tip_height - start_height) + 1;
     if (total == 0) return;
 
-    /* Find a connected peer to send the request to. */
-    dogecoin_node* peer = NULL;
+    /* Find connected peers to send the request to (prefer bloom-capable peers). */
+    dogecoin_node* peers[5] = {0};
+    dogecoin_node* fallback_peer = NULL;
+    int peer_count = 0;
     unsigned int ni;
     for (ni = 0; ni < (unsigned int)client->nodegroup->nodes->len; ni++) {
         dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, ni);
-        if (n && (n->state & NODE_CONNECTED) && n->version_handshake) {
-            peer = n;
-            break;
+        if (!n || ((n->state & NODE_CONNECTED) != NODE_CONNECTED) || !n->version_handshake) continue;
+        if ((n->services & DOGECOIN_NODE_BLOOM) == DOGECOIN_NODE_BLOOM) {
+            peers[peer_count++] = n;
+            if (peer_count == (int)(sizeof(peers) / sizeof(peers[0]))) break;
+        } else if (!fallback_peer) {
+            fallback_peer = n;
         }
     }
-    if (!peer) return;
+    if (peer_count == 0 && fallback_peer) {
+        peers[peer_count++] = fallback_peer;
+    }
+    if (peer_count == 0) return;
 
     /* Reset rescan progress counters. */
     client->rescan_total = 0;
@@ -1492,38 +1500,40 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
         return;
     }
 
-    /* Send in batches of batch_max, oldest first. */
-    while (sent < total) {
-        int batch = total - sent;
-        if (batch > batch_max) batch = batch_max;
+    for (int pi = 0; pi < peer_count; pi++) {
+        sent = 0;
+        while (sent < total) {
+            int batch = total - sent;
+            if (batch > batch_max) batch = batch_max;
 
-        /* Build getdata payload: varint(count) + count * (uint32 type + uint256 hash) */
-        cstring* payload = cstr_new_sz(9 + (size_t)batch * 36);
-        if (!payload) break;
+            /* Build getdata payload: varint(count) + count * (uint32 type + uint256 hash) */
+            cstring* payload = cstr_new_sz(9 + (size_t)batch * 36);
+            if (!payload) break;
 
-        ser_varlen(payload, (uint32_t)batch);
+            ser_varlen(payload, (uint32_t)batch);
 
-        int bi;
-        for (bi = 0; bi < batch; bi++) {
-            uint32_t type = DOGECOIN_INV_TYPE_FILTERED_BLOCK;
-            ser_u32(payload, type);
-            ser_bytes(payload, block_hashes + ((size_t)(sent + bi) * 32), 32);
+            int bi;
+            for (bi = 0; bi < batch; bi++) {
+                uint32_t type = DOGECOIN_INV_TYPE_FILTERED_BLOCK;
+                ser_u32(payload, type);
+                ser_bytes(payload, block_hashes + ((size_t)(sent + bi) * 32), 32);
+            }
+
+            cstring *p2p_msg = dogecoin_p2p_message_new(
+                peers[pi]->nodegroup->chainparams->netmagic,
+                DOGECOIN_MSG_GETDATA,
+                (const uint8_t*)payload->str, payload->len);
+            dogecoin_node_send(peers[pi], p2p_msg);
+            cstr_free(p2p_msg, true);
+            cstr_free(payload, true);
+
+            sent += batch;
         }
-
-        cstring *p2p_msg = dogecoin_p2p_message_new(
-            peer->nodegroup->chainparams->netmagic,
-            DOGECOIN_MSG_GETDATA,
-            (const uint8_t*)payload->str, payload->len);
-        dogecoin_node_send(peer, p2p_msg);
-        cstr_free(p2p_msg, true);
-        cstr_free(payload, true);
-
-        sent += batch;
     }
 
     if (client->nodegroup->log_write_cb) {
-        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) from node %d\n",
-            total, start_height, tip_height, peer->nodeid);
+        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) from %d node(s)\n",
+            total, start_height, tip_height, peer_count);
     }
 
     client->filtered_history_last_end_height = tip_height;

@@ -423,10 +423,6 @@ void spv_sync_completed(dogecoin_spv_client* client) {
             printf("Note: already-known wallet transactions from that older range are still retained and do not need to be re-requested.\n");
             printf("Hint: rerun with -q/--select_checkpoint and choose a checkpoint at or before height %d (e.g. %d).\n",
                    spv_filter_oldest_utxo_height, suggested_checkpoint_height);
-        } else if (available_start_height > 0 && spv_filter_oldest_utxo_height == 0) {
-            printf("Warning: locally available headers start at %d; older transactions before this height cannot be discovered in this run.\n",
-                   available_start_height);
-            printf("Hint: rerun with a fresh headers file and select an older checkpoint with -q/--select_checkpoint.\n");
         }
         dogecoin_net_spv_request_filtered_history(client, request_depth);
     }
