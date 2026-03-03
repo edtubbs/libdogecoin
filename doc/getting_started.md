@@ -51,6 +51,7 @@ At this step there are plenty of flags that can be specified, the two most perti
 ./configure --disable-net --disable-tools
 ./configure LD_LIBRARY_PATH='path/to/additional/libraries'
 ./configure CFLAGS='-Ipath/to/additional/include/files'
+./configure --enable-debug --enable-tss2 --enable-test-passwd
 ```
 
 For a complete list of all different configuration options, you can run the command `./configure --help`.
@@ -65,6 +66,14 @@ Or, if you would like to also run our basic unit tests, you can run the command 
 
 ```c
 make check
+```
+
+To test TPM flows on Linux without interactive password prompts, configure with `--enable-test-passwd` and run a TPM emulator before `make check`:
+
+```c
+mkdir -p /tmp/libdogecoin-tpm
+swtpm socket --tpm2 --tpmstate dir=/tmp/libdogecoin-tpm --ctrl type=tcp,port=2322 --server type=tcp,port=2321 --flags not-need-init &
+export TSS2_TCTI="swtpm:host=127.0.0.1,port=2321"
 ```
 
 _Output:_

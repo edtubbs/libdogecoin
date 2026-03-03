@@ -69,6 +69,38 @@ void test_tpm()
     // Decrypt the seed with the TPM2
     u_assert_true (dogecoin_decrypt_seed_with_tpm (decrypted_seed, TEST_FILE));
     debug_print ("Decrypted seed: %s\n", utils_uint8_to_hex (decrypted_seed, sizeof (SEED)));
+    u_assert_mem_eq (seed, decrypted_seed, sizeof (SEED));
+
+    // Generate and decrypt an HD node with the TPM2
+    dogecoin_hdnode node, decrypted_node;
+    u_assert_true (dogecoin_generate_hdnode_encrypt_with_tpm (&node, TEST_FILE, true));
+    u_assert_true (dogecoin_decrypt_hdnode_with_tpm (&decrypted_node, TEST_FILE));
+    u_assert_mem_eq (&node, &decrypted_node, sizeof (dogecoin_hdnode));
+
+    // Generate and decrypt a mnemonic with the TPM2
+    MNEMONIC mnemonic = {0};
+    MNEMONIC decrypted_mnemonic = {0};
+    u_assert_true (dogecoin_generate_mnemonic_encrypt_with_tpm(mnemonic, TEST_FILE, true, "eng", " ", NULL));
+    u_assert_true (dogecoin_decrypt_mnemonic_with_tpm(decrypted_mnemonic, TEST_FILE));
+    u_assert_mem_eq (mnemonic, decrypted_mnemonic, sizeof (MNEMONIC));
+
+    // list encryption keys in the TPM
+    wchar_t *names[MAX_FILES] = {0};
+    size_t count = 0;
+    u_assert_true (dogecoin_list_encryption_keys_in_tpm(names, &count));
+    u_assert_true (count >= 3);
+    for (size_t i = 0; i < count; i++) {
+        if (names[i]) dogecoin_free(names[i]);
+    }
+
+    // test generateRandomEnglishMnemonicTPM
+    u_assert_true (generateRandomEnglishMnemonicTPM(mnemonic, TEST_FILE, true));
+
+    // test derived address helpers with encrypted objects
+    char derived_address[35];
+    u_assert_true (getDerivedHDAddressFromEncryptedSeed(0, 0, BIP44_CHANGE_EXTERNAL, derived_address, false, TEST_FILE) == 0);
+    u_assert_true (getDerivedHDAddressFromEncryptedMnemonic(0, 0, BIP44_CHANGE_EXTERNAL, NULL, derived_address, false, TEST_FILE) == 0);
+    u_assert_true (getDerivedHDAddressFromEncryptedHDNode(0, 0, BIP44_CHANGE_EXTERNAL, derived_address, false, TEST_FILE) == 0);
 
 #elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
 

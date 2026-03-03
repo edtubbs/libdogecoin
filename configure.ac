@@ -98,6 +98,12 @@ AC_ARG_ENABLE([debug],
   [enable_debug=$enableval],
   [enable_debug=no])
 
+AC_ARG_ENABLE([test-passwd],
+  [AS_HELP_STRING([--enable-test-passwd],
+                  [use a fixed TPM test password to avoid interactive prompts (default is no)])],
+  [enable_test_passwd=$enableval],
+  [enable_test_passwd=no])
+
 AC_ARG_ENABLE([tools],
   [AS_HELP_STRING([--disable-tools],
   [disable dogecoin tool cli application])],
@@ -180,6 +186,10 @@ if test "x$enable_debug" = xyes; then
   CFLAGS="$CFLAGS -g3 -O0 -DDEBUG"
   CXXFLAGS="$CXXFLAGS -g3 -O0 -DDEBUG"
   AC_DEFINE_UNQUOTED([ENABLE_DEBUG],[1],[Define to 1 to enable debug output])
+fi
+
+if test "x$enable_test_passwd" = xyes; then
+  AC_DEFINE_UNQUOTED([ENABLE_TEST_PASSWD],[1],[Define to 1 to use fixed TPM test password])
 fi
 
 if test "x$with_net" = xyes; then

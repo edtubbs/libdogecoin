@@ -29,6 +29,8 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - verify_message
 - transaction
 
+For Linux TPM commands (`list_encryption_keys_in_tpm`, `decrypt_master_key_with_tpm`, `decrypt_mnemonic_with_tpm`), run against a TPM2 device or TPM emulator and build with `--enable-tss2`. For automated/non-interactive tests, also configure with `--enable-test-passwd`.
+
 So an example run of `such` could be something like this:
 ```
 ./such -c generate_private_key
