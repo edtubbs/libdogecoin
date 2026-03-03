@@ -78,6 +78,7 @@ static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 static const unsigned int MAX_INVALID_STREAK_VALUE = 0xFFU;
 static const unsigned int INVALID_STREAK_SENTINEL = 0x100U;
 static const unsigned int MAX_PARALLEL_HEADER_REQUESTS = 5;
+static const unsigned int MAX_HEADER_LANE_TRIM = 10;
 
 static unsigned int spv_get_invalid_header_streak(const dogecoin_node* node)
 {
@@ -922,7 +923,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 for (size_t lane = 0; lane < max_parallel; lane++) {
                     size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
                     dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
-                    uint32_t lane_hint = (uint32_t)((client->next_headers_peer_cursor + lane) % MAX_PARALLEL_HEADER_REQUESTS);
+                    uint32_t lane_hint = (uint32_t)(((client->next_headers_peer_cursor % MAX_HEADER_LANE_TRIM) + (lane * 2U)) % MAX_HEADER_LANE_TRIM);
                     selected_node->hints = (selected_node->hints & ~HEADER_LANE_HINT_MASK) | lane_hint;
                     dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
                     client->nodegroup->log_write_cb("Requested next headers chunk from node %d (lane=%zu/%zu, lane_trim_offset=%u, tip=%u)\n", selected_node->nodeid, lane + 1, max_parallel, lane_hint, tip_height);
@@ -980,7 +981,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
             for (size_t lane = 0; lane < max_parallel; lane++) {
                 size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
                 dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
-                uint32_t lane_hint = (uint32_t)((client->next_headers_peer_cursor + lane) % MAX_PARALLEL_HEADER_REQUESTS);
+                uint32_t lane_hint = (uint32_t)(((client->next_headers_peer_cursor % MAX_HEADER_LANE_TRIM) + (lane * 2U)) % MAX_HEADER_LANE_TRIM);
                 selected_node->hints = (selected_node->hints & ~HEADER_LANE_HINT_MASK) | lane_hint;
                 dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
                 new_headers_available = true;
