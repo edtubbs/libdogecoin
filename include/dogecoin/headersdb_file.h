@@ -39,6 +39,9 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+#define SPV_HEADERS_FILE_HDR_LEN 8 /* magic(4) + version(4) */
+#define SPV_HEADERS_FILE_REC_LEN (32 + 4 + 32 + 80) /* hash + height + chainwork + header */
+
 /* filebased headers database (including binary tree option for fast access)
 */
 typedef struct dogecoin_headers_db_

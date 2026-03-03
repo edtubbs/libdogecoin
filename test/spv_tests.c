@@ -592,6 +592,9 @@ void test_reorg() {
 // BIP37 filter state tests
 void test_bip37_filter_state()
 {
+    u_assert_true(SPV_HEADERS_FILE_HDR_LEN == 8);
+    u_assert_true(SPV_HEADERS_FILE_REC_LEN == 148);
+
     dogecoin_spv_client* client = dogecoin_spv_client_new(&dogecoin_chainparams_main, false, true, false, false, 1, NULL);
     u_assert_true(client != NULL);
 

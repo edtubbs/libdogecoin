@@ -68,9 +68,6 @@
 #define SPV_VARINT_MAX_LEN 9 /* compactSize max bytes; we reserve max for simple one-pass allocation */
 #define SPV_FILTERLOAD_FIXED_FIELDS_LEN 9 /* 4-byte nHashFuncs + 4-byte nTweak + 1-byte flags */
 #define SPV_TXID_HEX_LEN 65 /* 32-byte hash => 64 hex chars + NUL */
-#define SPV_HEADERS_FILE_HDR_LEN 8 /* magic(4) + version(4) */
-#define SPV_HEADERS_FILE_REC_LEN (32 + 4 + 32 + 80) /* hash + height + chainwork + header */
-
 /* Build and send filterload directly from SPV/network context. */
 static dogecoin_bool spv_send_filterload_to_node(dogecoin_node* node,
                                                  const uint8_t* filter,
