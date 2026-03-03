@@ -71,6 +71,34 @@ int dogecoin_header_compare(const void *l, const void *r)
     return 0;
 }
 
+static void dogecoin_headers_db_prune_in_memory_chain(dogecoin_headers_db* db)
+{
+    if (!db || db->max_hdr_in_mem == 0 || !db->chaintip) return;
+
+    dogecoin_blockindex *scan_tip = db->chaintip;
+    unsigned int i;
+    unsigned int traversed = 0;
+    for (i = 0; i < db->max_hdr_in_mem && scan_tip->prev; i++) {
+        scan_tip = scan_tip->prev;
+        traversed++;
+    }
+
+    if (!scan_tip || traversed < db->max_hdr_in_mem || !scan_tip->prev || scan_tip == &db->genesis) return;
+
+    dogecoin_blockindex* old_chain = scan_tip->prev;
+    scan_tip->prev = NULL;
+    db->chainbottom = scan_tip;
+
+    while (old_chain && old_chain != &db->genesis) {
+        dogecoin_blockindex* next = old_chain->prev;
+        if (db->use_binary_tree) {
+            dogecoin_btree_tdelete(old_chain, &db->tree_root, dogecoin_header_compare);
+        }
+        dogecoin_free(old_chain);
+        old_chain = next;
+    }
+}
+
 /**
  * The function creates a new dogecoin_headers_db object and initializes it
  *
@@ -256,12 +284,18 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                     }
                     else {
                         connected_headers_count++;
+                        /* Prune every 1024 loaded headers to reduce per-header overhead
+                         * while keeping temporary load-time memory growth bounded. */
+                        if (db->max_hdr_in_mem > 0 && (connected_headers_count & 0x3ff) == 0) {
+                            dogecoin_headers_db_prune_in_memory_chain(db);
+                        }
                     }
                 }
                 memcpy(db->chaintip->chainwork, chainwork, sizeof(uint256_t));
             }
         }
     }
+    dogecoin_headers_db_prune_in_memory_chain(db);
     printf("\nConnected %ld headers, now at height: %d\n",  connected_headers_count, db->chaintip->height);
     return (db->headers_tree_file != NULL);
 }
@@ -444,7 +478,7 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
             dogecoin_btree_tsearch(blockindex, &db->tree_root, dogecoin_header_compare);
         }
 
-        if (db->max_hdr_in_mem > 0) {
+        if (!load_process && db->max_hdr_in_mem > 0) {
             // de-allocate no longer required headers
             // keep them only on-disk
             dogecoin_blockindex *scan_tip = db->chaintip;
