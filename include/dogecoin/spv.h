@@ -82,6 +82,7 @@ typedef struct dogecoin_spv_client_
     uint64_t stats_fees_total;
     uint64_t stats_block_bytes_total;
     uint64_t start_ts;
+    int headers_target_nodeid;
 
     void* smpv_ctx;
     dogecoin_bool smpv_enabled;
@@ -108,6 +109,7 @@ LIBDOGECOIN_API void dogecoin_spv_enable_smpv(dogecoin_spv_client* client, dogec
 LIBDOGECOIN_API dogecoin_bool dogecoin_spv_handle_mempool_tx_hex(dogecoin_spv_client* client, const char* raw_tx_hex);
 LIBDOGECOIN_API void dogecoin_spv_get_smpv_stats(dogecoin_spv_client* client, uint32_t* total_txs, uint32_t* watched_addrs);
 LIBDOGECOIN_API void dogecoin_net_spv_request_mempool(dogecoin_spv_client *client);
+LIBDOGECOIN_API void dogecoin_spv_set_headers_target_node(dogecoin_spv_client* client, int nodeid);
 
 LIBDOGECOIN_END_DECL
 

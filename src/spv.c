@@ -78,7 +78,6 @@ static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 static const unsigned int MAX_INVALID_STREAK_VALUE = 0xFFU;
 static const unsigned int INVALID_STREAK_SENTINEL = 0x100U;
 static const unsigned int MAX_PARALLEL_HEADER_REQUESTS = 5;
-static const unsigned int MAX_HEADER_LANE_TRIM = 10;
 
 static unsigned int spv_get_invalid_header_streak(const dogecoin_node* node)
 {
@@ -535,6 +534,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->stats_fees_total = 0;
     client->stats_block_bytes_total = 0;
     client->start_ts = (uint64_t)time(NULL);
+    client->headers_target_nodeid = -1;
     client->next_headers_peer_cursor = 0;
     client->header_no_progress_rounds = 0;
     client->last_tip_height_observed = 0;
@@ -545,6 +545,14 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->headers_pipeline_ctx = spv_headers_pipeline_init();
 
     return client;
+}
+
+void dogecoin_spv_set_headers_target_node(dogecoin_spv_client* client, int nodeid)
+{
+    if (!client) {
+        return;
+    }
+    client->headers_target_nodeid = nodeid;
 }
 
 /**
@@ -834,6 +842,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
 {
     size_t i;
     dogecoin_bool new_headers_available = false;
+    int headers_target_nodeid = client->headers_target_nodeid;
     spv_headers_pipeline_drain(client);
     dogecoin_blockindex *chaintip = client->headers_db->getchaintip(client->headers_db_ctx);
     if (!chaintip) {
@@ -878,6 +887,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                     dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
                     if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
                         check_node->version_handshake &&
+                        (headers_target_nodeid < 0 || check_node->nodeid == headers_target_nodeid) &&
                         check_node->bestknownheight == longest_chain_height &&
                         (check_node->state & NODE_HEADERSYNC) != NODE_HEADERSYNC &&
                         (check_node->state & NODE_BLOCKSYNC) != NODE_BLOCKSYNC)
@@ -894,6 +904,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
                 if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
                     check_node->version_handshake &&
+                    (headers_target_nodeid < 0 || check_node->nodeid == headers_target_nodeid) &&
                     check_node->bestknownheight == longest_chain_height &&
                     (check_node->state & NODE_HEADERSYNC) != NODE_HEADERSYNC &&
                     (check_node->state & NODE_BLOCKSYNC) != NODE_BLOCKSYNC)
@@ -923,7 +934,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 for (size_t lane = 0; lane < max_parallel; lane++) {
                     size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
                     dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
-                    uint32_t lane_hint = (uint32_t)(((client->next_headers_peer_cursor % MAX_HEADER_LANE_TRIM) + (lane * 2U)) % MAX_HEADER_LANE_TRIM);
+                    uint32_t lane_hint = (uint32_t)((client->next_headers_peer_cursor + lane) % MAX_PARALLEL_HEADER_REQUESTS);
                     selected_node->hints = (selected_node->hints & ~HEADER_LANE_HINT_MASK) | lane_hint;
                     dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
                     client->nodegroup->log_write_cb("Requested next headers chunk from node %d (lane=%zu/%zu, lane_trim_offset=%u, tip=%u)\n", selected_node->nodeid, lane + 1, max_parallel, lane_hint, tip_height);
@@ -949,6 +960,9 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
         {
             dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
             if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) && check_node->version_handshake && check_node->bestknownheight > tip_height) {
+                if (headers_target_nodeid >= 0 && check_node->nodeid != headers_target_nodeid) {
+                    continue;
+                }
                 unsigned int streak = spv_get_invalid_header_streak(check_node);
                 if (streak < best_invalid_streak) {
                     best_invalid_streak = streak;
@@ -960,6 +974,9 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
             dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
             if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) && check_node->version_handshake)
             {
+                if (headers_target_nodeid >= 0 && check_node->nodeid != headers_target_nodeid) {
+                    continue;
+                }
                 if (check_node->bestknownheight > tip_height && spv_get_invalid_header_streak(check_node) == best_invalid_streak) {
                     if (candidate_len < MAX_HEADER_SYNC_CANDIDATES) {
                         candidate_node_indices[candidate_len++] = i;
@@ -981,7 +998,7 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
             for (size_t lane = 0; lane < max_parallel; lane++) {
                 size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
                 dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
-                uint32_t lane_hint = (uint32_t)(((client->next_headers_peer_cursor % MAX_HEADER_LANE_TRIM) + (lane * 2U)) % MAX_HEADER_LANE_TRIM);
+                uint32_t lane_hint = (uint32_t)((client->next_headers_peer_cursor + lane) % MAX_PARALLEL_HEADER_REQUESTS);
                 selected_node->hints = (selected_node->hints & ~HEADER_LANE_HINT_MASK) | lane_hint;
                 dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
                 new_headers_available = true;

@@ -46,6 +46,7 @@
 
 #include <ctype.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -453,6 +454,7 @@ static struct option long_options[] = {
         {"debug", no_argument, NULL, 'd'},
         {"maxnodes", required_argument, NULL, 'm'},
         {"workers", required_argument, NULL, 'o'},
+        {"headers_node", required_argument, NULL, 'g'},
         {"mnemonic", no_argument, NULL, 'n'},
         {"pass_phrase", no_argument, NULL, 's'},
         {"dbfile", no_argument, NULL, 'f'},
@@ -484,7 +486,7 @@ static void print_version() {
  */
 static void print_usage() {
     print_version();
-    printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m|--maxnodes <int>) (-o|--workers <int>) (-f <headersfile|0 for in mem only>) \
+    printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m|--maxnodes <int>) (-o|--workers <int>) (-g|--headers_node <nodeid>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
 (-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
 (-u|--http_server <ip:port>) (-x|--smpv) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
@@ -604,6 +606,7 @@ int main(int argc, char* argv[]) {
     char* http_server = NULL;
     int file_num = NO_FILE;
     dogecoin_bool smpv_cli_enable = false;
+    int headers_target_nodeid = -1;
 
     if (argc == 2 && (!strcmp(argv[1], "-v") || !strcmp(argv[1], "--version"))) {
         print_version();
@@ -617,7 +620,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:o:n:f:y:u:w:h:a:lbpzkj:xv", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:o:g:n:f:y:u:w:h:a:lbpzkj:xv", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -645,6 +648,17 @@ int main(int argc, char* argv[]) {
                     if (workers < 1) workers = 1;
                     if (workers > 64) workers = 64;
                     break;
+                case 'g':
+                {
+                    char* endptr = NULL;
+                    long parsed_nodeid = strtol(optarg, &endptr, 10);
+                    if (endptr == optarg || *endptr != '\0' || parsed_nodeid < 0 || parsed_nodeid > INT_MAX) {
+                        printf("Invalid nodeid for -g/--headers_node: %s\n", optarg);
+                        exit(EXIT_FAILURE);
+                    }
+                    headers_target_nodeid = (int)parsed_nodeid;
+                    break;
+                }
                 case 'n':
                     mnemonic_in = optarg;
                     break;
@@ -722,6 +736,12 @@ int main(int argc, char* argv[]) {
         dogecoin_ecc_start();
         dogecoin_bool headers_memonly = (dbfile != NULL) && (!strcmp(dbfile, "0") || !strcmp(dbfile, "no"));
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, headers_memonly, use_checkpoint, full_sync, maxnodes, http_server);
+        if (headers_target_nodeid >= 0) {
+            dogecoin_spv_set_headers_target_node(client, headers_target_nodeid);
+            if (debug) {
+                printf("Targeting getheaders to nodeid %d\n", headers_target_nodeid);
+            }
+        }
         if (http_server) {
             evhttp_set_gencb(client->nodegroup->http_server, dogecoin_http_request_cb, client);
         }
