@@ -47,6 +47,8 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/validation.h>
 
+#define TEST_MAX_HEADERS_IN_MEMORY 1
+
 void test_spv_sync_completed(dogecoin_spv_client* client) {
     printf("Sync completed, at height %d\n", client->headers_db->getchaintip(client->headers_db_ctx)->height);
     dogecoin_node_group_shutdown(client->nodegroup);
@@ -585,6 +587,114 @@ void test_reorg() {
 
     // Cleanup
     dogecoin_spv_client_free(client);
+    remove_all_hashes();
+    remove_all_maps();
+}
+
+void test_headersdb_disk_height_lookup_after_prune() {
+    const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
+    char* headersfile = "test_headers_lookup.db";
+    unlink(headersfile);
+
+    dogecoin_spv_client* client = dogecoin_spv_client_new(chain, false, false, false, false, 1, NULL);
+    dogecoin_spv_client_load(client, headersfile, false);
+    dogecoin_headers_db* db = client->headers_db_ctx;
+    db->max_hdr_in_mem = TEST_MAX_HEADERS_IN_MEMORY;
+
+    dogecoin_block_header* header1 = dogecoin_block_header_new();
+    dogecoin_block_header* header2 = dogecoin_block_header_new();
+    dogecoin_block_header* header3 = dogecoin_block_header_new();
+    dogecoin_block_header* header4 = dogecoin_block_header_new();
+    size_t outlen;
+
+    header1->version = 1;
+    header1->timestamp = 1386474927;
+    header1->nonce = 1417875456;
+    header1->bits = 0x1e0ffff0;
+    {
+        char prevblock_hex[65] = "1a91e3dace36e2be3bf030a65679fe821aa1d6ef92e7c9902eb318182c355691";
+        char merkleroot_hex[65] = "5f7e779f7600f54e528686e91d5891f3ae226ee907f461692519e549105f521c";
+        utils_reverse_hex(prevblock_hex, 64);
+        utils_reverse_hex(merkleroot_hex, 64);
+        utils_hex_to_bin(prevblock_hex, (uint8_t*) header1->prev_block, 64, &outlen);
+        utils_hex_to_bin(merkleroot_hex, (uint8_t*) header1->merkle_root, 64, &outlen);
+    }
+
+    header2->version = 1;
+    header2->timestamp = 1386474933;
+    header2->nonce = 3404207872;
+    header2->bits = 0x1e0ffff0;
+    {
+        char prevblock_hex[65] = "82bc68038f6034c0596b6e313729793a887fded6e92a31fbdf70863f89d9bea2";
+        char merkleroot_hex[65] = "3b14b76d22a3f2859d73316002bc1b9bfc7f37e2c3393be9b722b62bbd786983";
+        utils_reverse_hex(prevblock_hex, 64);
+        utils_reverse_hex(merkleroot_hex, 64);
+        utils_hex_to_bin(prevblock_hex, (uint8_t*) header2->prev_block, 64, &outlen);
+        utils_hex_to_bin(merkleroot_hex, (uint8_t*) header2->merkle_root, 64, &outlen);
+    }
+
+    header3->version = 1;
+    header3->timestamp = 1386474940;
+    header3->nonce = 3785361152;
+    header3->bits = 0x1e0ffff0;
+    {
+        char prevblock_hex[65] = "ea5380659e02a68c073369e502125c634b2fb0aaf351b9360c673368c4f20c96";
+        char merkleroot_hex[65] = "1e10c28574e3b9d7032329b624ce4ac8064d0e91324aa14634aa2da61146ddfd";
+        utils_reverse_hex(prevblock_hex, 64);
+        utils_reverse_hex(merkleroot_hex, 64);
+        utils_hex_to_bin(prevblock_hex, (uint8_t*) header3->prev_block, 64, &outlen);
+        utils_hex_to_bin(merkleroot_hex, (uint8_t*) header3->merkle_root, 64, &outlen);
+    }
+
+    header4->version = 1;
+    header4->timestamp = 1386474943;
+    header4->nonce = 151130624;
+    header4->bits = 0x1e0ffff0;
+    {
+        char prevblock_hex[65] = "76f80a8a81e6f6669d340651723b874f97395c4dbda200f8b024df4c6566a92c";
+        char merkleroot_hex[65] = "9f69a09b940fc7645b0a261e81a1f777e3e6514989eaf15bbc66759fa49b70c2";
+        utils_reverse_hex(prevblock_hex, 64);
+        utils_reverse_hex(merkleroot_hex, 64);
+        utils_hex_to_bin(prevblock_hex, (uint8_t*) header4->prev_block, 64, &outlen);
+        utils_hex_to_bin(merkleroot_hex, (uint8_t*) header4->merkle_root, 64, &outlen);
+    }
+
+    cstring* cbuf_all = cstr_new_sz(80 * 4);
+    dogecoin_block_header_serialize(cbuf_all, header1);
+    dogecoin_block_header_serialize(cbuf_all, header2);
+    dogecoin_block_header_serialize(cbuf_all, header3);
+    dogecoin_block_header_serialize(cbuf_all, header4);
+
+    struct const_buffer cbuf_header1 = {cbuf_all->str, 80};
+    struct const_buffer cbuf_header2 = {cbuf_all->str + 80, 80};
+    struct const_buffer cbuf_header3 = {cbuf_all->str + 160, 80};
+    struct const_buffer cbuf_header4 = {cbuf_all->str + 240, 80};
+    dogecoin_bool connected = false;
+    u_assert_true(dogecoin_headers_db_connect_hdr(db, &cbuf_header1, false, &connected) != NULL);
+    u_assert_true(connected);
+    u_assert_true(dogecoin_headers_db_connect_hdr(db, &cbuf_header2, false, &connected) != NULL);
+    u_assert_true(connected);
+    u_assert_true(dogecoin_headers_db_connect_hdr(db, &cbuf_header3, false, &connected) != NULL);
+    u_assert_true(connected);
+    u_assert_true(dogecoin_headers_db_connect_hdr(db, &cbuf_header4, false, &connected) != NULL);
+    u_assert_true(connected);
+
+    uint256_t hash1;
+    dogecoin_block_header_hash(header1, (uint8_t*)hash1);
+    u_assert_true(dogecoin_headersdb_find(db, hash1) == NULL);
+    {
+        uint32_t disk_height = 0;
+        u_assert_true(dogecoin_headersdb_find_height_on_disk(db, hash1, &disk_height));
+        u_assert_true(disk_height == 1);
+    }
+
+    cstr_free(cbuf_all, true);
+    dogecoin_block_header_free(header1);
+    dogecoin_block_header_free(header2);
+    dogecoin_block_header_free(header3);
+    dogecoin_block_header_free(header4);
+    dogecoin_spv_client_free(client);
+    unlink(headersfile);
     remove_all_hashes();
     remove_all_maps();
 }

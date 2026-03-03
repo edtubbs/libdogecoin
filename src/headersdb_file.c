@@ -558,6 +558,37 @@ dogecoin_blockindex * dogecoin_headersdb_find(dogecoin_headers_db* db, uint256_t
     return NULL;
 }
 
+dogecoin_bool dogecoin_headersdb_find_height_on_disk(dogecoin_headers_db* db, const uint256_t hash, uint32_t* height_out) {
+    if (!db || !db->headers_tree_file || !height_out) return false;
+
+    long old_pos = ftell(db->headers_tree_file);
+    dogecoin_bool can_restore_pos = (old_pos != -1L);
+    uint8_t rec[SPV_HEADERS_FILE_REC_LEN];
+    dogecoin_bool found = false;
+
+    if (fseek(db->headers_tree_file, SPV_HEADERS_FILE_HDR_LEN, SEEK_SET) != 0) {
+        return false;
+    }
+
+    while (fread(rec, sizeof(rec), 1, db->headers_tree_file) == 1) {
+        struct const_buffer rec_buf = { rec, sizeof(rec) };
+        uint256_t rec_hash;
+        uint32_t h = 0;
+        uint256_t rec_chainwork;
+        deser_u256(rec_hash, &rec_buf);
+        deser_u32(&h, &rec_buf);
+        deser_u256(rec_chainwork, &rec_buf);
+        if (memcmp(rec_hash, hash, sizeof(uint256_t)) == 0) {
+            *height_out = h;
+            found = true;
+            break;
+        }
+    }
+
+    if (can_restore_pos) fseek(db->headers_tree_file, old_pos, SEEK_SET);
+    return found;
+}
+
 /**
  * Get the block index of the current tip of the main chain
  *
