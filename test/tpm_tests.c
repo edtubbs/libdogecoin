@@ -12,6 +12,7 @@
 #include <dogecoin/seal.h>
 #include <dogecoin/utils.h>
 #include <stdlib.h>
+#include <string.h>
 
 #if defined (_WIN64) && !defined(__MINGW64__)
 #include <windows.h>
@@ -99,8 +100,11 @@ void test_tpm()
     // test derived address helpers with encrypted objects
     char derived_address[35];
     u_assert_true (getDerivedHDAddressFromEncryptedSeed(0, 0, BIP44_CHANGE_EXTERNAL, derived_address, false, TEST_FILE) == 0);
+    u_assert_true (strlen(derived_address) > 0);
     u_assert_true (getDerivedHDAddressFromEncryptedMnemonic(0, 0, BIP44_CHANGE_EXTERNAL, NULL, derived_address, false, TEST_FILE) == 0);
+    u_assert_true (strlen(derived_address) > 0);
     u_assert_true (getDerivedHDAddressFromEncryptedHDNode(0, 0, BIP44_CHANGE_EXTERNAL, derived_address, false, TEST_FILE) == 0);
+    u_assert_true (strlen(derived_address) > 0);
 
 #elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
 

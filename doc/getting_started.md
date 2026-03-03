@@ -76,6 +76,8 @@ swtpm socket --tpm2 --tpmstate dir=/tmp/libdogecoin-tpm --ctrl type=tcp,port=232
 export TSS2_TCTI="swtpm:host=127.0.0.1,port=2321"
 ```
 
+When finished testing, stop the background emulator with `kill <pid>` (where `<pid>` is `$!` from the `swtpm` command) and remove `/tmp/libdogecoin-tpm` if desired.
+
 _Output:_
 
 ```c

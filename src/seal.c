@@ -50,6 +50,7 @@
  * Defines
  */
 #define RESP_RAND_OFFSET 12 // Offset to the random data in the TPM2_CC_GetRandom response
+#define MAX_RSA_ENCRYPTED_SIZE 256
 
 /**
  * @brief Validates a file number
@@ -85,7 +86,8 @@ static dogecoin_bool linux_tpm_get_password(char* out, size_t out_size, const ch
 #else
     char password_copy[128] = {0};
     char* password = getpass(prompt);
-    if (!password || strlen(password) == 0 || strlen(password) >= sizeof(password_copy)) {
+    size_t password_len = password ? strnlen(password, sizeof(password_copy)) : 0;
+    if (!password || password_len == 0 || password_len >= sizeof(password_copy)) {
         return false;
     }
     strncpy(password_copy, password, sizeof(password_copy) - 1);
@@ -343,13 +345,13 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
     }
 
     size_t encrypted_size = (size_t)(file_size - header_size);
-    if (encrypted_size > 256) {
+    if (encrypted_size > MAX_RSA_ENCRYPTED_SIZE) {
         fclose(fp);
         Esys_Finalize(&context);
         return false;
     }
-    uint8_t encrypted_blob[256] = {0};
-    if (encrypted_size > sizeof(encrypted_blob) || fread(encrypted_blob, 1, encrypted_size, fp) != encrypted_size) {
+    uint8_t encrypted_blob[MAX_RSA_ENCRYPTED_SIZE] = {0};
+    if (fread(encrypted_blob, 1, encrypted_size, fp) != encrypted_size) {
         fclose(fp);
         Esys_Finalize(&context);
         return false;
@@ -1493,6 +1495,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
     char* rand_hex = utils_uint8_to_hex((uint8_t*)random_bytes->buffer, random_bytes->size);
     size_t mnemonicSize = 0;
     int mnemonicResult = dogecoin_generate_mnemonic("256", lang, space, (const char*)rand_hex, words, NULL, &mnemonicSize, mnemonic);
+    utils_clear_buffers();
     Esys_Free(random_bytes);
     Esys_Finalize(&context);
     if (mnemonicResult == -1) {
@@ -1860,6 +1863,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
         snprintf(filename, sizeof(filename), "encrypted_seed_%d", i);
         if (access(filename, F_OK) == 0) {
             names[*count] = malloc((wcslen(L"dogecoin_seed_000") + 1) * sizeof(wchar_t));
+            if (names[*count] == NULL) return false;
             swprintf(names[*count], wcslen(L"dogecoin_seed_000") + 1, L"dogecoin_seed_%03d", i);
             (*count)++;
         }
@@ -1867,6 +1871,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
         snprintf(filename, sizeof(filename), "encrypted_hdnode_%d", i);
         if (access(filename, F_OK) == 0) {
             names[*count] = malloc((wcslen(L"dogecoin_master_000") + 1) * sizeof(wchar_t));
+            if (names[*count] == NULL) return false;
             swprintf(names[*count], wcslen(L"dogecoin_master_000") + 1, L"dogecoin_master_%03d", i);
             (*count)++;
         }
@@ -1874,6 +1879,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
         snprintf(filename, sizeof(filename), "encrypted_mnemonic_%d", i);
         if (access(filename, F_OK) == 0) {
             names[*count] = malloc((wcslen(L"dogecoin_mnemonic_000") + 1) * sizeof(wchar_t));
+            if (names[*count] == NULL) return false;
             swprintf(names[*count], wcslen(L"dogecoin_mnemonic_000") + 1, L"dogecoin_mnemonic_%03d", i);
             (*count)++;
         }
