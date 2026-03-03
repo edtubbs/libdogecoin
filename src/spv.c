@@ -68,6 +68,8 @@
 #define SPV_VARINT_MAX_LEN 9 /* compactSize max bytes; we reserve max for simple one-pass allocation */
 #define SPV_FILTERLOAD_FIXED_FIELDS_LEN 9 /* 4-byte nHashFuncs + 4-byte nTweak + 1-byte flags */
 #define SPV_TXID_HEX_LEN 65 /* 32-byte hash => 64 hex chars + NUL */
+#define SPV_HEADERS_FILE_HDR_LEN 8 /* magic(4) + version(4) */
+#define SPV_HEADERS_FILE_REC_LEN (32 + 4 + 32 + 80) /* hash + height + chainwork + header */
 
 /* Build and send filterload directly from SPV/network context. */
 static dogecoin_bool spv_send_filterload_to_node(dogecoin_node* node,
@@ -1370,8 +1372,30 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
         start_height = tip_height - depth + 1;
         if (start_height < 0) start_height = 0;
     } else {
+        dogecoin_headers_db* hdb = (dogecoin_headers_db*)client->headers_db_ctx;
+        int file_start_height = -1;
+
         while (cur && cur->prev) cur = cur->prev;
         if (cur) start_height = (int)cur->height;
+
+        if (hdb && hdb->headers_tree_file) {
+            long old_pos = ftell(hdb->headers_tree_file);
+            dogecoin_bool can_restore_pos = (old_pos >= 0);
+            uint8_t rec[SPV_HEADERS_FILE_REC_LEN];
+            if (fseek(hdb->headers_tree_file, SPV_HEADERS_FILE_HDR_LEN, SEEK_SET) == 0 &&
+                fread(rec, sizeof(rec), 1, hdb->headers_tree_file) == 1) {
+                struct const_buffer rec_buf = { rec, sizeof(rec) };
+                uint256_t first_block_hash;
+                uint32_t h = 0;
+                uint256_t first_block_chainwork;
+                deser_u256(first_block_hash, &rec_buf);
+                deser_u32(&h, &rec_buf);
+                deser_u256(first_block_chainwork, &rec_buf);
+                file_start_height = (int)h;
+            }
+            if (can_restore_pos) fseek(hdb->headers_tree_file, old_pos, SEEK_SET);
+        }
+        if (file_start_height >= 0 && file_start_height < start_height) start_height = file_start_height;
         cur = tip;
     }
 
@@ -1411,26 +1435,63 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     int sent = 0;
     cur = tip;
 
-    /* Allocate array of block pointers (each is 8 bytes, so ~5MB for 680k blocks).
-       Walk backward from tip storing pointers, then iterate forward sending batches. */
-    dogecoin_blockindex** block_ptrs = (dogecoin_blockindex**)dogecoin_calloc(total, sizeof(dogecoin_blockindex*));
-    if (!block_ptrs) return;
+    /* Collect block hashes oldest->newest for requested range. */
+    uint8_t* block_hashes = (uint8_t*)dogecoin_calloc((size_t)total, 32);
+    if (!block_hashes) return;
 
-    /* Walk backward from tip, storing pointers so index 0 is oldest in requested range. */
+    dogecoin_bool collected = true;
     cur = tip;
     int idx = total - 1;
     while (cur && idx >= 0) {
         if ((int)cur->height < start_height) break;
-        block_ptrs[idx] = cur;
+        memcpy(block_hashes + ((size_t)idx * 32), cur->hash, 32);
         idx--;
         cur = cur->prev;
     }
+
+    /* If in-memory chain is truncated, backfill range from headers file records. */
     if (idx >= 0) {
+        dogecoin_headers_db* hdb = (dogecoin_headers_db*)client->headers_db_ctx;
+        uint8_t* slot_filled = NULL;
+        int found = 0;
+
+        collected = false;
+        if (hdb && hdb->headers_tree_file) {
+            long old_pos = ftell(hdb->headers_tree_file);
+            dogecoin_bool can_restore_pos = (old_pos >= 0);
+            uint8_t rec[SPV_HEADERS_FILE_REC_LEN];
+            slot_filled = (uint8_t*)dogecoin_calloc((size_t)total, 1);
+            if (slot_filled && fseek(hdb->headers_tree_file, SPV_HEADERS_FILE_HDR_LEN, SEEK_SET) == 0) {
+                while (fread(rec, sizeof(rec), 1, hdb->headers_tree_file) == 1) {
+                    struct const_buffer rec_buf = { rec, sizeof(rec) };
+                    uint256_t hash;
+                    uint32_t h = 0;
+                    uint256_t cw_unused;
+                    int offset;
+                    deser_u256(hash, &rec_buf);
+                    deser_u32(&h, &rec_buf);
+                    deser_u256(cw_unused, &rec_buf);
+                    if ((int)h < start_height || (int)h > tip_height) continue;
+                    offset = (int)h - start_height;
+                    if (!slot_filled[offset]) {
+                        memcpy(block_hashes + ((size_t)offset * 32), hash, 32);
+                        slot_filled[offset] = 1;
+                        found++;
+                        if (found == total) break;
+                    }
+                }
+            }
+            if (can_restore_pos) fseek(hdb->headers_tree_file, old_pos, SEEK_SET);
+            if (found == total) collected = true;
+        }
+        if (slot_filled) dogecoin_free(slot_filled);
+    }
+    if (!collected) {
         if (client->nodegroup->log_write_cb) {
             client->nodegroup->log_write_cb("[spv] skipped historical filtered request due to incomplete local header range (start_height=%d, tip=%d)\n",
                 start_height, tip_height);
         }
-        dogecoin_free(block_ptrs);
+        dogecoin_free(block_hashes);
         return;
     }
 
@@ -1449,7 +1510,7 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
         for (bi = 0; bi < batch; bi++) {
             uint32_t type = DOGECOIN_INV_TYPE_FILTERED_BLOCK;
             ser_u32(payload, type);
-            ser_bytes(payload, block_ptrs[sent + bi]->hash, 32);
+            ser_bytes(payload, block_hashes + ((size_t)(sent + bi) * 32), 32);
         }
 
         cstring *p2p_msg = dogecoin_p2p_message_new(
@@ -1464,15 +1525,13 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     }
 
     if (client->nodegroup->log_write_cb) {
-        int start_height = block_ptrs[0] ? (int)block_ptrs[0]->height : 0;
-        int end_height = block_ptrs[total - 1] ? (int)block_ptrs[total - 1]->height : 0;
         client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) from node %d\n",
-            total, start_height, end_height, peer->nodeid);
+            total, start_height, tip_height, peer->nodeid);
     }
 
     client->filtered_history_last_end_height = tip_height;
 
-    dogecoin_free(block_ptrs);
+    dogecoin_free(block_hashes);
 }
 
 LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterload(

@@ -281,8 +281,8 @@ static dogecoin_bool quit_when_synced = true;
 static dogecoin_bool spv_enable_filtered_blocks = false;
 static dogecoin_bool spv_select_checkpoint = false;
 static int spv_filter_oldest_utxo_height = 0;
-/* Keep enough headers in memory so filtered historical scans can start at checkpoint/genesis floor. */
-#define SPV_FILTERED_MIN_HEADERS_IN_MEM 50000U
+#define SPV_HEADERS_FILE_HDR_LEN 8
+#define SPV_HEADERS_FILE_REC_LEN (32 + 4 + 32 + 80)
 
 static int spv_choose_checkpoint_index(const dogecoin_chainparams* chain, dogecoin_bool prompt, int max_height)
 {
@@ -361,8 +361,26 @@ void spv_sync_completed(dogecoin_spv_client* client) {
     int request_start_height;
     int request_depth;
     dogecoin_blockindex* cursor = tip;
+    dogecoin_headers_db* headers_db = (dogecoin_headers_db*)client->headers_db_ctx;
     while (cursor && cursor->prev) cursor = cursor->prev;
     if (cursor) available_start_height = (int)cursor->height;
+    if (headers_db && headers_db->headers_tree_file) {
+        long old_pos = ftell(headers_db->headers_tree_file);
+        dogecoin_bool can_restore_pos = (old_pos >= 0);
+        uint8_t rec[SPV_HEADERS_FILE_REC_LEN];
+        if (fseek(headers_db->headers_tree_file, SPV_HEADERS_FILE_HDR_LEN, SEEK_SET) == 0 &&
+            fread(rec, sizeof(rec), 1, headers_db->headers_tree_file) == 1) {
+            struct const_buffer rec_buf = { rec, sizeof(rec) };
+            uint256_t first_block_hash;
+            uint32_t h = 0;
+            uint256_t first_block_chainwork;
+            deser_u256(first_block_hash, &rec_buf);
+            deser_u32(&h, &rec_buf);
+            deser_u256(first_block_chainwork, &rec_buf);
+            available_start_height = (int)h;
+        }
+        if (can_restore_pos) fseek(headers_db->headers_tree_file, old_pos, SEEK_SET);
+    }
     request_start_height = available_start_height;
     if (request_start_height < 0) request_start_height = 0;
     if (request_start_height > tip_height) request_start_height = tip_height;
@@ -693,14 +711,6 @@ int main(int argc, char* argv[]) {
         char* header_prefix = (char*)chain->chainname;
         char* headersfile = NULL;
         dogecoin_bool response = false;
-        if (spv_enable_filtered_blocks && client->headers_db_ctx) {
-            dogecoin_headers_db* headers_db = (dogecoin_headers_db*)client->headers_db_ctx;
-            if (headers_db->max_hdr_in_mem > 0 &&
-                headers_db->max_hdr_in_mem < SPV_FILTERED_MIN_HEADERS_IN_MEM) {
-                headers_db->max_hdr_in_mem = SPV_FILTERED_MIN_HEADERS_IN_MEM;
-            }
-        }
-
         if (mnemonic_in) {
             // mnemonic was provided, so store headers in separate file
             char* wallet_type = "_mnemonic";
