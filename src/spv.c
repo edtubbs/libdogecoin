@@ -1507,9 +1507,9 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     }
 
     {
-        int per_peer_sent = 0;
-        while (per_peer_sent < total) {
-            int batch = total - per_peer_sent;
+        int blocks_sent = 0;
+        while (blocks_sent < total) {
+            int batch = total - blocks_sent;
             if (batch > batch_max) batch = batch_max;
 
             /* Build getdata payload: varint(count) + count * (uint32 type + uint256 hash) */
@@ -1522,7 +1522,7 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
             for (bi = 0; bi < batch; bi++) {
                 uint32_t type = DOGECOIN_INV_TYPE_FILTERED_BLOCK;
                 ser_u32(payload, type);
-                ser_bytes(payload, block_hashes + ((size_t)(per_peer_sent + bi) * 32), 32);
+                ser_bytes(payload, block_hashes + ((size_t)(blocks_sent + bi) * 32), 32);
             }
 
             cstring *p2p_msg = dogecoin_p2p_message_new(
@@ -1533,13 +1533,13 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
             cstr_free(p2p_msg, true);
             cstr_free(payload, true);
 
-            per_peer_sent += batch;
+            blocks_sent += batch;
         }
     }
 
     if (client->nodegroup->log_write_cb) {
-        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) from one node\n",
-            total, start_height, tip_height);
+        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) from node %d\n",
+            total, start_height, tip_height, selected_peer->nodeid);
     }
 
     client->filtered_history_last_end_height = tip_height;
