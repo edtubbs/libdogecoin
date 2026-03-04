@@ -560,7 +560,9 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
         for(i = 0; i < client->nodegroup->nodes->len; ++i)
         {
             dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
-            if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) && check_node->version_handshake)
+        if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
+            ((check_node->state & NODE_MISSBEHAVED) != NODE_MISSBEHAVED) &&
+            check_node->version_handshake)
             {
                 if (check_node->bestknownheight > longest_chain_height)
                 {
@@ -584,7 +586,9 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
         for(i = 0; i < client->nodegroup->nodes->len; i++)
         {
             dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
-            if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) && check_node->version_handshake)
+            if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
+                ((check_node->state & NODE_MISSBEHAVED) != NODE_MISSBEHAVED) &&
+                check_node->version_handshake)
             {
                 if (check_node->bestknownheight > client->headers_db->getchaintip(client->headers_db_ctx)->height) {
                     dogecoin_net_spv_node_request_headers_or_blocks(check_node, false);
@@ -601,7 +605,9 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
         for(i = 0; i< client->nodegroup->nodes->len; i++)
         {
             dogecoin_node *check_node = vector_idx(client->nodegroup->nodes, i);
-            if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) && check_node->version_handshake)
+            if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
+                ((check_node->state & NODE_MISSBEHAVED) != NODE_MISSBEHAVED) &&
+                check_node->version_handshake)
             {
                 if (check_node->bestknownheight == client->headers_db->getchaintip(client->headers_db_ctx)->height) {
                     nodes_at_same_height++;
@@ -851,6 +857,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             client->nodegroup->log_write_cb("Got invalid block (not in sequence) from node %d\n", node->nodeid);
             node->state &= ~NODE_BLOCKSYNC;
             node->state |= NODE_MISSBEHAVED;
+            dogecoin_node_disconnect(node);
             node->nodegroup->node_connection_state_changed_cb(node);
             dogecoin_free(pindex);
             return;
@@ -903,6 +910,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 client->nodegroup->log_write_cb("Got invalid headers (not in sequence) from node %d\n", node->nodeid);
                 node->state &= ~NODE_HEADERSYNC;
                 node->state |= NODE_MISSBEHAVED;
+                dogecoin_node_disconnect(node);
                 node->nodegroup->node_connection_state_changed_cb(node);
                 dogecoin_free(pindex);
                 break;
@@ -974,6 +982,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             }
             node->state &= ~NODE_BLOCKSYNC;
             node->state |= NODE_MISSBEHAVED;
+            dogecoin_node_disconnect(node);
             node->nodegroup->node_connection_state_changed_cb(node);
             if (pindex && !is_historical) dogecoin_free(pindex);
             return;
@@ -1419,7 +1428,9 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     unsigned int ni;
     for (ni = 0; ni < (unsigned int)client->nodegroup->nodes->len; ni++) {
         dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, ni);
-        if (!n || ((n->state & NODE_CONNECTED) != NODE_CONNECTED) || !n->version_handshake) continue;
+        if (!n || ((n->state & NODE_CONNECTED) != NODE_CONNECTED) ||
+            ((n->state & NODE_MISSBEHAVED) == NODE_MISSBEHAVED) ||
+            !n->version_handshake) continue;
         if ((n->services & DOGECOIN_NODE_BLOOM) != 0) {
             selected_peer = n;
             break;
