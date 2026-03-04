@@ -902,6 +902,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             {
                 client->nodegroup->log_write_cb("Got invalid headers (not in sequence) from node %d\n", node->nodeid);
                 node->state &= ~NODE_HEADERSYNC;
+                node->state |= NODE_MISSBEHAVED;
                 node->nodegroup->node_connection_state_changed_cb(node);
                 dogecoin_free(pindex);
                 break;
@@ -1413,24 +1414,23 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     if (total == 0) return;
 
     /* Find connected peers to send the request to (prefer bloom-capable peers). */
-    dogecoin_node* peers[SPV_FILTER_HISTORY_MAX_REQUEST_PEERS] = {0};
+    dogecoin_node* selected_peer = NULL;
     dogecoin_node* fallback_peer = NULL;
-    int peer_count = 0;
     unsigned int ni;
     for (ni = 0; ni < (unsigned int)client->nodegroup->nodes->len; ni++) {
         dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, ni);
         if (!n || ((n->state & NODE_CONNECTED) != NODE_CONNECTED) || !n->version_handshake) continue;
         if ((n->services & DOGECOIN_NODE_BLOOM) != 0) {
-            peers[peer_count++] = n;
-            if (peer_count == SPV_FILTER_HISTORY_MAX_REQUEST_PEERS) break;
+            selected_peer = n;
+            break;
         } else if (!fallback_peer) {
             fallback_peer = n;
         }
     }
-    if (peer_count == 0 && fallback_peer) {
-        peers[peer_count++] = fallback_peer;
+    if (!selected_peer && fallback_peer) {
+        selected_peer = fallback_peer;
     }
-    if (peer_count == 0) return;
+    if (!selected_peer) return;
 
     /* Reset rescan progress counters. */
     client->rescan_total = 0;
@@ -1506,9 +1506,8 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
         return;
     }
 
-    for (int pi = 0; pi < peer_count; pi++) {
+    {
         int per_peer_sent = 0;
-        /* Intentionally request the full range from each selected peer for reliability. */
         while (per_peer_sent < total) {
             int batch = total - per_peer_sent;
             if (batch > batch_max) batch = batch_max;
@@ -1527,10 +1526,10 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
             }
 
             cstring *p2p_msg = dogecoin_p2p_message_new(
-                peers[pi]->nodegroup->chainparams->netmagic,
+                selected_peer->nodegroup->chainparams->netmagic,
                 DOGECOIN_MSG_GETDATA,
                 (const uint8_t*)payload->str, payload->len);
-            dogecoin_node_send(peers[pi], p2p_msg);
+            dogecoin_node_send(selected_peer, p2p_msg);
             cstr_free(p2p_msg, true);
             cstr_free(payload, true);
 
@@ -1539,8 +1538,8 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     }
 
     if (client->nodegroup->log_write_cb) {
-        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) from %d node(s)\n",
-            total, start_height, tip_height, peer_count);
+        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) from one node\n",
+            total, start_height, tip_height);
     }
 
     client->filtered_history_last_end_height = tip_height;
