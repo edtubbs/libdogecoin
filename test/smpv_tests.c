@@ -31,6 +31,15 @@ static void test_tx_callback(const dogecoin_smpv_tx* tx, const char* address, vo
     debug_print("    Timestamp: %llu\n", (unsigned long long)tx->timestamp);
 }
 
+static void sum_unconfirmed_script_types(const dogecoin_smpv_client* client, uint64_t* p2pkh_out) {
+    *p2pkh_out = 0;
+    for (uint32_t i = 0; i < client->mempool_tx_count; i++) {
+        const dogecoin_smpv_tx* tx = &client->mempool_txs[i];
+        if (tx->is_confirmed) continue;
+        *p2pkh_out += tx->p2pkh_out;
+    }
+}
+
 /* Test SMPV client creation and destruction */
 void test_smpv_client_creation() {
     debug_print("%s", "Testing SMPV client creation...\n");
@@ -554,6 +563,15 @@ void test_confirmation_tracking() {
         return;
     }
 
+    uint64_t unconfirmed_p2pkh = 0;
+    sum_unconfirmed_script_types(client, &unconfirmed_p2pkh);
+    if (unconfirmed_p2pkh != tx->p2pkh_out) {
+        debug_print("  Unconfirmed P2PKH should be %u, got %llu\n",
+                    tx->p2pkh_out, (unsigned long long)unconfirmed_p2pkh);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
     debug_print("%s", "  Transaction initially unconfirmed (0 confirmations)\n");
 
     /* Confirm the transaction at block height 100 */
@@ -587,6 +605,14 @@ void test_confirmation_tracking() {
 
     if (client->unconfirmed_count != 0) {
         debug_print("  Unconfirmed count should be 0, got %u\n", client->unconfirmed_count);
+        dogecoin_smpv_client_free(client);
+        return;
+    }
+
+    sum_unconfirmed_script_types(client, &unconfirmed_p2pkh);
+    if (unconfirmed_p2pkh != 0) {
+        debug_print("  Unconfirmed P2PKH should be 0 after confirmation, got %llu\n",
+                    (unsigned long long)unconfirmed_p2pkh);
         dogecoin_smpv_client_free(client);
         return;
     }
