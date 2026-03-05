@@ -1146,6 +1146,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             /* Log individual blocks only when they have matches. */
             client->nodegroup->log_write_cb("[merkle] MATCH at height %d: nTx=%u matched=%u\n",
                 pindex->height, nTx, client->merkle_match_pending);
+        } else if (client->filtered_history_last_end_height >= 0 &&
+                   client->nodegroup && client->nodegroup->log_write_cb &&
+                   (client->rescan_total <= 50 || (client->rescan_total % 1000) == 0)) {
+            /* During historical scans, emit early + periodic parse logs so we can confirm merkleblocks are being processed. */
+            client->nodegroup->log_write_cb("[merkle] parsed height %d: nTx=%u matched=0 (scanned=%llu)\n",
+                pindex->height, nTx, (unsigned long long)client->rescan_total);
         }
         /* Log periodic progress every 10,000 blocks. */
         if (client->rescan_total % 10000 == 0) {
@@ -1428,9 +1434,9 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
         }
     }
 
-    /* Find connected bloom-capable peers to send historical requests through. */
-    dogecoin_node* history_peers[8];
-    int history_peer_count = 0;
+    /* Find one connected bloom-capable peer and keep historical requests serialized on it.
+       This avoids interleaved merkleblock streams that can constantly reset match state. */
+    dogecoin_node* history_peer = NULL;
     unsigned int ni;
     for (ni = 0; ni < (unsigned int)client->nodegroup->nodes->len; ni++) {
         dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, ni);
@@ -1438,26 +1444,24 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
             ((n->state & NODE_MISSBEHAVED) == NODE_MISSBEHAVED) ||
             !n->version_handshake) continue;
         if ((n->services & DOGECOIN_NODE_BLOOM) != 0) {
-            history_peers[history_peer_count++] = n;
-            if (history_peer_count == (int)(sizeof(history_peers) / sizeof(history_peers[0]))) break;
+            history_peer = n;
+            break;
         }
     }
-    if (history_peer_count == 0) {
+    if (!history_peer) {
         if (client->nodegroup->log_write_cb) {
             client->nodegroup->log_write_cb("[spv] skipped historical filtered request: no connected bloom-capable peer available\n");
         }
         return;
     }
 
-    /* Ensure selected historical peers have our current bloom filter loaded. */
-    for (ni = 0; ni < (unsigned int)history_peer_count; ni++) {
-        spv_send_filterload_to_node(history_peers[ni],
-                                    client->bloom_filter,
-                                    client->bloom_filter_len,
-                                    client->bloom_nhashfunc,
-                                    client->bloom_ntweak,
-                                    client->bloom_flags);
-    }
+    /* Ensure selected historical peer has our current bloom filter loaded. */
+    spv_send_filterload_to_node(history_peer,
+                                client->bloom_filter,
+                                client->bloom_filter_len,
+                                client->bloom_nhashfunc,
+                                client->bloom_ntweak,
+                                client->bloom_flags);
 
     /* Reset rescan progress counters. */
     client->rescan_total = 0;
@@ -1554,12 +1558,11 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
                 ser_bytes(payload, block_hashes + ((size_t)(blocks_sent + bi) * 32), 32);
             }
 
-            dogecoin_node* batch_peer = history_peers[(blocks_sent / batch_max) % history_peer_count];
             cstring *p2p_msg = dogecoin_p2p_message_new(
-                batch_peer->nodegroup->chainparams->netmagic,
+                history_peer->nodegroup->chainparams->netmagic,
                 DOGECOIN_MSG_GETDATA,
                 (const uint8_t*)payload->str, payload->len);
-            dogecoin_node_send(batch_peer, p2p_msg);
+            dogecoin_node_send(history_peer, p2p_msg);
             cstr_free(p2p_msg, true);
             cstr_free(payload, true);
 
@@ -1568,8 +1571,8 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     }
 
     if (client->nodegroup->log_write_cb) {
-        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) across %d bloom peers\n",
-            total, start_height, request_end_height, history_peer_count);
+        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) via bloom peer %d\n",
+            total, start_height, request_end_height, history_peer->nodeid);
     }
 
     client->filtered_history_last_end_height = request_end_height;
