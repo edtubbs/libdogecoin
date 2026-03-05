@@ -1141,14 +1141,17 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
         /* Update rescan progress counters. */
         client->rescan_total++;
+        static const uint64_t early_rescan_log_threshold = 50;
+        static const uint64_t periodic_rescan_log_interval = 1000;
         if (client->merkle_match_pending > 0) {
             client->rescan_matched++;
             /* Log individual blocks only when they have matches. */
             client->nodegroup->log_write_cb("[merkle] MATCH at height %d: nTx=%u matched=%u\n",
                 pindex->height, nTx, client->merkle_match_pending);
-        } else if (client->filtered_history_last_end_height >= 0 &&
-                   client->nodegroup && client->nodegroup->log_write_cb &&
-                   (client->rescan_total <= 50 || (client->rescan_total % 1000) == 0)) {
+        } else if (client->nodegroup->log_write_cb &&
+                   client->filtered_history_last_end_height >= 0 &&
+                   (client->rescan_total <= early_rescan_log_threshold ||
+                    (client->rescan_total % periodic_rescan_log_interval) == 0)) {
             /* During historical scans, emit early + periodic parse logs so we can confirm merkleblocks are being processed. */
             client->nodegroup->log_write_cb("[merkle] parsed height %d: nTx=%u matched=0 (scanned=%llu)\n",
                 pindex->height, nTx, (unsigned long long)client->rescan_total);
