@@ -1372,6 +1372,7 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     if (!tip) return;
 
     int tip_height = (int)tip->height;
+    int request_end_height = tip_height;
     int start_height = tip_height;
     dogecoin_blockindex* cur = tip;
 
@@ -1416,8 +1417,18 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     int total = (tip_height - start_height) + 1;
     if (total == 0) return;
 
-    /* Find connected peers to send the request to (prefer bloom-capable peers). */
-    dogecoin_node* selected_peer = NULL;
+    /* Bound each historical request window so peers can realistically serve it. */
+    {
+        const int max_historical_request_blocks = 50000;
+        if (total > max_historical_request_blocks) {
+            request_end_height = start_height + max_historical_request_blocks - 1;
+            total = max_historical_request_blocks;
+        }
+    }
+
+    /* Find connected bloom-capable peers to send historical requests through. */
+    dogecoin_node* history_peers[8];
+    int history_peer_count = 0;
     unsigned int ni;
     for (ni = 0; ni < (unsigned int)client->nodegroup->nodes->len; ni++) {
         dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, ni);
@@ -1425,15 +1436,25 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
             ((n->state & NODE_MISSBEHAVED) == NODE_MISSBEHAVED) ||
             !n->version_handshake) continue;
         if ((n->services & DOGECOIN_NODE_BLOOM) != 0) {
-            selected_peer = n;
-            break;
+            history_peers[history_peer_count++] = n;
+            if (history_peer_count == (int)(sizeof(history_peers) / sizeof(history_peers[0]))) break;
         }
     }
-    if (!selected_peer) {
+    if (history_peer_count == 0) {
         if (client->nodegroup->log_write_cb) {
             client->nodegroup->log_write_cb("[spv] skipped historical filtered request: no connected bloom-capable peer available\n");
         }
         return;
+    }
+
+    /* Ensure selected historical peers have our current bloom filter loaded. */
+    for (ni = 0; ni < (unsigned int)history_peer_count; ni++) {
+        spv_send_filterload_to_node(history_peers[ni],
+                                    client->bloom_filter,
+                                    client->bloom_filter_len,
+                                    client->bloom_nhashfunc,
+                                    client->bloom_ntweak,
+                                    client->bloom_flags);
     }
 
     /* Reset rescan progress counters. */
@@ -1449,6 +1470,7 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
        then send and repeat. */
     int batch_max = 500;
     cur = tip;
+    while (cur && (int)cur->height > request_end_height) cur = cur->prev;
 
     /* Collect block hashes oldest->newest for requested range. */
     uint8_t* block_hashes = (uint8_t*)dogecoin_calloc((size_t)total, 32);
@@ -1456,6 +1478,7 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
 
     dogecoin_bool collected = true;
     cur = tip;
+    while (cur && (int)cur->height > request_end_height) cur = cur->prev;
     int idx = total - 1;
     while (cur && idx >= 0) {
         if ((int)cur->height < start_height) break;
@@ -1486,7 +1509,7 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
                     deser_u256(hash, &rec_buf);
                     deser_u32(&h, &rec_buf);
                     deser_u256(cw_unused, &rec_buf);
-                    if ((int)h < start_height || (int)h > tip_height) continue;
+                    if ((int)h < start_height || (int)h > request_end_height) continue;
                     offset = (int)h - start_height;
                     if (!slot_filled[offset]) {
                         memcpy(block_hashes + ((size_t)offset * 32), hash, 32);
@@ -1503,8 +1526,8 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     }
     if (!collected) {
         if (client->nodegroup->log_write_cb) {
-            client->nodegroup->log_write_cb("[spv] skipped historical filtered request due to incomplete local header range (start_height=%d, tip=%d)\n",
-                start_height, tip_height);
+            client->nodegroup->log_write_cb("[spv] skipped historical filtered request due to incomplete local header range (start_height=%d, end=%d)\n",
+                start_height, request_end_height);
         }
         dogecoin_free(block_hashes);
         return;
@@ -1529,11 +1552,12 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
                 ser_bytes(payload, block_hashes + ((size_t)(blocks_sent + bi) * 32), 32);
             }
 
+            dogecoin_node* batch_peer = history_peers[(blocks_sent / batch_max) % history_peer_count];
             cstring *p2p_msg = dogecoin_p2p_message_new(
-                selected_peer->nodegroup->chainparams->netmagic,
+                batch_peer->nodegroup->chainparams->netmagic,
                 DOGECOIN_MSG_GETDATA,
                 (const uint8_t*)payload->str, payload->len);
-            dogecoin_node_send(selected_peer, p2p_msg);
+            dogecoin_node_send(batch_peer, p2p_msg);
             cstr_free(p2p_msg, true);
             cstr_free(payload, true);
 
@@ -1542,11 +1566,11 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
     }
 
     if (client->nodegroup->log_write_cb) {
-        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) from node %d\n",
-            total, start_height, tip_height, selected_peer->nodeid);
+        client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) across %d bloom peers\n",
+            total, start_height, request_end_height, history_peer_count);
     }
 
-    client->filtered_history_last_end_height = tip_height;
+    client->filtered_history_last_end_height = request_end_height;
 
     dogecoin_free(block_hashes);
 }
