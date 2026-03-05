@@ -107,7 +107,6 @@ extern void test_reorg();
 extern void test_spv();
 extern void test_bip37_filter_state();
 extern void test_bip37_merkleblock_vector();
-extern void test_headersdb_disk_height_lookup_after_prune();
 #else
 extern void test_net_flag_not_defined();
 #endif
@@ -195,7 +194,6 @@ int main()
     u_run_test(test_spv);
     u_run_test(test_bip37_filter_state);
     u_run_test(test_bip37_merkleblock_vector);
-    u_run_test(test_headersdb_disk_height_lookup_after_prune);
 #else
     u_run_test(test_net_flag_not_defined);
 #endif

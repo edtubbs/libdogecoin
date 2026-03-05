@@ -965,12 +965,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 dogecoin_free(pindex);
                 pindex = found;
                 is_historical = true;
-            } else {
-                uint32_t disk_height = 0;
-                if (dogecoin_headersdb_find_height_on_disk(db, pindex->hash, &disk_height)) {
-                    pindex->height = disk_height;
-                    is_historical = true;
-                }
             }
         }
 

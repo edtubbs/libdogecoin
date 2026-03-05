@@ -284,18 +284,12 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                     }
                     else {
                         connected_headers_count++;
-                        /* Prune every 1024 loaded headers to reduce per-header overhead
-                         * while keeping temporary load-time memory growth bounded. */
-                        if (db->max_hdr_in_mem > 0 && (connected_headers_count & 0x3ff) == 0) {
-                            dogecoin_headers_db_prune_in_memory_chain(db);
-                        }
                     }
                 }
                 memcpy(db->chaintip->chainwork, chainwork, sizeof(uint256_t));
             }
         }
     }
-    dogecoin_headers_db_prune_in_memory_chain(db);
     printf("\nConnected %ld headers, now at height: %d\n",  connected_headers_count, db->chaintip->height);
     return (db->headers_tree_file != NULL);
 }
