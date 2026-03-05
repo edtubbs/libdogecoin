@@ -1,0 +1,129 @@
+name: SPV historical resume
+
+on:
+  workflow_dispatch:
+    inputs:
+      address:
+        description: Dogecoin address for filtered block scan
+        required: true
+        default: DFhe3jyi2rLtmCHz6bvTiG46eoAoBQgggQ
+      checkpoint_choice:
+        description: Checkpoint menu choice used on a fresh headers DB
+        required: true
+        default: "24"
+      continue_chain:
+        description: Dispatch the next run before this runner exits
+        required: true
+        default: "true"
+      hop:
+        description: Current chained run number
+        required: true
+        default: "1"
+      max_hops:
+        description: Maximum chained runs before stopping
+        required: true
+        default: "12"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  spv-resume:
+    runs-on: ubuntu-latest
+    timeout-minutes: 58
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore SPV state cache
+        id: cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            build/main_headers.db
+            build/main_wallet.db
+          key: spv-state-${{ github.ref_name }}-
+          restore-keys: |
+            spv-state-${{ github.ref_name }}-
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libevent-dev
+
+      - name: Build spvnode
+        run: |
+          cmake -S . -B build -DWITH_NET=ON
+          cmake --build build --target spvnode -j"$(nproc)"
+
+      - name: Run bounded SPV sync chunk
+        id: run-spv
+        env:
+          ADDRESS: ${{ github.event.inputs.address }}
+          CHECKPOINT_CHOICE: ${{ github.event.inputs.checkpoint_choice }}
+        run: |
+          set +e
+          cd build
+          printf '\n\n%s\n' "$CHECKPOINT_CHOICE" | timeout 50m ./spvnode -c -x -a "$ADDRESS" -g -q -p scan > spv-run.log 2>&1
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]; then
+            tail -n 200 spv-run.log
+            exit "$rc"
+          fi
+          python - <<'PY'
+          from pathlib import Path
+          import struct
+          p=Path('main_headers.db')
+          if not p.exists() or p.stat().st_size < 8+148:
+              print('tip_height=unknown')
+          else:
+              n=(p.stat().st_size-8)//148
+              with p.open('rb') as f:
+                  f.seek(8+(n-1)*148+32)
+                  h=struct.unpack('<I',f.read(4))[0]
+              print(f'tip_height={h}')
+          PY
+
+      - name: Upload SPV run log
+        uses: actions/upload-artifact@v4
+        with:
+          name: spv-resume-log-hop-${{ github.event.inputs.hop }}-${{ github.run_id }}
+          path: build/spv-run.log
+          if-no-files-found: error
+
+      - name: Save updated SPV state cache
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            build/main_headers.db
+            build/main_wallet.db
+          key: spv-state-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Chain next run
+        if: ${{ github.event.inputs.continue_chain == 'true' && fromJSON(github.event.inputs.hop) < fromJSON(github.event.inputs.max_hops) }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const hop = Number('${{ github.event.inputs.hop }}');
+            const maxHops = Number('${{ github.event.inputs.max_hops }}');
+            if (hop >= maxHops) {
+              core.info(`Reached max hops (${maxHops}), not dispatching another run.`);
+              return;
+            }
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'spv-resume.yml',
+              ref: context.ref.replace('refs/heads/', ''),
+              inputs: {
+                address: '${{ github.event.inputs.address }}',
+                checkpoint_choice: '${{ github.event.inputs.checkpoint_choice }}',
+                continue_chain: '${{ github.event.inputs.continue_chain }}',
+                hop: String(hop + 1),
+                max_hops: String(maxHops)
+              }
+            });
+            core.info(`Dispatched next SPV resume hop: ${hop + 1}/${maxHops}`);
