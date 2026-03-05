@@ -44,7 +44,7 @@ jobs:
           path: |
             build/main_headers.db
             build/main_wallet.db
-          key: spv-state-${{ github.ref_name }}-
+          key: spv-state-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             spv-state-${{ github.ref_name }}-
 
@@ -76,13 +76,16 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           import struct
+          SPV_HEADERS_FILE_HDR_LEN = 8
+          SPV_HEADERS_FILE_REC_LEN = 148
+          SPV_HEADERS_HEIGHT_OFFSET = 32
           p=Path('main_headers.db')
-          if not p.exists() or p.stat().st_size < 8+148:
+          if not p.exists() or p.stat().st_size < SPV_HEADERS_FILE_HDR_LEN + SPV_HEADERS_FILE_REC_LEN:
               print('tip_height=unknown')
           else:
-              n=(p.stat().st_size-8)//148
+              n=(p.stat().st_size - SPV_HEADERS_FILE_HDR_LEN)//SPV_HEADERS_FILE_REC_LEN
               with p.open('rb') as f:
-                  f.seek(8+(n-1)*148+32)
+                  f.seek(SPV_HEADERS_FILE_HDR_LEN + (n-1)*SPV_HEADERS_FILE_REC_LEN + SPV_HEADERS_HEIGHT_OFFSET)
                   h=struct.unpack('<I',f.read(4))[0]
               print(f'tip_height={h}')
           PY
@@ -103,12 +106,16 @@ jobs:
           key: spv-state-${{ github.ref_name }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Chain next run
-        if: ${{ github.event.inputs.continue_chain == 'true' && fromJSON(github.event.inputs.hop) < fromJSON(github.event.inputs.max_hops) }}
+        if: ${{ github.event.inputs.continue_chain == 'true' }}
         uses: actions/github-script@v7
         with:
           script: |
             const hop = Number('${{ github.event.inputs.hop }}');
             const maxHops = Number('${{ github.event.inputs.max_hops }}');
+            if (!Number.isInteger(hop) || !Number.isInteger(maxHops) || hop < 1 || maxHops < 1) {
+              core.setFailed(`Invalid hop inputs: hop=${hop}, max_hops=${maxHops}. Both must be positive integers.`);
+              return;
+            }
             if (hop >= maxHops) {
               core.info(`Reached max hops (${maxHops}), not dispatching another run.`);
               return;
@@ -117,7 +124,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'spv-resume.yml',
-              ref: context.ref.replace('refs/heads/', ''),
+              ref: '${{ github.ref_name }}',
               inputs: {
                 address: '${{ github.event.inputs.address }}',
                 checkpoint_choice: '${{ github.event.inputs.checkpoint_choice }}',
