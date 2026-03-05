@@ -1424,7 +1424,6 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
 
     /* Find connected peers to send the request to (prefer bloom-capable peers). */
     dogecoin_node* selected_peer = NULL;
-    dogecoin_node* fallback_peer = NULL;
     unsigned int ni;
     for (ni = 0; ni < (unsigned int)client->nodegroup->nodes->len; ni++) {
         dogecoin_node* n = (dogecoin_node*)vector_idx(client->nodegroup->nodes, ni);
@@ -1434,14 +1433,14 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
         if ((n->services & DOGECOIN_NODE_BLOOM) != 0) {
             selected_peer = n;
             break;
-        } else if (!fallback_peer) {
-            fallback_peer = n;
         }
     }
-    if (!selected_peer && fallback_peer) {
-        selected_peer = fallback_peer;
+    if (!selected_peer) {
+        if (client->nodegroup->log_write_cb) {
+            client->nodegroup->log_write_cb("[spv] skipped historical filtered request: no connected bloom-capable peer available\n");
+        }
+        return;
     }
-    if (!selected_peer) return;
 
     /* Reset rescan progress counters. */
     client->rescan_total = 0;
