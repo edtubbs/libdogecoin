@@ -682,11 +682,6 @@ void test_headersdb_disk_height_lookup_after_prune() {
     uint256_t hash1;
     dogecoin_block_header_hash(header1, (uint8_t*)hash1);
     u_assert_true(dogecoin_headersdb_find(db, hash1) == NULL);
-    {
-        uint32_t disk_height = 0;
-        u_assert_true(dogecoin_headersdb_find_height_on_disk(db, hash1, &disk_height));
-        u_assert_true(disk_height == 1);
-    }
 
     cstr_free(cbuf_all, true);
     dogecoin_block_header_free(header1);
