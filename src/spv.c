@@ -965,10 +965,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             if (found) {
                 dogecoin_free(pindex);
                 pindex = found;
-                is_historical = true;
-            } else if (client->filtered_history_last_end_height >= 0 &&
-                       client->bloom_filter &&
-                       client->bloom_filter_len > 0) {
+            }
+            /* During filtered-history rescans, allow processing even if the header is pruned from in-memory tree. */
+            if (found || (client->filtered_history_last_end_height >= 0 && client->bloom_filter)) {
                 is_historical = true;
             }
         }
