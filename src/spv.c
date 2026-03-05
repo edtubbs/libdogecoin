@@ -434,6 +434,15 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
         dogecoin_net_spv_request_headers(client);
     }
 
+    /* Continue historical filtered scan in bounded windows after sync-complete. */
+    if (client->called_sync_completed &&
+        client->bloom_filter && client->bloom_filter_len > 0) {
+        dogecoin_blockindex* tip_now = client->headers_db->getchaintip(client->headers_db_ctx);
+        if (tip_now && client->filtered_history_last_end_height < (int)tip_now->height) {
+            dogecoin_net_spv_request_filtered_history(client, 0);
+        }
+    }
+
     client->last_statecheck_time = *now;
 }
 
