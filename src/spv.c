@@ -120,6 +120,12 @@ static dogecoin_bool spv_lookup_headersdb_height_by_hash(dogecoin_spv_client* cl
         return false;
     }
 
+    uint8_t hash_rev[32];
+    size_t ri;
+    for (ri = 0; ri < sizeof(hash_rev); ri++) {
+        hash_rev[ri] = hash[sizeof(hash_rev) - 1 - ri];
+    }
+
     while (fread(rec, sizeof(rec), 1, hdb->headers_tree_file) == 1) {
         struct const_buffer rec_buf = { rec, sizeof(rec) };
         uint256_t rec_hash;
@@ -129,7 +135,8 @@ static dogecoin_bool spv_lookup_headersdb_height_by_hash(dogecoin_spv_client* cl
         deser_u32(&rec_height, &rec_buf);
         deser_u256(rec_chainwork_unused, &rec_buf);
         UNUSED(rec_chainwork_unused);
-        if (memcmp(rec_hash, hash, sizeof(uint256_t)) == 0) {
+        if (memcmp(rec_hash, hash, sizeof(uint256_t)) == 0 ||
+            memcmp(rec_hash, hash_rev, sizeof(uint256_t)) == 0) {
             *out_height = rec_height;
             if (can_restore_pos) fseek(hdb->headers_tree_file, old_pos, SEEK_SET);
             return true;
@@ -278,7 +285,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->rescan_total = 0;
     client->rescan_matched = 0;
     client->filtered_history_last_end_height = -1; /* -1 means no historical filtered range has been requested yet */
-    client->filtered_history_tail_rerequested = false;
+    client->filtered_history_tail_rerequest_count = 0;
 
     if (http_server) {
         // split ip and port
@@ -1003,6 +1010,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (!connected && pindex) {
             dogecoin_headers_db* db = (dogecoin_headers_db*)client->headers_db_ctx;
             dogecoin_blockindex* found = dogecoin_headersdb_find(db, pindex->hash);
+            dogecoin_bool recovered_historical_height = false;
             if (found) {
                 dogecoin_free(pindex);
                 pindex = found;
@@ -1010,10 +1018,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 uint32_t historical_height = 0;
                 if (spv_lookup_headersdb_height_by_hash(client, pindex->hash, &historical_height)) {
                     pindex->height = historical_height;
+                    recovered_historical_height = true;
                 }
             }
             /* During filtered-history rescans, allow processing even if the header is pruned from in-memory tree. */
-            if (found || (client->filtered_history_last_end_height >= 0 && client->bloom_filter)) {
+            if (found || recovered_historical_height) {
                 is_historical = true;
             }
         }
@@ -1265,7 +1274,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         pos, bi ? (int)bi->height : -1);
                     client->sync_transaction(client->sync_transaction_ctx, tx, pos, bi);
 
-                    if (!client->filtered_history_tail_rerequested &&
+                    if (client->filtered_history_tail_rerequest_count < 8 &&
                         client->filtered_history_last_end_height >= 0 &&
                         bi &&
                         (int32_t)bi->height < client->filtered_history_last_end_height) {
@@ -1275,11 +1284,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             if (height_delta > 0) {
                                 int32_t previous_end = client->filtered_history_last_end_height;
                                 int depth_to_tip = (height_delta > (int64_t)INT_MAX) ? INT_MAX : (int)height_delta;
-                                client->filtered_history_tail_rerequested = true;
+                                client->filtered_history_tail_rerequest_count++;
                                 client->filtered_history_last_end_height = (int32_t)bi->height;
                                 if (client->nodegroup && client->nodegroup->log_write_cb) {
-                                    client->nodegroup->log_write_cb("[spv] re-requesting historical tail heights %d-%d after new matched tx to catch spends\n",
-                                        (int)bi->height + 1, (int)previous_end);
+                                    client->nodegroup->log_write_cb("[spv] re-requesting historical tail heights %d-%d after new matched tx to catch spends (attempt %u/8)\n",
+                                        (int)bi->height + 1, (int)previous_end,
+                                        (unsigned int)client->filtered_history_tail_rerequest_count);
                                 }
                                 if (depth_to_tip > 0) {
                                     dogecoin_net_spv_request_filtered_history(client, depth_to_tip);
