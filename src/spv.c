@@ -100,6 +100,46 @@ static dogecoin_bool spv_send_filterload_to_node(dogecoin_node* node,
     return true;
 }
 
+static dogecoin_bool spv_lookup_headersdb_height_by_hash(dogecoin_spv_client* client,
+                                                         const uint8_t hash[32],
+                                                         uint32_t* out_height)
+{
+    dogecoin_headers_db* hdb;
+    long old_pos;
+    dogecoin_bool can_restore_pos;
+    uint8_t rec[SPV_HEADERS_FILE_REC_LEN];
+
+    if (!client || !hash || !out_height) return false;
+    hdb = (dogecoin_headers_db*)client->headers_db_ctx;
+    if (!hdb || !hdb->headers_tree_file) return false;
+
+    old_pos = ftell(hdb->headers_tree_file);
+    can_restore_pos = (old_pos >= 0);
+    if (fseek(hdb->headers_tree_file, SPV_HEADERS_FILE_HDR_LEN, SEEK_SET) != 0) {
+        if (can_restore_pos) fseek(hdb->headers_tree_file, old_pos, SEEK_SET);
+        return false;
+    }
+
+    while (fread(rec, sizeof(rec), 1, hdb->headers_tree_file) == 1) {
+        struct const_buffer rec_buf = { rec, sizeof(rec) };
+        uint256_t rec_hash;
+        uint32_t rec_height = 0;
+        uint256_t rec_chainwork_unused;
+        deser_u256(rec_hash, &rec_buf);
+        deser_u32(&rec_height, &rec_buf);
+        deser_u256(rec_chainwork_unused, &rec_buf);
+        UNUSED(rec_chainwork_unused);
+        if (memcmp(rec_hash, hash, sizeof(uint256_t)) == 0) {
+            *out_height = rec_height;
+            if (can_restore_pos) fseek(hdb->headers_tree_file, old_pos, SEEK_SET);
+            return true;
+        }
+    }
+
+    if (can_restore_pos) fseek(hdb->headers_tree_file, old_pos, SEEK_SET);
+    return false;
+}
+
 typedef struct spv_merkle_log_ctx_ {
     dogecoin_spv_client* client;
     const dogecoin_blockindex* pindex;
@@ -238,6 +278,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->rescan_total = 0;
     client->rescan_matched = 0;
     client->filtered_history_last_end_height = -1; /* -1 means no historical filtered range has been requested yet */
+    client->filtered_history_tail_rerequested = false;
 
     if (http_server) {
         // split ip and port
@@ -965,6 +1006,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             if (found) {
                 dogecoin_free(pindex);
                 pindex = found;
+            } else if (client->filtered_history_last_end_height >= 0 && client->bloom_filter) {
+                uint32_t historical_height = 0;
+                if (spv_lookup_headersdb_height_by_hash(client, pindex->hash, &historical_height)) {
+                    pindex->height = historical_height;
+                }
             }
             /* During filtered-history rescans, allow processing even if the header is pruned from in-memory tree. */
             if (found || (client->filtered_history_last_end_height >= 0 && client->bloom_filter)) {
@@ -1201,10 +1247,46 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                         &match_pos)) {
                     unsigned int pos = (unsigned int)match_pos;
                     dogecoin_blockindex* bi = client->merkle_match_blockindex;
+                    uint32_t vout_i = 0;
+
+                    if (client->bloom_filter && client->bloom_filter_len > 0) {
+                        for (vout_i = 0; vout_i < (uint32_t)tx->vout->len; vout_i++) {
+                            uint8_t outpoint[36];
+                            memcpy(outpoint, txid, 32);
+                            outpoint[32] = (uint8_t)(vout_i & 0xffu);
+                            outpoint[33] = (uint8_t)((vout_i >> 8) & 0xffu);
+                            outpoint[34] = (uint8_t)((vout_i >> 16) & 0xffu);
+                            outpoint[35] = (uint8_t)((vout_i >> 24) & 0xffu);
+                            dogecoin_spv_client_filteradd(client, outpoint, (uint32_t)sizeof(outpoint));
+                        }
+                    }
 
                     client->nodegroup->log_write_cb("[merkle-tx] MATCH at pos %u, calling sync_transaction (height=%d)\n",
                         pos, bi ? (int)bi->height : -1);
                     client->sync_transaction(client->sync_transaction_ctx, tx, pos, bi);
+
+                    if (!client->filtered_history_tail_rerequested &&
+                        client->filtered_history_last_end_height >= 0 &&
+                        bi &&
+                        (int32_t)bi->height < client->filtered_history_last_end_height) {
+                        dogecoin_blockindex* tip_now = client->headers_db->getchaintip(client->headers_db_ctx);
+                        if (tip_now) {
+                            int64_t height_delta = (int64_t)tip_now->height - (int64_t)bi->height;
+                            if (height_delta > 0) {
+                                int32_t previous_end = client->filtered_history_last_end_height;
+                                int depth_to_tip = (height_delta > (int64_t)INT_MAX) ? INT_MAX : (int)height_delta;
+                                client->filtered_history_tail_rerequested = true;
+                                client->filtered_history_last_end_height = (int32_t)bi->height;
+                                if (client->nodegroup && client->nodegroup->log_write_cb) {
+                                    client->nodegroup->log_write_cb("[spv] re-requesting historical tail heights %d-%d after new matched tx to catch spends\n",
+                                        (int)bi->height + 1, (int)previous_end);
+                                }
+                                if (depth_to_tip > 0) {
+                                    dogecoin_net_spv_request_filtered_history(client, depth_to_tip);
+                                }
+                            }
+                        }
+                    }
 
                     if (client->merkle_match_pending == 0) {
                         client->merkle_match_active = false;
@@ -1628,6 +1710,16 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
     uint32_t data_len)
 {
     if (!client || !data || data_len == 0) return false;
+    if (client->bloom_filter && client->bloom_filter_len > 0) {
+        dogecoin_bip37_filter local_filter;
+        memset(&local_filter, 0, sizeof(local_filter));
+        local_filter.data = client->bloom_filter;
+        local_filter.data_len = client->bloom_filter_len;
+        local_filter.n_hash_funcs = client->bloom_nhashfunc;
+        local_filter.n_tweak = client->bloom_ntweak;
+        local_filter.n_flags = client->bloom_flags;
+        dogecoin_bip37_filter_add(&local_filter, data, data_len);
+    }
     if (!client->nodegroup || !client->nodegroup->nodes) return true;
 
     cstring* payload = cstr_new_sz((size_t)data_len + SPV_VARINT_MAX_LEN);

@@ -103,6 +103,7 @@ typedef struct dogecoin_spv_client_
     uint64_t rescan_total;      /* total merkle blocks received during rescan */
     uint64_t rescan_matched;    /* merkle blocks with at least one matched tx */
     int32_t  filtered_history_last_end_height; /* highest historical height already requested via getdata(FILTERED_BLOCK) */
+    dogecoin_bool filtered_history_tail_rerequested; /* one-time tail re-request after first historical match to catch spends */
 
     /* callbacks */
     /* ========= */

@@ -612,6 +612,22 @@ void test_bip37_filter_state()
     u_assert_true(client->bloom_filter[0] == 0xaa);
 
     u_assert_true(!dogecoin_spv_client_filterload(client, NULL, 0, 0, 0, 0));
+
+    {
+        uint8_t empty_filter[8] = {0};
+        uint8_t before[8] = {0};
+        uint8_t outpoint[36] = {0};
+        uint32_t vout = 1;
+        outpoint[32] = (uint8_t)(vout & 0xffu);
+        outpoint[33] = (uint8_t)((vout >> 8) & 0xffu);
+        outpoint[34] = (uint8_t)((vout >> 16) & 0xffu);
+        outpoint[35] = (uint8_t)((vout >> 24) & 0xffu);
+        u_assert_true(dogecoin_spv_client_filterload(client, empty_filter, sizeof(empty_filter), 2, 123, 1));
+        memcpy(before, client->bloom_filter, sizeof(before));
+        u_assert_true(dogecoin_spv_client_filteradd(client, outpoint, sizeof(outpoint)));
+        u_assert_true(memcmp(client->bloom_filter, before, sizeof(before)) != 0);
+    }
+
     u_assert_true(dogecoin_spv_client_filterclear(client));
     u_assert_true(client->bloom_filter == NULL);
     u_assert_true(client->bloom_filter_len == 0);
