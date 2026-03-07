@@ -1296,6 +1296,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             int64_t height_delta = (int64_t)tip_now->height - (int64_t)bi->height;
                             if (height_delta > 0) {
                                 dogecoin_bool is_duplicate_tail_trigger =
+                                    (client->filtered_history_last_rerequest_height >= 0) &&
                                     ((int32_t)bi->height == client->filtered_history_last_rerequest_height) &&
                                     (memcmp(client->filtered_history_last_rerequest_txid, txid, sizeof(uint256_t)) == 0);
                                 if (is_duplicate_tail_trigger) {
