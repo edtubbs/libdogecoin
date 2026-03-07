@@ -286,6 +286,8 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->rescan_matched = 0;
     client->filtered_history_last_end_height = -1; /* -1 means no historical filtered range has been requested yet */
     client->filtered_history_tail_rerequest_count = 0;
+    dogecoin_hash_clear(client->filtered_history_last_rerequest_txid);
+    client->filtered_history_last_rerequest_height = -1;
 
     if (http_server) {
         // split ip and port
@@ -1214,10 +1216,15 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             client->headers_db &&
             client->bloom_filter && client->bloom_filter_len > 0 &&
             client->filtered_history_last_end_height >= 0 &&
+            !client->merkle_match_active &&
+            client->merkle_match_pending == 0 &&
             pindex &&
             (int32_t)pindex->height >= client->filtered_history_last_end_height) {
             dogecoin_blockindex* tip_now = client->headers_db->getchaintip(client->headers_db_ctx);
             if (tip_now && (uint32_t)client->filtered_history_last_end_height < tip_now->height) {
+                client->filtered_history_tail_rerequest_count = 0;
+                dogecoin_hash_clear(client->filtered_history_last_rerequest_txid);
+                client->filtered_history_last_rerequest_height = -1;
                 dogecoin_net_spv_request_filtered_history(client, 0);
             }
         }
@@ -1288,9 +1295,20 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         if (tip_now) {
                             int64_t height_delta = (int64_t)tip_now->height - (int64_t)bi->height;
                             if (height_delta > 0) {
+                                dogecoin_bool is_duplicate_tail_trigger =
+                                    ((int32_t)bi->height == client->filtered_history_last_rerequest_height) &&
+                                    (memcmp(client->filtered_history_last_rerequest_txid, txid, sizeof(uint256_t)) == 0);
+                                if (is_duplicate_tail_trigger) {
+                                    if (client->nodegroup && client->nodegroup->log_write_cb) {
+                                        client->nodegroup->log_write_cb("[spv] skipping duplicate historical tail re-request for tx at height %d\n",
+                                            (int)bi->height);
+                                    }
+                                } else {
                                 int32_t previous_end = client->filtered_history_last_end_height;
                                 int depth_to_tip = (height_delta > (int64_t)INT_MAX) ? INT_MAX : (int)height_delta;
                                 client->filtered_history_tail_rerequest_count++;
+                                dogecoin_hash_set(client->filtered_history_last_rerequest_txid, txid);
+                                client->filtered_history_last_rerequest_height = (int32_t)bi->height;
                                 client->filtered_history_last_end_height = (int32_t)bi->height;
                                 if (client->nodegroup && client->nodegroup->log_write_cb) {
                                     client->nodegroup->log_write_cb("[spv] re-requesting historical tail heights %d-%d after new matched tx to catch spends (attempt %u/8)\n",
@@ -1299,6 +1317,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                 }
                                 if (depth_to_tip > 0) {
                                     dogecoin_net_spv_request_filtered_history(client, depth_to_tip);
+                                }
                                 }
                             }
                         }
