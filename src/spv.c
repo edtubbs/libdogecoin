@@ -1261,9 +1261,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     if (client->bloom_filter && client->bloom_filter_len > 0) {
                         for (vout_i = 0; vout_i < (uint32_t)tx->vout->len; vout_i++) {
                             uint8_t outpoint[36];
-                            unsigned int b = 0;
-                            /* COutPoint serializes txid little-endian on the wire. */
-                            for (b = 0; b < 32; b++) outpoint[b] = txid[31 - b];
+                            memcpy(outpoint, txid, 32);
                             outpoint[32] = (uint8_t)(vout_i & 0xffu);
                             outpoint[33] = (uint8_t)((vout_i >> 8) & 0xffu);
                             outpoint[34] = (uint8_t)((vout_i >> 16) & 0xffu);
@@ -1568,6 +1566,11 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
         client->nodegroup->log_write_cb("[spv] scanning %d historical blocks for UTXO discovery (only matches will be logged)\n", total);
     }
 
+    /* Persist requested historical end before dispatching getdata so
+       follow-up tail re-requests can be scheduled immediately from
+       early matched transactions. */
+    client->filtered_history_last_end_height = request_end_height;
+
     /* Send getdata in batches to avoid huge allocations and messages.
        We walk backwards collecting a batch of hashes, reverse them (oldest first),
        then send and repeat. */
@@ -1671,8 +1674,6 @@ LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_clie
         client->nodegroup->log_write_cb("[spv] requested %d historical filtered blocks (heights %d-%d) via bloom peer %d\n",
             total, start_height, request_end_height, history_peer->nodeid);
     }
-
-    client->filtered_history_last_end_height = request_end_height;
 
     dogecoin_free(block_hashes);
 }
