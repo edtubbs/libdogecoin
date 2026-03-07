@@ -1211,6 +1211,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
            requested end-height has actually been parsed. This avoids
            pre-queuing many future windows with a stale bloom filter state. */
         if (client->called_sync_completed &&
+            client->headers_db &&
             client->bloom_filter && client->bloom_filter_len > 0 &&
             client->filtered_history_last_end_height >= 0 &&
             pindex &&
