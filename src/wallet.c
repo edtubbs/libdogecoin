@@ -987,7 +987,6 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
     }
     else {
         uint32_t tx_loaded_count = 0;
-        uint32_t tx_last_reported_count = 0;
         dogecoin_bool tx_loading_announced = false;
         // check file-header-magic, version and genesis
         uint8_t buf[sizeof(file_hdr_magic)+sizeof(current_version)+sizeof(uint256_t)];
@@ -1036,11 +1035,6 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
                 tx_loaded_count++;
                 if (wallet->vec_wtxes) {
                     tx_loaded_count = (uint32_t)wallet->vec_wtxes->len;
-                }
-                if (tx_loaded_count != tx_last_reported_count) {
-                    printf("\r%u transactions loaded", tx_loaded_count);
-                    fflush(stdout);
-                    tx_last_reported_count = tx_loaded_count;
                 }
             } else {
                 fseek(wallet->dbfile, reclen, SEEK_CUR);
