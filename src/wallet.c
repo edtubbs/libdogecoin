@@ -1497,7 +1497,42 @@ int64_t dogecoin_wallet_get_debit_tx(dogecoin_wallet *wallet, const dogecoin_tx 
 
 dogecoin_bool dogecoin_wallet_is_from_me(dogecoin_wallet *wallet, const dogecoin_tx *tx)
 {
-    return (dogecoin_wallet_get_debit_tx(wallet, tx) > 0);
+    if (dogecoin_wallet_get_debit_tx(wallet, tx) > 0) {
+        return true;
+    }
+
+    if (!wallet || !tx || !tx->vin) {
+        return false;
+    }
+
+    for (unsigned int i = 0; i < tx->vin->len; i++) {
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, i);
+        if (!tx_in) {
+            continue;
+        }
+
+        dogecoin_utxo* utxo;
+        dogecoin_utxo* tmp;
+        HASH_ITER(hh, utxos, utxo, tmp) {
+            if (!utxo) {
+                continue;
+            }
+
+            if (memcmp(tx_in->prevout.hash, utxo->txid, 32) == 0) {
+                return true;
+            }
+
+            uint8_t reversed_prevout[32];
+            for (unsigned int b = 0; b < 32; b++) {
+                reversed_prevout[b] = tx_in->prevout.hash[31 - b];
+            }
+            if (memcmp(reversed_prevout, utxo->txid, 32) == 0) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 dogecoin_bool dogecoin_wallet_is_spent(dogecoin_wallet* wallet, uint256_t hash, uint32_t n)
