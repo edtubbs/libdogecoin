@@ -71,34 +71,6 @@ int dogecoin_header_compare(const void *l, const void *r)
     return 0;
 }
 
-static void dogecoin_headers_db_prune_in_memory_chain(dogecoin_headers_db* db)
-{
-    if (!db || db->max_hdr_in_mem == 0 || !db->chaintip) return;
-
-    dogecoin_blockindex *scan_tip = db->chaintip;
-    unsigned int i;
-    unsigned int traversed = 0;
-    for (i = 0; i < db->max_hdr_in_mem && scan_tip->prev; i++) {
-        scan_tip = scan_tip->prev;
-        traversed++;
-    }
-
-    if (!scan_tip || traversed < db->max_hdr_in_mem || !scan_tip->prev || scan_tip == &db->genesis) return;
-
-    dogecoin_blockindex* old_chain = scan_tip->prev;
-    scan_tip->prev = NULL;
-    db->chainbottom = scan_tip;
-
-    while (old_chain && old_chain != &db->genesis) {
-        dogecoin_blockindex* next = old_chain->prev;
-        if (db->use_binary_tree) {
-            dogecoin_btree_tdelete(old_chain, &db->tree_root, dogecoin_header_compare);
-        }
-        dogecoin_free(old_chain);
-        old_chain = next;
-    }
-}
-
 /**
  * The function creates a new dogecoin_headers_db object and initializes it
  *
