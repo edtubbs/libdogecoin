@@ -25,6 +25,7 @@ TESTNET_FLAG="-t"
 TMPDIR="/tmp/falcon_testnet_$$"
 mkdir -m 700 -p "$TMPDIR"
 BROADCASTED=0
+SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-300}"
 
 # Function to print colored messages
 info() {
@@ -114,8 +115,14 @@ get_testnet_coins() {
     echo ""
     echo "Note: some faucets require browser CAPTCHA or may rate-limit by IP."
     echo ""
+    echo "[FAUCET] Preferred: https://faucet.doge.toys/"
+    echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
+    read -p "Optional faucet txid (for log): " FAUCET_TXID
     warning "Press Enter after you have received coins..."
     read
+    if [ -n "$FAUCET_TXID" ]; then
+        echo "FAUCET_TXID=$FAUCET_TXID" > "$TMPDIR/faucet.txt"
+    fi
     
     success "Assuming coins received. Continuing..."
 }
@@ -246,33 +253,52 @@ monitor_spvnode() {
     
     warning "SPV sync may take time. Be patient!"
     if [ "$BROADCASTED" -eq 1 ]; then
-        read -p "Start header-first spvnode scan now? [y/N]: " RUN_SPV
-        if [[ "$RUN_SPV" =~ ^[Yy]$ ]]; then
-            ./spvnode $TESTNET_FLAG -l -c -d -x -p -a "$TESTNET_ADDR" scan
+        info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Falcon validation log before next step..."
+        set +e
+        timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -c -d -x -p -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
+        SPV_EXIT=$?
+        set -e
+        if ! grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode.log"; then
+            echo "----- spvnode log tail -----"
+            tail -n 80 "$TMPDIR/spvnode.log"
+            if [ "$SPV_EXIT" -eq 124 ]; then
+                error "spvnode timed out before Falcon commitment validation was observed"
+            else
+                error "Falcon commitment was not validated by spvnode before proceeding"
+            fi
         fi
+        success "spvnode confirmed Falcon commitment validation"
+    else
+        warning "Transaction was not broadcast, skipping required spvnode validation gate"
     fi
 }
 
 # Step 8: Verify commitment off-chain
 verify_commitment() {
     info "Step 8: Verifying commitment off-chain..."
-    
+    VERIFY_OUTPUT=$(./such -c falcon_verify -k "$FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$FALCON_SIG")
+    echo "$VERIFY_OUTPUT" > "$TMPDIR/falcon_verify.txt"
+    if ! echo "$VERIFY_OUTPUT" | grep -q "valid: true"; then
+        echo "$VERIFY_OUTPUT"
+        error "Off-chain Falcon signature verification failed"
+    fi
+
+    COMMIT_OUTPUT=$(./such -c falcon_commit -k "$FALCON_PK" -s "$FALCON_SIG")
+    echo "$COMMIT_OUTPUT" > "$TMPDIR/falcon_commit_verify.txt"
+    REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
+    if [ -z "$REGENERATED_COMMIT" ]; then
+        error "Failed to parse regenerated Falcon commitment"
+    fi
+    if [ "$REGENERATED_COMMIT" != "$FALCON_COMMIT" ]; then
+        error "Regenerated Falcon commitment does not match expected commitment"
+    fi
+    success "Off-chain Falcon verification and commitment match passed"
+
     echo ""
-    echo "To verify the commitment off-chain:"
-    echo ""
-    echo "1. Verify the signature:"
-    echo "   ./such -c falcon_verify -k $FALCON_PK \\"
-    echo "                           -x $TX_SIGHASH_HEX \\"
-    echo "                           -s $FALCON_SIG"
-    echo ""
-    echo "2. Regenerate commitment and compare:"
-    echo "   ./such -c falcon_commit -k $FALCON_PK -s $FALCON_SIG"
-    echo "   Expected: $FALCON_COMMIT"
-    echo ""
-    echo "3. If both match, you've proven:"
-    echo "   ✓ Pre-anchor transaction template sighash was signed with Falcon-512 private key"
-    echo "   ✓ Commitment was published on testnet blockchain"
-    echo "   ✓ Commitment can be verified without revealing full signature"
+    echo "Verification details:"
+    echo "  valid: true"
+    echo "  Expected commitment: $FALCON_COMMIT"
+    echo "  Regenerated commitment: $REGENERATED_COMMIT"
     echo ""
 }
 
@@ -305,12 +331,8 @@ main() {
     echo "  - $TMPDIR/falcon_sig.txt (tx_sighash signature)"
     echo "  - $TMPDIR/falcon_commit.txt (tx-bound commitment)"
     echo "  - $TMPDIR/tx_info.txt (transaction info)"
-    echo ""
-    
-    echo "Next steps:"
-    echo "1. Broadcast transaction with OP_RETURN containing: $FALCON_COMMIT"
-    echo "2. Monitor with SPV node"
-    echo "3. Verify commitment off-chain"
+    echo "  - $TMPDIR/spvnode.log (SPV validation log)"
+    echo "  - $TMPDIR/falcon_verify.txt (off-chain verify result)"
     echo ""
 }
 

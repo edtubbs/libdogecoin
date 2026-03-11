@@ -20,6 +20,7 @@ TESTNET_FLAG="-t"
 TMPDIR=$(mktemp -d /tmp/dilithium2_testnet_XXXXXX)
 chmod 700 "$TMPDIR"
 BROADCASTED=0
+SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-300}"
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -59,8 +60,13 @@ get_testnet_coins() {
     echo ""
     echo "Send testnet DOGE to: $TESTNET_ADDR"
     echo "Faucet: https://faucet.doge.toys/"
+    echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
+    read -p "Optional faucet txid (for log): " FAUCET_TXID
     warning "Press Enter after funding the address..."
     read
+    if [ -n "$FAUCET_TXID" ]; then
+        echo "FAUCET_TXID=$FAUCET_TXID" > "$TMPDIR/faucet.txt"
+    fi
 }
 
 generate_dilithium2_keypair() {
@@ -130,20 +136,49 @@ EOF
 }
 
 monitor_spvnode() {
-    info "Monitor with spvnode:"
-    echo "  ./spvnode $TESTNET_FLAG -l -c -d -x -p -a \"$TESTNET_ADDR\" scan"
-    echo "Then full mode:"
-    echo "  ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a \"$TESTNET_ADDR\" scan"
+    info "Step 7: Monitor with spvnode"
     echo "Expected log:"
     echo "  [dilithium-commit] Valid at height=X txpos=Y commit=$DILITHIUM2_COMMIT"
+    if [ "$BROADCASTED" -eq 1 ]; then
+        info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Dilithium2 validation log before next step..."
+        set +e
+        timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -c -d -x -p -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
+        SPV_EXIT=$?
+        set -e
+        if ! grep -Fq "[dilithium-commit] Valid" "$TMPDIR/spvnode.log"; then
+            echo "----- spvnode log tail -----"
+            tail -n 80 "$TMPDIR/spvnode.log"
+            if [ "$SPV_EXIT" -eq 124 ]; then
+                error "spvnode timed out before Dilithium2 commitment validation was observed"
+            else
+                error "Dilithium2 commitment was not validated by spvnode before proceeding"
+            fi
+        fi
+        success "spvnode confirmed Dilithium2 commitment validation"
+    else
+        warning "Transaction was not broadcast, skipping required spvnode validation gate"
+    fi
 }
 
 verify_commitment() {
-    info "Off-chain verification commands:"
-    echo "  ./such -c dilithium2_verify -k $DILITHIUM2_PK -x $TX_SIGHASH_HEX -s $DILITHIUM2_SIG"
-    echo "  ./such -c dilithium2_commit -k $DILITHIUM2_PK -s $DILITHIUM2_SIG"
-    echo "  Expected: $DILITHIUM2_COMMIT"
-    echo "  Note: tx_sighash32 is derived from pre-anchor transaction template bytes."
+    info "Step 8: Off-chain verification"
+    VERIFY_OUTPUT=$(./such -c dilithium2_verify -k "$DILITHIUM2_PK" -x "$TX_SIGHASH_HEX" -s "$DILITHIUM2_SIG")
+    echo "$VERIFY_OUTPUT" > "$TMPDIR/dilithium2_verify.txt"
+    if ! echo "$VERIFY_OUTPUT" | grep -q "valid: true"; then
+        echo "$VERIFY_OUTPUT"
+        error "Off-chain Dilithium2 signature verification failed"
+    fi
+
+    COMMIT_OUTPUT=$(./such -c dilithium2_commit -k "$DILITHIUM2_PK" -s "$DILITHIUM2_SIG")
+    echo "$COMMIT_OUTPUT" > "$TMPDIR/dilithium2_commit_verify.txt"
+    REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
+    if [ -z "$REGENERATED_COMMIT" ]; then
+        error "Failed to parse regenerated Dilithium2 commitment"
+    fi
+    if [ "$REGENERATED_COMMIT" != "$DILITHIUM2_COMMIT" ]; then
+        error "Regenerated Dilithium2 commitment does not match expected commitment"
+    fi
+    success "Off-chain Dilithium2 verification and commitment match passed"
 }
 
 main() {
@@ -160,6 +195,10 @@ main() {
     monitor_spvnode
     verify_commitment
     success "All test data saved in: $TMPDIR"
+    echo "Files:"
+    echo "  - $TMPDIR/tx_info.txt"
+    echo "  - $TMPDIR/spvnode.log"
+    echo "  - $TMPDIR/dilithium2_verify.txt"
 }
 
 main
