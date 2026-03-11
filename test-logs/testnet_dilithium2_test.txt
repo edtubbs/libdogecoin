@@ -6,133 +6,28 @@
 [0;34m[INFO][0m Checking required tools...
 [0;32m[SUCCESS][0m All tools available
 [0;34m[INFO][0m Generating testnet wallet...
-[0;32m[SUCCESS][0m Wallet ready: nfxeDg6hJTmBaCf2Pf2NKgwjUxw1HWPVvf
+[0;32m[SUCCESS][0m Wallet ready: naWjMxsEvaKFgyWQ75i3nLDncEsY1gjL9L
 
-Send testnet DOGE to: nfxeDg6hJTmBaCf2Pf2NKgwjUxw1HWPVvf
+Send testnet DOGE to: naWjMxsEvaKFgyWQ75i3nLDncEsY1gjL9L
 Faucet: https://faucet.doge.toys/
-[FAUCET] Request coins for address: nfxeDg6hJTmBaCf2Pf2NKgwjUxw1HWPVvf
+[FAUCET] Request coins for address: naWjMxsEvaKFgyWQ75i3nLDncEsY1gjL9L
 [1;33m[WARNING][0m Press Enter after funding the address...
 [0;34m[INFO][0m Generating Dilithium2 keypair...
 [0;32m[SUCCESS][0m Dilithium2 keypair generated
 [0;34m[INFO][0m Build unsigned testnet tx with such, then paste hex below:
-[0;34m[INFO][0m tx_sighash32: 2882df256ca1aedbabcba980a22c677dc76b220bb78402b6d3c70f106e742617
+[0;34m[INFO][0m tx_sighash32: 3392fc5a1d6d6eb3fe08f004585f67721535b4806cd49b15fc651c47289dea8f
 [0;34m[INFO][0m Signing tx_sighash32 with Dilithium2...
 [0;32m[SUCCESS][0m tx_sighash32 signed
 [0;34m[INFO][0m Generating Dilithium2 commitment...
-[0;32m[SUCCESS][0m Commitment generated: e30c55c11e14495beeef9834174b0fc6096bce432eff3e453272c62e63d7c38b
-Start broadcasting transaction: 45e3dbd667dcff798d762f1977cbf56ed7c63dbb2581d75d90a2c4c5cc52c2fa with timeout 15 seconds
-Trying to connect to nodes...
-Successfully connected to peer 1 (100.21.235.190)
-Successfully connected to peer 9 (198.58.102.18)
-Successfully connected to peer 14 (35.84.106.212)
-Successfully connected to peer 15 (3.85.120.238)
-Successfully connected to peer 5 (165.227.227.139)
-Successfully connected to peer 2 (185.232.70.226)
-Successfully connected to peer 10 (95.141.35.117)
-Successfully connected to peer 4 (142.132.147.162)
-Successfully connected to peer 16 (89.58.9.219)
-Successfully connected to peer 3 (93.57.24.247)
-Successfully connected to peer 8 (188.117.132.82)
-Successfully connected to peer 13 (135.181.168.83)
-Successfully connected to peer 7 (65.109.127.244)
-Successfully connected to peer 12 (37.27.63.117)
-Successfully connected to peer 6 (15.235.227.118)
-Successfully connected to peer 11 (139.167.11.99)
-tx successfully sent to node 1
-tx successfully sent to node 9
-
-
-Result:
-=============
-Max nodes to connect to: 10
-Successfully connected to nodes: 16
-Informed nodes: 2
-Requested from nodes: 2
-Seen on other nodes: 0
-
-Error: The transaction was not relayed back. Your transaction is very likely invalid (or was already broadcasted and picked up by an invalid node)
+[0;32m[SUCCESS][0m Commitment generated: 2a0048926c44cf465bcd012ff098e90cfeda312a1ec8b1bb9c4a4bc2cc6f1c92
 [0;34m[INFO][0m Step 7: Monitor with spvnode
 Expected log:
-  [dilithium-commit] Valid at height=X txpos=Y commit=e30c55c11e14495beeef9834174b0fc6096bce432eff3e453272c62e63d7c38b
-[0;34m[INFO][0m Running spvnode scan (timeout 20s) and requiring Dilithium2 validation log before next step...
------ spvnode log tail -----
-DEBUG: received command from node 15: addr
-DEBUG: received command from node 15: feefilter
-DEBUG: received command from node 8: sendheaders
-DEBUG: received command from node 8: sendcmpct
-DEBUG: received command from node 8: ping
-DEBUG: sending message to node 8: pong
-DEBUG: received command from node 8: addr
-DEBUG: received command from node 8: feefilter
-DEBUG: received command from node 5: sendheaders
-DEBUG: received command from node 5: sendcmpct
-DEBUG: received command from node 5: ping
-DEBUG: sending message to node 5: pong
-DEBUG: received command from node 5: addr
-DEBUG: received command from node 5: feefilter
-DEBUG: received command from node 10: version
-DEBUG: Connected to node 10: /Shibetoshi:1.14.5/ (41595271)
-DEBUG: sending message to node 10: verack
-DEBUG: received command from node 10: verack
-DEBUG: received command from node 14: sendheaders
-DEBUG: received command from node 14: sendcmpct
-DEBUG: received command from node 14: ping
-DEBUG: sending message to node 14: pong
-DEBUG: received command from node 14: addr
-DEBUG: received command from node 14: feefilter
-DEBUG: received command from node 7: sendheaders
-DEBUG: received command from node 7: sendcmpct
-DEBUG: received command from node 7: ping
-DEBUG: sending message to node 7: pong
-DEBUG: received command from node 7: addr
-DEBUG: received command from node 7: feefilter
-DEBUG: received command from node 3: sendheaders
-DEBUG: received command from node 3: sendcmpct
-DEBUG: received command from node 3: ping
-DEBUG: sending message to node 3: pong
-DEBUG: received command from node 3: addr
-DEBUG: received command from node 3: feefilter
-DEBUG: received command from node 4: sendheaders
-DEBUG: received command from node 4: sendcmpct
-DEBUG: received command from node 4: ping
-DEBUG: sending message to node 4: pong
-DEBUG: received command from node 4: addr
-DEBUG: received command from node 4: feefilter
-DEBUG: received command from node 11: sendheaders
-DEBUG: received command from node 11: sendcmpct
-DEBUG: received command from node 11: ping
-DEBUG: sending message to node 11: pong
-DEBUG: received command from node 11: addr
-DEBUG: received command from node 11: feefilter
-DEBUG: received command from node 2: sendheaders
-DEBUG: received command from node 2: sendcmpct
-DEBUG: received command from node 2: ping
-DEBUG: sending message to node 2: pong
-DEBUG: received command from node 2: addr
-DEBUG: received command from node 2: feefilter
-DEBUG: received command from node 9: sendheaders
-DEBUG: received command from node 9: sendcmpct
-DEBUG: received command from node 9: ping
-DEBUG: sending message to node 9: pong
-DEBUG: received command from node 9: addr
-DEBUG: received command from node 9: feefilter
-DEBUG: received command from node 10: sendheaders
-DEBUG: received command from node 10: sendcmpct
-DEBUG: received command from node 10: ping
-DEBUG: sending message to node 10: pong
-DEBUG: received command from node 10: addr
-DEBUG: received command from node 10: feefilter
-DEBUG: Statecheck: amount of connected nodes: 16
-chaintip hash: b1699b740c45f27462765b3daa568fdf184081e302e03ef0be55bcec9e0d080b
-chaintip height: 41595271
-DEBUG: sending message to node 1: ping
-DEBUG: sending message to node 16: ping
-DEBUG: sending message to node 15: ping
-DEBUG: sending message to node 14: ping
-DEBUG: sending message to node 13: ping
-DEBUG: sending message to node 12: ping
-DEBUG: sending message to node 11: ping
-DEBUG: sending message to node 10: ping
-DEBUG: sending message to node 9: ping
-DEBUG: sending message to node 8: ping
-DEBUG: sending message to nod[0;31m[ERROR][0m spvnode timed out before Dilithium2 commitment validation was observed
+  [dilithium-commit] Valid at height=X txpos=Y commit=2a0048926c44cf465bcd012ff098e90cfeda312a1ec8b1bb9c4a4bc2cc6f1c92
+[1;33m[WARNING][0m Transaction was not broadcast, skipping required spvnode validation gate
+[0;34m[INFO][0m Step 8: Off-chain verification
+[0;32m[SUCCESS][0m Off-chain Dilithium2 verification and commitment match passed
+[0;32m[SUCCESS][0m All test data saved in: /tmp/dilithium2_testnet_Tmj3fx
+Files:
+  - /tmp/dilithium2_testnet_Tmj3fx/tx_info.txt
+  - /tmp/dilithium2_testnet_Tmj3fx/spvnode.log
+  - /tmp/dilithium2_testnet_Tmj3fx/dilithium2_verify.txt

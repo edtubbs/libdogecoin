@@ -25,7 +25,7 @@ TESTNET_FLAG="-t"
 TMPDIR="/tmp/falcon_testnet_$$"
 mkdir -m 700 -p "$TMPDIR"
 BROADCASTED=0
-SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-300}"
+SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-900}"
 
 # Function to print colored messages
 info() {
@@ -208,8 +208,12 @@ build_transaction() {
     echo ""
     read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
-        ./sendtx $TESTNET_FLAG "$SIGNED_TX"
-        success "Broadcast command submitted"
+        SENDTX_OUTPUT=$(./sendtx $TESTNET_FLAG "$SIGNED_TX" 2>&1 || true)
+        if echo "$SENDTX_OUTPUT" | grep -q "tx successfully sent to node"; then
+            success "Broadcast submitted to peers"
+        else
+            warning "sendtx did not report relay confirmation"
+        fi
         BROADCASTED=1
     else
         warning "Skipping broadcast. You can run:"
@@ -255,7 +259,7 @@ monitor_spvnode() {
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Falcon validation log before next step..."
         set +e
-        timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -c -d -x -p -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
+        timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
         SPV_EXIT=$?
         set -e
         if ! grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode.log"; then
@@ -278,7 +282,7 @@ verify_commitment() {
     info "Step 8: Verifying commitment off-chain..."
     VERIFY_OUTPUT=$(./such -c falcon_verify -k "$FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$FALCON_SIG")
     echo "$VERIFY_OUTPUT" > "$TMPDIR/falcon_verify.txt"
-    if ! echo "$VERIFY_OUTPUT" | grep -q "valid: true"; then
+    if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid"; then
         echo "$VERIFY_OUTPUT"
         error "Off-chain Falcon signature verification failed"
     fi

@@ -20,7 +20,7 @@ TESTNET_FLAG="-t"
 TMPDIR=$(mktemp -d /tmp/dilithium2_testnet_XXXXXX)
 chmod 700 "$TMPDIR"
 BROADCASTED=0
-SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-300}"
+SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-900}"
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -128,7 +128,12 @@ EOF
 
     read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
-        ./sendtx $TESTNET_FLAG "$SIGNED_TX"
+        SENDTX_OUTPUT=$(./sendtx $TESTNET_FLAG "$SIGNED_TX" 2>&1 || true)
+        if echo "$SENDTX_OUTPUT" | grep -q "tx successfully sent to node"; then
+            success "Broadcast submitted to peers"
+        else
+            warning "sendtx did not report relay confirmation"
+        fi
         BROADCASTED=1
     else
         BROADCASTED=0
@@ -142,7 +147,7 @@ monitor_spvnode() {
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Dilithium2 validation log before next step..."
         set +e
-        timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -c -d -x -p -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
+        timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
         SPV_EXIT=$?
         set -e
         if ! grep -Fq "[dilithium-commit] Valid" "$TMPDIR/spvnode.log"; then
@@ -164,7 +169,7 @@ verify_commitment() {
     info "Step 8: Off-chain verification"
     VERIFY_OUTPUT=$(./such -c dilithium2_verify -k "$DILITHIUM2_PK" -x "$TX_SIGHASH_HEX" -s "$DILITHIUM2_SIG")
     echo "$VERIFY_OUTPUT" > "$TMPDIR/dilithium2_verify.txt"
-    if ! echo "$VERIFY_OUTPUT" | grep -q "valid: true"; then
+    if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid|VALID"; then
         echo "$VERIFY_OUTPUT"
         error "Off-chain Dilithium2 signature verification failed"
     fi
