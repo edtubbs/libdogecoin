@@ -6,28 +6,28 @@
 [0;34m[INFO][0m Checking required tools...
 [0;32m[SUCCESS][0m All tools available
 [0;34m[INFO][0m Generating testnet wallet...
-[0;32m[SUCCESS][0m Wallet ready: naWjMxsEvaKFgyWQ75i3nLDncEsY1gjL9L
+[0;32m[SUCCESS][0m Wallet ready: njGm6aPN399ySWrtg3s8CPDdbjM6v6NnWC
 
-Send testnet DOGE to: naWjMxsEvaKFgyWQ75i3nLDncEsY1gjL9L
+Send testnet DOGE to: njGm6aPN399ySWrtg3s8CPDdbjM6v6NnWC
 Faucet: https://faucet.doge.toys/
-[FAUCET] Request coins for address: naWjMxsEvaKFgyWQ75i3nLDncEsY1gjL9L
+[FAUCET] Request coins for address: njGm6aPN399ySWrtg3s8CPDdbjM6v6NnWC
 [1;33m[WARNING][0m Press Enter after funding the address...
 [0;34m[INFO][0m Generating Dilithium2 keypair...
 [0;32m[SUCCESS][0m Dilithium2 keypair generated
 [0;34m[INFO][0m Build unsigned testnet tx with such, then paste hex below:
-[0;34m[INFO][0m tx_sighash32: 3392fc5a1d6d6eb3fe08f004585f67721535b4806cd49b15fc651c47289dea8f
+[0;34m[INFO][0m tx_sighash32: 2882df256ca1aedbabcba980a22c677dc76b220bb78402b6d3c70f106e742617
 [0;34m[INFO][0m Signing tx_sighash32 with Dilithium2...
 [0;32m[SUCCESS][0m tx_sighash32 signed
 [0;34m[INFO][0m Generating Dilithium2 commitment...
-[0;32m[SUCCESS][0m Commitment generated: 2a0048926c44cf465bcd012ff098e90cfeda312a1ec8b1bb9c4a4bc2cc6f1c92
+[0;32m[SUCCESS][0m Commitment generated: 4455bd837d5ad82f6c8e935c769556351be0187fa93d080cf448e500488bb47c
 [0;34m[INFO][0m Step 7: Monitor with spvnode
 Expected log:
-  [dilithium-commit] Valid at height=X txpos=Y commit=2a0048926c44cf465bcd012ff098e90cfeda312a1ec8b1bb9c4a4bc2cc6f1c92
+  [dilithium-commit] Valid at height=X txpos=Y commit=4455bd837d5ad82f6c8e935c769556351be0187fa93d080cf448e500488bb47c
 [1;33m[WARNING][0m Transaction was not broadcast, skipping required spvnode validation gate
 [0;34m[INFO][0m Step 8: Off-chain verification
 [0;32m[SUCCESS][0m Off-chain Dilithium2 verification and commitment match passed
-[0;32m[SUCCESS][0m All test data saved in: /tmp/dilithium2_testnet_Tmj3fx
+[0;32m[SUCCESS][0m All test data saved in: /tmp/dilithium2_testnet_Dkuawi
 Files:
-  - /tmp/dilithium2_testnet_Tmj3fx/tx_info.txt
-  - /tmp/dilithium2_testnet_Tmj3fx/spvnode.log
-  - /tmp/dilithium2_testnet_Tmj3fx/dilithium2_verify.txt
+  - /tmp/dilithium2_testnet_Dkuawi/tx_info.txt
+  - /tmp/dilithium2_testnet_Dkuawi/spvnode.log
+  - /tmp/dilithium2_testnet_Dkuawi/dilithium2_verify.txt
