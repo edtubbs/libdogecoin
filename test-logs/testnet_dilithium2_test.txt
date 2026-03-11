@@ -1,19 +1,3 @@
-Run timestamp: 2026-03-11T21:27:09Z
-RERUN start
-Using faucet URL: https://faucet.doge.toys/
-Generated address via such: nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q
-Generated private key WIF via such: cnNBfTgmZMvjBBQRdRPLSKi4JF31as9r1JwoxRPPMWC222uD4Zyg
-faucet_payload {'address': 'nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q', 'amount': '10', 'recaptchaToken': '', 'captchaType': 'v3'}
-faucet_status 400
-faucet_body {"error":"Invalid JSON payload"}
-faucet_payload {'address': 'nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q', 'amount': '10', 'recaptchaToken': 'test', 'captchaType': 'v3'}
-faucet_status 400
-faucet_body {"errorCode":3}
-faucet_payload {'address': 'nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q', 'amount': '10', 'recaptchaToken': 'test', 'captchaType': 'v2'}
-faucet_status 400
-faucet_body {"errorCode":3}
-
---- Begin contrib/testnet_dilithium2_test.sh (rerun) ---
 
 ==========================================
   Dilithium2 Testnet Integration Test
@@ -22,10 +6,11 @@ faucet_body {"errorCode":3}
 [0;34m[INFO][0m Checking required tools...
 [0;32m[SUCCESS][0m All tools available
 [0;34m[INFO][0m Generating testnet wallet...
-[0;32m[SUCCESS][0m Wallet ready: nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q
+[0;32m[SUCCESS][0m Wallet ready: nfxeDg6hJTmBaCf2Pf2NKgwjUxw1HWPVvf
 
-Send testnet DOGE to: nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q
+Send testnet DOGE to: nfxeDg6hJTmBaCf2Pf2NKgwjUxw1HWPVvf
 Faucet: https://faucet.doge.toys/
+[FAUCET] Request coins for address: nfxeDg6hJTmBaCf2Pf2NKgwjUxw1HWPVvf
 [1;33m[WARNING][0m Press Enter after funding the address...
 [0;34m[INFO][0m Generating Dilithium2 keypair...
 [0;32m[SUCCESS][0m Dilithium2 keypair generated
@@ -34,42 +19,27 @@ Faucet: https://faucet.doge.toys/
 [0;34m[INFO][0m Signing tx_sighash32 with Dilithium2...
 [0;32m[SUCCESS][0m tx_sighash32 signed
 [0;34m[INFO][0m Generating Dilithium2 commitment...
-[0;32m[SUCCESS][0m Commitment generated: 93ee49a892ba111b0f2386fde83bf88f9455a08a4a488035196d2d4fa16892a4
-[0;34m[INFO][0m Monitor with spvnode:
-  ./spvnode -t -l -c -d -x -p -a "nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q" scan
-Then full mode:
-  ./spvnode -t -l -c -d -x -p -b -a "nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q" scan
-Expected log:
-  [dilithium-commit] Valid at height=X txpos=Y commit=93ee49a892ba111b0f2386fde83bf88f9455a08a4a488035196d2d4fa16892a4
-[0;34m[INFO][0m Off-chain verification commands:
-  ./such -c dilithium2_verify -k 433dd8a7ae36d45daf3bb64f49bd3460cf8f8d318ec8f78b20b095edea5eff2010e614ef4d9764695e846be5de1edc375578598982eaddecafa5e58f1cec49c063a6906b9240b32a9107d14e95e71207f3b79c97b4af2e712588f30330e33790a64735c0d57dabd2eaf1768e2818441c72ab7dfe2e5552a0da05b34c9daa09588f300526b5534e69a01c4e90fe499119f5f2f1ab62536cfa6d88b34b421bb5512ed965a014e5940add6c6afcda3c9738b3a1d770706c1bba2d4ee0f0e08425eb517be0a877b37b2d5f26481a17381382dc73c1dc14c2e93598f75ee4d1887e05cfee8ef760b55b1338c4aa7ec6f322edcc3ac3d67653e542a7b6c1dea653c799b7067b5691ac8424d7ff561bb0d185dec25d72af90dd180b3792721fa984df562631cefe4b74d3949b8e59ceb5aed1a670a3f210759b02c3fc4be6c10a854b30ee16e94f3799567a19e84883ae38a863d6ce286e866275d35b661746974d36c0741c684bbb2d1f03a1b3c55f4b6977f35e88f4820897486afb032cf4998a9dd5b24a86c500ac2a5a1b895e009e53a5d2f4c40f0aa831d6d367713107b52143861b45a388ea071a2e06e9a9f555661d1f8af268d731799592495bf00e982de0480e3099ee123551d9241f9961017a61fb935f8ab28441315e50f21839996d4d10570366f1f2faca64db112b0e15b1a081083fe365177d01edafdd92ef13b3277e7e52d834ca4d9e58d55688283311d4e1424e53b32ad8f842a4ed66165b6896e501622d37f3806b17b8ef9fd4349a1437ae68e573b0b8461de35210720ba8624193f550d626a2932cde9ad41af3866831be2828670fde82c855bc0a45276194531ee6ddcc7a547422aa1a1564dfc24809d0148a13aa7d7cf14d33c34bd3f5393d13bb1ed4d39b92f841060143653342b056802a5c157fea2d30515f7c053499771f14ef8a2688a699dad18a0ced823f9a5fa884a76f3b2bd9d0eec76a58dadb3f3468e1d8c95167b36f821f4551e373f53b247f3c04d9d3b251b77bfe4354d25dc2aaeff597207dc4c906c9afee4f4ee35bb59f8e3ff11e57a38a941a102f609c4626b85aa406704e0644c265ed29bd32f11bd61acbdfe4a73dac8bb42a1bcdf29da8315d2dfb19cd5e49bfc0bfcccdf3de82a0bda512efbfda33d42cfb5913d69112a25c112c047a38aca6088d207a0a0dd5d607e6ad36c7f613eeb31aa81a706da58ffa253750b1c540c91a0cdc3a326762bb5acb5f4a036f9bb44d966de06c1a5fcbb33d86e0bef03426a2fa4704cc27b8d189fb06e8138bab856e8c530cd7d6c4ae74f07699e5cb7fa5e90e4ee2495b78c1dfc05e6bb9a864879df2d3aecd0698e21d8c37d37c407100aded99278b6394d7735441df17627db78df32a48e615fa892d8ef2ec2e63c9ca2d787bf91807af410e135015e8c94cb7c3281db50c68ff02de673b6a4394b17942f6f8598391dd4aecb07729e30a5965031fb5c881696f86ba520b272372fd4c1f32596caf449349a0d838f3cc633bf62640be605814446eee602e20d1737cb635ffbc609843d5351b785781d331c48a86be3797ac0c974e1bc7c98eb16ec1b67932684d2394683e8e926f0b46cfaab8c938905cc2971cff2012f7b7f1f837de80e34e7a8044238ef485048a8bee9e73b89e9f0d7e0656a39f013d018a59a12415fcc439f5596753d1f8355ed606f0096279f0e29d1e3ed779de473e4a7c648ddd84207277020a65efc73d0dd2cb3ebb0990d611582e4e6c39800ec2a7524a6734756be0c634159f5a1e3378ab1788c38ebcd7968daa485fac8d3fec2dd6753f0542b9188d679ec25e041c999614799a7cfef6cd66 -x 2882df256ca1aedbabcba980a22c677dc76b220bb78402b6d3c70f106e742617 -s 47e43112baf753cb2e272ebfd5a08a61301799c413a73642e2016a9e7aefc57e32f594a42d6c604a7d74fa72261c188a35c2655cdbf71884761d227c7e6f984f2fb52ba6be6db5fa78683f4f3ac9bbbb69a2a4a58b0169971a1492554f3b22cd01f486983d1bd9bd294499b624c2c3ab1ee31b48fb3d3188da637b962f4d203d6a8ed4071be99919c6fcb61e4a4746e5f71a03d2a56b7b7a5c521e3a9846eb1d5a2f8db1e908eea940db28bb5f372817d9902bcf84c5bc4d3f8c3c2c72f47a7fac5cd55eaf23b78c56985d61eacb480158841a8c765204cdbe9af2812fded334dc53a96e6b8c6439806b153aa9f4f0b8198e87192d78bb7de1142fcff812c64f32a0a6a087403ce8ba1a726b6daeb3ec68ddcfad1d07885281ba8221e94cc5802b16a5cb80188c13432774c68395894c3c770ea4085113573ecfdbd81cdbd5d18271efd7d017f2de1368bafa76563ae3623c1be31dfd019bbda3d1f6c07b46dc47da57856d102f68eadab805b4f672f4e9bdaba52b2a3a1d14869f7a72ce7eb3f4d16971c728870ab10ea961d7585e8076511eb1ad6c86a07c61af2ecb642a980c94a9d7858392668603b4304d3745544f808285fc45a682e3b6cb4bd9eb89b9faf49549bcda4c6178bd0b2db4a0b01aca82a9549b675cef1c584a70864a22e8f9fe99f1c2407c07fbbc2596ac607b56bb8a8cf45771b43e3fe724d18e09be6fbaedb2eaca1660fe239fcaecc981017f03a5e212c31163ae6ef53589fc3c8ec4be4b06c4f09105c5c380e8b8db78d3a3acbbc166eeb563c905710bf063375ff35fc1fc8137d5eb9df10e4690674674d9a813faf34124a3438495b67e40b3b4afa4657af9c90c7b760685b92082f1daf232741bad1131e2ece44bd1b3adf2c35e692ed4376fa673798a5f9c49e13919341120b543f897175576481aca7d0e28ccc96c3e36c449cd1757e01a33b14e46da5e9635e27612580c64134882100261a2992c3833e4c3b8dd3796397f9e06a325d8c8da07af65d52c4286b2a239bd6562bce78c08f92f213dda9b49948abe6b1b23919630d007869145432f51bc104ede077eec4156b14dea2a14f2faaf43fcd51d5cea978402547c272fc9bd6cbbebbb432ab51dad7ce3dc0b4f94a74ce98d0baff2cd445e61dce457751c1d0fd139eeda94c96821437beaa4ec017f71f6e85c45b4f9384ebe418a7659652b6571670e468daa4509162cb804cd640016809b37f6943b3eb7e041747c2bd6c91b9d533c763d3c358ec95ee4bb819eef694a8429a70d15411937fc1ade18dfc94e97b6599e7cd9e4cbf5ca782609e2715a53c9999ae06aa6f81476af40fd8c05afc2fce8b5a3aab17c15a0e882bde0c3ab70b29f43565cf2a145045dd3c3048fdc63990f7ab66d340478bed8043088c112f91a166ff42539d1a010884d759974724cf94b0f3b0c405297c3af031759c80a0bc34fdc03c8e3b2523c885cc9eb6a88492c86b60dd96f8ed07a8a7c2e3f498df6a6e6d5c31a5d1a614abdefdf0aff1e6f4740b176d821112ba9aebb83df7f6a5323933d56cdb8ba4451578a2b02535b600604f0d725481ea39a26a3d6c9e16c46c3048cc51b668a63816857191a03526bc1d29c444aea0db2dcd1b2c2d9529eed0a94a6d49633c65a7aadc1f03acf116778ea6a3228e7644229ac4298f54379e647b6623a3862a0c9da699bb10730ad1a5aa19de06d2aadb8b96e39749253cd7a18b236cdb3a9d32fe10b2246d3a32a42f4719810aa7ec1e2196293dd13b7bc2d0aa4ead949937e869273a4ccd6559af44b4c044703a5598fe3159193c17f61403b3c16e6ce076313c3e5d06e90009d785493d6138a1ace0111f2d1b51ca9a56f91304de33737133b56bbe01de65edc57509e8487daa75b9d44cf46d006e106802dff7b23feaabbf429010b749788332c5590a5b3559adda1921de470b6cc597eb6cef56980c095ac00290722697f964222b2383d9fd5b16778c356768eac1908e635ebf1f4fce5fc283d3ca35806ec26e11734a85c75ad11b57371e1fe81fe227a08d661872a9dc54aec644da06f217210b6e5805f6c475268ef3076ed8074e73412e3512bb090ee9a969c12498229e119126a1969a0bda983fa5dec2d049b999b23921372f3e0158532d7f85232e146c0db4e26a3b562062a3313f3008fe232e0a468d9888a4aac6a21c726eccbe850afe0ad74dde9445f610e33027edc1654fc6ffbde3638fb8a29fecbb99e0359b51110d6ba61b0b2cf05a1814fa1814665f91a7e22d40290ac4edf1c29aea86e250555eae4f99d5c1aebbf4988941d040136d3fd23247b94b3ae82698ff56ad3ce30885bb776064d40f7a7f5c1354d8cf0f291b7d95845aefa5ff3a8e64b79cc6449eece49208601d7864cbb2859ecbf20bd46ddfb8e21f81dd5bc09621b2e72fd1da68aaed112fc2b08091f537c5c6f79247a585e7e7688a5b433cdcda46a85e1851943069c1e05f6752079162436f7d925d8d0d2686ab8ab85568117e48725fdbd83a57e755cf9076e95fe95863900bcf41ebf67878749bbb7488890283e6c055138f741e2c7ca46847f6b57a2be9f7e2f00310501dbd3542e345911fe36d96257188582edf6af13765453bf58d301aa3275ce539396b312b4f89937b8b035f504825947780d8c5c2db2f5a5081b30c782b812591e0bee75a5676dc5f0ce9caf7fdd70487f40aca4c3dbbe945a83d8ab1a5657dcf23487d508e4e6d06f2dc6d8bcf4f5df223f64899cce8a88b60617bc5c4d4218b10b06b199964729ad9725e7aad66d73f1fe28dd8c74a7b3ea3b8121bbee37bc232bf5c4bab63dc4757ffa11a1e5ea7f1a24962c742533df525a68cac7623d062499b92e2491f502adca8759a7bcf6d9eec539005f54fa194fc4263bb669fc20d19e381a852730e34a703af8466e33c62ed28a9c5f684d2d090997de1580f144c752482e2f2f8036747311218565f87ddc46db1e1c0205a594c7f7e2211bb78686457fd3c112a8bc256e5788b6dfc3057cea279b0db18b2f15fb62b4164ec294acbbd397fed9dee37369931d71294ccab3e8a8be3146f1f3e263d635e40e2f851b67d33b86e770037268811109c3edadaf9e1a433e77e3776f5c1d384a96aabb6183a4d3b8431267ae59ccc97cbb67239fd1e33fa3e5036560f934bf02287ef840bac59d1b791f819df54b9a1c181acd5201f260badee188bf3705bc0a181f21f76c18ca235fc4b4ff389a072105b99f7ff38a362247a5f9aa78a2ec8842c069bf0127e2bbf7399f5b755cca39ee0b383f49545d688695b7f1f414284a5f758a94d6ebfb242d3a3c58828496caf8fd021335363c3e4a5d616e797e838690afc2d0e6f8fc00000000000000000000000000000000000000000000000000000c162136
-  ./such -c dilithium2_commit -k 433dd8a7ae36d45daf3bb64f49bd3460cf8f8d318ec8f78b20b095edea5eff2010e614ef4d9764695e846be5de1edc375578598982eaddecafa5e58f1cec49c063a6906b9240b32a9107d14e95e71207f3b79c97b4af2e712588f30330e33790a64735c0d57dabd2eaf1768e2818441c72ab7dfe2e5552a0da05b34c9daa09588f300526b5534e69a01c4e90fe499119f5f2f1ab62536cfa6d88b34b421bb5512ed965a014e5940add6c6afcda3c9738b3a1d770706c1bba2d4ee0f0e08425eb517be0a877b37b2d5f26481a17381382dc73c1dc14c2e93598f75ee4d1887e05cfee8ef760b55b1338c4aa7ec6f322edcc3ac3d67653e542a7b6c1dea653c799b7067b5691ac8424d7ff561bb0d185dec25d72af90dd180b3792721fa984df562631cefe4b74d3949b8e59ceb5aed1a670a3f210759b02c3fc4be6c10a854b30ee16e94f3799567a19e84883ae38a863d6ce286e866275d35b661746974d36c0741c684bbb2d1f03a1b3c55f4b6977f35e88f4820897486afb032cf4998a9dd5b24a86c500ac2a5a1b895e009e53a5d2f4c40f0aa831d6d367713107b52143861b45a388ea071a2e06e9a9f555661d1f8af268d731799592495bf00e982de0480e3099ee123551d9241f9961017a61fb935f8ab28441315e50f21839996d4d10570366f1f2faca64db112b0e15b1a081083fe365177d01edafdd92ef13b3277e7e52d834ca4d9e58d55688283311d4e1424e53b32ad8f842a4ed66165b6896e501622d37f3806b17b8ef9fd4349a1437ae68e573b0b8461de35210720ba8624193f550d626a2932cde9ad41af3866831be2828670fde82c855bc0a45276194531ee6ddcc7a547422aa1a1564dfc24809d0148a13aa7d7cf14d33c34bd3f5393d13bb1ed4d39b92f841060143653342b056802a5c157fea2d30515f7c053499771f14ef8a2688a699dad18a0ced823f9a5fa884a76f3b2bd9d0eec76a58dadb3f3468e1d8c95167b36f821f4551e373f53b247f3c04d9d3b251b77bfe4354d25dc2aaeff597207dc4c906c9afee4f4ee35bb59f8e3ff11e57a38a941a102f609c4626b85aa406704e0644c265ed29bd32f11bd61acbdfe4a73dac8bb42a1bcdf29da8315d2dfb19cd5e49bfc0bfcccdf3de82a0bda512efbfda33d42cfb5913d69112a25c112c047a38aca6088d207a0a0dd5d607e6ad36c7f613eeb31aa81a706da58ffa253750b1c540c91a0cdc3a326762bb5acb5f4a036f9bb44d966de06c1a5fcbb33d86e0bef03426a2fa4704cc27b8d189fb06e8138bab856e8c530cd7d6c4ae74f07699e5cb7fa5e90e4ee2495b78c1dfc05e6bb9a864879df2d3aecd0698e21d8c37d37c407100aded99278b6394d7735441df17627db78df32a48e615fa892d8ef2ec2e63c9ca2d787bf91807af410e135015e8c94cb7c3281db50c68ff02de673b6a4394b17942f6f8598391dd4aecb07729e30a5965031fb5c881696f86ba520b272372fd4c1f32596caf449349a0d838f3cc633bf62640be605814446eee602e20d1737cb635ffbc609843d5351b785781d331c48a86be3797ac0c974e1bc7c98eb16ec1b67932684d2394683e8e926f0b46cfaab8c938905cc2971cff2012f7b7f1f837de80e34e7a8044238ef485048a8bee9e73b89e9f0d7e0656a39f013d018a59a12415fcc439f5596753d1f8355ed606f0096279f0e29d1e3ed779de473e4a7c648ddd84207277020a65efc73d0dd2cb3ebb0990d611582e4e6c39800ec2a7524a6734756be0c634159f5a1e3378ab1788c38ebcd7968daa485fac8d3fec2dd6753f0542b9188d679ec25e041c999614799a7cfef6cd66 -s 47e43112baf753cb2e272ebfd5a08a61301799c413a73642e2016a9e7aefc57e32f594a42d6c604a7d74fa72261c188a35c2655cdbf71884761d227c7e6f984f2fb52ba6be6db5fa78683f4f3ac9bbbb69a2a4a58b0169971a1492554f3b22cd01f486983d1bd9bd294499b624c2c3ab1ee31b48fb3d3188da637b962f4d203d6a8ed4071be99919c6fcb61e4a4746e5f71a03d2a56b7b7a5c521e3a9846eb1d5a2f8db1e908eea940db28bb5f372817d9902bcf84c5bc4d3f8c3c2c72f47a7fac5cd55eaf23b78c56985d61eacb480158841a8c765204cdbe9af2812fded334dc53a96e6b8c6439806b153aa9f4f0b8198e87192d78bb7de1142fcff812c64f32a0a6a087403ce8ba1a726b6daeb3ec68ddcfad1d07885281ba8221e94cc5802b16a5cb80188c13432774c68395894c3c770ea4085113573ecfdbd81cdbd5d18271efd7d017f2de1368bafa76563ae3623c1be31dfd019bbda3d1f6c07b46dc47da57856d102f68eadab805b4f672f4e9bdaba52b2a3a1d14869f7a72ce7eb3f4d16971c728870ab10ea961d7585e8076511eb1ad6c86a07c61af2ecb642a980c94a9d7858392668603b4304d3745544f808285fc45a682e3b6cb4bd9eb89b9faf49549bcda4c6178bd0b2db4a0b01aca82a9549b675cef1c584a70864a22e8f9fe99f1c2407c07fbbc2596ac607b56bb8a8cf45771b43e3fe724d18e09be6fbaedb2eaca1660fe239fcaecc981017f03a5e212c31163ae6ef53589fc3c8ec4be4b06c4f09105c5c380e8b8db78d3a3acbbc166eeb563c905710bf063375ff35fc1fc8137d5eb9df10e4690674674d9a813faf34124a3438495b67e40b3b4afa4657af9c90c7b760685b92082f1daf232741bad1131e2ece44bd1b3adf2c35e692ed4376fa673798a5f9c49e13919341120b543f897175576481aca7d0e28ccc96c3e36c449cd1757e01a33b14e46da5e9635e27612580c64134882100261a2992c3833e4c3b8dd3796397f9e06a325d8c8da07af65d52c4286b2a239bd6562bce78c08f92f213dda9b49948abe6b1b23919630d007869145432f51bc104ede077eec4156b14dea2a14f2faaf43fcd51d5cea978402547c272fc9bd6cbbebbb432ab51dad7ce3dc0b4f94a74ce98d0baff2cd445e61dce457751c1d0fd139eeda94c96821437beaa4ec017f71f6e85c45b4f9384ebe418a7659652b6571670e468daa4509162cb804cd640016809b37f6943b3eb7e041747c2bd6c91b9d533c763d3c358ec95ee4bb819eef694a8429a70d15411937fc1ade18dfc94e97b6599e7cd9e4cbf5ca782609e2715a53c9999ae06aa6f81476af40fd8c05afc2fce8b5a3aab17c15a0e882bde0c3ab70b29f43565cf2a145045dd3c3048fdc63990f7ab66d340478bed8043088c112f91a166ff42539d1a010884d759974724cf94b0f3b0c405297c3af031759c80a0bc34fdc03c8e3b2523c885cc9eb6a88492c86b60dd96f8ed07a8a7c2e3f498df6a6e6d5c31a5d1a614abdefdf0aff1e6f4740b176d821112ba9aebb83df7f6a5323933d56cdb8ba4451578a2b02535b600604f0d725481ea39a26a3d6c9e16c46c3048cc51b668a63816857191a03526bc1d29c444aea0db2dcd1b2c2d9529eed0a94a6d49633c65a7aadc1f03acf116778ea6a3228e7644229ac4298f54379e647b6623a3862a0c9da699bb10730ad1a5aa19de06d2aadb8b96e39749253cd7a18b236cdb3a9d32fe10b2246d3a32a42f4719810aa7ec1e2196293dd13b7bc2d0aa4ead949937e869273a4ccd6559af44b4c044703a5598fe3159193c17f61403b3c16e6ce076313c3e5d06e90009d785493d6138a1ace0111f2d1b51ca9a56f91304de33737133b56bbe01de65edc57509e8487daa75b9d44cf46d006e106802dff7b23feaabbf429010b749788332c5590a5b3559adda1921de470b6cc597eb6cef56980c095ac00290722697f964222b2383d9fd5b16778c356768eac1908e635ebf1f4fce5fc283d3ca35806ec26e11734a85c75ad11b57371e1fe81fe227a08d661872a9dc54aec644da06f217210b6e5805f6c475268ef3076ed8074e73412e3512bb090ee9a969c12498229e119126a1969a0bda983fa5dec2d049b999b23921372f3e0158532d7f85232e146c0db4e26a3b562062a3313f3008fe232e0a468d9888a4aac6a21c726eccbe850afe0ad74dde9445f610e33027edc1654fc6ffbde3638fb8a29fecbb99e0359b51110d6ba61b0b2cf05a1814fa1814665f91a7e22d40290ac4edf1c29aea86e250555eae4f99d5c1aebbf4988941d040136d3fd23247b94b3ae82698ff56ad3ce30885bb776064d40f7a7f5c1354d8cf0f291b7d95845aefa5ff3a8e64b79cc6449eece49208601d7864cbb2859ecbf20bd46ddfb8e21f81dd5bc09621b2e72fd1da68aaed112fc2b08091f537c5c6f79247a585e7e7688a5b433cdcda46a85e1851943069c1e05f6752079162436f7d925d8d0d2686ab8ab85568117e48725fdbd83a57e755cf9076e95fe95863900bcf41ebf67878749bbb7488890283e6c055138f741e2c7ca46847f6b57a2be9f7e2f00310501dbd3542e345911fe36d96257188582edf6af13765453bf58d301aa3275ce539396b312b4f89937b8b035f504825947780d8c5c2db2f5a5081b30c782b812591e0bee75a5676dc5f0ce9caf7fdd70487f40aca4c3dbbe945a83d8ab1a5657dcf23487d508e4e6d06f2dc6d8bcf4f5df223f64899cce8a88b60617bc5c4d4218b10b06b199964729ad9725e7aad66d73f1fe28dd8c74a7b3ea3b8121bbee37bc232bf5c4bab63dc4757ffa11a1e5ea7f1a24962c742533df525a68cac7623d062499b92e2491f502adca8759a7bcf6d9eec539005f54fa194fc4263bb669fc20d19e381a852730e34a703af8466e33c62ed28a9c5f684d2d090997de1580f144c752482e2f2f8036747311218565f87ddc46db1e1c0205a594c7f7e2211bb78686457fd3c112a8bc256e5788b6dfc3057cea279b0db18b2f15fb62b4164ec294acbbd397fed9dee37369931d71294ccab3e8a8be3146f1f3e263d635e40e2f851b67d33b86e770037268811109c3edadaf9e1a433e77e3776f5c1d384a96aabb6183a4d3b8431267ae59ccc97cbb67239fd1e33fa3e5036560f934bf02287ef840bac59d1b791f819df54b9a1c181acd5201f260badee188bf3705bc0a181f21f76c18ca235fc4b4ff389a072105b99f7ff38a362247a5f9aa78a2ec8842c069bf0127e2bbf7399f5b755cca39ee0b383f49545d688695b7f1f414284a5f758a94d6ebfb242d3a3c58828496caf8fd021335363c3e4a5d616e797e838690afc2d0e6f8fc00000000000000000000000000000000000000000000000000000c162136
-  Expected: 93ee49a892ba111b0f2386fde83bf88f9455a08a4a488035196d2d4fa16892a4
-  Note: tx_sighash32 is derived from pre-anchor transaction template bytes.
-[0;32m[SUCCESS][0m All test data saved in: /tmp/dilithium2_testnet_tTx7Pz
---- End contrib/testnet_dilithium2_test.sh (rerun) ---
-
---- Manual sendtx (dilithium2 rerun) ---
-Start broadcasting transaction: 2fdc9af632e11fbad9a6e90f2ecf0c7d57c8ae10f2904422896e4480930b7fe5 with timeout 15 seconds
+[0;32m[SUCCESS][0m Commitment generated: e30c55c11e14495beeef9834174b0fc6096bce432eff3e453272c62e63d7c38b
+Start broadcasting transaction: 45e3dbd667dcff798d762f1977cbf56ed7c63dbb2581d75d90a2c4c5cc52c2fa with timeout 15 seconds
 Trying to connect to nodes...
-Successfully connected to peer 14 (3.85.120.238)
-Successfully connected to peer 7 (198.58.102.18)
-Successfully connected to peer 4 (100.21.235.190)
-Successfully connected to peer 9 (35.84.106.212)
-Successfully connected to peer 12 (165.227.227.139)
-Successfully connected to peer 1 (93.57.24.247)
-Successfully connected to peer 3 (142.132.147.162)
-Successfully connected to peer 16 (95.141.35.117)
-Successfully connected to peer 6 (89.58.9.219)
+Successfully connected to peer 1 (100.21.235.190)
+Successfully connected to peer 9 (198.58.102.18)
+Successfully connected to peer 14 (35.84.106.212)
+Successfully connected to peer 15 (3.85.120.238)
+Successfully connected to peer 5 (165.227.227.139)
 Successfully connected to peer 2 (185.232.70.226)
-Successfully connected to peer 5 (188.117.132.82)
-Successfully connected to peer 11 (65.109.127.244)
-Successfully connected to peer 15 (37.27.63.117)
-Successfully connected to peer 10 (135.181.168.83)
-Successfully connected to peer 13 (15.235.227.118)
-Successfully connected to peer 8 (139.167.11.99)
-tx successfully sent to node 14
-tx successfully sent to node 7
+Successfully connected to peer 10 (95.141.35.117)
+Successfully connected to peer 4 (142.132.147.162)
+Successfully connected to peer 16 (89.58.9.219)
+Successfully connected to peer 3 (93.57.24.247)
+Successfully connected to peer 8 (188.117.132.82)
+Successfully connected to peer 13 (135.181.168.83)
+Successfully connected to peer 7 (65.109.127.244)
+Successfully connected to peer 12 (37.27.63.117)
+Successfully connected to peer 6 (15.235.227.118)
+Successfully connected to peer 11 (139.167.11.99)
+tx successfully sent to node 1
+tx successfully sent to node 9
 
 
 Result:
@@ -81,232 +51,29 @@ Requested from nodes: 2
 Seen on other nodes: 0
 
 Error: The transaction was not relayed back. Your transaction is very likely invalid (or was already broadcasted and picked up by an invalid node)
-sendtx_exit:0
-
---- Manual spvnode scan (dilithium2 rerun, 25s timeout) ---
-DEBUG: [oqs] falcon_512=enabled falcon_1024=enabled (liboqs)
-DEBUG: [smpv] enabled
-[smpv] enabled via CLI flag
-address: nWuPJxw5d3DaoRjRsXr43VJ1HRYPWHjRJV
-address: nrs8k6QQgYRzaShbR19QYEcu879GG5Yt5p
-address: nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q
-Loading headers from disk, this may take several minutes...
-0 headers loaded0 headers loaded1000 headers loaded2000 headers loaded3000 headers loaded4000 headers loaded5000 headers loaded6000 headers loaded7000 headers loaded8000 headers loaded9000 headers loaded10000 headers loaded11000 headers loaded12000 headers loaded13000 headers loaded14000 headers loaded15000 headers loaded16000 headers loaded17000 headers loaded18000 headers loaded19000 headers loaded20000 headers loaded21000 headers loaded22000 headers loaded23000 headers loaded24000 headers loaded25000 headers loaded26000 headers loaded27000 headers loaded28000 headers loaded29000 headers loaded30000 headers loaded31000 headers loaded32000 headers loaded33000 headers loaded34000 headers loaded35000 headers loaded36000 headers loaded37000 headers loaded38000 headers loaded39000 headers loaded40000 headers loaded41000 headers loaded42000 headers loaded43000 headers loaded44000 headers loaded45000 headers loaded46000 headers loaded47000 headers loaded48000 headers loaded49000 headers loaded50000 headers loaded51000 headers loaded52000 headers loaded53000 headers loaded54000 headers loaded55000 headers loaded56000 headers loaded57000 headers loaded58000 headers loaded59000 headers loaded60000 headers loaded61000 headers loaded62000 headers loaded63000 headers loaded64000 headers loaded65000 headers loaded66000 headers loaded67000 headers loaded68000 headers loaded69000 headers loaded70000 headers loaded71000 headers loaded72000 headers loaded73000 headers loaded74000 headers loaded75000 headers loaded76000 headers loaded77000 headers loaded78000 headers loaded79000 headers loaded80000 headers loaded81000 headers loaded82000 headers loaded83000 headers loaded84000 headers loaded85000 headers loaded86000 headers loaded87000 headers loaded88000 headers loaded89000 headers loaded90000 headers loaded91000 headers loaded92000 headers loaded93000 headers loaded94000 headers loaded95000 headers loaded96000 headers loaded97000 headers loaded98000 headers loaded99000 headers loaded100000 headers loaded101000 headers loaded102000 headers loaded103000 headers loaded104000 headers loaded105000 headers loaded106000 headers loaded107000 headers loaded108000 headers loaded109000 headers loaded110000 headers loaded111000 headers loaded112000 headers loaded113000 headers loaded114000 headers loaded115000 headers loaded116000 headers loaded117000 headers loaded
-Connected 117684 headers, now at height: 6017685
-done
-Discover peers...
-Connecting to the p2p network...
-DEBUG: Trying to connect to 1...
-DEBUG: Trying to connect to 2...
-DEBUG: Trying to connect to 3...
-DEBUG: Trying to connect to 4...
-DEBUG: Trying to connect to 5...
-DEBUG: Trying to connect to 6...
-DEBUG: Trying to connect to 7...
-DEBUG: Trying to connect to 8...
-DEBUG: Trying to connect to 9...
-DEBUG: Trying to connect to 10...
-DEBUG: Trying to connect to 11...
-DEBUG: Trying to connect to 12...
-DEBUG: Trying to connect to 13...
-DEBUG: Trying to connect to 14...
-DEBUG: Trying to connect to 15...
-DEBUG: Trying to connect to 16...
-DEBUG: Event callback on node 2
-DEBUG: Successful connected to node 2.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 2: version
-DEBUG: Connected nodes: 1
-DEBUG: Event callback on node 10
-DEBUG: Successful connected to node 10.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 10: version
-DEBUG: Connected nodes: 2
-DEBUG: received command from node 2: version
-DEBUG: Connected to node 2: /Shibetoshi:1.14.7/ (41595136)
-DEBUG: sending message to node 2: verack
-DEBUG: received command from node 2: verack
-DEBUG: sending message to node 2: getheaders
+[0;34m[INFO][0m Step 7: Monitor with spvnode
+Expected log:
+  [dilithium-commit] Valid at height=X txpos=Y commit=e30c55c11e14495beeef9834174b0fc6096bce432eff3e453272c62e63d7c38b
+[0;34m[INFO][0m Running spvnode scan (timeout 20s) and requiring Dilithium2 validation log before next step...
+----- spvnode log tail -----
+DEBUG: received command from node 15: addr
+DEBUG: received command from node 15: feefilter
+DEBUG: received command from node 8: sendheaders
+DEBUG: received command from node 8: sendcmpct
+DEBUG: received command from node 8: ping
+DEBUG: sending message to node 8: pong
+DEBUG: received command from node 8: addr
+DEBUG: received command from node 8: feefilter
+DEBUG: received command from node 5: sendheaders
+DEBUG: received command from node 5: sendcmpct
+DEBUG: received command from node 5: ping
+DEBUG: sending message to node 5: pong
+DEBUG: received command from node 5: addr
+DEBUG: received command from node 5: feefilter
 DEBUG: received command from node 10: version
-DEBUG: Connected to node 10: /Shibetoshi:1.14.6/ (41595136)
+DEBUG: Connected to node 10: /Shibetoshi:1.14.5/ (41595271)
 DEBUG: sending message to node 10: verack
 DEBUG: received command from node 10: verack
-DEBUG: Event callback on node 6
-DEBUG: Successful connected to node 6.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 6: version
-DEBUG: Connected nodes: 3
-DEBUG: Event callback on node 13
-DEBUG: Successful connected to node 13.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 13: version
-DEBUG: Connected nodes: 4
-DEBUG: received command from node 2: sendheaders
-DEBUG: received command from node 2: sendcmpct
-DEBUG: received command from node 2: ping
-DEBUG: sending message to node 2: pong
-DEBUG: received command from node 2: addr
-DEBUG: received command from node 2: feefilter
-DEBUG: received command from node 10: sendheaders
-DEBUG: received command from node 10: sendcmpct
-DEBUG: received command from node 10: ping
-DEBUG: sending message to node 10: pong
-DEBUG: received command from node 10: addr
-DEBUG: received command from node 10: feefilter
-DEBUG: Event callback on node 4
-DEBUG: Successful connected to node 4.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 4: version
-DEBUG: Connected nodes: 5
-DEBUG: Event callback on node 16
-DEBUG: Successful connected to node 16.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 16: version
-DEBUG: Connected nodes: 6
-DEBUG: Event callback on node 12
-DEBUG: Successful connected to node 12.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 12: version
-DEBUG: Connected nodes: 7
-DEBUG: Event callback on node 14
-DEBUG: Successful connected to node 14.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 14: version
-DEBUG: Connected nodes: 8
-DEBUG: Event callback on node 7
-DEBUG: Successful connected to node 7.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 7: version
-DEBUG: Connected nodes: 9
-DEBUG: Event callback on node 1
-DEBUG: Successful connected to node 1.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 1: version
-DEBUG: Connected nodes: 10
-DEBUG: received command from node 6: version
-DEBUG: Connected to node 6: /Shibetoshi:1.14.9/ (41595136)
-DEBUG: sending message to node 6: verack
-DEBUG: received command from node 6: verack
-DEBUG: received command from node 13: version
-DEBUG: Connected to node 13: /Shibetoshi:1.14.6/ (41595136)
-DEBUG: sending message to node 13: verack
-DEBUG: received command from node 13: verack
-DEBUG: Event callback on node 15
-DEBUG: Successful connected to node 15.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 15: version
-DEBUG: Connected nodes: 11
-DEBUG: Event callback on node 8
-DEBUG: Successful connected to node 8.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 8: version
-DEBUG: Connected nodes: 12
-DEBUG: Event callback on node 5
-DEBUG: Successful connected to node 5.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 5: version
-DEBUG: Connected nodes: 13
-DEBUG: Event callback on node 11
-DEBUG: Successful connected to node 11.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 11: version
-DEBUG: Connected nodes: 14
-DEBUG: received command from node 6: sendheaders
-DEBUG: received command from node 6: sendcmpct
-DEBUG: received command from node 6: ping
-DEBUG: sending message to node 6: pong
-DEBUG: received command from node 6: addr
-DEBUG: received command from node 6: feefilter
-DEBUG: received command from node 13: sendheaders
-DEBUG: received command from node 13: sendcmpct
-DEBUG: received command from node 13: ping
-DEBUG: sending message to node 13: pong
-DEBUG: received command from node 13: addr
-DEBUG: received command from node 13: feefilter
-DEBUG: received command from node 2: headers
-DEBUG: Got 2000 headers (took 0 s) from node 2
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 6019685
-New headers tip height 6019685 from Mon Mar 11 13:23:41 2024
-
-DEBUG: chain size: 6019685, last time Mon Mar 11 13:23:41 2024
-DEBUG: sending message to node 2: getheaders
-DEBUG: Event callback on node 3
-DEBUG: Successful connected to node 3.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 3: version
-DEBUG: Connected nodes: 15
-DEBUG: received command from node 4: version
-DEBUG: Connected to node 4: /Shibetoshi:1.14.9/ (41595136)
-DEBUG: sending message to node 4: verack
-DEBUG: received command from node 4: verack
-DEBUG: received command from node 16: version
-DEBUG: Connected to node 16: /Shibetoshi:1.14.7/ (41595136)
-DEBUG: sending message to node 16: verack
-DEBUG: received command from node 16: verack
-DEBUG: received command from node 12: version
-DEBUG: Connected to node 12: /Shibetoshi:1.14.7/ (41595136)
-DEBUG: sending message to node 12: verack
-DEBUG: received command from node 12: verack
-DEBUG: received command from node 14: version
-DEBUG: Connected to node 14: /Shibetoshi:1.14.9/ (41595136)
-DEBUG: sending message to node 14: verack
-DEBUG: received command from node 14: verack
-DEBUG: received command from node 7: version
-DEBUG: Connected to node 7: /Shibetoshi:1.14.9/ (41595136)
-DEBUG: sending message to node 7: verack
-DEBUG: received command from node 7: verack
-DEBUG: received command from node 1: version
-DEBUG: Connected to node 1: /Shibetoshi:1.14.9/ (41595136)
-DEBUG: sending message to node 1: verack
-DEBUG: received command from node 1: verack
-DEBUG: Event callback on node 9
-DEBUG: Successful connected to node 9.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 9: version
-DEBUG: Connected nodes: 16
-DEBUG: received command from node 15: version
-DEBUG: Connected to node 15: /Shibetoshi:1.14.9/ (41595136)
-DEBUG: sending message to node 15: verack
-DEBUG: received command from node 15: verack
-DEBUG: received command from node 11: version
-DEBUG: Connected to node 11: /Shibetoshi:1.14.9/ (41595136)
-DEBUG: sending message to node 11: verack
-DEBUG: received command from node 11: verack
-DEBUG: received command from node 5: version
-DEBUG: Connected to node 5: /Shibetoshi:1.14.8/ (41595136)
-DEBUG: sending message to node 5: verack
-DEBUG: received command from node 5: verack
-DEBUG: received command from node 8: version
-DEBUG: Connected to node 8: /Shibetoshi:1.14.8(DoOnlyGoodEveryday)/ (41595136)
-DEBUG: sending message to node 8: verack
-DEBUG: received command from node 8: verack
-DEBUG: received command from node 4: sendheaders
-DEBUG: received command from node 4: sendcmpct
-DEBUG: received command from node 4: ping
-DEBUG: sending message to node 4: pong
-DEBUG: received command from node 4: addr
-DEBUG: received command from node 4: feefilter
-DEBUG: received command from node 16: sendheaders
-DEBUG: received command from node 16: sendcmpct
-DEBUG: received command from node 16: ping
-DEBUG: sending message to node 16: pong
-DEBUG: received command from node 16: addr
-DEBUG: received command from node 16: feefilter
-DEBUG: received command from node 2: headers
-DEBUG: Got 2000 headers (took 0 s) from node 2
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 6021685
-New headers tip height 6021685 from Tue Mar 12 05:54:12 2024
-
-DEBUG: chain size: 6021685, last time Tue Mar 12 05:54:12 2024
-DEBUG: sending message to node 2: getheaders
-DEBUG: received command from node 12: sendheaders
-DEBUG: received command from node 12: sendcmpct
-DEBUG: received command from node 12: ping
-DEBUG: sending message to node 12: pong
-DEBUG: received command from node 12: addr
-DEBUG: received command from node 12: feefilter
 DEBUG: received command from node 14: sendheaders
 DEBUG: received command from node 14: sendcmpct
 DEBUG: received command from node 14: ping
@@ -319,69 +86,53 @@ DEBUG: received command from node 7: ping
 DEBUG: sending message to node 7: pong
 DEBUG: received command from node 7: addr
 DEBUG: received command from node 7: feefilter
-DEBUG: received command from node 1: sendheaders
-DEBUG: received command from node 1: sendcmpct
-DEBUG: received command from node 1: ping
-DEBUG: sending message to node 1: pong
-DEBUG: received command from node 1: addr
-DEBUG: received command from node 1: feefilter
-DEBUG: received command from node 15: sendheaders
-DEBUG: received command from node 15: sendcmpct
-DEBUG: received command from node 15: ping
-DEBUG: sending message to node 15: pong
-DEBUG: received command from node 15: addr
-DEBUG: received command from node 15: feefilter
-DEBUG: received command from node 11: sendheaders
-DEBUG: received command from node 11: sendcmpct
-DEBUG: received command from node 11: ping
-DEBUG: sending message to node 11: pong
-DEBUG: received command from node 11: addr
-DEBUG: received command from node 11: feefilter
-DEBUG: received command from node 5: sendheaders
-DEBUG: received command from node 5: sendcmpct
-DEBUG: received command from node 5: ping
-DEBUG: sending message to node 5: pong
-DEBUG: received command from node 5: addr
-DEBUG: received command from node 5: feefilter
-DEBUG: received command from node 8: sendheaders
-DEBUG: received command from node 8: sendcmpct
-DEBUG: received command from node 8: ping
-DEBUG: sending message to node 8: pong
-DEBUG: received command from node 8: addr
-DEBUG: received command from node 8: feefilter
-DEBUG: received command from node 3: version
-DEBUG: Connected to node 3: /Shibetoshi:1.14.9/ (41595136)
-DEBUG: sending message to node 3: verack
-DEBUG: received command from node 3: verack
-DEBUG: received command from node 9: version
-DEBUG: Connected to node 9: /Shibetoshi:1.14.5/ (41595136)
-DEBUG: sending message to node 9: verack
-DEBUG: received command from node 9: verack
-DEBUG: received command from node 2: headers
-DEBUG: Got 2000 headers (took 0 s) from node 2
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 6023685
-New headers tip height 6023685 from Tue Mar 12 21:30:41 2024
-
-DEBUG: chain size: 6023685, last time Tue Mar 12 21:30:41 2024
-DEBUG: sending message to node 2: getheaders
 DEBUG: received command from node 3: sendheaders
 DEBUG: received command from node 3: sendcmpct
 DEBUG: received command from node 3: ping
 DEBUG: sending message to node 3: pong
 DEBUG: received command from node 3: addr
 DEBUG: received command from node 3: feefilter
+DEBUG: received command from node 4: sendheaders
+DEBUG: received command from node 4: sendcmpct
+DEBUG: received command from node 4: ping
+DEBUG: sending message to node 4: pong
+DEBUG: received command from node 4: addr
+DEBUG: received command from node 4: feefilter
+DEBUG: received command from node 11: sendheaders
+DEBUG: received command from node 11: sendcmpct
+DEBUG: received command from node 11: ping
+DEBUG: sending message to node 11: pong
+DEBUG: received command from node 11: addr
+DEBUG: received command from node 11: feefilter
+DEBUG: received command from node 2: sendheaders
+DEBUG: received command from node 2: sendcmpct
+DEBUG: received command from node 2: ping
+DEBUG: sending message to node 2: pong
+DEBUG: received command from node 2: addr
+DEBUG: received command from node 2: feefilter
 DEBUG: received command from node 9: sendheaders
-DEBUG: received command from node 9spvnode_exit:124
-
---- Manual such off-chain verify (dilithium2 rerun) ---
-
-=== Dilithium2 Verification Result ===
-✓ VERIFIED: Signature is valid!
-
-=== Dilithium2 Commitment Generated ===
-commitment:  93ee49a892ba111b0f2386fde83bf88f9455a08a4a488035196d2d4fa16892a4
-length:      32 bytes
-
-This commitment can be included in an OP_RETURN output:
-OP_RETURN script (prefix 6a24 + tag 44494c32='DIL2'): 6a2444494c3293ee49a892ba111b0f2386fde83bf88f9455a08a4a488035196d2d4fa16892a4
+DEBUG: received command from node 9: sendcmpct
+DEBUG: received command from node 9: ping
+DEBUG: sending message to node 9: pong
+DEBUG: received command from node 9: addr
+DEBUG: received command from node 9: feefilter
+DEBUG: received command from node 10: sendheaders
+DEBUG: received command from node 10: sendcmpct
+DEBUG: received command from node 10: ping
+DEBUG: sending message to node 10: pong
+DEBUG: received command from node 10: addr
+DEBUG: received command from node 10: feefilter
+DEBUG: Statecheck: amount of connected nodes: 16
+chaintip hash: b1699b740c45f27462765b3daa568fdf184081e302e03ef0be55bcec9e0d080b
+chaintip height: 41595271
+DEBUG: sending message to node 1: ping
+DEBUG: sending message to node 16: ping
+DEBUG: sending message to node 15: ping
+DEBUG: sending message to node 14: ping
+DEBUG: sending message to node 13: ping
+DEBUG: sending message to node 12: ping
+DEBUG: sending message to node 11: ping
+DEBUG: sending message to node 10: ping
+DEBUG: sending message to node 9: ping
+DEBUG: sending message to node 8: ping
+DEBUG: sending message to nod[0;31m[ERROR][0m spvnode timed out before Dilithium2 commitment validation was observed
