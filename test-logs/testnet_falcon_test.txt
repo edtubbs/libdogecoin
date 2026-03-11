@@ -1,11 +1,19 @@
-Run timestamp: 2026-03-11T21:22:48Z
-Faucet URL required: https://faucet.doge.toys/
-Generated test address: ncVdUp875fmhEporELpo3LLXwnb4iKd3SK
-Faucet backend endpoint probe: https://doge-testnet-faucet-v1.oasnft.workers.dev/faucet
+Run timestamp: 2026-03-11T21:26:51Z
+RERUN start
+Using faucet URL: https://faucet.doge.toys/
+Generated address via such: nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q
+Generated private key WIF via such: cnNBfTgmZMvjBBQRdRPLSKi4JF31as9r1JwoxRPPMWC222uD4Zyg
+faucet_payload {'address': 'nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q', 'amount': '10', 'recaptchaToken': '', 'captchaType': 'v3'}
+faucet_status 400
+faucet_body {"error":"Invalid JSON payload"}
+faucet_payload {'address': 'nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q', 'amount': '10', 'recaptchaToken': 'test', 'captchaType': 'v3'}
+faucet_status 400
+faucet_body {"errorCode":3}
+faucet_payload {'address': 'nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q', 'amount': '10', 'recaptchaToken': 'test', 'captchaType': 'v2'}
 faucet_status 400
 faucet_body {"errorCode":3}
 
---- Begin contrib/testnet_falcon_test.sh ---
+--- Begin contrib/testnet_falcon_test.sh (rerun) ---
 
 ==========================================
   Falcon-512 Testnet Integration Test
@@ -15,16 +23,16 @@ faucet_body {"errorCode":3}
 [0;32m[SUCCESS][0m All tools available
 [0;34m[INFO][0m Step 1: Generating testnet wallet...
 [0;32m[SUCCESS][0m Testnet wallet generated
-  Address: nWuPJxw5d3DaoRjRsXr43VJ1HRYPWHjRJV
-  Private Key (WIF): chTxDXmoRwLzTeFLxd5KGX6pADfWtVU6YJBnr4A3ewDuboSNxA6S
-  Public Key: 029d63c92eff2406fe93bcf18d4c2cd42627012dcea8fb38f416c31fd1772aeefd
+  Address: nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q
+  Private Key (WIF): cnNBfTgmZMvjBBQRdRPLSKi4JF31as9r1JwoxRPPMWC222uD4Zyg
+  Public Key: 0298e3929bf3d4a2b24b6ea6caf451341fed96e28c046dfc3afb738440769dc8f9
 [0;34m[INFO][0m Step 2: Getting testnet coins...
 
 ==========================================
   REQUEST TESTNET COINS
 ==========================================
 
-Send testnet DOGE to: nWuPJxw5d3DaoRjRsXr43VJ1HRYPWHjRJV
+Send testnet DOGE to: nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q
 
 Faucets:
   1. https://faucet.doge.toys/
@@ -39,8 +47,8 @@ Note: some faucets require browser CAPTCHA or may rate-limit by IP.
 [0;32m[SUCCESS][0m Assuming coins received. Continuing...
 [0;34m[INFO][0m Step 3: Generating Falcon-512 keypair...
 [0;32m[SUCCESS][0m Falcon-512 keypair generated
-  Public Key (1794 chars): 090de58f859528a5777a38316d57c2b23a6a2aea619d1904d9c13fac8253dcc7...
-  Secret Key (2562 chars): 59e8413ffb9fc6083ec413e0c4083f7c17a146ebd004ec0085fc50bbef813cfc...
+  Public Key (1794 chars): 099f0ce483555c183676a6240ac64b1c62c9b7ee93d950d2c091c4cbeb6c45bc...
+  Secret Key (2562 chars): 59082f780fe0b5fff03c04303c0b8ffff460810461050c6145fc0efdec207be7...
 [0;34m[INFO][0m Step 4: Building transaction and deriving tx_sighash32...
 Create an unsigned testnet transaction with such first:
   ./such -c transaction
@@ -56,24 +64,24 @@ Then paste the unsigned raw tx hex below.
   Signed TX: 01000000010000000000000000000000000000000000000000000000000000000000000000000000...
 
 [1;33m[WARNING][0m Skipping broadcast. You can run:
-  ./sendtx -t 01000000010000000000000000000000000000000000000000000000000000000000000000000000006b483045022100859507bf1889947e29690842362b0c0e8ce9d1b84bd4832ec725bf4d69f67cc902204f2420398a53fd2f7ceee30bd37a1a0733b8c97bfac3a1f6615fe9338ee14c5c0121029d63c92eff2406fe93bcf18d4c2cd42627012dcea8fb38f416c31fd1772aeefdffffffff0200e1f505000000001976a914000000000000000000000000000000000000000088ac0000000000000000266a24464c433185ef975c8693357183c9ab5f70cca25421c8dfc1547684ece49c3abad6fcc2e600000000
+  ./sendtx -t 01000000010000000000000000000000000000000000000000000000000000000000000000000000006b483045022100c807b97d1c0cb35140fb7e34008e2ce1eacb4a235c114696f22600d14993995f02204e5513414a156aaf0507e6768535cb149d7c1ac227191509aed9288c1bc2dc0801210298e3929bf3d4a2b24b6ea6caf451341fed96e28c046dfc3afb738440769dc8f9ffffffff0200e1f505000000001976a914000000000000000000000000000000000000000088ac0000000000000000266a24464c433195ee36c5f758deb1a2b61f65bf35eb0ecba21d8faef9f43840935e63f1868a5300000000
 [0;34m[INFO][0m Step 7: Monitoring with SPV node...
 
 After broadcasting your transaction, monitor it with header-first sync:
 
   # -l no prompt, -c continuous, -d debug, -x smpv, -p checkpoint, -a address
-  ./spvnode -t -l -c -d -x -p -a "nWuPJxw5d3DaoRjRsXr43VJ1HRYPWHjRJV" scan
+  ./spvnode -t -l -c -d -x -p -a "nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q" scan
 
 Then switch to full block scan mode (or use -b directly):
 
-  ./spvnode -t -l -c -d -x -p -b -a "nWuPJxw5d3DaoRjRsXr43VJ1HRYPWHjRJV" scan
+  ./spvnode -t -l -c -d -x -p -b -a "nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q" scan
 
 The SPV node will:
   - Sync testnet blockchain headers
-  - Track wallet activity for: nWuPJxw5d3DaoRjRsXr43VJ1HRYPWHjRJV
+  - Track wallet activity for: nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q
   - Download and scan blocks in full mode
   - Detect Falcon commitments
-  - Log: [falcon-commit] Valid at height=X txpos=Y commit=85ef975c8693357183c9ab5f70cca25421c8dfc1547684ece49c3abad6fcc2e6
+  - Log: [falcon-commit] Valid at height=X txpos=Y commit=95ee36c5f758deb1a2b61f65bf35eb0ecba21d8faef9f43840935e63f1868a53
 
 [1;33m[WARNING][0m SPV sync may take time. Be patient!
 [0;34m[INFO][0m Step 8: Verifying commitment off-chain...
@@ -81,13 +89,13 @@ The SPV node will:
 To verify the commitment off-chain:
 
 1. Verify the signature:
-   ./such -c falcon_verify -k 090de58f859528a5777a38316d57c2b23a6a2aea619d1904d9c13fac8253dcc764cc8e505d9eaa3a8c903ba93055753e42888e6c2ec917cc94a78c8f732f92f793c899e8b6eb72b7892cab2aa39d30d57d81ac4bfc361066b2afadbfb76418ab382b0d9465f3f18099e5077a397a8d83bf6aa8faf094a9cfbfc038b44de6eb0c045088170fc7964e8c81ad848d6a40cd5180977e76e5667619d5adb3c48551c3db5b2cdd6ab8e8ac3b9c7ee852f746361e1086bb10462a3140b658db504451754a0b8a0b1756a1f9959d482b29f863382802b941ad6a37070145abcc8502359cefb8c8bd7b7a1d91b349a8d115c2b182d07572feec6e1e96f5f1bd50b99ce253eabf6415affdf6e9341564a9cc4530b09031334a1ea829263344fcf18046194d645476692024681c519875fc074b6d09e14b361cb55cc4578b38275383e256e99049bc55b8d7f2d023e765265c1b1fde2ab720c178ded3b465f520770d88520565d539e76666a0e9be371988dbb27077f14d26d048dd75fa210ae4218eeaf580a2da64f8a246b34b4abf2085c2d8d4c512f1c9f3606b0a1481b63293e15b678d189b2216ed88aa76233363797958e7e226ce7fae408a011c1404621287fb3be2ec4ca4bfa14adca855a097a118968e874a0c9b1515d18c5a70a76741c03cb56d656d65668bb657e805872a06814139d19b6d168ec1b1c9ae9605cd73a526d47a77e9da71702cb70da28d70a2a793bdea2e30a0dba18791284b5d0f87338a7c283ee1059da9c169eade292db1c9e03560cf4516aef68659537e6502f6a2132356e026f7cb67b198ad8ae3e12d7e3a3855b0b4507a4e350c614e98ee592448f23d8362a2bcedc46c86dc1c796cb2b6cac795366e55d7c19a7aa021184210f95552635488e22f9be1e45610690da9b51ac3738f16b10d4d41c0c14ea1b5ea06981e861772176b505c592959c1eb1aa21f498865a39001d53601bfe0fe0164bf8574f5069074bf128fe0b587fa9b84f8d9361aa184b6bd1321550d5c1d98886b4bb730ca45e8f2de21ac28dc51b6624f1c90ec709fcd4b33198758baad9229c50c76c958734fd4268b4b1d064ce9dc96fc81fc6daef3a6fad58268c9c39a06a1857f30f25b2fcea24462f3f4bf821365a921da476d1e4208fd34f8e49403c936f2bec1346e6eeea80f84724eac3571f4d0dcbd0e54b5aa6fa568a6bb292cc5af3ca4c4b984242e3e9e47758e00251fe95df30097be9fd2e36286cb0819cc3be9c7d20c \
+   ./such -c falcon_verify -k 099f0ce483555c183676a6240ac64b1c62c9b7ee93d950d2c091c4cbeb6c45bca8cf971b89bdca1b6060e359d08424f50e5d86028c85df5e20b606a8fa278ca817059df981eefb41b00531294b12326a0c3065240227fc5bf5fe29fe69809e61bd5884043acec9244d2c2e11ca46132c484fbe64faa7c9d447f880caf8403232a58df4616c9a3ac219055c542db80a528893ae584d4efde2b1a949a32e2992bcedf12fe490094d123f582020f15855c981fceb49c8087a8998c63a2967915fb66c77fae75644887746e6ec67006a03cbcc09b50c849a4029a835a34afd92ae6e857310585563cbb85928f86676c8fd1bc87e10a848d955663023a04d0c0c1a88c60aeb94bc1a112193d0d63f59c7451bccfb309948b3b196b786927b4a67a159944e1282b596a24170d601dd5f6baa412d000d87f46a2a9f77e0601f3baee0e4fc602f75a675dbc9dc9b45ee4ab28c60044d7152260f2edc3b3a954a86951a41941b67f289fb4c660d86f6ca9d4aa0fdb682a0c2491e2bc3a959de13162059886a0d73c2a3d9bda8f50c9211758f93409826832a59d66a8dad685680a9f70e9db6e4d1a9995ffd4cb2656bbd54042cd4b085c26c501ef1ea1b8080ae67c9b0a91a66ca89e325eb95a89d4268e3296e66259f2026a10872d1d4b41c5ba2bfdeccb75e02621d2a8975fecb8f0a21554029d2ad5f927ff4b0d06c96493c13742a9715a88e127456f1a2fefbd02251b502499d22d38c7c580ad0d68d17468b04b62be881922fac1cc06e8457753d07f04fe5928921cf3a89e6165f3d2b45a3d7203cdd6ef5d191db8c78a0a6fac763845da118a15d45a39ddf3080d4667c9da1a02525d039709346070d3a4b99f966f9694eb94656ebbd8194bac179774e9e40507d78f73c6f8b30057b33aee0f46192ab63ca83cd19b9dabb53c37d7dbd5014b185259051fc0103c9df9f4ede32982784353e15c980015c7bb61cf71141dc0d4e51b78de7985da0c90bb4d7cda66ac9b475cee240b816b51e6501043ccaa4969c0a7829ae381e8a105ee10f372dadb942c48ff354590532f5c6a711065a2ab8a62b8eeb02b414e6e7b4ef45af782f24cc2d1a1660b6072a91e16a7c0d44e048dd384a131234c0ed6d20e451e204e29c292d41af9b72505584f8606def4de14f4909112a7b1c348416d764a27239ebd8cc9b4af0fa2369564b439018806d58a660d1d58a4722d41261f4c17bc06324a8b649271e065ff5a143ecd12baa6158f9f88362 \
                            -x 2882df256ca1aedbabcba980a22c677dc76b220bb78402b6d3c70f106e742617 \
-                           -s 39cbdda6069387ce69771be33a75993e48bd49d7601706e8a814a03ebe74b51c83f62ab38f2de016e7b8471d49ce49476f2ce4025a536dd2440ba2403b9eebd910410a4d4b6383dc71f0050881b729a626cdbefd767acc0e5b78e838d27f32b94426d3431963a3509b252b88a341770e73ed3b9ee232838ddc88dc7651642f0e9415673d615834c67b0a8ddfa413c553438bf6ba301e6f88e758d71a3ca13fa2f6fc3dd94cee67d095e4e9175cd18ffcd190a456954acff67cee1e38d493f217fb8cae1c1709c82fb36b42486c17785d9de2d2fbe9edfc013c3f92232f40a0b1269bf4c1efb2363247f2c5a312cdb60b0dbc52bcce4e7566c96361b164fd555254779a7d9f9243cf67cb54f8113d0b9ad3a79084c7b73b49358a4896774a0cad01a92ef84bd762108f14c534ec9887899a325895c8e4a2d9e49683baba22d5dec92033acd71ec069fd185d6b75d1553b92d6b77290112fd3fe90605a112ccb363128918ab5e2d844319b72e988b28d852b155822c5a72d4aec78c820d0f6e920ad5732287346a7ac3d7d8eba67e457a34faf6e28d4607f8d2e7bc088687a050ec70d65178ca62120b1694578e3d0ddb51ad72ed3f675a78b3621b143af8464591359a9e65625b8d53ea6800f1a60ac53d4c1d67936e94c436baaad629982878d43bec99a8361db684f6607a16b618c03f755769930f798ae67d345abcb19816a916d55474696c83a51de8e566c86d2ac15f83665c1946f9013155ad7b93125c5a75364a8c6dcf63aff7f3b56d3628c24775d9797345abfcab057f8d405677f73f50edde323c182a578baa25ac539b32a94b9a5f05de0e80571c342fc9cda81b38d1935cf724d9739b6b71d9070e4312d2d2dd57853b3a7e2983cba33ede33826079d3c632e524d4f4ffd1e52f29f34
+                           -s 393ba32d331a36e2963f9aef38c35088b980361cbac7435be1cfc497b87bc87ae084901fdd52a315a5a1a9cb1f489f1af337e83bba47ae986213ed677ee7c7f67cafc73a32b0d9341ddabc319e5273dd3a44f30988adb2442cd56f93a73d1772169c85dcf7ff1f89de275b20a76b5d37c2ab1541d9953ff1fbe672b098f7425fd66fa01af46f0e81bcd44507fbad7f529aae362f2bd25df7787e7adb533cac2d7cee6def50fd0c5e2e2dfbce5c9e12502fb40599f95f168969ae9e496469293a6fd63d5372bae8ef9f7c0a0fd75fa49e4d852d1dcc71b638bfaf14ec936fee2b88f95ebe289a00d5d4783406d53b694ec648c635d9310bdbb4d3249e93ef44f5bb4ab1f47972ad1cf1e9e80c1202acb0f59db983224cbdcd759456d96771345f3e2ad20e2551b49e30d32010b476106f9cf921f7d5b1f2b9ba94ba99aad5b9b561a586ba10a0d97fb10635d7d4f2d2fd7b5c5d331e59755ab45af68c030523418b0fc9736b2c65738738e8f98d9e3b150728f804087d64054adb5f4f9246f36e71e4dd2f355d7bdf497433d550c73530b22b1a83c1cc4c229ba2df325f9220f534d488677b28b38841d1d5ddd98b0c9103562691e524a2f65377a3d082c4c9de3df48d0ed47ac52c997391a5ee4ae73c2e1b49508b135e2a032f420f85950ea12ed14d6cb566dfaf72e873ef2ff9a8fba844426b8341b4c66ff3444223bc28eda25ec2a50dbb0e5e9874a7ad0c334ab3ad44d8f389ce1db64f7d34163389fbf6729a7ceed226408923185659131c45535d1ac5b69154a93342ab94c1e2ad7fa8ce0573b75074fe0b1a578928344380e2afde5c30a74256f71bac97de5fae564126dfb71918cd2d193512651246afd0bc7913a8ceec8488d52b058a2d01ff4ce7707f5cf5c3c754f64c9b2c7d7890
 
 2. Regenerate commitment and compare:
-   ./such -c falcon_commit -k 090de58f859528a5777a38316d57c2b23a6a2aea619d1904d9c13fac8253dcc764cc8e505d9eaa3a8c903ba93055753e42888e6c2ec917cc94a78c8f732f92f793c899e8b6eb72b7892cab2aa39d30d57d81ac4bfc361066b2afadbfb76418ab382b0d9465f3f18099e5077a397a8d83bf6aa8faf094a9cfbfc038b44de6eb0c045088170fc7964e8c81ad848d6a40cd5180977e76e5667619d5adb3c48551c3db5b2cdd6ab8e8ac3b9c7ee852f746361e1086bb10462a3140b658db504451754a0b8a0b1756a1f9959d482b29f863382802b941ad6a37070145abcc8502359cefb8c8bd7b7a1d91b349a8d115c2b182d07572feec6e1e96f5f1bd50b99ce253eabf6415affdf6e9341564a9cc4530b09031334a1ea829263344fcf18046194d645476692024681c519875fc074b6d09e14b361cb55cc4578b38275383e256e99049bc55b8d7f2d023e765265c1b1fde2ab720c178ded3b465f520770d88520565d539e76666a0e9be371988dbb27077f14d26d048dd75fa210ae4218eeaf580a2da64f8a246b34b4abf2085c2d8d4c512f1c9f3606b0a1481b63293e15b678d189b2216ed88aa76233363797958e7e226ce7fae408a011c1404621287fb3be2ec4ca4bfa14adca855a097a118968e874a0c9b1515d18c5a70a76741c03cb56d656d65668bb657e805872a06814139d19b6d168ec1b1c9ae9605cd73a526d47a77e9da71702cb70da28d70a2a793bdea2e30a0dba18791284b5d0f87338a7c283ee1059da9c169eade292db1c9e03560cf4516aef68659537e6502f6a2132356e026f7cb67b198ad8ae3e12d7e3a3855b0b4507a4e350c614e98ee592448f23d8362a2bcedc46c86dc1c796cb2b6cac795366e55d7c19a7aa021184210f95552635488e22f9be1e45610690da9b51ac3738f16b10d4d41c0c14ea1b5ea06981e861772176b505c592959c1eb1aa21f498865a39001d53601bfe0fe0164bf8574f5069074bf128fe0b587fa9b84f8d9361aa184b6bd1321550d5c1d98886b4bb730ca45e8f2de21ac28dc51b6624f1c90ec709fcd4b33198758baad9229c50c76c958734fd4268b4b1d064ce9dc96fc81fc6daef3a6fad58268c9c39a06a1857f30f25b2fcea24462f3f4bf821365a921da476d1e4208fd34f8e49403c936f2bec1346e6eeea80f84724eac3571f4d0dcbd0e54b5aa6fa568a6bb292cc5af3ca4c4b984242e3e9e47758e00251fe95df30097be9fd2e36286cb0819cc3be9c7d20c -s 39cbdda6069387ce69771be33a75993e48bd49d7601706e8a814a03ebe74b51c83f62ab38f2de016e7b8471d49ce49476f2ce4025a536dd2440ba2403b9eebd910410a4d4b6383dc71f0050881b729a626cdbefd767acc0e5b78e838d27f32b94426d3431963a3509b252b88a341770e73ed3b9ee232838ddc88dc7651642f0e9415673d615834c67b0a8ddfa413c553438bf6ba301e6f88e758d71a3ca13fa2f6fc3dd94cee67d095e4e9175cd18ffcd190a456954acff67cee1e38d493f217fb8cae1c1709c82fb36b42486c17785d9de2d2fbe9edfc013c3f92232f40a0b1269bf4c1efb2363247f2c5a312cdb60b0dbc52bcce4e7566c96361b164fd555254779a7d9f9243cf67cb54f8113d0b9ad3a79084c7b73b49358a4896774a0cad01a92ef84bd762108f14c534ec9887899a325895c8e4a2d9e49683baba22d5dec92033acd71ec069fd185d6b75d1553b92d6b77290112fd3fe90605a112ccb363128918ab5e2d844319b72e988b28d852b155822c5a72d4aec78c820d0f6e920ad5732287346a7ac3d7d8eba67e457a34faf6e28d4607f8d2e7bc088687a050ec70d65178ca62120b1694578e3d0ddb51ad72ed3f675a78b3621b143af8464591359a9e65625b8d53ea6800f1a60ac53d4c1d67936e94c436baaad629982878d43bec99a8361db684f6607a16b618c03f755769930f798ae67d345abcb19816a916d55474696c83a51de8e566c86d2ac15f83665c1946f9013155ad7b93125c5a75364a8c6dcf63aff7f3b56d3628c24775d9797345abfcab057f8d405677f73f50edde323c182a578baa25ac539b32a94b9a5f05de0e80571c342fc9cda81b38d1935cf724d9739b6b71d9070e4312d2d2dd57853b3a7e2983cba33ede33826079d3c632e524d4f4ffd1e52f29f34
-   Expected: 85ef975c8693357183c9ab5f70cca25421c8dfc1547684ece49c3abad6fcc2e6
+   ./such -c falcon_commit -k 099f0ce483555c183676a6240ac64b1c62c9b7ee93d950d2c091c4cbeb6c45bca8cf971b89bdca1b6060e359d08424f50e5d86028c85df5e20b606a8fa278ca817059df981eefb41b00531294b12326a0c3065240227fc5bf5fe29fe69809e61bd5884043acec9244d2c2e11ca46132c484fbe64faa7c9d447f880caf8403232a58df4616c9a3ac219055c542db80a528893ae584d4efde2b1a949a32e2992bcedf12fe490094d123f582020f15855c981fceb49c8087a8998c63a2967915fb66c77fae75644887746e6ec67006a03cbcc09b50c849a4029a835a34afd92ae6e857310585563cbb85928f86676c8fd1bc87e10a848d955663023a04d0c0c1a88c60aeb94bc1a112193d0d63f59c7451bccfb309948b3b196b786927b4a67a159944e1282b596a24170d601dd5f6baa412d000d87f46a2a9f77e0601f3baee0e4fc602f75a675dbc9dc9b45ee4ab28c60044d7152260f2edc3b3a954a86951a41941b67f289fb4c660d86f6ca9d4aa0fdb682a0c2491e2bc3a959de13162059886a0d73c2a3d9bda8f50c9211758f93409826832a59d66a8dad685680a9f70e9db6e4d1a9995ffd4cb2656bbd54042cd4b085c26c501ef1ea1b8080ae67c9b0a91a66ca89e325eb95a89d4268e3296e66259f2026a10872d1d4b41c5ba2bfdeccb75e02621d2a8975fecb8f0a21554029d2ad5f927ff4b0d06c96493c13742a9715a88e127456f1a2fefbd02251b502499d22d38c7c580ad0d68d17468b04b62be881922fac1cc06e8457753d07f04fe5928921cf3a89e6165f3d2b45a3d7203cdd6ef5d191db8c78a0a6fac763845da118a15d45a39ddf3080d4667c9da1a02525d039709346070d3a4b99f966f9694eb94656ebbd8194bac179774e9e40507d78f73c6f8b30057b33aee0f46192ab63ca83cd19b9dabb53c37d7dbd5014b185259051fc0103c9df9f4ede32982784353e15c980015c7bb61cf71141dc0d4e51b78de7985da0c90bb4d7cda66ac9b475cee240b816b51e6501043ccaa4969c0a7829ae381e8a105ee10f372dadb942c48ff354590532f5c6a711065a2ab8a62b8eeb02b414e6e7b4ef45af782f24cc2d1a1660b6072a91e16a7c0d44e048dd384a131234c0ed6d20e451e204e29c292d41af9b72505584f8606def4de14f4909112a7b1c348416d764a27239ebd8cc9b4af0fa2369564b439018806d58a660d1d58a4722d41261f4c17bc06324a8b649271e065ff5a143ecd12baa6158f9f88362 -s 393ba32d331a36e2963f9aef38c35088b980361cbac7435be1cfc497b87bc87ae084901fdd52a315a5a1a9cb1f489f1af337e83bba47ae986213ed677ee7c7f67cafc73a32b0d9341ddabc319e5273dd3a44f30988adb2442cd56f93a73d1772169c85dcf7ff1f89de275b20a76b5d37c2ab1541d9953ff1fbe672b098f7425fd66fa01af46f0e81bcd44507fbad7f529aae362f2bd25df7787e7adb533cac2d7cee6def50fd0c5e2e2dfbce5c9e12502fb40599f95f168969ae9e496469293a6fd63d5372bae8ef9f7c0a0fd75fa49e4d852d1dcc71b638bfaf14ec936fee2b88f95ebe289a00d5d4783406d53b694ec648c635d9310bdbb4d3249e93ef44f5bb4ab1f47972ad1cf1e9e80c1202acb0f59db983224cbdcd759456d96771345f3e2ad20e2551b49e30d32010b476106f9cf921f7d5b1f2b9ba94ba99aad5b9b561a586ba10a0d97fb10635d7d4f2d2fd7b5c5d331e59755ab45af68c030523418b0fc9736b2c65738738e8f98d9e3b150728f804087d64054adb5f4f9246f36e71e4dd2f355d7bdf497433d550c73530b22b1a83c1cc4c229ba2df325f9220f534d488677b28b38841d1d5ddd98b0c9103562691e524a2f65377a3d082c4c9de3df48d0ed47ac52c997391a5ee4ae73c2e1b49508b135e2a032f420f85950ea12ed14d6cb566dfaf72e873ef2ff9a8fba844426b8341b4c66ff3444223bc28eda25ec2a50dbb0e5e9874a7ad0c334ab3ad44d8f389ce1db64f7d34163389fbf6729a7ceed226408923185659131c45535d1ac5b69154a93342ab94c1e2ad7fa8ce0573b75074fe0b1a578928344380e2afde5c30a74256f71bac97de5fae564126dfb71918cd2d193512651246afd0bc7913a8ceec8488d52b058a2d01ff4ce7707f5cf5c3c754f64c9b2c7d7890
+   Expected: 95ee36c5f758deb1a2b61f65bf35eb0ecba21d8faef9f43840935e63f1868a53
 
 3. If both match, you've proven:
    ✓ Pre-anchor transaction template sighash was signed with Falcon-512 private key
@@ -99,43 +107,43 @@ To verify the commitment off-chain:
   TEST COMPLETE
 ==========================================
 
-[0;32m[SUCCESS][0m All test data saved in: /tmp/falcon_testnet_32673
+[0;32m[SUCCESS][0m All test data saved in: /tmp/falcon_testnet_32920
 
 Files:
-  - /tmp/falcon_testnet_32673/wallet.txt (testnet wallet)
-  - /tmp/falcon_testnet_32673/falcon_keys.txt (Falcon keypair)
-  - /tmp/falcon_testnet_32673/falcon_sig.txt (tx_sighash signature)
-  - /tmp/falcon_testnet_32673/falcon_commit.txt (tx-bound commitment)
-  - /tmp/falcon_testnet_32673/tx_info.txt (transaction info)
+  - /tmp/falcon_testnet_32920/wallet.txt (testnet wallet)
+  - /tmp/falcon_testnet_32920/falcon_keys.txt (Falcon keypair)
+  - /tmp/falcon_testnet_32920/falcon_sig.txt (tx_sighash signature)
+  - /tmp/falcon_testnet_32920/falcon_commit.txt (tx-bound commitment)
+  - /tmp/falcon_testnet_32920/tx_info.txt (transaction info)
 
 Next steps:
-1. Broadcast transaction with OP_RETURN containing: 85ef975c8693357183c9ab5f70cca25421c8dfc1547684ece49c3abad6fcc2e6
+1. Broadcast transaction with OP_RETURN containing: 95ee36c5f758deb1a2b61f65bf35eb0ecba21d8faef9f43840935e63f1868a53
 2. Monitor with SPV node
 3. Verify commitment off-chain
 
---- End contrib/testnet_falcon_test.sh ---
+--- End contrib/testnet_falcon_test.sh (rerun) ---
 
---- Manual sendtx (falcon) ---
-Start broadcasting transaction: 696fa2a5dd29d21fcbb1cea4b5eeff2a02c7ff4220f9d80820f22d4c92b8ed26 with timeout 15 seconds
+--- Manual sendtx (falcon rerun) ---
+Start broadcasting transaction: 0703000141a842697af5a89bac5e3f4e4821e1b23a297703c162124f5b3eb3bb with timeout 15 seconds
 Trying to connect to nodes...
-Successfully connected to peer 13 (3.85.120.238)
-Successfully connected to peer 8 (198.58.102.18)
-Successfully connected to peer 4 (35.84.106.212)
-Successfully connected to peer 2 (100.21.235.190)
-Successfully connected to peer 7 (165.227.227.139)
-Successfully connected to peer 10 (89.58.9.219)
-Successfully connected to peer 3 (93.57.24.247)
-Successfully connected to peer 5 (142.132.147.162)
-Successfully connected to peer 11 (185.232.70.226)
-Successfully connected to peer 1 (188.117.132.82)
-Successfully connected to peer 6 (37.27.63.117)
-Successfully connected to peer 9 (65.109.127.244)
-Successfully connected to peer 12 (135.181.168.83)
-Successfully connected to peer 14 (15.235.227.118)
-Successfully connected to peer 16 (95.141.35.117)
-Successfully connected to peer 15 (139.167.11.99)
-tx successfully sent to node 13
-tx successfully sent to node 8
+Successfully connected to peer 5 (3.85.120.238)
+Successfully connected to peer 3 (198.58.102.18)
+Successfully connected to peer 6 (100.21.235.190)
+Successfully connected to peer 10 (35.84.106.212)
+Successfully connected to peer 4 (165.227.227.139)
+Successfully connected to peer 9 (89.58.9.219)
+Successfully connected to peer 12 (93.57.24.247)
+Successfully connected to peer 8 (142.132.147.162)
+Successfully connected to peer 7 (185.232.70.226)
+Successfully connected to peer 14 (188.117.132.82)
+Successfully connected to peer 1 (135.181.168.83)
+Successfully connected to peer 13 (65.109.127.244)
+Successfully connected to peer 16 (37.27.63.117)
+Successfully connected to peer 15 (95.141.35.117)
+Successfully connected to peer 11 (15.235.227.118)
+Successfully connected to peer 2 (139.167.11.99)
+tx successfully sent to node 5
+tx successfully sent to node 3
 
 
 Result:
@@ -149,14 +157,16 @@ Seen on other nodes: 0
 Error: The transaction was not relayed back. Your transaction is very likely invalid (or was already broadcasted and picked up by an invalid node)
 sendtx_exit:0
 
---- Manual spvnode scan (falcon address) ---
+--- Manual spvnode scan (falcon rerun, 25s timeout) ---
 DEBUG: [oqs] falcon_512=enabled falcon_1024=enabled (liboqs)
 DEBUG: [smpv] enabled
 [smpv] enabled via CLI flag
 address: nWuPJxw5d3DaoRjRsXr43VJ1HRYPWHjRJV
+address: nrs8k6QQgYRzaShbR19QYEcu879GG5Yt5p
+address: nZ5nQ93om6WBMye2ZQjyN7yQr6PacAxs6Q
 Loading headers from disk, this may take several minutes...
-0 headers loaded0 headers loaded1000 headers loaded2000 headers loaded3000 headers loaded4000 headers loaded5000 headers loaded6000 headers loaded7000 headers loaded8000 headers loaded9000 headers loaded10000 headers loaded11000 headers loaded12000 headers loaded13000 headers loaded14000 headers loaded15000 headers loaded16000 headers loaded17000 headers loaded18000 headers loaded19000 headers loaded20000 headers loaded21000 headers loaded22000 headers loaded23000 headers loaded24000 headers loaded25000 headers loaded26000 headers loaded27000 headers loaded28000 headers loaded29000 headers loaded30000 headers loaded31000 headers loaded32000 headers loaded33000 headers loaded34000 headers loaded35000 headers loaded36000 headers loaded37000 headers loaded38000 headers loaded39000 headers loaded
-Connected 39999 headers, now at height: 5940000
+0 headers loaded0 headers loaded1000 headers loaded2000 headers loaded3000 headers loaded4000 headers loaded5000 headers loaded6000 headers loaded7000 headers loaded8000 headers loaded9000 headers loaded10000 headers loaded11000 headers loaded12000 headers loaded13000 headers loaded14000 headers loaded15000 headers loaded16000 headers loaded17000 headers loaded18000 headers loaded19000 headers loaded20000 headers loaded21000 headers loaded22000 headers loaded23000 headers loaded24000 headers loaded25000 headers loaded26000 headers loaded27000 headers loaded28000 headers loaded29000 headers loaded30000 headers loaded31000 headers loaded32000 headers loaded33000 headers loaded34000 headers loaded35000 headers loaded36000 headers loaded37000 headers loaded38000 headers loaded39000 headers loaded40000 headers loaded41000 headers loaded42000 headers loaded43000 headers loaded44000 headers loaded45000 headers loaded46000 headers loaded47000 headers loaded48000 headers loaded49000 headers loaded50000 headers loaded51000 headers loaded52000 headers loaded53000 headers loaded54000 headers loaded55000 headers loaded56000 headers loaded57000 headers loaded58000 headers loaded59000 headers loaded60000 headers loaded61000 headers loaded62000 headers loaded63000 headers loaded64000 headers loaded65000 headers loaded66000 headers loaded67000 headers loaded68000 headers loaded69000 headers loaded70000 headers loaded71000 headers loaded72000 headers loaded73000 headers loaded74000 headers loaded75000 headers loaded76000 headers loaded77000 headers loaded78000 headers loaded79000 headers loaded80000 headers loaded81000 headers loaded82000 headers loaded83000 headers loaded84000 headers loaded85000 headers loaded86000 headers loaded87000 headers loaded88000 headers loaded89000 headers loaded90000 headers loaded91000 headers loaded92000 headers loaded93000 headers loaded94000 headers loaded95000 headers loaded96000 headers loaded97000 headers loaded
+Connected 97888 headers, now at height: 5997889
 done
 Discover peers...
 Connecting to the p2p network...
@@ -176,219 +186,175 @@ DEBUG: Trying to connect to 13...
 DEBUG: Trying to connect to 14...
 DEBUG: Trying to connect to 15...
 DEBUG: Trying to connect to 16...
-DEBUG: Event callback on node 6
-DEBUG: Successful connected to node 6.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 6: version
-DEBUG: Connected nodes: 1
-DEBUG: Event callback on node 3
-DEBUG: Successful connected to node 3.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 3: version
-DEBUG: Connected nodes: 2
-DEBUG: received command from node 6: version
-DEBUG: Connected to node 6: /Shibetoshi:1.14.7/ (41595131)
-DEBUG: sending message to node 6: verack
-DEBUG: received command from node 6: verack
-DEBUG: sending message to node 6: getheaders
-DEBUG: received command from node 3: version
-DEBUG: Connected to node 3: /Shibetoshi:1.14.6/ (41595131)
-DEBUG: sending message to node 3: verack
-DEBUG: received command from node 3: verack
-DEBUG: Event callback on node 7
-DEBUG: Successful connected to node 7.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 7: version
-DEBUG: Connected nodes: 3
-DEBUG: Event callback on node 5
-DEBUG: Successful connected to node 5.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 5: version
-DEBUG: Connected nodes: 4
-DEBUG: received command from node 6: sendheaders
-DEBUG: received command from node 6: sendcmpct
-DEBUG: received command from node 6: ping
-DEBUG: sending message to node 6: pong
-DEBUG: received command from node 6: addr
-DEBUG: received command from node 6: feefilter
-DEBUG: received command from node 3: sendheaders
-DEBUG: received command from node 3: sendcmpct
-DEBUG: received command from node 3: ping
-DEBUG: sending message to node 3: pong
-DEBUG: received command from node 3: addr
-DEBUG: received command from node 3: feefilter
-DEBUG: Event callback on node 16
-DEBUG: Successful connected to node 16.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 16: version
-DEBUG: Connected nodes: 5
-DEBUG: Event callback on node 8
-DEBUG: Successful connected to node 8.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 8: version
-DEBUG: Connected nodes: 6
-DEBUG: Event callback on node 13
-DEBUG: Successful connected to node 13.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 13: version
-DEBUG: Connected nodes: 7
-DEBUG: Event callback on node 4
-DEBUG: Successful connected to node 4.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 4: version
-DEBUG: Connected nodes: 8
-DEBUG: received command from node 7: version
-DEBUG: Connected to node 7: /Shibetoshi:1.14.6/ (41595131)
-DEBUG: sending message to node 7: verack
-DEBUG: received command from node 7: verack
-DEBUG: Event callback on node 1
-DEBUG: Successful connected to node 1.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 1: version
-DEBUG: Connected nodes: 9
-DEBUG: Event callback on node 12
-DEBUG: Successful connected to node 12.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 12: version
-DEBUG: Connected nodes: 10
-DEBUG: received command from node 5: version
-DEBUG: Connected to node 5: /Shibetoshi:1.14.9/ (41595131)
-DEBUG: sending message to node 5: verack
-DEBUG: received command from node 5: verack
-DEBUG: Event callback on node 2
-DEBUG: Successful connected to node 2.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 2: version
-DEBUG: Connected nodes: 11
-DEBUG: Event callback on node 14
-DEBUG: Successful connected to node 14.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 14: version
-DEBUG: Connected nodes: 12
-DEBUG: Event callback on node 9
-DEBUG: Successful connected to node 9.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 9: version
-DEBUG: Connected nodes: 13
-DEBUG: Event callback on node 11
-DEBUG: Successful connected to node 11.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 11: version
-DEBUG: Connected nodes: 14
-DEBUG: received command from node 7: sendheaders
-DEBUG: received command from node 7: sendcmpct
-DEBUG: received command from node 7: ping
-DEBUG: sending message to node 7: pong
-DEBUG: received command from node 7: addr
-DEBUG: received command from node 7: feefilter
-DEBUG: received command from node 5: sendheaders
-DEBUG: received command from node 5: sendcmpct
-DEBUG: received command from node 5: ping
-DEBUG: sending message to node 5: pong
-DEBUG: received command from node 5: addr
-DEBUG: received command from node 5: feefilter
-DEBUG: received command from node 6: headers
-DEBUG: Got 2000 headers (took 0 s) from node 6
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 5942000
-New headers tip height 5942000 from Fri Feb  2 21:37:11 2024
-
-DEBUG: chain size: 5942000, last time Fri Feb  2 21:37:11 2024
-DEBUG: sending message to node 6: getheaders
-DEBUG: received command from node 16: version
-DEBUG: Connected to node 16: /Shibetoshi:1.14.9/ (41595131)
-DEBUG: sending message to node 16: verack
-DEBUG: received command from node 16: verack
-DEBUG: Event callback on node 10
-DEBUG: Successful connected to node 10.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: sending message to node 10: version
-DEBUG: Connected nodes: 15
-DEBUG: received command from node 8: version
-DEBUG: Connected to node 8: /Shibetoshi:1.14.7/ (41595131)
-DEBUG: sending message to node 8: verack
-DEBUG: received command from node 8: verack
-DEBUG: received command from node 13: version
-DEBUG: Connected to node 13: /Shibetoshi:1.14.7/ (41595131)
-DEBUG: sending message to node 13: verack
-DEBUG: received command from node 13: verack
-DEBUG: received command from node 1: version
-DEBUG: Connected to node 1: /Shibetoshi:1.14.9/ (41595131)
-DEBUG: sending message to node 1: verack
-DEBUG: received command from node 1: verack
-DEBUG: received command from node 12: version
-DEBUG: Connected to node 12: /Shibetoshi:1.14.9/ (41595131)
-DEBUG: sending message to node 12: verack
-DEBUG: received command from node 12: verack
 DEBUG: Event callback on node 15
 DEBUG: Successful connected to node 15.
 DEBUG: check if more nodes are required (connected to already: 16): false
 DEBUG: sending message to node 15: version
-DEBUG: Connected nodes: 16
+DEBUG: Connected nodes: 1
+DEBUG: Event callback on node 2
+DEBUG: Successful connected to node 2.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 2: version
+DEBUG: Connected nodes: 2
+DEBUG: received command from node 15: version
+DEBUG: Connected to node 15: /Shibetoshi:1.14.7/ (41595134)
+DEBUG: sending message to node 15: verack
+DEBUG: received command from node 15: verack
+DEBUG: sending message to node 15: getheaders
 DEBUG: received command from node 2: version
-DEBUG: Connected to node 2: /Shibetoshi:1.14.9/ (41595131)
+DEBUG: Connected to node 2: /Shibetoshi:1.14.6/ (41595134)
 DEBUG: sending message to node 2: verack
 DEBUG: received command from node 2: verack
-DEBUG: received command from node 9: version
-DEBUG: Connected to node 9: /Shibetoshi:1.14.9/ (41595131)
-DEBUG: sending message to node 9: verack
-DEBUG: received command from node 9: verack
-DEBUG: received command from node 14: version
-DEBUG: Connected to node 14: /Shibetoshi:1.14.8(DoOnlyGoodEveryday)/ (41595131)
-DEBUG: sending message to node 14: verack
-DEBUG: received command from node 14: verack
-DEBUG: received command from node 11: version
-DEBUG: Connected to node 11: /Shibetoshi:1.14.8/ (41595131)
-DEBUG: sending message to node 11: verack
-DEBUG: received command from node 11: verack
-DEBUG: received command from node 4: version
-DEBUG: Connected to node 4: /Shibetoshi:1.14.9/ (41595131)
-DEBUG: sending message to node 4: verack
-DEBUG: received command from node 4: verack
-DEBUG: received command from node 16: sendheaders
-DEBUG: received command from node 16: sendcmpct
-DEBUG: received command from node 16: ping
-DEBUG: sending message to node 16: pong
-DEBUG: received command from node 16: addr
-DEBUG: received command from node 16: feefilter
-DEBUG: received command from node 8: sendheaders
-DEBUG: received command from node 8: sendcmpct
-DEBUG: received command from node 8: ping
-DEBUG: sending message to node 8: pong
-DEBUG: received command from node 8: addr
-DEBUG: received command from node 8: feefilter
-DEBUG: received command from node 13: sendheaders
-DEBUG: received command from node 13: sendcmpct
-DEBUG: received command from node 13: ping
-DEBUG: sending message to node 13: pong
-DEBUG: received command from node 13: addr
-DEBUG: received command from node 13: feefilter
-DEBUG: received command from node 1: sendheaders
-DEBUG: received command from node 1: sendcmpct
-DEBUG: received command from node 1: ping
-DEBUG: sending message to node 1: pong
-DEBUG: received command from node 1: addr
-DEBUG: received command from node 1: feefilter
-DEBUG: received command from node 12: sendheaders
-DEBUG: received command from node 12: sendcmpct
-DEBUG: received command from node 12: ping
-DEBUG: sending message to node 12: pong
-DEBUG: received command from node 12: addr
-DEBUG: received command from node 12: feefilter
-DEBUG: received command from node 6: headers
-DEBUG: Got 2000 headers (took 0 s) from node 6
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 5944000
-New headers tip height 5944000 from Sat Feb  3 21:48:53 2024
-
-DEBUG: chain size: 5944000, last time Sat Feb  3 21:48:53 2024
-DEBUG: sending message to node 6: getheaders
+DEBUG: Event callback on node 3
+DEBUG: Successful connected to node 3.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 3: version
+DEBUG: Connected nodes: 3
+DEBUG: Event callback on node 10
+DEBUG: Successful connected to node 10.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 10: version
+DEBUG: Connected nodes: 4
+DEBUG: received command from node 15: sendheaders
+DEBUG: received command from node 15: sendcmpct
+DEBUG: received command from node 15: ping
+DEBUG: sending message to node 15: pong
+DEBUG: received command from node 15: addr
+DEBUG: received command from node 15: feefilter
 DEBUG: received command from node 2: sendheaders
 DEBUG: received command from node 2: sendcmpct
 DEBUG: received command from node 2: ping
 DEBUG: sending message to node 2: pong
 DEBUG: received command from node 2: addr
 DEBUG: received command from node 2: feefilter
+DEBUG: Event callback on node 9
+DEBUG: Successful connected to node 9.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 9: version
+DEBUG: Connected nodes: 5
+DEBUG: Event callback on node 11
+DEBUG: Successful connected to node 11.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 11: version
+DEBUG: Connected nodes: 6
+DEBUG: Event callback on node 5
+DEBUG: Successful connected to node 5.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 5: version
+DEBUG: Connected nodes: 7
+DEBUG: Event callback on node 7
+DEBUG: Successful connected to node 7.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 7: version
+DEBUG: Connected nodes: 8
+DEBUG: Event callback on node 8
+DEBUG: Successful connected to node 8.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 8: version
+DEBUG: Connected nodes: 9
+DEBUG: Event callback on node 13
+DEBUG: Successful connected to node 13.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 13: version
+DEBUG: Connected nodes: 10
+DEBUG: received command from node 3: version
+DEBUG: Connected to node 3: /Shibetoshi:1.14.9/ (41595134)
+DEBUG: sending message to node 3: verack
+DEBUG: received command from node 3: verack
+DEBUG: received command from node 10: version
+DEBUG: Connected to node 10: /Shibetoshi:1.14.6/ (41595134)
+DEBUG: sending message to node 10: verack
+DEBUG: received command from node 10: verack
+DEBUG: Event callback on node 14
+DEBUG: Successful connected to node 14.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 14: version
+DEBUG: Connected nodes: 11
+DEBUG: Event callback on node 4
+DEBUG: Successful connected to node 4.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 4: version
+DEBUG: Connected nodes: 12
+DEBUG: Event callback on node 12
+DEBUG: Successful connected to node 12.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 12: version
+DEBUG: Connected nodes: 13
+DEBUG: Event callback on node 6
+DEBUG: Successful connected to node 6.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 6: version
+DEBUG: Connected nodes: 14
+DEBUG: received command from node 3: sendheaders
+DEBUG: received command from node 3: sendcmpct
+DEBUG: received command from node 3: ping
+DEBUG: sending message to node 3: pong
+DEBUG: received command from node 3: addr
+DEBUG: received command from node 3: feefilter
+DEBUG: received command from node 10: sendheaders
+DEBUG: received command from node 10: sendcmpct
+DEBUG: received command from node 10: ping
+DEBUG: sending message to node 10: pong
+DEBUG: received command from node 10: addr
+DEBUG: received command from node 10: feefilter
+DEBUG: received command from node 9: version
+DEBUG: Connected to node 9: /Shibetoshi:1.14.9/ (41595134)
+DEBUG: sending message to node 9: verack
+DEBUG: received command from node 9: verack
+DEBUG: received command from node 15: headers
+DEBUG: Got 2000 headers (took 0 s) from node 15
+DEBUG: Connected 2000 headers
+DEBUG: Chaintip at height 5999889
+New headers tip height 5999889 from Mon Mar  4 14:09:28 2024
+
+DEBUG: chain size: 5999889, last time Mon Mar  4 14:09:28 2024
+DEBUG: sending message to node 15: getheaders
+DEBUG: Event callback on node 1
+DEBUG: Successful connected to node 1.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 1: version
+DEBUG: Connected nodes: 15
+DEBUG: received command from node 11: version
+DEBUG: Connected to node 11: /Shibetoshi:1.14.7/ (41595134)
+DEBUG: sending message to node 11: verack
+DEBUG: received command from node 11: verack
+DEBUG: received command from node 5: version
+DEBUG: Connected to node 5: /Shibetoshi:1.14.7/ (41595134)
+DEBUG: sending message to node 5: verack
+DEBUG: received command from node 5: verack
+DEBUG: received command from node 7: version
+DEBUG: Connected to node 7: /Shibetoshi:1.14.9/ (41595134)
+DEBUG: sending message to node 7: verack
+DEBUG: received command from node 7: verack
+DEBUG: received command from node 8: version
+DEBUG: Connected to node 8: /Shibetoshi:1.14.9/ (41595134)
+DEBUG: sending message to node 8: verack
+DEBUG: received command from node 8: verack
+DEBUG: received command from node 13: version
+DEBUG: Connected to node 13: /Shibetoshi:1.14.9/ (41595134)
+DEBUG: sending message to node 13: verack
+DEBUG: received command from node 13: verack
+DEBUG: Event callback on node 16
+DEBUG: Successful connected to node 16.
+DEBUG: check if more nodes are required (connected to already: 16): false
+DEBUG: sending message to node 16: version
+DEBUG: Connected nodes: 16
+DEBUG: received command from node 14: version
+DEBUG: Connected to node 14: /Shibetoshi:1.14.9/ (41595134)
+DEBUG: sending message to node 14: verack
+DEBUG: received command from node 14: verack
+DEBUG: received command from node 12: version
+DEBUG: Connected to node 12: /Shibetoshi:1.14.9/ (41595134)
+DEBUG: sending message to node 12: verack
+DEBUG: received command from node 12: verack
+DEBUG: received command from node 4: version
+DEBUG: Connected to node 4: /Shibetoshi:1.14.8(DoOnlyGoodEveryday)/ (41595134)
+DEBUG: sending message to node 4: verack
+DEBUG: received command from node 4: verack
+DEBUG: received command from node 6: version
+DEBUG: Connected to node 6: /Shibetoshi:1.14.8/ (41595134)
+DEBUG: sending message to node 6: verack
+DEBUG: received command from node 6: verack
 DEBUG: received command from node 9: sendheaders
 DEBUG: received command from node 9: sendcmpct
 DEBUG: received command from node 9: ping
@@ -401,142 +367,89 @@ DEBUG: received command from node 11: ping
 DEBUG: sending message to node 11: pong
 DEBUG: received command from node 11: addr
 DEBUG: received command from node 11: feefilter
+DEBUG: received command from node 5: sendheaders
+DEBUG: received command from node 5: sendcmpct
+DEBUG: received command from node 5: ping
+DEBUG: sending message to node 5: pong
+DEBUG: received command from node 5: addr
+DEBUG: received command from node 5: feefilter
+DEBUG: received command from node 7: sendheaders
+DEBUG: received command from node 7: sendcmpct
+DEBUG: received command from node 7: ping
+DEBUG: sending message to node 7: pong
+DEBUG: received command from node 7: addr
+DEBUG: received command from node 7: feefilter
+DEBUG: received command from node 8: sendheaders
+DEBUG: received command from node 8: sendcmpct
+DEBUG: received command from node 8: ping
+DEBUG: sending message to node 8: pong
+DEBUG: received command from node 8: addr
+DEBUG: received command from node 8: feefilter
+DEBUG: received command from node 13: sendheaders
+DEBUG: received command from node 13: sendcmpct
+DEBUG: received command from node 13: ping
+DEBUG: sending message to node 13: pong
+DEBUG: received command from node 13: addr
+DEBUG: received command from node 13: feefilter
 DEBUG: received command from node 14: sendheaders
 DEBUG: received command from node 14: sendcmpct
 DEBUG: received command from node 14: ping
 DEBUG: sending message to node 14: pong
 DEBUG: received command from node 14: addr
 DEBUG: received command from node 14: feefilter
-DEBUG: received command from node 10: version
-DEBUG: Connected to node 10: /Shibetoshi:1.14.9/ (41595131)
-DEBUG: sending message to node 10: verack
-DEBUG: received command from node 10: verack
-DEBUG: received command from node 15: version
-DEBUG: Connected to node 15: /Shibetoshi:1.14.5/ (41595131)
-DEBUG: sending message to node 15: verack
-DEBUG: received command from node 15: verack
+DEBUG: received command from node 12: sendheaders
+DEBUG: received command from node 12: sendcmpct
+DEBUG: received command from node 12: ping
+DEBUG: sending message to node 12: pong
+DEBUG: received command from node 12: addr
+DEBUG: received command from node 6: sendheaders
+DEBUG: received command from node 6: sendcmpct
+DEBUG: received command from node 6: ping
+DEBUG: sending message to node 6: pong
+DEBUG: received command from node 12: feefilter
+DEBUG: received command from node 6: addr
+DEBUG: received command from node 6: feefilter
 DEBUG: received command from node 4: sendheaders
 DEBUG: received command from node 4: sendcmpct
 DEBUG: received command from node 4: ping
 DEBUG: sending message to node 4: pong
 DEBUG: received command from node 4: addr
 DEBUG: received command from node 4: feefilter
+DEBUG: received command from node 15: headers
+DEBUG: Got 2000 headers (took 0 s) from node 15
+DEBUG: Connected 2000 headers
+DEBUG: Chaintip at height 6001889
+New headers tip height 6001889 from Tue Mar  5 06:22:11 2024
+
+DEBUG: chain size: 6001889, last time Tue Mar  5 06:22:11 2024
+DEBUG: sending message to node 15: getheaders
+DEBUG: received command from node 1: version
+DEBUG: Connected to node 1: /Shibetoshi:1.14.9/ (41595134)
+DEBUG: sending message to node 1: verack
+DEBUG: received command from node 1: verack
+DEBUG: received command from node 16: version
+DEBUG: Connected to node 16: /Shibetoshi:1.14.5/ (41595134)
+DEBUG: sending message to node 16: verack
+DEBUG: received command from node 16: verack
 DEBUG: Statecheck: amount of connected nodes: 16
-chaintip hash: 7f93cf23d5fab3314d8fe2bbf4508e77a2c7e25df38d1e421d6eea6e05d0e03b
-chaintip height: 5944000
+chaintip hash: 8474ac67c22c98850e59a82acb6f1f5156f593df105c39ef81a3fb72324bcc21
+chaintip height: 6001889
 DEBUG: sending message to node 1: ping
-DEBUG: sending message to node 16: ping
-DEBUG: sending message to node 15: ping
-DEBUG: sending message to node 14: ping
-DEBUG: sending message to node 13: ping
-DEBUG: sending message to node 12: ping
+DEBUG: sending message to node 3: ping
+DEBUG: sending message to node 6: ping
+DEBUG: sending message to node 2: ping
+DEBUG: sending message to node 5: ping
+DEBUG: sending message to node 4: ping
 DEBUG: sending message to node 11: ping
 DEBUG: sending message to node 10: ping
 DEBUG: sending message to node 9: ping
 DEBUG: sending message to node 8: ping
 DEBUG: sending message to node 7: ping
-DEBUG: sending message to node 6: ping
-DEBUG: sending message to node 5: ping
-DEBUG: sending message to node 4: ping
-DEBUG: sending message to node 3: ping
-DEBUG: sending message to node 2: ping
-DEBUG: received command from node 3: pong
-DEBUG: received command from node 7: pong
-DEBUG: received command from node 5: pong
-DEBUG: received command from node 8: pong
-DEBUG: received command from node 13: pong
-DEBUG: received command from node 1: pong
-DEBUG: received command from node 12: pong
-DEBUG: received command from node 2: pong
-DEBUG: received command from node 9: pong
-DEBUG: received command from node 11: pong
-DEBUG: received command from node 14: pong
-DEBUG: received command from node 6: headers
-DEBUG: Got 2000 headers (took 1773264309 s) from node 6
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 5946000
-New headers tip height 5946000 from Tue Feb  6 08:46:01 2024
+DEBUG: sending message to node 16: ping
+DEBUG: sending message to node 14: ping
+DEBUG: sendspvnode_exit:124
 
-DEBUG: chain size: 5946000, last time Tue Feb  6 08:46:01 2024
-DEBUG: sending message to node 6: getheaders
-DEBUG: received command from node 6: pong
-DEBUG: received command from node 4: pong
-DEBUG: received command from node 10: sendheaders
-DEBUG: received command from node 10: sendcmpct
-DEBUG: received command from node 10: ping
-DEBUG: sending message to node 10: pong
-DEBUG: received command from node 10: addr
-DEBUG: received command from node 10: feefilter
-DEBUG: received command from node 10: pong
-DEBUG: received command from node 16: pong
-DEBUG: received command from node 15: sendheaders
-DEBUG: received command from node 15: sendcmpct
-DEBUG: received command from node 15: ping
-DEBUG: sending message to node 15: pong
-DEBUG: received command from node 15: addr
-DEBUG: received command from node 15: feefilter
-DEBUG: received command from node 15: pong
-DEBUG: received command from node 6: headers
-DEBUG: Got 2000 headers (took 0 s) from node 6
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 5948000
-New headers tip height 5948000 from Thu Feb  8 12:35:16 2024
-
-DEBUG: chain size: 5948000, last time Thu Feb  8 12:35:16 2024
-DEBUG: sending message to node 6: getheaders
-DEBUG: received command from node 6: headers
-DEBUG: Got 2000 headers (took 0 s) from node 6
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 5950000
-New headers tip height 5950000 from Fri Feb  9 18:01:28 2024
-
-DEBUG: chain size: 5950000, last time Fri Feb  9 18:01:28 2024
-DEBUG: sending message to node 6: getheaders
-DEBUG: received command from node 6: headers
-DEBUG: Got 2000 headers (took 0 s) from node 6
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 5952000
-New headers tip height 5952000 from Tue Feb 13 00:00:31 2024
-
-DEBUG: chain size: 5952000, last time Tue Feb 13 00:00:31 2024
-DEBUG: sending message to node 6: getheaders
-DEBUG: Statecheck: amount of connected nodes: 16
-chaintip hash: a413f72331215e8030fe058bd185ecdb5cbcb099a5d3680b97587a136568bbcf
-chaintip height: 5952000
-DEBUG: received command from node 6: headers
-DEBUG: Got 2000 headers (took 1773264316 s) from node 6
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 5954000
-New headers tip height 5954000 from Wed Feb 14 08:21:15 2024
-
-DEBUG: chain size: 5954000, last time Wed Feb 14 08:21:15 2024
-DEBUG: sending message to node 6: getheaders
-DEBUG: received command from node 6: headers
-DEBUG: Got 2000 headers (took 1 s) from node 6
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 5956000
-New headers tip height 5956000 from Thu Feb 15 14:44:28 2024
-
-DEBUG: chain size: 5956000, last time Thu Feb 15 14:44:28 2024
-DEBUG: sending message to node 6: getheaders
-DEBUG: received command from node 6: headers
-DEBUG: Got 2000 headers (took 0 s) from node 6
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 5958000
-New headers tip height 5958000 from Fri Feb 16 17:05:53 2024
-
-DEBUG: chain size: 5958000, last time Fri Feb 16 17:05:53 2024
-DEBUG: sending message to node 6: getheaders
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from nodespvnode_exit:124
-
---- Manual such off-chain verify (falcon) ---
+--- Manual such off-chain verify (falcon rerun) ---
 Verifying Falcon-512 signature...
 
 === Falcon-512 Verification Result ===
@@ -545,11 +458,11 @@ The signature is authentic for this message and public key.
 Generating Falcon-512 commitment...
 
 === Falcon-512 Commitment Generated ===
-commitment:  85ef975c8693357183c9ab5f70cca25421c8dfc1547684ece49c3abad6fcc2e6
+commitment:  95ee36c5f758deb1a2b61f65bf35eb0ecba21d8faef9f43840935e63f1868a53
 length:      32 bytes
 
 This commitment can be included in an OP_RETURN output:
-OP_RETURN script: 6a24464c433185ef975c8693357183c9ab5f70cca25421c8dfc1547684ece49c3abad6fcc2e6
+OP_RETURN script: 6a24464c433195ee36c5f758deb1a2b61f65bf35eb0ecba21d8faef9f43840935e63f1868a53
 
 To verify off-chain:
 1. Get the full signature from the signer
