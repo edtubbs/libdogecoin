@@ -51,6 +51,18 @@ At this step there are plenty of flags that can be specified, the two most perti
 ./configure LD_LIBRARY_PATH='path/to/additional/libraries'
 ./configure CFLAGS='-Ipath/to/additional/include/files'
 ```
+If you want to build the CLI tools together with the post-quantum commands used by the testnet end-to-end scripts, you must also enable `liboqs`:
+
+```c
+./configure --enable-liboqs
+```
+
+On Linux, the helper script below will build `depends` first and then configure and build the CLI tools against the staged dependencies:
+
+```c
+./contrib/scripts/build.sh --host x86_64-pc-linux-gnu --depends --enable-liboqs
+```
+
 If you're building on Windows, you'll need to use `cmake` instead of `./configure`:
 
 ```c
@@ -204,8 +216,17 @@ The build steps for cross compilation are very similar to the native build steps
 ```c
 make -C depends HOST=<target_architecture>
 ./autogen.sh
-./configure --prefix=`pwd`/depends/<target_architecture>
+CONFIG_SITE=`pwd`/depends/<target_architecture>/share/config.site ./configure --prefix=`pwd`/depends/<target_architecture>
 make check
+```
+
+If you need the post-quantum commands (`tx_sighash32`, `falcon_*`, `dilithium2_*`), build `depends` with `liboqs` enabled and pass `--enable-liboqs` to `./configure`:
+
+```c
+make -C depends HOST=<target_architecture> NO_LIBOQS=
+./autogen.sh
+CONFIG_SITE=`pwd`/depends/<target_architecture>/share/config.site ./configure --prefix=`pwd`/depends/<target_architecture> --enable-liboqs
+make
 ```
 
 It is important to run `make check` after cross compiling to make sure that everything is running properly for your architecture. For some guidance on which configuration flags to run, you can refer to our [CI test file](../.github/workflows/ci.yml).

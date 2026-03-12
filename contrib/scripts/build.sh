@@ -25,7 +25,7 @@ has_param() {
 DEPENDS=""
 TARGET_HOST_TRIPLET=""
 TARGET_ARCH=""
-CONFIGURE_OPTIONS=""
+CONFIGURE_OPTIONS=()
 PREFIX=""
 
 if [ -f "`pwd`/such*" ]; then
@@ -45,9 +45,25 @@ if [ -d "`pwd`/.libs" ]; then
     make clean
 fi
 
-if has_param '--host' "$@"; then
-    TARGET_HOST_TRIPLET=$2
-    case "$2" in
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --host)
+            TARGET_HOST_TRIPLET="$2"
+            shift 2
+        ;;
+        --depends)
+            DEPENDS=1
+            shift
+        ;;
+        *)
+            CONFIGURE_OPTIONS+=("$1")
+            shift
+        ;;
+    esac
+done
+
+if [ -n "$TARGET_HOST_TRIPLET" ]; then
+    case "$TARGET_HOST_TRIPLET" in
         "arm-linux-gnueabihf") 
             TARGET_ARCH="armhf"
         ;;
@@ -75,13 +91,25 @@ if has_param '--host' "$@"; then
     esac
 fi
 
-if has_param '--depends' "$@"; then
-    DEPENDS=1
-    export PREFIX=`pwd`/depends/$TARGET_HOST_TRIPLET
-    export CFLAGS+="-I`pwd`/depends/$TARGET_HOST_TRIPLET/include/"
-    export LDFLAGS+="-I`pwd`/depends/$TARGET_HOST_TRIPLET/lib/"
-    export LD_LIBRARY_PATH+="`pwd`/depends/$TARGET_HOST_TRIPLET/lib"
-    export PKG_CONFIG_PATH+="`pwd`/depends/$TARGET_HOST_TRIPLET/lib/pkgconfig"
+if [ "$DEPENDS" = "1" ]; then
+    if [ -z "$TARGET_HOST_TRIPLET" ]; then
+        echo "--depends requires --host <host triple>"
+        exit 1
+    fi
+
+    DEPENDS_ARGS=("HOST=$TARGET_HOST_TRIPLET")
+    if has_param '--enable-liboqs' "${CONFIGURE_OPTIONS[@]}"; then
+        DEPENDS_ARGS+=("NO_LIBOQS=")
+    fi
+
+    make -C depends "${DEPENDS_ARGS[@]}"
+
+    export PREFIX="`pwd`/depends/$TARGET_HOST_TRIPLET"
+    export CONFIG_SITE="$PREFIX/share/config.site"
+    export CFLAGS="${CFLAGS:+$CFLAGS }-I$PREFIX/include/"
+    export LDFLAGS="${LDFLAGS:+$LDFLAGS }-L$PREFIX/lib/"
+    export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 fi
 
 ./autogen.sh
@@ -91,8 +119,9 @@ if [ "$DEPENDS" ]; then
     --disable-maintainer-mode \
     --disable-dependency-tracking \
     --enable-static \
-    --disable-shared
+    --disable-shared \
+    "${CONFIGURE_OPTIONS[@]}"
 else
-    ./configure
+    ./configure "${CONFIGURE_OPTIONS[@]}"
 fi
 make

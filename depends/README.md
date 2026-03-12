@@ -16,7 +16,7 @@ A prefix will be generated that's suitable for plugging into libdogecoin's
 configure. In the above example, a dir named x86_64-w64-mingw32 will be
 created. To use it for libdogecoin:
 
-    ./configure --prefix=`pwd`/depends/x86_64-w64-mingw32
+    CONFIG_SITE=`pwd`/depends/x86_64-w64-mingw32/share/config.site ./configure --prefix=`pwd`/depends/x86_64-w64-mingw32
 
 Common `host-platform-triplets` for cross compilation are:
 
@@ -44,6 +44,7 @@ The following can be set when running make: make FOO=bar
     DEBUG: disable some optimizations and enable more runtime checking
     HOST_ID_SALT: Optional salt to use when generating host package ids
     BUILD_ID_SALT: Optional salt to use when generating build package ids
+    NO_LIBOQS: set to empty to also build liboqs for --enable-liboqs configure builds
 
 If some packages are not built, the appropriate
 options will be passed to libdogecoin's configure. In this case, `--disable-net`.

@@ -74,7 +74,8 @@ generate_testnet_wallet() {
 get_testnet_coins() {
     echo ""
     echo "Send testnet DOGE to: $TESTNET_ADDR"
-    echo "Faucet: https://faucet.doge.toys/"
+    echo "Faucet: https://faucet.dogetest.doge.xyz/"
+    echo "Fallbacks: https://faucet.doge.toys/ (reCAPTCHA), https://faucet.triangleplatform.com/dogecoin/testnet (reCAPTCHA)"
     echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
     read -p "Optional faucet txid (for log): " FAUCET_TXID
     info "Press Enter after funding the address..."
