@@ -27,15 +27,15 @@ p2pkh address: nkA4i9AB6ZpLZNAmivbZbnKjJt5Dvw9DZT
 Send testnet DOGE to: nkA4i9AB6ZpLZNAmivbZbnKjJt5Dvw9DZT
 
 Faucets:
-  1. https://faucet.doge.toys/
-  2. https://faucet.triangleplatform.com/dogecoin/testnet
-  3. https://dogecoin-faucet.ruan.dev/
+  1. https://faucet.dogetest.doge.xyz/ (preferred for end-to-end runs; currently no CAPTCHA markup detected)
+  2. https://faucet.doge.toys/ (currently includes reCAPTCHA markup)
+  3. https://faucet.triangleplatform.com/dogecoin/testnet (currently includes reCAPTCHA markup)
   4. Discord: Dogecoin community #testnet channel
   5. Reddit: r/dogecoindev
 
-Note: some faucets require browser CAPTCHA or may rate-limit by IP.
+Note: faucets may rate-limit by IP and fallback options may currently require browser CAPTCHA.
 
-[FAUCET] Preferred: https://faucet.doge.toys/
+[FAUCET] Preferred: https://faucet.dogetest.doge.xyz/
 [FAUCET] Request coins for address: nkA4i9AB6ZpLZNAmivbZbnKjJt5Dvw9DZT
 Optional faucet txid (for log): [0;34m[INFO][0m Press Enter after you have received coins...
 [0;32m[SUCCESS][0m Assuming coins received. Continuing...
