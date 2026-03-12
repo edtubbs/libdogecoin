@@ -25,7 +25,7 @@ TESTNET_FLAG="-t"
 TMPDIR="/tmp/falcon_testnet_$$"
 mkdir -m 700 -p "$TMPDIR"
 BROADCASTED=0
-SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-900}"
+SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
 
@@ -73,6 +73,9 @@ check_tools() {
     fi
     if ! ./such -c help 2>&1 | grep -q tx_sighash32; then
         error "such missing tx_sighash32 command"
+    fi
+    if [ "$SPV_REQUIRE_VALIDATION" -ne 1 ]; then
+        error "SPV_REQUIRE_VALIDATION must be 1 for full-run mode"
     fi
     
     success "All tools available"
@@ -130,7 +133,7 @@ get_testnet_coins() {
     echo "[FAUCET] Preferred: https://faucet.doge.toys/"
     echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
     read -p "Optional faucet txid (for log): " FAUCET_TXID
-    warning "Press Enter after you have received coins..."
+    info "Press Enter after you have received coins..."
     read
     if [ -n "$FAUCET_TXID" ]; then
         echo "FAUCET_TXID=$FAUCET_TXID" > "$TMPDIR/faucet.txt"
@@ -229,13 +232,10 @@ build_transaction() {
             success "Broadcast submitted to peers"
             BROADCASTED=1
         else
-            warning "sendtx did not report relay confirmation"
-            BROADCASTED=0
+            error "sendtx did not report relay confirmation"
         fi
     else
-        warning "Skipping broadcast. You can run:"
-        echo "  ./sendtx $TESTNET_FLAG $SIGNED_TX"
-        BROADCASTED=0
+        error "Broadcast is required for full-run mode"
     fi
 
     cat > "$TMPDIR/tx_info.txt" <<EOF
@@ -272,7 +272,7 @@ monitor_spvnode() {
     echo "  - Log: [falcon-commit] Valid at height=X txpos=Y commit=$FALCON_COMMIT"
     echo ""
     
-    warning "SPV sync may take time. Be patient!"
+    info "SPV sync may take time. Be patient!"
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Falcon validation log before next step..."
         set +e
@@ -283,24 +283,16 @@ monitor_spvnode() {
         if ! grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode.log"; then
             echo "----- spvnode log tail -----"
             tail -n 80 "$TMPDIR/spvnode.log"
-            if [ "$SPV_REQUIRE_VALIDATION" -eq 1 ]; then
-                if [ "$SPV_EXIT" -eq 124 ]; then
-                    error "spvnode timed out before Falcon commitment validation was observed"
-                else
-                    error "Falcon commitment was not validated by spvnode before proceeding"
-                fi
+            if [ "$SPV_EXIT" -eq 124 ]; then
+                error "spvnode timed out before Falcon commitment validation was observed"
             else
-                warning "Falcon validation marker not observed in this run (SPV_REQUIRE_VALIDATION=0)"
+                error "Falcon commitment was not validated by spvnode before proceeding"
             fi
         else
             success "spvnode confirmed Falcon commitment validation"
         fi
     else
-        warning "Transaction was not broadcast; running bounded spvnode scan for full logging only"
-        set +e
-        run_and_log "spvnode scan (no-broadcast)" timeout "$SPV_NO_BROADCAST_TIMEOUT" ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
-        set -e
-        cat "$TMPDIR/spvnode.log"
+        error "Transaction was not broadcast; cannot continue full-run validation flow"
     fi
 }
 

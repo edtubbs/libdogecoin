@@ -20,7 +20,7 @@ TESTNET_FLAG="-t"
 TMPDIR=$(mktemp -d /tmp/dilithium2_testnet_XXXXXX)
 chmod 700 "$TMPDIR"
 BROADCASTED=0
-SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-900}"
+SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
 
@@ -51,6 +51,9 @@ check_tools() {
     if ! ./such -c help 2>&1 | grep -q tx_sighash32; then
         error "such missing tx_sighash32 command"
     fi
+    if [ "$SPV_REQUIRE_VALIDATION" -ne 1 ]; then
+        error "SPV_REQUIRE_VALIDATION must be 1 for full-run mode"
+    fi
     success "All tools available"
 }
 
@@ -73,7 +76,7 @@ get_testnet_coins() {
     echo "Faucet: https://faucet.doge.toys/"
     echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
     read -p "Optional faucet txid (for log): " FAUCET_TXID
-    warning "Press Enter after funding the address..."
+    info "Press Enter after funding the address..."
     read
     if [ -n "$FAUCET_TXID" ]; then
         echo "FAUCET_TXID=$FAUCET_TXID" > "$TMPDIR/faucet.txt"
@@ -148,11 +151,10 @@ EOF
             success "Broadcast submitted to peers"
             BROADCASTED=1
         else
-            warning "sendtx did not report relay confirmation"
-            BROADCASTED=0
+            error "sendtx did not report relay confirmation"
         fi
     else
-        BROADCASTED=0
+        error "Broadcast is required for full-run mode"
     fi
 }
 
@@ -170,24 +172,16 @@ monitor_spvnode() {
         if ! grep -Fq "[dilithium-commit] Valid" "$TMPDIR/spvnode.log"; then
             echo "----- spvnode log tail -----"
             tail -n 80 "$TMPDIR/spvnode.log"
-            if [ "$SPV_REQUIRE_VALIDATION" -eq 1 ]; then
-                if [ "$SPV_EXIT" -eq 124 ]; then
-                    error "spvnode timed out before Dilithium2 commitment validation was observed"
-                else
-                    error "Dilithium2 commitment was not validated by spvnode before proceeding"
-                fi
+            if [ "$SPV_EXIT" -eq 124 ]; then
+                error "spvnode timed out before Dilithium2 commitment validation was observed"
             else
-                warning "Dilithium2 validation marker not observed in this run (SPV_REQUIRE_VALIDATION=0)"
+                error "Dilithium2 commitment was not validated by spvnode before proceeding"
             fi
         else
             success "spvnode confirmed Dilithium2 commitment validation"
         fi
     else
-        warning "Transaction was not broadcast; running bounded spvnode scan for full logging only"
-        set +e
-        run_and_log "spvnode scan (no-broadcast)" timeout "$SPV_NO_BROADCAST_TIMEOUT" ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
-        set -e
-        cat "$TMPDIR/spvnode.log"
+        error "Transaction was not broadcast; cannot continue full-run validation flow"
     fi
 }
 
