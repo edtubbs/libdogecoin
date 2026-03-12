@@ -173,9 +173,11 @@ build_transaction() {
     read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
     read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
 
-    if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(0){64}'; then
+    # Reject placeholder prevout (32-byte txid + 4-byte vout = 36 bytes = 72 hex chars).
+    if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(0){72}'; then
         error "Input transaction uses a zero prevout placeholder. Provide a real funded UTXO transaction."
     fi
+    # Reject zeroed P2PKH scriptPubKey: 76a914 + 20-byte hash160 (40 hex chars) + 88ac.
     if echo "$SCRIPT_PUBKEY" | grep -Eq '^76a914(0){40}88ac$'; then
         error "scriptPubKey is a zero placeholder. Provide the real UTXO scriptPubKey."
     fi
