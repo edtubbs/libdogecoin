@@ -38,10 +38,6 @@ success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
-warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
 run_and_log() {
     local label="$1"
     shift
@@ -177,6 +173,13 @@ build_transaction() {
     read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
     read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
 
+    if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(0){64}'; then
+        error "Input transaction uses a zero prevout placeholder. Provide a real funded UTXO transaction."
+    fi
+    if echo "$SCRIPT_PUBKEY" | grep -Eq '^76a914(0){40}88ac$'; then
+        error "scriptPubKey is a zero placeholder. Provide the real UTXO scriptPubKey."
+    fi
+
     SIGHASH_OUTPUT=$(run_and_log "such tx_sighash32" ./such -c tx_sighash32 -x "$RAW_UNSIGNED_TX" -s "$SCRIPT_PUBKEY" -i 0 -h 1)
     echo "$SIGHASH_OUTPUT"
     TX_SIGHASH_HEX=$(echo "$SIGHASH_OUTPUT" | grep "^tx_sighash32:" | cut -d: -f2 | tr -d ' ')
@@ -228,11 +231,11 @@ build_transaction() {
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
         SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $TESTNET_FLAG "$SIGNED_TX" || true)
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
-        if echo "$SENDTX_OUTPUT" | grep -q "tx successfully sent to node"; then
-            success "Broadcast submitted to peers"
+        if echo "$SENDTX_OUTPUT" | grep -Eqi "tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known"; then
+            success "Broadcast accepted or already known by peers"
             BROADCASTED=1
         else
-            error "sendtx did not report relay confirmation"
+            error "sendtx did not report a known relay/acceptance status"
         fi
     else
         error "Broadcast is required for full-run mode"
