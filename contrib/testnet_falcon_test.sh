@@ -30,6 +30,8 @@ SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
 # sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
+# Public Electrs API for checking balance/UTXOs (no captcha, no auth).
+ELECTRS_API="${ELECTRS_API:-https://doge-electrs-testnet-demo.qed.me}"
 
 # Function to print colored messages
 info() {
@@ -111,7 +113,27 @@ EOF
 # Step 2: Get testnet coins
 get_testnet_coins() {
     info "Step 2: Getting testnet coins..."
-    
+
+    # --- Automated UTXO check via public Electrs API (no captcha) ---
+    if command -v curl &>/dev/null; then
+        info "Checking balance via Electrs API (no captcha): $ELECTRS_API"
+        UTXO_JSON=$(curl -s "$ELECTRS_API/address/$TESTNET_ADDR/utxo" 2>/dev/null || true)
+        if echo "$UTXO_JSON" | grep -q '"txid"'; then
+            UTXO_COUNT=$(echo "$UTXO_JSON" | grep -c '"txid"')
+            success "Address already has $UTXO_COUNT UTXO(s) — skipping faucet request"
+            echo "$UTXO_JSON" > "$TMPDIR/utxos.json"
+            return 0
+        fi
+        info "No UTXOs found yet for $TESTNET_ADDR"
+    fi
+
+    # --- Accept pre-supplied faucet txid via env var ---
+    if [ -n "$FAUCET_TXID" ]; then
+        info "Using pre-supplied FAUCET_TXID=$FAUCET_TXID"
+        echo "FAUCET_TXID=$FAUCET_TXID" > "$TMPDIR/faucet.txt"
+        return 0
+    fi
+
     echo ""
     echo "=========================================="
     echo "  REQUEST TESTNET COINS"
@@ -119,16 +141,19 @@ get_testnet_coins() {
     echo ""
     echo "Send testnet DOGE to: $TESTNET_ADDR"
     echo ""
-    echo "Faucets:"
-    echo "  1. https://faucet.doge.toys/"
-    echo "  2. https://faucet.triangleplatform.com/dogecoin/testnet"
-    echo "  3. https://dogecoin-faucet.ruan.dev/"
-    echo "  4. Discord: Dogecoin community #testnet channel"
-    echo "  5. Reddit: r/dogecoindev"
+    echo "Faucets (no captcha for balance/UTXO queries):"
+    echo "  1. https://faucet.doge.toys/  (web UI, recaptcha)"
+    echo "  2. https://faucet.triangleplatform.com/dogecoin/testnet  (web UI)"
+    echo "  3. Discord: Dogecoin community #testnet channel"
+    echo "  4. Reddit: r/dogecoindev"
     echo ""
-    echo "Note: some faucets require browser CAPTCHA or may rate-limit by IP."
+    echo "Electrs API (no captcha, no auth — query balance & broadcast):"
+    echo "  Balance: curl $ELECTRS_API/address/$TESTNET_ADDR"
+    echo "  UTXOs:   curl $ELECTRS_API/address/$TESTNET_ADDR/utxo"
+    echo "  Send TX: curl '$ELECTRS_API/tx' --data-raw '<signed hex>'"
     echo ""
-    echo "[FAUCET] Preferred: https://faucet.doge.toys/"
+    echo "Tip: pre-fund a wallet and export TESTNET_PRIVKEY_WIF to skip this step."
+    echo ""
     echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
     read -p "Optional faucet txid (for log): " FAUCET_TXID
     info "Press Enter after you have received coins..."
