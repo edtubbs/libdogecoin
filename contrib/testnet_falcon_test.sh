@@ -99,6 +99,7 @@ generate_testnet_wallet() {
     echo "  Address: $TESTNET_ADDR"
     echo "  Private Key (WIF): $PRIVKEY_WIF"
     echo "  Public Key: $PUBKEY"
+    echo "  [FUNDING] Send testnet DOGE to this address: $TESTNET_ADDR"
     
     # Save to file for later use
     cat > "$TMPDIR/wallet.txt" <<EOF
@@ -118,6 +119,7 @@ get_testnet_coins() {
     echo "=========================================="
     echo ""
     echo "Send testnet DOGE to: $TESTNET_ADDR"
+    echo "Wallet private key (WIF): $PRIVKEY_WIF"
     echo ""
     echo "Faucets:"
     echo "  1. https://faucet.doge.toys/"

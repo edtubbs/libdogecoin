@@ -69,11 +69,14 @@ generate_testnet_wallet() {
     run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $TESTNET_FLAG | tee "$TMPDIR/testnet_addr.txt"
     TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
     success "Wallet ready: $TESTNET_ADDR"
+    echo "  Private Key (WIF): $PRIVKEY_WIF"
+    echo "  [FUNDING] Send testnet DOGE to this address: $TESTNET_ADDR"
 }
 
 get_testnet_coins() {
     echo ""
     echo "Send testnet DOGE to: $TESTNET_ADDR"
+    echo "Wallet private key (WIF): $PRIVKEY_WIF"
     echo "Faucet: https://faucet.doge.toys/"
     echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
     read -p "Optional faucet txid (for log): " FAUCET_TXID
