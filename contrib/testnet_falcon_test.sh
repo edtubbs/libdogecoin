@@ -28,6 +28,8 @@ BROADCASTED=0
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
+# sendtx can report success either as immediate relay or as "already known".
+RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
 
 # Function to print colored messages
 info() {
@@ -174,7 +176,7 @@ build_transaction() {
     read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
 
     # Reject placeholder prevout (32-byte txid + 4-byte vout = 36 bytes = 72 hex chars).
-    if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(0){72}'; then
+    if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(00){36}'; then
         error "Input transaction uses a zero prevout placeholder. Provide a real funded UTXO transaction."
     fi
     # Reject zeroed P2PKH scriptPubKey: 76a914 + 20-byte hash160 (40 hex chars) + 88ac.
@@ -233,7 +235,7 @@ build_transaction() {
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
         SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $TESTNET_FLAG "$SIGNED_TX" || true)
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
-        if echo "$SENDTX_OUTPUT" | grep -Eqi "tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known"; then
+        if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
             success "Broadcast accepted or already known by peers"
             BROADCASTED=1
         else
