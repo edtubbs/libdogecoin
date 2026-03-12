@@ -98,7 +98,7 @@ get_testnet_coins() {
 
     echo ""
     echo "Send testnet DOGE to: $TESTNET_ADDR"
-    echo "Faucets (no captcha for balance/UTXO queries):"
+    echo "Faucets:"
     echo "  1. https://faucet.doge.toys/  (web UI, recaptcha)"
     echo "  2. https://faucet.triangleplatform.com/dogecoin/testnet  (web UI)"
     echo "  3. Discord: Dogecoin community #testnet channel"
