@@ -21,6 +21,7 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
+#include <dogecoin/pqc_raccoon.h>
 
 /*
  * Transaction API tests (UTXO build/sign) plus optional Falcon-512 commit test.
@@ -660,5 +661,40 @@ void test_transaction()
     dogecoin_free(dpk);
     dogecoin_free(dsk);
     dogecoin_free(dsig);
+
+    // optional Raccoon-G-44 OP_RETURN commit + HD derivation test
+    uint8_t *rpk = NULL, *rsk = NULL, *rsig = NULL;
+    size_t rpk_len = 0, rsk_len = 0, rsig_len = 0;
+
+    u_assert_true(dogecoin_raccoong44_keypair(&rpk, &rpk_len, &rsk, &rsk_len));
+    u_assert_true(dogecoin_raccoong44_sign(rsk, rsk_len, msg, sizeof msg, &rsig, &rsig_len));
+    u_assert_true(dogecoin_raccoong44_verify(rpk, rpk_len, msg, sizeof msg, rsig, rsig_len));
+
+    uint8_t rcommit32[32];
+    u_assert_true(dogecoin_raccoong44_commit_bytes(rpk, rpk_len, rsig, rsig_len, rcommit32));
+
+    dogecoin_tx* rtxc = dogecoin_tx_new();
+    u_assert_true(dogecoin_tx_add_raccoong44_commit(rtxc, rcommit32));
+
+    uint8_t rextracted[32];
+    u_assert_true(dogecoin_tx_extract_raccoong44_commit(rtxc, rextracted));
+    u_assert_true(memcmp(rextracted, rcommit32, 32) == 0);
+
+    uint8_t hd_chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN];
+    memset(hd_chaincode, 0x42, sizeof(hd_chaincode));
+    uint8_t *child_sk = NULL, *child_pk = NULL, *child_pubonly = NULL;
+    size_t child_sk_len = 0, child_pk_len = 0, child_pubonly_len = 0;
+    u_assert_true(dogecoin_raccoong44_hd_derive_priv(rsk, rsk_len, hd_chaincode, 7, false, &child_sk, &child_sk_len, &child_pk, &child_pk_len));
+    u_assert_true(dogecoin_raccoong44_hd_derive_pub(rpk, rpk_len, hd_chaincode, 7, &child_pubonly, &child_pubonly_len));
+    u_assert_true(child_pk_len == child_pubonly_len);
+    u_assert_true(memcmp(child_pk, child_pubonly, child_pk_len) == 0);
+
+    dogecoin_tx_free(rtxc);
+    dogecoin_free(rpk);
+    dogecoin_free(rsk);
+    dogecoin_free(rsig);
+    dogecoin_free(child_sk);
+    dogecoin_free(child_pk);
+    dogecoin_free(child_pubonly);
 #endif
 }

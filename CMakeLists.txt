@@ -310,6 +310,7 @@ IF(USE_LIBOQS)
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/pqc_dilithium.c
     src/pqc_falcon.c
+    src/pqc_raccoon.c
 )
 ENDIF()
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PUBLIC

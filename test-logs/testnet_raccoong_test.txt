@@ -1,0 +1,17 @@
+Raccoon-G test script integration log
+Tue Mar 17 19:32:32 UTC 2026
+
+[1] Syntax check
+OK
+
+[2] such command availability
+raccoong_keygen (generates Raccoon-G-44 keypair),
+raccoong_sign (requires -p <raccoong_secret_key_hex> -x <message_hex|tx_sighash_hex>),
+raccoong_verify (requires -k <raccoong_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),
+raccoong_commit (requires -k <raccoong_public_key_hex> -s <signature_hex>),
+raccoong_hd_derive (requires -p <raccoong_secret_key_hex> -s <chaincode_hex> -i <child_index>, optional -g <0|1 hardened>),
+raccoong_hd_derive_pub (requires -k <raccoong_public_key_hex> -s <chaincode_hex> -i <child_index>),
+raccoong_add_commit_tx (requires -x <raw_tx_hex> -s <raccoong_commitment_hex>),
+
+[3] Note
+Full funded end-to-end execution requires manual faucet funding and interactive tx input, same as existing falcon/dilithium scripts.

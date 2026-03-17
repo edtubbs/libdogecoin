@@ -17,7 +17,7 @@ This document proposes a staged path for introducing post-quantum (PQ) signature
 In the initial stage, a PQ signature commitment is embedded in transaction outputs using a canonical OP_RETURN pattern to enable immediate interoperability and chain-level observability without a consensus change.
 In a later stage, this proposal is intended to migrate from OP_RETURN commitments to a dedicated reserved opcode path (for example via OP_SUCCESSx-based soft fork design), enabling native script-level validation semantics and stronger on-chain composability.
 
-The current implementation focus is Falcon-512 and Dilithium2 commitment publication and SPV-side commitment validation during block scan.
+The current implementation focus is Falcon-512, Dilithium2, and Raccoon-G-44 commitment publication and SPV-side commitment validation during block scan.
 This document is written in standard BIP format and can be adapted to a DIP process if/when a formal DIP track is preferred.
 
 ===Copyright===
@@ -60,6 +60,7 @@ Current libdogecoin tagged variants are:
 <source>
 Falcon-512:  0x6a 0x24 0x464c4331 <32-byte-commitment>   ; "FLC1"
 Dilithium2:  0x6a 0x24 0x44494c32 <32-byte-commitment>   ; "DIL2"
+Raccoon-G:   0x6a 0x24 0x52434734 <32-byte-commitment>   ; "RCG4"
 </source>
 
 Where:
@@ -68,6 +69,7 @@ Where:
 * <code>0x24</code> is push-36
 * <code>0x464c4331</code> is the Falcon identifier (<code>"FLC1"</code> in ASCII)
 * <code>0x44494c32</code> is the Dilithium2 identifier (<code>"DIL2"</code> in ASCII)
+* <code>0x52434734</code> is the Raccoon-G-44 identifier (<code>"RCG4"</code> in ASCII)
 * payload is exactly 4-byte tag + 32-byte commitment
 
 Non-canonical encodings are invalid for commitment interpretation under this proposal.
@@ -77,6 +79,7 @@ For implementation namespace clarity, libdogecoin defines identifier constants:
 <source>
 DOGECOIN_PQC_FALCON_TAG = "FLC1"
 DOGECOIN_PQC_DILITHIUM_TAG = "DIL2"
+DOGECOIN_PQC_RACCOON_TAG = "RCG4"
 </source>
 
 Current consensus-neutral Phase 1 interoperability in this proposal remains canonical tagged <code>OP_RETURN 0x24 <tag4> <32-byte-commitment></code>.
@@ -128,6 +131,12 @@ Current libdogecoin behavior is compatible with this model:
 * PQC transaction-binding workflows should use <code>dogecoin_tx_sighash32(...)</code> to derive that same per-input transaction-digest context, then publish the PQ commitment in OP_RETURN.
 * SPV Phase 1 still validates canonical commitment encoding only; full signature verification remains an off-chain verifier responsibility.
 
+Raccoon-G-44 additionally supports BIP32-style HD derivation in the current implementation:
+
+* private-child derivation (<code>CKDpriv</code>-style) supports hardened and non-hardened index paths;
+* public-child derivation (<code>CKDpub</code>-style) supports non-hardened paths only; and
+* derivation paths require explicit chaincode input and deterministic index handling.
+
 Implementations MAY support additional PQ schemes in future revisions, but MUST preserve canonical on-chain encoding rules.
 
 ===Phase 1: SPV Validation Behavior===
@@ -135,7 +144,7 @@ Implementations MAY support additional PQ schemes in future revisions, but MUST 
 SPV implementations should:
 
 * parse transactions in scanned blocks;
-* detect canonical tagged Falcon and Dilithium2 commitment scripts;
+* detect canonical tagged Falcon, Dilithium2, and Raccoon-G commitment scripts;
 * treat only canonical encodings as valid commitments; and
 * surface deterministic commitment logs/telemetry for downstream verification workflows.
 
@@ -166,6 +175,7 @@ In Phase 1, PQC commitments should be treated as an interoperability and migrati
 This mirrors current implementation behavior:
 
 * <code>such</code> exposes PQ sign/verify/commit commands and commitment-output append commands.
+* Raccoon-G tooling includes HD child derivation commands for private (hardened/non-hardened) and public (non-hardened) paths.
 * PQ sign/verify command payload (<code>-x</code>) accepts transaction sighash bytes.
 * SPV commitment detection validates canonical encoding and emits deterministic commitment logs.
 
@@ -193,7 +203,7 @@ Current reference behavior exists in libdogecoin components that:
 
 * sign raw transaction inputs using existing <code>dogecoin_tx_sign_input(...)</code> secp/ECC authorization flow;
 * derive matching PQC signing messages with <code>dogecoin_tx_sighash32(...)</code>;
-* generate/verify Falcon-512 and Dilithium2 signatures over caller-provided message bytes;
+* generate/verify Falcon-512, Dilithium2, and Raccoon-G-44 signatures over caller-provided message bytes;
 * derive commitments from PQ verification material (<code>SHA256(pubkey || signature)</code>);
 * append/extract canonical tagged commitments in transaction OP_RETURN outputs; and
 * detect canonical commitments during SPV block scanning and emit deterministic commitment logs.
@@ -203,7 +213,9 @@ Current CLI wiring reflects this implementation model:
 * <code>such -c tx_sighash32</code> derives transaction-bound digest bytes for a selected input;
 * <code>such -c falcon_sign</code> / <code>dilithium2_sign</code> accept message bytes via <code>-x</code> (including tx_sighash32 hex);
 * <code>such -c falcon_commit</code> / <code>dilithium2_commit</code> derive commitment32 from public key + signature; and
-* <code>such -c falcon_add_commit_tx</code> / <code>dilithium2_add_commit_tx</code> attach canonical tagged commitments to raw tx outputs.
+* <code>such -c raccoong_commit</code> derives Raccoon-G-44 commitment32 from public key + signature;
+* <code>such -c falcon_add_commit_tx</code> / <code>dilithium2_add_commit_tx</code> / <code>raccoong_add_commit_tx</code> attach canonical tagged commitments to raw tx outputs; and
+* <code>such -c raccoong_hd_derive</code> / <code>raccoong_hd_derive_pub</code> expose HD derivation behavior used for wallet path modeling.
 
 ==Deployment==
 

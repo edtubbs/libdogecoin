@@ -39,6 +39,12 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - dilithium2_sign (requires --enable-liboqs)
 - dilithium2_verify (requires --enable-liboqs)
 - dilithium2_commit (requires --enable-liboqs)
+- raccoong_keygen (requires --enable-liboqs)
+- raccoong_sign (requires --enable-liboqs)
+- raccoong_verify (requires --enable-liboqs)
+- raccoong_commit (requires --enable-liboqs)
+- raccoong_hd_derive (requires --enable-liboqs)
+- raccoong_hd_derive_pub (requires --enable-liboqs)
 
 So an example run of `such` could be something like this:
 ```

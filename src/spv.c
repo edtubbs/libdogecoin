@@ -60,6 +60,7 @@
 #include <dogecoin/vector.h>
 #include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
+#include <dogecoin/pqc_raccoon.h>
 #include <event2/event.h>
 
 /* Optional liboqs (Falcon-only) presence check; compile with -DUSE_LIBOQS */
@@ -169,12 +170,17 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     }
 
 #ifdef USE_LIBOQS
-    // Log what Falcon variants are present at runtime (minimal, no hard dependency).
+#ifndef OQS_SIG_alg_raccoon_g_44
+#define OQS_SIG_alg_raccoon_g_44 "Raccoon-G-44"
+#endif
+    // Log what PQC variants are present at runtime (minimal, no hard dependency).
     if (client->nodegroup && client->nodegroup->log_write_cb) {
         client->nodegroup->log_write_cb(
-            "[oqs] falcon_512=%s falcon_1024=%s (liboqs)\n",
+            "[oqs] falcon_512=%s falcon_1024=%s ml_dsa_44=%s raccoon_g_44=%s (liboqs)\n",
             OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_512) ? "enabled" : "disabled",
-            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_1024) ? "enabled" : "disabled");
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_1024) ? "enabled" : "disabled",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_ml_dsa_44) ? "enabled" : "disabled",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_raccoon_g_44) ? "enabled" : "disabled");
     }
 #endif
 
@@ -702,6 +708,13 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     utils_bin_to_hex(dilithium_commit_data, 32, dilithium_commit_hex);
                     client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s\n",
                                                      pindex->height, i, dilithium_commit_hex);
+                }
+                uint8_t raccoong_commit_data[32];
+                if (dogecoin_tx_extract_raccoong44_commit(tx, raccoong_commit_data)) {
+                    char raccoong_commit_hex[65];
+                    utils_bin_to_hex(raccoong_commit_data, 32, raccoong_commit_hex);
+                    client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s\n",
+                                                     pindex->height, i, raccoong_commit_hex);
                 }
 #endif
                 
