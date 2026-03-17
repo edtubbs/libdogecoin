@@ -82,6 +82,13 @@ typedef struct {
 static benchmark_result results[MAX_BENCHMARKS];
 static int num_results = 0;
 
+static void bench_require(int ok, const char* op) {
+    if (!ok) {
+        fprintf(stderr, "Benchmark fatal: %s failed\n", op);
+        exit(EXIT_FAILURE);
+    }
+}
+
 /* ---- timing helpers ---- */
 static double gettimedouble(void) {
 #ifdef _WIN32
@@ -283,7 +290,7 @@ static void raccoong44_keypair_bench(benchmark_context *ctx) {
     uint8_t *sk = NULL;
     size_t pk_len = 0;
     size_t sk_len = 0;
-    (void)dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len);
+    bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
     if (pk) dogecoin_free(pk);
     if (sk) dogecoin_free(sk);
     ctx->end = gettimedouble();
@@ -299,8 +306,8 @@ static void raccoong44_sign_bench(benchmark_context *ctx) {
     static size_t sk_len = 0;
     uint8_t *sig = NULL;
     size_t sig_len = 0;
-    if (!pk || !sk) (void)dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len);
-    (void)dogecoin_raccoong44_sign(sk, sk_len, ctx->input, 32, &sig, &sig_len);
+    if (!pk || !sk) bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
+    bench_require(dogecoin_raccoong44_sign(sk, sk_len, ctx->input, 32, &sig, &sig_len), "dogecoin_raccoong44_sign");
     if (sig) dogecoin_free(sig);
     ctx->end = gettimedouble();
     ctx->endCycles = perf_cpucycles();
@@ -317,11 +324,11 @@ static void raccoong44_verify_bench(benchmark_context *ctx) {
     static size_t sig_len = 0;
     static int primed = 0;
     if (!primed) {
-        (void)dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len);
-        (void)dogecoin_raccoong44_sign(sk, sk_len, ctx->input, 32, &sig, &sig_len);
+        bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
+        bench_require(dogecoin_raccoong44_sign(sk, sk_len, ctx->input, 32, &sig, &sig_len), "dogecoin_raccoong44_sign");
         primed = 1;
     }
-    (void)dogecoin_raccoong44_verify(pk, pk_len, ctx->input, 32, sig, sig_len);
+    bench_require(dogecoin_raccoong44_verify(pk, pk_len, ctx->input, 32, sig, sig_len), "dogecoin_raccoong44_verify");
     ctx->end = gettimedouble();
     ctx->endCycles = perf_cpucycles();
     ctx->totalTime += ctx->end - ctx->start;
@@ -337,12 +344,12 @@ static void raccoong44_commit_bytes_bench(benchmark_context *ctx) {
     static size_t sig_len = 0;
     static int primed = 0;
     if (!primed) {
-        (void)dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len);
-        (void)dogecoin_raccoong44_sign(sk, sk_len, ctx->input, 32, &sig, &sig_len);
+        bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
+        bench_require(dogecoin_raccoong44_sign(sk, sk_len, ctx->input, 32, &sig, &sig_len), "dogecoin_raccoong44_sign");
         primed = 1;
     }
     uint8_t commit32[32];
-    (void)dogecoin_raccoong44_commit_bytes(pk, pk_len, sig, sig_len, commit32);
+    bench_require(dogecoin_raccoong44_commit_bytes(pk, pk_len, sig, sig_len, commit32), "dogecoin_raccoong44_commit_bytes");
     ctx->end = gettimedouble();
     ctx->endCycles = perf_cpucycles();
     ctx->totalTime += ctx->end - ctx->start;
@@ -356,7 +363,7 @@ static void raccoong44_hd_hardened_bench(benchmark_context *ctx) {
     static size_t sk_len = 0;
     static int primed = 0;
     if (!primed) {
-        (void)dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len);
+        bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
         primed = 1;
     }
     uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN];
@@ -365,8 +372,9 @@ static void raccoong44_hd_hardened_bench(benchmark_context *ctx) {
     uint8_t *child_pk = NULL;
     size_t child_sk_len = 0;
     size_t child_pk_len = 0;
-    (void)dogecoin_raccoong44_hd_derive_priv(sk, sk_len, chaincode, 0, true,
-                                             &child_sk, &child_sk_len, &child_pk, &child_pk_len);
+    bench_require(dogecoin_raccoong44_hd_derive_priv(sk, sk_len, chaincode, 0, true,
+                                                     &child_sk, &child_sk_len, &child_pk, &child_pk_len),
+                  "dogecoin_raccoong44_hd_derive_priv");
     if (child_sk) dogecoin_free(child_sk);
     if (child_pk) dogecoin_free(child_pk);
     ctx->end = gettimedouble();
@@ -382,14 +390,15 @@ static void raccoong44_hd_nonhardened_bench(benchmark_context *ctx) {
     static size_t sk_len = 0;
     static int primed = 0;
     if (!primed) {
-        (void)dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len);
+        bench_require(dogecoin_raccoong44_keypair(&pk, &pk_len, &sk, &sk_len), "dogecoin_raccoong44_keypair");
         primed = 1;
     }
     uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN];
     sha256_raw(ctx->input, BUFFER_SIZE, chaincode);
     uint8_t *child_pk = NULL;
     size_t child_pk_len = 0;
-    (void)dogecoin_raccoong44_hd_derive_pub(pk, pk_len, chaincode, 1, &child_pk, &child_pk_len);
+    bench_require(dogecoin_raccoong44_hd_derive_pub(pk, pk_len, chaincode, 1, &child_pk, &child_pk_len),
+                  "dogecoin_raccoong44_hd_derive_pub");
     if (child_pk) dogecoin_free(child_pk);
     ctx->end = gettimedouble();
     ctx->endCycles = perf_cpucycles();
@@ -476,7 +485,10 @@ static void pqc_keypair_bench_generic(benchmark_context *ctx, const char *alg_na
     uint8_t *sk = (uint8_t*)dogecoin_malloc(alg->length_secret_key);
     
     if (pk && sk) {
-        OQS_SIG_keypair(alg, pk, sk);
+        OQS_STATUS st = OQS_SIG_keypair(alg, pk, sk);
+        if (st != OQS_SUCCESS) {
+            bench_require(0, "OQS_SIG_keypair");
+        }
         dogecoin_free(pk);
         dogecoin_free(sk);
     }
@@ -491,7 +503,10 @@ static void pqc_sign_bench_generic(benchmark_context *ctx, pqc_bench_state *stat
     if (!state->alg) return;
     
     size_t sig_len = 0;
-    OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+    OQS_STATUS st = OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+    if (st != OQS_SUCCESS) {
+        bench_require(0, "OQS_SIG_sign");
+    }
     
     ctx->end = gettimedouble(); ctx->endCycles = perf_cpucycles();
     ctx->totalTime += ctx->end - ctx->start; ctx->totalCycles += ctx->endCycles - ctx->startCycles;
@@ -502,12 +517,18 @@ static void pqc_verify_bench_generic(benchmark_context *ctx, pqc_bench_state *st
         pqc_init_state(state, alg_name);
         if (state->alg) {
             size_t sig_len = 0;
-            OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+            OQS_STATUS st = OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+            if (st != OQS_SUCCESS) {
+                bench_require(0, "OQS_SIG_sign");
+            }
         }
     }
     if (!state->alg) return;
     
-    OQS_SIG_verify(state->alg, ctx->input, 32, state->sig, state->alg->length_signature, state->pk);
+    OQS_STATUS st = OQS_SIG_verify(state->alg, ctx->input, 32, state->sig, state->alg->length_signature, state->pk);
+    if (st != OQS_SUCCESS) {
+        bench_require(0, "OQS_SIG_verify");
+    }
     
     ctx->end = gettimedouble(); ctx->endCycles = perf_cpucycles();
     ctx->totalTime += ctx->end - ctx->start; ctx->totalCycles += ctx->endCycles - ctx->startCycles;
@@ -518,7 +539,10 @@ static void pqc_commit_bench_generic(benchmark_context *ctx, pqc_bench_state *st
         pqc_init_state(state, alg_name);
         if (state->alg) {
             size_t sig_len = 0;
-            OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+            OQS_STATUS st = OQS_SIG_sign(state->alg, state->sig, &sig_len, ctx->input, 32, state->sk);
+            if (st != OQS_SUCCESS) {
+                bench_require(0, "OQS_SIG_sign");
+            }
         }
     }
     if (!state->alg) return;
