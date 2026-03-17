@@ -1031,12 +1031,16 @@ int main(void) {
 
     /* Raccoon-G (includes HD derivation primitives) */
     printf("\n--- Raccoon-G (PQC + HD Derivation) ---\n");
-    run_benchmark(raccoong44_keypair_bench,      "RaccoonG-kp", "pqc-keypair");
-    run_benchmark(raccoong44_sign_bench,         "RaccoonG-sig", "pqc-sign");
-    run_benchmark(raccoong44_verify_bench,       "RaccoonG-ver", "pqc-verify");
-    run_benchmark(raccoong44_commit_bytes_bench, "RaccoonG-cmt", "pqc-commit");
-    run_benchmark(raccoong44_hd_hardened_bench,  "RaccoonG-hdh", "pqc-hd");
-    run_benchmark(raccoong44_hd_nonhardened_bench, "RaccoonG-hdn", "pqc-hd");
+    if (dogecoin_raccoong44_is_available()) {
+        run_benchmark(raccoong44_keypair_bench,      "RaccoonG-kp", "pqc-keypair");
+        run_benchmark(raccoong44_sign_bench,         "RaccoonG-sig", "pqc-sign");
+        run_benchmark(raccoong44_verify_bench,       "RaccoonG-ver", "pqc-verify");
+        run_benchmark(raccoong44_commit_bytes_bench, "RaccoonG-cmt", "pqc-commit");
+        run_benchmark(raccoong44_hd_hardened_bench,  "RaccoonG-hdh", "pqc-hd");
+        run_benchmark(raccoong44_hd_nonhardened_bench, "RaccoonG-hdn", "pqc-hd");
+    } else {
+        printf("%-16s %s\n", "RaccoonG", "not available");
+    }
 
     /* Dilithium variants - compare against Falcon */
     printf("\n--- Dilithium (NIST PQC Standard) - Compare vs Falcon ---\n");

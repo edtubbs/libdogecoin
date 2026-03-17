@@ -166,6 +166,11 @@ static const char* get_raccoong_alg_name(void)
     return NULL;
 }
 
+dogecoin_bool dogecoin_raccoong44_is_available(void)
+{
+    return get_raccoong_alg_name() != NULL;
+}
+
 dogecoin_bool dogecoin_raccoong44_keypair(uint8_t** pk, size_t* pk_len,
                                           uint8_t** sk, size_t* sk_len)
 {

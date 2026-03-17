@@ -42,8 +42,9 @@ LIBDOGECOIN_BEGIN_DECL
 #define DOGECOIN_PQC_RACCOON_CHAINCODE_LEN 32
 
 #ifdef USE_LIBOQS
+LIBDOGECOIN_API dogecoin_bool dogecoin_raccoong44_is_available(void);
 LIBDOGECOIN_API dogecoin_bool dogecoin_raccoong44_keypair(uint8_t** pk, size_t* pk_len,
-                                                           uint8_t** sk, size_t* sk_len);
+                                                            uint8_t** sk, size_t* sk_len);
 LIBDOGECOIN_API dogecoin_bool dogecoin_raccoong44_sign(const uint8_t* sk, size_t sk_len,
                                                         const uint8_t* msg, size_t msg_len,
                                                         uint8_t** sig, size_t* sig_len);
