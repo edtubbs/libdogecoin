@@ -158,22 +158,36 @@ monitor_spvnode() {
     echo "Expected log:"
     echo "  [raccoong-commit] Valid at height=X txpos=Y commit=$RACCOONG_COMMIT"
     if [ "$BROADCASTED" -eq 1 ]; then
-        info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Raccoon-G validation log..."
-        set +e
-        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
-        SPV_EXIT=$?
-        set -e
-        cat "$TMPDIR/spvnode.log"
-        if ! grep -Fq "[raccoong-commit] Valid" "$TMPDIR/spvnode.log"; then
+        info "Running spvnode scan and waiting for [raccoong-commit] Valid marker..."
+        : > "$TMPDIR/spvnode.log"
+        ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1 &
+        SPV_PID=$!
+        DEADLINE=$(( $(date +%s) + SPV_TIMEOUT_SECONDS ))
+        FOUND_VALID=0
+
+        while kill -0 "$SPV_PID" 2>/dev/null; do
+            if grep -Fq "[raccoong-commit] Valid" "$TMPDIR/spvnode.log"; then
+                FOUND_VALID=1
+                break
+            fi
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+                break
+            fi
+            sleep 3
+        done
+
+        if [ "$FOUND_VALID" -eq 1 ]; then
+            kill "$SPV_PID" 2>/dev/null || true
+            wait "$SPV_PID" 2>/dev/null || true
+            cat "$TMPDIR/spvnode.log"
+            success "spvnode confirmed Raccoon-G commitment validation"
+        else
+            kill "$SPV_PID" 2>/dev/null || true
+            wait "$SPV_PID" 2>/dev/null || true
+            cat "$TMPDIR/spvnode.log"
             echo "----- spvnode log tail -----"
             tail -n 80 "$TMPDIR/spvnode.log"
-            if [ "$SPV_EXIT" -eq 124 ]; then
-                error "spvnode timed out before Raccoon-G commitment validation was observed"
-            else
-                error "Raccoon-G commitment was not validated by spvnode before proceeding"
-            fi
-        else
-            success "spvnode confirmed Raccoon-G commitment validation"
+            error "spvnode did not emit [raccoong-commit] Valid before timeout (${SPV_TIMEOUT_SECONDS}s)"
         fi
     else
         error "Transaction was not broadcast; cannot continue full-run validation flow"
