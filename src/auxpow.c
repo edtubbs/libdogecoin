@@ -67,17 +67,13 @@ uint256_t* check_merkle_branch(uint256_t* hash, const vector_t* merkle_branch, i
 
     for (size_t i = 0; i < merkle_branch->len; ++i) {
         uint256_t* next_branch_hash = (uint256_t*)vector_idx(merkle_branch, i);
-        uint8_t hash_input[DOGECOIN_HASH_LENGTH * 2];
 
         if (index & 1) {
-            memcpy(hash_input, next_branch_hash, DOGECOIN_HASH_LENGTH);
-            memcpy(hash_input + DOGECOIN_HASH_LENGTH, current_hash, DOGECOIN_HASH_LENGTH);
+            dogecoin_hash_2_inputs(*next_branch_hash, *current_hash, *current_hash);
         } else {
-            memcpy(hash_input, current_hash, DOGECOIN_HASH_LENGTH);
-            memcpy(hash_input + DOGECOIN_HASH_LENGTH, next_branch_hash, DOGECOIN_HASH_LENGTH);
+            dogecoin_hash_2_inputs(*current_hash, *next_branch_hash, *current_hash);
         }
 
-        dogecoin_dblhash(hash_input, sizeof(hash_input), *current_hash);
         index >>= 1;
     }
 
