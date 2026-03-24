@@ -495,14 +495,14 @@ int main(int argc, char* argv[])
         printf("- Verify mnemonic\n");
         if (!mnemonic_in) {
             fprintf(stderr, "verify_mnemonic requires -n <mnemonic_input>\n");
-            ret = 0;
+            ret = 1;
             goto exit;
         }
         if (dogecoin_verify_mnemonic(mnemonic_in, lang, " ", NULL) == 0) {
             printf("Mnemonic is valid\n");
         } else {
             fprintf(stderr, "Mnemonic is invalid\n");
-            ret = 0;
+            ret = 1;
         }
     }
     else if (strcmp(cmd, "generate_extended_public_key") == 0)
