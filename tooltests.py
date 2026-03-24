@@ -26,6 +26,8 @@ commands.append(["-c generate_public_key -p QUaohmokNWroj71dRtmPSses5eRw5SGLKsY"
 commands.append(["-c p2pkh -p 039ca1fdedbe160cb7b14df2a798c8fed41ad4ed30b06a85ad23e03abe43c413b2", 1])
 commands.append(["-c p2pkh -k 039ca1fdedbe160cb7b14df2a798c8fed41ad4ed30b06a85ad23e03abe43c413b2", 0])
 commands.append(["-c bip32_extended_master_key", 0])
+commands.append(["-c verify_mnemonic -n \"chief prevent advice search broccoli dish pride grow evidence bicycle cushion lady\" -q eng", 0])
+commands.append(["-c verify_mnemonic -n \"chief prevent advice search broccoli dish pride grow evidence bicycle cushion invalid\" -q eng", 1])
 commands.append(["-c derive_child_keys -p dgub8kXBZ7ymNWy2TFvsWoQu5qGuFZk1zVAS69bD8pif6QYcnHMP2VotzLragqavGQkkpaGSwt1EqTr5A6JqKviXTnJdKp7vJ62nFyn246GjuHj -m m/100h/10h/100/10", 1]) #hardened keypath with pubkey
 commands.append(["-c derive_child_keys -p dgpv51eADS3spNJhAQGiUZnvxyjJo1NPAN8ioYozyiKgJHVcEEEgcjG8M3Sw7bAhvMPyCyHVj1zcu3tbfpu2wEoAyvkxyRyFvKHWjp9m2PUEDAr -m m/100h/10h/100/10", 0])
 commands.append(["-c derive_child_keys -p dgpv51eADS3spNJhAQGiUZnvxyjJo1NPAN8ioYozyiKgJHVcEEEgcjG8M3Sw7bAhvMPyCyHVj1zcu3tbfpu2wEoAyvkxyRyFvKHWjp9m2PUEDAr -m n/100h/10h/100/10", 1]) #wrong keypath prefix

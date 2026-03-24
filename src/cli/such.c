@@ -617,6 +617,7 @@ static struct option long_options[] =
         {"entropy", required_argument, NULL, 'e'},
         {"entropy_size", required_argument, NULL, 'z'},
         {"mnemonic", required_argument, NULL, 'n'},
+        {"lang", required_argument, NULL, 'q'},
         {"pass_phrase", no_argument, NULL, 'a'},
         {"account_int", required_argument, NULL, 'o'},
         {"change_level", required_argument, NULL, 'g'},
@@ -641,7 +642,7 @@ static void print_usage()
     print_version();
     printf("Usage: such -c <cmd> (-m|-derived_path <bip_derived_path>) (-k|-pubkey <publickey>) (-p|-privkey <privatekey>) (-h|-sighash <sighash type>) \
 (-s|-script <script pubkey>) (-i|-input_index <input index>) (-x|-raw_tx <raw hex tx>) (-o|-account_int <account_int>) (-g|-change_level <change_level>) \
-(-e|-entropy <hex_entropy>) (-n|-mnemonic <seed_phrase>) (-a|-pass_phrase) (-y|-encrypted_file <file_num 0-999>) (-w[--overwrite]) (-b[--silent]) \
+(-e|-entropy <hex_entropy>) (-n|-mnemonic <seed_phrase>) (-q|-lang <language>) (-a|-pass_phrase) (-y|-encrypted_file <file_num 0-999>) (-w[--overwrite]) (-b[--silent]) \
 (-z|-entropy_size <bit_size>) (-j[--use_tpm]) (-t[--testnet]) (-r[--regtest])\n");
     printf("Available commands:\n");
     printf("generate_public_key (requires -p <wif>),\n");
@@ -655,6 +656,7 @@ static void print_usage()
     printf("seed_to_master_key (-y <file_num>, -j (use_tpm) optional),\n");
     printf("mnemonic_to_key (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
     printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
+    printf("verify_mnemonic (requires -n <seed_phrase>, optional -q <language>),\n");
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
@@ -687,6 +689,7 @@ int main(int argc, char* argv[])
     uint32_t account = BIP44_FIRST_ACCOUNT_NODE;   /* default account (BIP44_FIRST_ACCOUNT_NODE) */
     char* change_level = BIP44_CHANGE_EXTERNAL;    /* default external (BIP44_CHANGE_EXTERNAL) */
     char* mnemonic_in = 0;
+    char* language = "eng";
     char* pass = 0;
     char* entropy = 0;
     char* entropy_size = "256";
@@ -706,7 +709,7 @@ int main(int argc, char* argv[])
     const dogecoin_chainparams* chain = &dogecoin_chainparams_main;
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:m:o:g:e:n:y:c:z:atrvbwj", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "h:i:s:x:p:k:m:o:g:e:n:y:c:z:atrvbwjq:", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'p':
                     pkey = optarg;
@@ -739,6 +742,9 @@ int main(int argc, char* argv[])
                     break;
                 case 'n':
                     mnemonic_in = optarg;
+                    break;
+                case 'q':
+                    language = optarg;
                     break;
                 case 'a':
                     pass = getpass("BIP39 passphrase: \n");
@@ -1504,6 +1510,16 @@ int main(int argc, char* argv[])
             dogecoin_free(pass);
             }
         }
+    else if (strcmp(cmd, "verify_mnemonic") == 0) {
+        if (!mnemonic_in) {
+            return showError("verify_mnemonic (requires -n <seed_phrase>, optional -q <language>)");
+        }
+        if (dogecoin_verify_mnemonic(mnemonic_in, language, " ", NULL) == 0) {
+            printf("Mnemonic is valid\n");
+        } else {
+            return showError("Mnemonic is invalid");
+        }
+    }
     else if (strcmp(cmd, "signmessage") == 0) {
         // ./such -c signmessage -x "<message>" -p <private key>
         if (!txhex) {

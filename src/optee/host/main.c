@@ -530,6 +530,7 @@ static struct option long_options[] = {
     {"mnemonic_input", required_argument, NULL, 'n'},
     {"shared_secret", required_argument, NULL, 's'},
     {"entropy_size", required_argument, NULL, 'e'},
+    {"lang", required_argument, NULL, 'g'},
     {"password", required_argument, NULL, 'p'},
     {"delegate_password", required_argument, NULL, 'd'},
     {"auth_token", required_argument, NULL, 'a'},
@@ -543,10 +544,10 @@ static void print_usage()
 {
     printf("Usage: optee_libdogecoin -c <cmd> (-o|-account_int <account_int>) (-i|-input_index <input index>) (-l|-change_level <change level>) \
 (-m|-message <message>) (-t|-transaction <transaction>) (-n|-mnemonic_input <mnemonic input>) (-s|-shared_secret <shared secret>) \
-(-e|-entropy_size <entropy size>) (-a|-auth_token <auth token>) (-p|-password <password>) (-d|-delegate_password <delegate password>) \
+(-e|-entropy_size <entropy size>) (-g|-lang <language>) (-a|-auth_token <auth token>) (-p|-password <password>) (-d|-delegate_password <delegate password>) \
 (-h|custom_path <custom_path>) (-f|flags <flags>) (-z|yubikey)\n");
     printf("Available commands:\n");
-    printf("  generate_mnemonic (optional -n <mnemonic_input> -s <shared_secret> -e <entropy_size> -p <password> -f <flags>)\n");
+    printf("  generate_mnemonic (optional -n <mnemonic_input> -g <language> -s <shared_secret> -e <entropy_size> -p <password> -f <flags>)\n");
     printf("  generate_extended_public_key (requires -o <account> -l <change_level>, optional -h <custom_path> -a <auth_token> -p <password> -z)\n");
     printf("  generate_address (requires -o <account> -l <change_level> -i <address_index>, optional -h <custom_path> -a <auth_token> -p <password> -z)\n");
     printf("  sign_message (requires -o <account> -l <change_level> -i <address_index> -m <message>, optional -h <custom_path> -a <auth_token> -p <password> -z)\n");
@@ -668,12 +669,13 @@ int main(int argc, const char* argv[])
     uint8_t* shared_secret = NULL;
     char* password = NULL;
     char* mnemonic = NULL;
+    char* lang = "eng";
     char* entropy_size = NULL;
     char* delegate_password = NULL;
     dogecoin_bool yubikey = false;
     char* flags = "";
 
-    while ((opt = getopt_long_only(argc, (char *const *)argv, "c:o:l:i:m:t:n:s:e:p:d:a:f:h:z", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, (char *const *)argv, "c:o:l:i:m:t:n:s:e:g:p:d:a:f:h:z", long_options, &long_index)) != -1) {
         switch (opt) {
             case 'c':
                 cmd = optarg;
@@ -707,6 +709,9 @@ int main(int argc, const char* argv[])
                 break;
             case 'e':
                 entropy_size = optarg;
+                break;
+            case 'g':
+                lang = optarg;
                 break;
             case 'a':
                 auth_token = (uint32_t)strtol(optarg, NULL, 10);
@@ -761,6 +766,10 @@ int main(int argc, const char* argv[])
             printf("Master key generated\n");
     } else if (strcmp(cmd, "generate_mnemonic") == 0) {
         printf("- Generate and encrypt a mnemonic\n");
+        if (mnemonic && dogecoin_verify_mnemonic(mnemonic, lang, " ", NULL) != 0) {
+            fprintf(stderr, "Invalid mnemonic input\n");
+            goto exit;
+        }
 
         if (yubikey) {
             if (!shared_secret) {
