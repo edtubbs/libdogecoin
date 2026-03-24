@@ -67,16 +67,17 @@ uint256_t* check_merkle_branch(uint256_t* hash, const vector_t* merkle_branch, i
 
     for (size_t i = 0; i < merkle_branch->len; ++i) {
         uint256_t* next_branch_hash = (uint256_t*)vector_idx(merkle_branch, i);
-        uint256_t* new_hash;
+        uint8_t hash_input[DOGECOIN_HASH_LENGTH * 2];
 
         if (index & 1) {
-            new_hash = Hash((const uint256_t*) next_branch_hash, (const uint256_t*) current_hash);
+            memcpy(hash_input, next_branch_hash, DOGECOIN_HASH_LENGTH);
+            memcpy(hash_input + DOGECOIN_HASH_LENGTH, current_hash, DOGECOIN_HASH_LENGTH);
         } else {
-            new_hash = Hash((const uint256_t*) current_hash, (const uint256_t*) next_branch_hash);
+            memcpy(hash_input, current_hash, DOGECOIN_HASH_LENGTH);
+            memcpy(hash_input + DOGECOIN_HASH_LENGTH, next_branch_hash, DOGECOIN_HASH_LENGTH);
         }
 
-        memcpy(current_hash, new_hash, sizeof(uint256_t)); // Update the current hash
-        dogecoin_free(new_hash); // Free the new hash memory
+        dogecoin_dblhash(hash_input, sizeof(hash_input), *current_hash);
         index >>= 1;
     }
 
