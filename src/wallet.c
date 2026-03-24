@@ -501,21 +501,21 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
                 printf("No mnemonic/key, store random seed in encrypted file? (Y/n): ");
 
                 char buffer[MAX_LEN];
-                int file_id = 0; // Variable to store file ID, defaulting to 0
+                int file_num = 0; // Variable to store file number/ID, defaulting to 0
 
                 // read user input
                 if (fgets(buffer, sizeof(buffer), stdin) != NULL) {
                     if (buffer[0] == 'Y' || buffer[0] == 'y') {
-                        printf("Enter file ID (0-999): ");
+                        printf("Enter file number (0-999): ");
                         if (fgets(buffer, sizeof(buffer), stdin) != NULL) {
-                            file_id = atoi(buffer); // Update file_id with user input
+                            file_num = atoi(buffer); // Update file_num with user input
                         }
 
                         printf("Overwrite file if found? (Y/n): ");
                         if (fgets(buffer, sizeof(buffer), stdin) != NULL) {
                             bool overwrite = (buffer[0] == 'Y' || buffer[0] == 'y');
                             // encrypt seed for storage with software
-                            if (dogecoin_encrypt_seed_with_sw(seed, sizeof(seed), file_id, overwrite, NULL, NULL, NULL) == false) {
+                            if (dogecoin_encrypt_seed_with_sw(seed, sizeof(seed), file_num, overwrite, NULL, NULL, NULL) == false) {
                                 dogecoin_wallet_free(wallet);
                                 return NULL;
                             }
