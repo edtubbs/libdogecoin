@@ -123,6 +123,7 @@ example
 dummy
 
 # CMake files
+build-local/
 build/*
 **/cmake-build-debug
 **/CMakeCache.txt
