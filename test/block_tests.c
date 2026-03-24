@@ -12,6 +12,7 @@
 #include <assert.h>
 
 #include <dogecoin/arith_uint256.h>
+#include <dogecoin/auxpow.h>
 #include <dogecoin/block.h>
 
 #include <dogecoin/cstr.h>
@@ -184,4 +185,54 @@ void test_block_header()
     cstr_free(blockheader_ser, true);
     dogecoin_block_header_hash(&bheaderprev, (uint8_t *)&checkhash);
     u_assert_str_eq(utils_uint8_to_hex(bheader.prev_block, sizeof(bheader.prev_block)), utils_uint8_to_hex(checkhash, sizeof(checkhash)));
+}
+
+void test_auxpow_block()
+{
+    dogecoin_auxpow_block* block = dogecoin_auxpow_block_new();
+    assert(block != NULL);
+    assert(block->header != NULL);
+    assert(block->parent_header != NULL);
+    assert(block->parent_coinbase != NULL);
+    assert(block->header->auxpow->ctx == block);
+    assert(block->header->auxpow->is == false);
+    dogecoin_auxpow_block_free(block);
+
+    assert(get_expected_index(0, 0, 1) == 0);
+    assert(get_expected_index(0, 98, 5) == 24);
+    assert(get_expected_index(1, 98, 5) == 1);
+    assert(get_expected_index(123456789, 98, 10) == 981);
+
+    uint256_t base_hash = {0};
+    base_hash[0] = 1;
+
+    vector_t* merkle_branch = vector_new(1, dogecoin_free);
+    assert(merkle_branch != NULL);
+
+    uint256_t* passthrough_hash = check_merkle_branch(&base_hash, merkle_branch, 0);
+    assert(memcmp(passthrough_hash, base_hash, sizeof(uint256_t)) == 0);
+    dogecoin_free(passthrough_hash);
+
+    uint256_t* sentinel_hash = check_merkle_branch(&base_hash, merkle_branch, -1);
+    assert(sentinel_hash != NULL);
+    dogecoin_free(sentinel_hash);
+
+    uint256_t* branch_hash = dogecoin_calloc(1, sizeof(uint256_t));
+    assert(branch_hash != NULL);
+    (*branch_hash)[0] = 2;
+    assert(vector_add(merkle_branch, branch_hash) == true);
+
+    uint256_t* even_expected = Hash((const uint256_t*)&base_hash, (const uint256_t*)branch_hash);
+    uint256_t* even_actual = check_merkle_branch(&base_hash, merkle_branch, 0);
+    assert(memcmp(even_expected, even_actual, sizeof(uint256_t)) == 0);
+    dogecoin_free(even_expected);
+    dogecoin_free(even_actual);
+
+    uint256_t* odd_expected = Hash((const uint256_t*)branch_hash, (const uint256_t*)&base_hash);
+    uint256_t* odd_actual = check_merkle_branch(&base_hash, merkle_branch, 1);
+    assert(memcmp(odd_expected, odd_actual, sizeof(uint256_t)) == 0);
+    dogecoin_free(odd_expected);
+    dogecoin_free(odd_actual);
+
+    vector_free(merkle_branch, true);
 }
