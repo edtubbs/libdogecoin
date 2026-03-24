@@ -2636,11 +2636,14 @@ static const char* yubikey_factor_name(const dogecoin_yubikey_factor_type factor
 
 static dogecoin_bool secure_memeq(const uint8_t* lhs, const uint8_t* rhs, const size_t size)
 {
-    uint8_t diff = 0;
+    /* Use volatile reads/writes so the comparison loop is not optimized into a short-circuiting memcmp. */
+    volatile const uint8_t* lhs_v = (volatile const uint8_t*)lhs;
+    volatile const uint8_t* rhs_v = (volatile const uint8_t*)rhs;
+    volatile uint8_t diff = 0;
     size_t i = 0;
     for (i = 0; i < size; ++i)
     {
-        diff |= lhs[i] ^ rhs[i];
+        diff |= (uint8_t)(lhs_v[i] ^ rhs_v[i]);
     }
     return diff == 0;
 }

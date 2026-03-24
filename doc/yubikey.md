@@ -14,7 +14,7 @@ In addition to PIV-backed storage, libdogecoin now supports an optional second f
 
 These factor modes are available through the `_with_factor` APIs and can be used for encrypted seeds, mnemonics, and HD nodes.
 
-Its recommended that the user download the YubiKey Manager to manage the YubiKey. The YubiKey Manager is a graphical user interface that allows users to change the PIN, management key, and other settings. The YubiKey Manager is available for Windows, macOS, and Linux from the [Yubico website](https://www.yubico.com/support/download/yubikey-manager/).
+It's recommended that the user download the YubiKey Manager to manage the YubiKey. The YubiKey Manager is a graphical user interface that allows users to change the PIN, management key, and other settings. The YubiKey Manager is available for Windows, macOS, and Linux from the [Yubico website](https://www.yubico.com/support/download/yubikey-manager/).
 
 ### Dependencies
 - `libykpiv` - The YubiKey C library for interacting with the YubiKey.
