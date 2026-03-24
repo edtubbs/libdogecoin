@@ -2673,11 +2673,11 @@ static dogecoin_bool yubikey_read_factor_secret(const dogecoin_yubikey_factor_ty
         const char* prompt = NULL;
         if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
         {
-            prompt = "Complete YubiKey FIDO2/passkey verification, then enter passkey assertion secret: \n";
+            prompt = "Complete YubiKey FIDO2/passkey verification, then enter passkey assertion secret:\n";
         }
         else
         {
-            prompt = "Enter YubiKey static password (for BIP39 passphrase/38-char key workflows): \n";
+            prompt = "Enter YubiKey static password (for BIP39 passphrase/38-char key workflows):\n";
         }
 
         char* input = getpass(prompt);
