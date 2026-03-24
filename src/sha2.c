@@ -1291,6 +1291,25 @@ void sha256_raw(const sha2_byte* data, size_t len, uint8_t digest[SHA256_DIGEST_
     sha256_finalize(&context, digest);
 }
 
+void sha256d_2_input(const uint8_t left[SHA256_DIGEST_LENGTH], const uint8_t right[SHA256_DIGEST_LENGTH], uint8_t digest[SHA256_DIGEST_LENGTH])
+{
+    uint8_t mid[SHA256_DIGEST_LENGTH];
+    sha256_context context;
+
+    sha256_init(&context);
+    MEMCPY_BCOPY(context.buffer, left, SHA256_DIGEST_LENGTH);
+    MEMCPY_BCOPY(context.buffer + SHA256_DIGEST_LENGTH, right, SHA256_DIGEST_LENGTH);
+    sha256_transform(&context, (const sha2_word32*)context.buffer);
+    context.bitcount = SHA256_BLOCK_LENGTH << 3;
+    sha256_finalize(&context, mid);
+
+    sha256_init(&context);
+    sha256_write(&context, mid, SHA256_DIGEST_LENGTH);
+    sha256_finalize(&context, digest);
+
+    MEMSET_BZERO(mid, sizeof(mid));
+}
+
 void sha256_reset(sha256_context* ctx) {
     if (ctx == (sha256_context*)0)
         return;
