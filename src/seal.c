@@ -123,6 +123,13 @@
 #define SEED_DATA_TAG(file_num) (0x005F1000 + file_num)
 #define MNEMONIC_DATA_TAG(file_num) (0x005F2000 + file_num)
 #define HDNODE_DATA_TAG(file_num) (0x005F3000 + file_num)
+#define SEED_FACTOR_DATA_TAG(file_num) (0x005F4000 + file_num)
+#define MNEMONIC_FACTOR_DATA_TAG(file_num) (0x005F5000 + file_num)
+#define HDNODE_FACTOR_DATA_TAG(file_num) (0x005F6000 + file_num)
+
+#define YUBIKEY_FACTOR_METADATA_VERSION 1
+#define YUBIKEY_FACTOR_SECRET_MAX_LEN 256
+#define YUBIKEY_FACTOR_METADATA_SIZE (1 + 1 + SALT_SIZE + SHA512_DIGEST_LENGTH)
 
 /**
  * @brief Validates a file number
@@ -2600,7 +2607,201 @@ LIBDOGECOIN_API dogecoin_bool generateRandomEnglishMnemonicSW(MNEMONIC mnemonic,
     return dogecoin_generate_mnemonic_encrypt_with_sw(mnemonic, file_num, overwrite, "eng", " ", NULL, NULL, encrypted_blob, encrypted_blob_size);
 }
 
+static dogecoin_bool yubikey_factor_type_supported(const dogecoin_yubikey_factor_type factor_type)
+{
+    return factor_type == DOGECOIN_YUBIKEY_FACTOR_NONE ||
+           factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY ||
+           factor_type == DOGECOIN_YUBIKEY_FACTOR_STATIC_PASSWORD;
+}
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_is_valid_yubikey_factor_type(int factor_type)
+{
+    return yubikey_factor_type_supported((dogecoin_yubikey_factor_type)factor_type);
+}
+
 #ifdef USE_YUBIKEY
+
+static const char* yubikey_factor_name(const dogecoin_yubikey_factor_type factor_type)
+{
+    switch (factor_type)
+    {
+    case DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY:
+        return "FIDO2/passkey";
+    case DOGECOIN_YUBIKEY_FACTOR_STATIC_PASSWORD:
+        return "static password";
+    default:
+        return "none";
+    }
+}
+
+static dogecoin_bool secure_memeq(const uint8_t* lhs, const uint8_t* rhs, const size_t size)
+{
+    uint8_t diff = 0;
+    size_t i = 0;
+    for (i = 0; i < size; ++i)
+    {
+        diff |= lhs[i] ^ rhs[i];
+    }
+    return diff == 0;
+}
+
+static dogecoin_bool yubikey_read_factor_secret(const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret, char* factor_secret, const size_t factor_secret_size, const char* operation)
+{
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_NONE)
+    {
+        return true;
+    }
+
+    if (factor_secret == NULL || factor_secret_size == 0)
+    {
+        fprintf(stderr, "ERROR: Invalid factor secret buffer.\n");
+        return false;
+    }
+
+    if (test_factor_secret != NULL)
+    {
+        if (strlen(test_factor_secret) >= factor_secret_size)
+        {
+            fprintf(stderr, "ERROR: %s secret too long.\n", yubikey_factor_name(factor_type));
+            return false;
+        }
+        strncpy(factor_secret, test_factor_secret, factor_secret_size - 1);
+        factor_secret[factor_secret_size - 1] = '\0';
+    }
+    else
+    {
+        const char* prompt = NULL;
+        if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
+        {
+            prompt = "Complete YubiKey FIDO2/passkey verification, then enter passkey assertion secret: \n";
+        }
+        else
+        {
+            prompt = "Enter YubiKey static password (for BIP39 passphrase/38-char key workflows): \n";
+        }
+
+        char* input = getpass(prompt);
+        if (input == NULL)
+        {
+            fprintf(stderr, "ERROR: Failed to read %s secret.\n", yubikey_factor_name(factor_type));
+            return false;
+        }
+
+        if (strlen(input) >= factor_secret_size)
+        {
+            fprintf(stderr, "ERROR: %s secret too long.\n", yubikey_factor_name(factor_type));
+            return false;
+        }
+        strncpy(factor_secret, input, factor_secret_size - 1);
+        factor_secret[factor_secret_size - 1] = '\0';
+    }
+
+    if (strlen(factor_secret) == 0)
+    {
+        fprintf(stderr, "ERROR: %s secret cannot be empty for %s.\n", yubikey_factor_name(factor_type), operation);
+        return false;
+    }
+
+    return true;
+}
+
+static void yubikey_factor_hash_secret(const char* factor_secret, const uint8_t salt[SALT_SIZE], uint8_t hash_out[SHA512_DIGEST_LENGTH])
+{
+    uint8_t derived_key[AES_KEY_SIZE];
+    pbkdf2_hmac_sha256((const uint8_t*)factor_secret, strlen(factor_secret), salt, SALT_SIZE, PBKDF2_ITERATIONS, derived_key, AES_KEY_SIZE);
+    sha512_raw(derived_key, AES_KEY_SIZE, hash_out);
+    dogecoin_mem_zero(derived_key, sizeof(derived_key));
+}
+
+static dogecoin_bool yubikey_store_factor_metadata(ykpiv_state* state, const int factor_data_tag, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret)
+{
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_NONE)
+    {
+        return true;
+    }
+
+    uint8_t metadata[YUBIKEY_FACTOR_METADATA_SIZE];
+    char factor_secret[YUBIKEY_FACTOR_SECRET_MAX_LEN] = {0};
+    if (!yubikey_read_factor_secret(factor_type, test_factor_secret, factor_secret, sizeof(factor_secret), "encryption"))
+    {
+        return false;
+    }
+
+    metadata[0] = YUBIKEY_FACTOR_METADATA_VERSION;
+    metadata[1] = (uint8_t)factor_type;
+
+    if (!dogecoin_random_bytes(metadata + 2, SALT_SIZE, 1))
+    {
+        fprintf(stderr, "ERROR: Failed to generate YubiKey factor metadata salt.\n");
+        dogecoin_mem_zero(factor_secret, sizeof(factor_secret));
+        return false;
+    }
+
+    yubikey_factor_hash_secret(factor_secret, metadata + 2, metadata + 2 + SALT_SIZE);
+    dogecoin_mem_zero(factor_secret, sizeof(factor_secret));
+
+    if (ykpiv_save_object(state, factor_data_tag, metadata, sizeof(metadata)) != YKPIV_OK)
+    {
+        fprintf(stderr, "ERROR: Failed to save YubiKey %s metadata.\n", yubikey_factor_name(factor_type));
+        dogecoin_mem_zero(metadata, sizeof(metadata));
+        return false;
+    }
+
+    dogecoin_mem_zero(metadata, sizeof(metadata));
+    return true;
+}
+
+static dogecoin_bool yubikey_verify_factor_metadata(ykpiv_state* state, const int factor_data_tag, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret)
+{
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_NONE)
+    {
+        return true;
+    }
+
+    uint8_t metadata[YUBIKEY_FACTOR_METADATA_SIZE] = {0};
+    unsigned long metadata_size = sizeof(metadata);
+    if (ykpiv_fetch_object(state, factor_data_tag, metadata, &metadata_size) != YKPIV_OK)
+    {
+        fprintf(stderr, "ERROR: Failed to retrieve YubiKey %s metadata.\n", yubikey_factor_name(factor_type));
+        return false;
+    }
+
+    if (metadata_size != sizeof(metadata) || metadata[0] != YUBIKEY_FACTOR_METADATA_VERSION)
+    {
+        fprintf(stderr, "ERROR: Invalid YubiKey factor metadata format.\n");
+        dogecoin_mem_zero(metadata, sizeof(metadata));
+        return false;
+    }
+
+    if (metadata[1] != (uint8_t)factor_type)
+    {
+        fprintf(stderr, "ERROR: YubiKey factor type mismatch. Stored=%u expected=%u.\n", metadata[1], (unsigned int)factor_type);
+        dogecoin_mem_zero(metadata, sizeof(metadata));
+        return false;
+    }
+
+    char factor_secret[YUBIKEY_FACTOR_SECRET_MAX_LEN] = {0};
+    if (!yubikey_read_factor_secret(factor_type, test_factor_secret, factor_secret, sizeof(factor_secret), "decryption"))
+    {
+        dogecoin_mem_zero(metadata, sizeof(metadata));
+        return false;
+    }
+
+    uint8_t derived_hash[SHA512_DIGEST_LENGTH];
+    yubikey_factor_hash_secret(factor_secret, metadata + 2, derived_hash);
+    dogecoin_mem_zero(factor_secret, sizeof(factor_secret));
+    if (!secure_memeq(metadata + 2 + SALT_SIZE, derived_hash, SHA512_DIGEST_LENGTH))
+    {
+        fprintf(stderr, "ERROR: Invalid YubiKey %s secret.\n", yubikey_factor_name(factor_type));
+        dogecoin_mem_zero(derived_hash, sizeof(derived_hash));
+        dogecoin_mem_zero(metadata, sizeof(metadata));
+        return false;
+    }
+
+    dogecoin_mem_zero(derived_hash, sizeof(derived_hash));
+    dogecoin_mem_zero(metadata, sizeof(metadata));
+    return true;
+}
 
 /**
  * @brief Encrypt a seed with software encryption and write it to a YubiKey
@@ -2615,8 +2816,14 @@ LIBDOGECOIN_API dogecoin_bool generateRandomEnglishMnemonicSW(MNEMONIC mnemonic,
  *
  * @return True if the seed was successfully encrypted and written to the YubiKey, false otherwise
  */
-LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite, const char* test_password)
+LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey_with_factor(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret)
 {
+    if (!yubikey_factor_type_supported(factor_type))
+    {
+        fprintf(stderr, "ERROR: Unsupported YubiKey factor type.\n");
+        return false;
+    }
+
     ENCRYPTED_BLOB encrypted_blob;
     size_t encrypted_blob_size = 0;
     dogecoin_bool result = dogecoin_encrypt_seed_with_sw(seed, size, NO_FILE, overwrite, test_password, &encrypted_blob, &encrypted_blob_size);
@@ -2683,8 +2890,19 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey(const SEE
         return false;
     }
 
+    if (!yubikey_store_factor_metadata(state, SEED_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    {
+        ykpiv_done(state);
+        return false;
+    }
+
     ykpiv_done(state); // Clean up YubiKey state after use
     return true;
+}
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite, const char* test_password)
+{
+    return dogecoin_encrypt_seed_with_sw_to_yubikey_with_factor(seed, size, file_num, overwrite, test_password, DOGECOIN_YUBIKEY_FACTOR_NONE, NULL);
 }
 
 /**
@@ -2698,8 +2916,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey(const SEE
  *
  * @return True if the seed was successfully decrypted, false otherwise
  */
-LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey(SEED seed, const int file_num, const char* test_password)
+LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey_with_factor(SEED seed, const int file_num, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret)
 {
+    if (!yubikey_factor_type_supported(factor_type))
+    {
+        fprintf(stderr, "ERROR: Unsupported YubiKey factor type.\n");
+        return false;
+    }
+
     ykpiv_state *state = NULL;
     ENCRYPTED_BLOB encrypted_blob;
     unsigned long encrypted_blob_size = sizeof(encrypted_blob);
@@ -2738,10 +2962,21 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey(SEED se
         return false;
     }
 
+    if (!yubikey_verify_factor_metadata(state, SEED_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    {
+        ykpiv_done(state);
+        return false;
+    }
+
     ykpiv_done(state); // Clean up YubiKey state after use
 
     // Decrypt the seed using the software decryption function
     return dogecoin_decrypt_seed_with_sw(seed, NO_FILE, test_password, encrypted_blob);
+}
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey(SEED seed, const int file_num, const char* test_password)
+{
+    return dogecoin_decrypt_seed_with_sw_from_yubikey_with_factor(seed, file_num, test_password, DOGECOIN_YUBIKEY_FACTOR_NONE, NULL);
 }
 
 /**
@@ -2756,8 +2991,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey(SEED se
  *
  * @return True if the mnemonic was successfully encrypted and written to the YubiKey, false otherwise
  */
-LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey(dogecoin_hdnode* hdnode, const int file_num, const dogecoin_bool overwrite, const char* test_password)
+LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey_with_factor(dogecoin_hdnode* hdnode, const int file_num, const dogecoin_bool overwrite, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret)
 {
+    if (!yubikey_factor_type_supported(factor_type))
+    {
+        fprintf(stderr, "ERROR: Unsupported YubiKey factor type.\n");
+        return false;
+    }
+
     ENCRYPTED_BLOB encrypted_blob;
     size_t encrypted_blob_size = 0;
     dogecoin_bool result = dogecoin_generate_hdnode_encrypt_with_sw(hdnode, NO_FILE, overwrite, test_password, &encrypted_blob, &encrypted_blob_size);
@@ -2824,8 +3065,19 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubike
         return false;
     }
 
+    if (!yubikey_store_factor_metadata(state, HDNODE_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    {
+        ykpiv_done(state);
+        return false;
+    }
+
     ykpiv_done(state); // Clean up YubiKey state after use
     return true;
+}
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey(dogecoin_hdnode* hdnode, const int file_num, const dogecoin_bool overwrite, const char* test_password)
+{
+    return dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey_with_factor(hdnode, file_num, overwrite, test_password, DOGECOIN_YUBIKEY_FACTOR_NONE, NULL);
 }
 
 /**
@@ -2839,8 +3091,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubike
  *
  * @return True if the mnemonic is decrypted successfully, false otherwise
  */
-LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey(dogecoin_hdnode* hdnode, const int file_num, const char* test_password)
+LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey_with_factor(dogecoin_hdnode* hdnode, const int file_num, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret)
 {
+    if (!yubikey_factor_type_supported(factor_type))
+    {
+        fprintf(stderr, "ERROR: Unsupported YubiKey factor type.\n");
+        return false;
+    }
+
     ykpiv_state *state = NULL;
     ENCRYPTED_BLOB encrypted_blob;
     unsigned long encrypted_blob_size = sizeof(encrypted_blob);
@@ -2879,10 +3137,21 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey(dogec
         return false;
     }
 
+    if (!yubikey_verify_factor_metadata(state, HDNODE_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    {
+        ykpiv_done(state);
+        return false;
+    }
+
     ykpiv_done(state); // Clean up YubiKey state after use
 
     // Decrypt the HD node using the software decryption function
     return dogecoin_decrypt_hdnode_with_sw(hdnode, NO_FILE, test_password, encrypted_blob);
+}
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey(dogecoin_hdnode* hdnode, const int file_num, const char* test_password)
+{
+    return dogecoin_decrypt_hdnode_with_sw_from_yubikey_with_factor(hdnode, file_num, test_password, DOGECOIN_YUBIKEY_FACTOR_NONE, NULL);
 }
 
 /**
@@ -2900,8 +3169,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey(dogec
  *
  * @return True if the mnemonic was successfully encrypted and written to the YubiKey, false otherwise
  */
-LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, const char* lang, const char* space, const char* words, const char* test_password)
+LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey_with_factor(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, const char* lang, const char* space, const char* words, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret)
 {
+    if (!yubikey_factor_type_supported(factor_type))
+    {
+        fprintf(stderr, "ERROR: Unsupported YubiKey factor type.\n");
+        return false;
+    }
+
     ENCRYPTED_BLOB encrypted_blob;
     size_t encrypted_blob_size = 0;
     dogecoin_bool result = dogecoin_generate_mnemonic_encrypt_with_sw(mnemonic, NO_FILE, overwrite, lang, space, words, test_password, &encrypted_blob, &encrypted_blob_size);
@@ -2968,8 +3243,19 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubi
         return false;
     }
 
+    if (!yubikey_store_factor_metadata(state, MNEMONIC_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    {
+        ykpiv_done(state);
+        return false;
+    }
+
     ykpiv_done(state); // Clean up YubiKey state after use
     return true;
+}
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, const char* lang, const char* space, const char* words, const char* test_password)
+{
+    return dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey_with_factor(mnemonic, file_num, overwrite, lang, space, words, test_password, DOGECOIN_YUBIKEY_FACTOR_NONE, NULL);
 }
 
 /**
@@ -2983,8 +3269,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubi
  *
  * @return True if the mnemonic is decrypted successfully, false otherwise
  */
-LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw_from_yubikey(MNEMONIC mnemonic, const int file_num, const char* test_password)
+LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw_from_yubikey_with_factor(MNEMONIC mnemonic, const int file_num, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret)
 {
+    if (!yubikey_factor_type_supported(factor_type))
+    {
+        fprintf(stderr, "ERROR: Unsupported YubiKey factor type.\n");
+        return false;
+    }
+
     ykpiv_state *state = NULL;
     ENCRYPTED_BLOB encrypted_blob;
     unsigned long encrypted_blob_size = sizeof(encrypted_blob);
@@ -3023,10 +3315,21 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw_from_yubikey(MNE
         return false;
     }
 
+    if (!yubikey_verify_factor_metadata(state, MNEMONIC_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    {
+        ykpiv_done(state);
+        return false;
+    }
+
     ykpiv_done(state); // Clean up YubiKey state after use
 
     // Decrypt the mnemonic using the software decryption function
     return dogecoin_decrypt_mnemonic_with_sw(mnemonic, NO_FILE, test_password, encrypted_blob);
+}
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw_from_yubikey(MNEMONIC mnemonic, const int file_num, const char* test_password)
+{
+    return dogecoin_decrypt_mnemonic_with_sw_from_yubikey_with_factor(mnemonic, file_num, test_password, DOGECOIN_YUBIKEY_FACTOR_NONE, NULL);
 }
 
 #endif

@@ -43,6 +43,16 @@ LIBDOGECOIN_API
 /* Encrypted BLOB */
 typedef uint8_t ENCRYPTED_BLOB[MAX_ENCRYPTED_BLOB_SIZE];
 
+/* Optional second-factor types for YubiKey-backed encrypted objects */
+typedef enum dogecoin_yubikey_factor_type {
+    DOGECOIN_YUBIKEY_FACTOR_NONE = 0,
+    DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY = 1,
+    DOGECOIN_YUBIKEY_FACTOR_STATIC_PASSWORD = 2
+} dogecoin_yubikey_factor_type;
+
+/* Validate a YubiKey factor type identifier */
+LIBDOGECOIN_API dogecoin_bool dogecoin_is_valid_yubikey_factor_type(int factor_type);
+
 /* Encrypt a BIP32 seed with the TPM */
 LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite);
 
@@ -58,8 +68,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw(SEED seed, const int
 /* Encrypt a BIP32 seed with software and store it on YubiKey */
 LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite, const char* test_password);
 
+/* Encrypt a BIP32 seed with software and store it on YubiKey with an additional YubiKey factor */
+LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey_with_factor(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret);
+
 /* Decrypt a BIP32 seed with software after retrieving it from YubiKey */
 LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey(SEED seed, const int file_num, const char* test_password);
+
+/* Decrypt a BIP32 seed with software from YubiKey and verify an additional YubiKey factor */
+LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey_with_factor(SEED seed, const int file_num, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret);
 
 /* Generate a BIP39 mnemonic and encrypt it with the TPM */
 LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, const char* lang, const char* space, const char* words);
@@ -76,8 +92,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw(MNEMONIC mnemoni
 /* Generate a BIP39 mnemonic, encrypt it with software, and store it on YubiKey */
 LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, const char* lang, const char* space, const char* words, const char* test_password);
 
+/* Generate a BIP39 mnemonic, encrypt it with software, and store it on YubiKey with an additional YubiKey factor */
+LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey_with_factor(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, const char* lang, const char* space, const char* words, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret);
+
 /* Decrypt a BIP39 mnemonic with software after retrieving it from YubiKey */
 LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw_from_yubikey(MNEMONIC mnemonic, const int file_num, const char* test_password);
+
+/* Decrypt a BIP39 mnemonic with software from YubiKey and verify an additional YubiKey factor */
+LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw_from_yubikey_with_factor(MNEMONIC mnemonic, const int file_num, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret);
 
 /* Generate a BIP32 HD node and encrypt it with the TPM */
 LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin_hdnode* out, const int file_num, const dogecoin_bool overwrite);
@@ -94,8 +116,14 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* o
 /* Generate a BIP32 HD node, encrypt it with software, and store it on YubiKey */
 LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey(dogecoin_hdnode* out, const int file_num, const dogecoin_bool overwrite, const char* test_password);
 
+/* Generate a BIP32 HD node, encrypt it with software, and store it on YubiKey with an additional YubiKey factor */
+LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey_with_factor(dogecoin_hdnode* out, const int file_num, const dogecoin_bool overwrite, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret);
+
 /* Decrypt a BIP32 HD node with software after retrieving it from YubiKey */
 LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey(dogecoin_hdnode* out, const int file_num, const char* test_password);
+
+/* Decrypt a BIP32 HD node with software from YubiKey and verify an additional YubiKey factor */
+LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey_with_factor(dogecoin_hdnode* out, const int file_num, const char* test_password, const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret);
 
 /* List all encryption keys in the TPM */
 LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* names[], size_t* count);

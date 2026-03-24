@@ -8,6 +8,12 @@ We have integrated the YubiKey with the `seal` module, specifically for encrypte
 
 The process involves multi-factor authentication (PIN and YubiKey) to unlock the encrypted keys, followed by the decryption of BIP39 mnemonics. The seed, master key, or mnemonic is first encrypted with software and then stored on the YubiKey. During the storage process, the user enters a management password, and to retrieve the key, the user enters the YubiKey PIN.
 
+In addition to PIV-backed storage, libdogecoin now supports an optional second factor metadata check for YubiKey workflows:
+- `DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY` for passkey/FIDO2 assertion secret workflows.
+- `DOGECOIN_YUBIKEY_FACTOR_STATIC_PASSWORD` for static-password style workflows (for example, a BIP39 passphrase or another user-managed secret such as a 38-character key).
+
+These factor modes are available through the `_with_factor` APIs and can be used for encrypted seeds, mnemonics, and HD nodes.
+
 Its recommeded that the user download the YubiKey Manager to manage the YubiKey. The YubiKey Manager is a graphical user interface that allows users to change the PIN, management key, and other settings. The YubiKey Manager is available for Windows, macOS, and Linux from the [Yubico website](https://www.yubico.com/support/download/yubikey-manager/).
 
 ### Dependencies
@@ -35,4 +41,20 @@ uint8_t decrypted_seed[4096] = {0};
 u_assert_true(dogecoin_decrypt_seed_with_sw_from_yubikey(decrypted_seed, TEST_FILE, test_password));
 debug_print("Decrypted seed: %s\n", utils_uint8_to_hex(decrypted_seed, decrypted_size));
 u_assert_true(memcmp(seed, decrypted_seed, sizeof(SEED)) == 0);
+
+// Encrypt/decrypt with optional FIDO2/passkey-style factor metadata
+u_assert_true(dogecoin_encrypt_seed_with_sw_to_yubikey_with_factor(
+    seed,
+    sizeof(SEED),
+    TEST_FILE,
+    true,
+    test_password,
+    DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY,
+    "passkey-assertion-secret"));
+u_assert_true(dogecoin_decrypt_seed_with_sw_from_yubikey_with_factor(
+    decrypted_seed,
+    TEST_FILE,
+    test_password,
+    DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY,
+    "passkey-assertion-secret"));
 ```

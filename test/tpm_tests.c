@@ -26,6 +26,12 @@
 
 void test_tpm()
 {
+    // Validate YubiKey factor type parsing without requiring YubiKey hardware
+    u_assert_true(dogecoin_is_valid_yubikey_factor_type(DOGECOIN_YUBIKEY_FACTOR_NONE));
+    u_assert_true(dogecoin_is_valid_yubikey_factor_type(DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY));
+    u_assert_true(dogecoin_is_valid_yubikey_factor_type(DOGECOIN_YUBIKEY_FACTOR_STATIC_PASSWORD));
+    u_assert_int_eq(dogecoin_is_valid_yubikey_factor_type(-1), false);
+    u_assert_int_eq(dogecoin_is_valid_yubikey_factor_type(3), false);
 
     // Generate a random number
     uint8_t random[32] = {0};
