@@ -53,6 +53,7 @@ static void test_check_merkle_branch()
     uint256_t expected = {0};
     vector_t* merkle_branch = vector_new(3, dogecoin_free);
 
+    /* Fixed branch/index vector generated independently to verify deterministic hashing order. */
     utils_hex_to_bin("1111111111111111111111111111111111111111111111111111111111111111", hash, DOGECOIN_HASH_LENGTH * 2, &outlen);
 
     uint256_t* branch0 = dogecoin_uint256_vla(1);
