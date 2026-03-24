@@ -8,6 +8,7 @@
 
 #include <dogecoin/mem.h>
 #include <dogecoin/slip0039.h>
+#include <dogecoin/utils.h>
 
 #include <stdint.h>
 #include <string.h>
@@ -45,7 +46,8 @@ void test_slip0039()
     char tampered[SLIP0039_MAX_SHARE_STR_SIZE];
     strncpy(tampered, shares[0], sizeof(tampered) - 1);
     tampered[sizeof(tampered) - 1] = '\0';
-    tampered[strlen(tampered) - 1] = (tampered[strlen(tampered) - 1] == '0') ? '1' : '0';
+    size_t tampered_len = strlen(tampered);
+    tampered[tampered_len - 1] = (tampered[tampered_len - 1] == '0') ? '1' : '0';
     const char* tampered_set[] = { tampered, shares[1] };
     recovered_len = sizeof(recovered);
     u_assert_int_eq(dogecoin_slip0039_recover_secret(tampered_set, 2, recovered, &recovered_len), -1);

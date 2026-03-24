@@ -13,6 +13,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#define SLIP0039_VERSION 1u
+#define SLIP0039_PARSE_HEX_WIDTH "128"
+#define SLIP0039_SCAN_PATTERN "slip0039:%u:%u:%u:%u:%" SLIP0039_PARSE_HEX_WIDTH "[^:]:%2x"
+
 static dogecoin_bool slip0039_is_hex_char(char c)
 {
     return ((c >= '0' && c <= '9') ||
@@ -28,11 +32,13 @@ int dogecoin_slip0039_generate_shares(const uint8_t* secret, size_t secret_len, 
     if (threshold < 1 || share_count < threshold || share_count > SLIP0039_MAX_SHARES) {
         return -1;
     }
-
-    char* secret_hex = utils_uint8_to_hex(secret, secret_len);
-    if (!secret_hex) {
+    if (secret_len > MAX_SEED_SIZE) {
         return -1;
     }
+
+    char secret_hex[(MAX_SEED_SIZE * 2) + 1];
+    dogecoin_mem_zero(secret_hex, sizeof(secret_hex));
+    utils_bin_to_hex((unsigned char*)secret, secret_len, secret_hex);
 
     for (uint8_t i = 0; i < share_count; ++i) {
         uint8_t checksum = 0;
@@ -43,13 +49,13 @@ int dogecoin_slip0039_generate_shares(const uint8_t* secret, size_t secret_len, 
             checksum ^= secret[j];
         }
 
-        if (snprintf(shares[i], SLIP0039_MAX_SHARE_STR_SIZE, "slip0039:1:%u:%u:%u:%s:%02x", (unsigned int)(i + 1), (unsigned int)threshold, (unsigned int)share_count, secret_hex, (unsigned int)checksum) >= SLIP0039_MAX_SHARE_STR_SIZE) {
-            dogecoin_mem_zero(secret_hex, strlen(secret_hex));
+        if (snprintf(shares[i], SLIP0039_MAX_SHARE_STR_SIZE, "slip0039:%u:%u:%u:%u:%s:%02x", SLIP0039_VERSION, (unsigned int)(i + 1), (unsigned int)threshold, (unsigned int)share_count, secret_hex, (unsigned int)checksum) >= SLIP0039_MAX_SHARE_STR_SIZE) {
+            dogecoin_mem_zero(secret_hex, sizeof(secret_hex));
             return -1;
         }
     }
 
-    dogecoin_mem_zero(secret_hex, strlen(secret_hex));
+    dogecoin_mem_zero(secret_hex, sizeof(secret_hex));
     return 0;
 }
 
@@ -70,13 +76,17 @@ int dogecoin_slip0039_recover_secret(const char* shares[], size_t share_count, u
             return -1;
         }
 
+        unsigned int version = 0;
         unsigned int idx = 0;
         unsigned int threshold = 0;
         unsigned int total = 0;
         unsigned int checksum = 0;
         char secret_hex[(MAX_SEED_SIZE * 2) + 1];
 
-        if (sscanf(shares[i], "slip0039:1:%u:%u:%u:%128[^:]:%2x", &idx, &threshold, &total, secret_hex, &checksum) != 5) {
+        if (sscanf(shares[i], SLIP0039_SCAN_PATTERN, &version, &idx, &threshold, &total, secret_hex, &checksum) != 6) {
+            return -1;
+        }
+        if (version != SLIP0039_VERSION) {
             return -1;
         }
 
