@@ -91,6 +91,7 @@ static struct option long_options[] =
     {"mnemonic_input", required_argument, NULL, 'n'},
     {"shared_secret", required_argument, NULL, 's'},
     {"entropy_size", required_argument, NULL, 'e'},
+    {"lang", required_argument, NULL, 'g'},
     {"auth_token", required_argument, NULL, 'a'},
     {"password", required_argument, NULL, 'p'},
     {"custom_path", required_argument, NULL, 'h'},
@@ -102,9 +103,10 @@ static void print_usage()
 {
     printf("Usage: host/host enclave/enclave.signed -c <cmd> (-o|-account_int <account_int>) (-i|-input_index <input index>) (-l|-change_level <change level>) \
 (-m|-message <message>) (-t|-transaction <transaction>) (-n|-mnemonic_input <mnemonic input>) (-s|-shared_secret <shared secret>) \
-(-e|-entropy_size <entropy size>) (-a|-auth_token <auth token>) (-p|-password <password>) (-h|custom_path <custom path>) (-z|yubikey)\n");
+(-e|-entropy_size <entropy size>) (-g|-lang <language>) (-a|-auth_token <auth token>) (-p|-password <password>) (-h|custom_path <custom path>) (-z|yubikey)\n");
     printf("Available commands:\n");
     printf("  generate_mnemonic (optional -n <mnemonic_input> -s <shared_secret> -e <entropy_size> -p <password> -z)\n");
+    printf("  verify_mnemonic (requires -n <mnemonic_input>, optional -g <language>)\n");
     printf("  generate_extended_public_key (requires -o <account_int> -l <change_level>) (optional -h <custom_path> -a <auth_token> or -p <password> -z)\n");
     printf("  generate_address (requires -o <account_int> -i <input_index> -l <change_level>) (optional -h <custom_path> -a <auth_token> or -p <password> -z)\n");
     printf("  sign_message (requires -o <account_int> -i <input_index> -l <change_level> -m <message>) (optional -h <custom_path> -a <auth_token> or -p <password> -z)\n");
@@ -302,6 +304,7 @@ int main(int argc, char* argv[])
     char* shared_secret = NULL;
     char* mnemonic_in = NULL;
     char* entropy_size = NULL;
+    char* lang = "eng";
     char* password = NULL;
     bool yubikey = false;
 
@@ -309,7 +312,7 @@ int main(int argc, char* argv[])
     data_t encrypted_blob = {NULL, 0};
 
     // Parse remaining CLI options
-    while ((opt = getopt_long_only(remaining_argc, remaining_argv, "c:o:i:l:m:t:n:s:e:p:a:h:z", long_options, &long_index)) != -1)
+    while ((opt = getopt_long_only(remaining_argc, remaining_argv, "c:o:i:l:m:t:n:s:e:g:p:a:h:z", long_options, &long_index)) != -1)
     {
         switch (opt)
         {
@@ -339,6 +342,9 @@ int main(int argc, char* argv[])
                 break;
             case 'e':
                 entropy_size = optarg;
+                break;
+            case 'g':
+                lang = optarg;
                 break;
             case 'p':
                 password = optarg;
@@ -483,6 +489,21 @@ int main(int argc, char* argv[])
             write_encrypted_file(MNEMONIC_TEE_FILE_NAME, &encrypted_blob);
         }
         dogecoin_mem_zero(mnemonic, strlen(mnemonic));
+    }
+    else if (strcmp(cmd, "verify_mnemonic") == 0)
+    {
+        printf("- Verify mnemonic\n");
+        if (!mnemonic_in) {
+            fprintf(stderr, "verify_mnemonic requires -n <mnemonic_input>\n");
+            ret = 1;
+            goto exit;
+        }
+        if (dogecoin_verify_mnemonic(mnemonic_in, lang, " ", NULL) == 0) {
+            printf("Mnemonic is valid\n");
+        } else {
+            fprintf(stderr, "Mnemonic is invalid\n");
+            ret = 1;
+        }
     }
     else if (strcmp(cmd, "generate_extended_public_key") == 0)
     {
