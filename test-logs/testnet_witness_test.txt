@@ -3,6 +3,8 @@
 ==========================================
 [1/5] Build tools
 ----- make: make -j2 such sendtx spvnode -----
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/src/secp256k1'
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/src/secp256k1'
 make: 'sendtx' is up to date.
 make: 'spvnode' is up to date.
 ----- make exit=0 -----
@@ -10,7 +12,7 @@ make: 'spvnode' is up to date.
 tx with witness: 01000000000101aad9ecd645f150557080a0de9053a611bfe1f6a21ddca9f25480ea2d8dd212c8000000006a4730440220074450ba2ea6bc690c3388fd38336bf9c6433c35be2a7ab31d6fc4295c8326a202204655853f57105bd5c16f2cd0162a5e2fa4f570416da4730928069af6b46210e10121021bba012071cc524b955f5be6312bc20c7a658001dcc8de693d2a9081bed37945ffffffff02c0878b3b000000001976a914af1c8b5e0e88be99c779f5340ff47979ee259a1688ac0000000000000000266a24464c4331922cd322a23d7bed9ab0264499d4f3e642ddc50b4693a02065f3a08869680699010aff00aa6c6962646f676500000000
 input[0] witness items: 1
   witness[0]: ff00aa6c6962646f6765
-[3/5] Start spvnode in SMPV mode
+[3/5] Start spvnode in SMPV mode (checkpointed header sync)
 [4/5] Broadcast tx via sendtx
 ----- sendtx: ./sendtx -t -d 01000000000101aad9ecd645f150557080a0de9053a611bfe1f6a21ddca9f25480ea2d8dd212c8000000006a4730440220074450ba2ea6bc690c3388fd38336bf9c6433c35be2a7ab31d6fc4295c8326a202204655853f57105bd5c16f2cd0162a5e2fa4f570416da4730928069af6b46210e10121021bba012071cc524b955f5be6312bc20c7a658001dcc8de693d2a9081bed37945ffffffff02c0878b3b000000001976a914af1c8b5e0e88be99c779f5340ff47979ee259a1688ac0000000000000000266a24464c4331922cd322a23d7bed9ab0264499d4f3e642ddc50b4693a02065f3a08869680699010aff00aa6c6962646f676500000000 -----
 input[0] witness items: 1
@@ -27,412 +29,309 @@ DEBUG: Trying to connect to 7...
 DEBUG: Trying to connect to 8...
 DEBUG: Trying to connect to 9...
 DEBUG: Trying to connect to 10...
-DEBUG: Event callback on node 8
-DEBUG: Successful connected to node 8.
-DEBUG: sending message to node 8: version
-DEBUG: Connected nodes: 1
-DEBUG: received command from node 8: version
-DEBUG: Connected to node 8: /Shibetoshi:1.14.7/ (43453910)
-DEBUG: sending message to node 8: verack
-DEBUG: received command from node 8: verack
-Successfully connected to peer 8 (3.85.120.238)
-DEBUG: sending message to node 8: inv
-DEBUG: received command from node 8: sendheaders
-DEBUG: received command from node 8: sendcmpct
-DEBUG: received command from node 8: ping
-DEBUG: sending message to node 8: pong
-DEBUG: received command from node 8: addr
-DEBUG: received command from node 8: feefilter
-DEBUG: received command from node 8: getdata
-DEBUG: sending message to node 8: tx
-tx successfully sent to node 8
-DEBUG: Event callback on node 5
-DEBUG: Successful connected to node 5.
-DEBUG: sending message to node 5: version
-DEBUG: Connected nodes: 2
-DEBUG: received command from node 8: reject
-DEBUG: received command from node 5: version
-DEBUG: Connected to node 5: /Shibetoshi:1.14.6/ (43453910)
-DEBUG: sending message to node 5: verack
-DEBUG: received command from node 5: verack
-Successfully connected to peer 5 (198.58.102.18)
-DEBUG: sending message to node 5: inv
+DEBUG: Trying to connect to 11...
+DEBUG: Trying to connect to 12...
+DEBUG: Trying to connect to 13...
 DEBUG: Event callback on node 7
 DEBUG: Successful connected to node 7.
 DEBUG: sending message to node 7: version
-DEBUG: Connected nodes: 3
-DEBUG: Event callback on node 4
-DEBUG: Successful connected to node 4.
-DEBUG: sending message to node 4: version
-DEBUG: Connected nodes: 4
-DEBUG: Event callback on node 2
-DEBUG: Successful connected to node 2.
-DEBUG: sending message to node 2: version
-DEBUG: Connected nodes: 5
+DEBUG: Connected nodes: 1
+DEBUG: received command from node 7: version
+DEBUG: Connected to node 7: /Shibetoshi:1.14.6/ (43461063)
+DEBUG: sending message to node 7: verack
+DEBUG: received command from node 7: verack
+Successfully connected to peer 7 (198.58.102.18)
+DEBUG: sending message to node 7: inv
 DEBUG: Event callback on node 6
 DEBUG: Successful connected to node 6.
 DEBUG: sending message to node 6: version
-DEBUG: Connected nodes: 6
-DEBUG: received command from node 5: sendheaders
-DEBUG: received command from node 5: sendcmpct
-DEBUG: received command from node 5: ping
-DEBUG: sending message to node 5: pong
-DEBUG: received command from node 5: addr
-DEBUG: received command from node 5: feefilter
-DEBUG: Event callback on node 3
-DEBUG: Successful connected to node 3.
-DEBUG: sending message to node 3: version
-DEBUG: Connected nodes: 7
+DEBUG: Connected nodes: 2
+DEBUG: Event callback on node 8
+DEBUG: Successful connected to node 8.
+DEBUG: sending message to node 8: version
+DEBUG: Connected nodes: 3
 DEBUG: Event callback on node 10
 DEBUG: Successful connected to node 10.
 DEBUG: sending message to node 10: version
-DEBUG: Connected nodes: 8
-DEBUG: Event callback on node 1
-DEBUG: Successful connected to node 1.
-DEBUG: sending message to node 1: version
-DEBUG: Connected nodes: 9
-DEBUG: received command from node 5: getdata
-DEBUG: sending message to node 5: tx
-tx successfully sent to node 5
-DEBUG: received command from node 7: version
-DEBUG: Connected to node 7: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 7: verack
-DEBUG: received command from node 7: verack
-Successfully connected to peer 7 (100.21.235.190)
-DEBUG: received command from node 4: version
-DEBUG: Connected to node 4: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 4: verack
-DEBUG: received command from node 4: verack
-Successfully connected to peer 4 (142.132.147.162)
-DEBUG: received command from node 6: version
-DEBUG: Connected to node 6: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 6: verack
-DEBUG: received command from node 6: verack
-Successfully connected to peer 6 (185.232.70.226)
-DEBUG: received command from node 2: version
-DEBUG: Connected to node 2: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 2: verack
-DEBUG: received command from node 2: verack
-Successfully connected to peer 2 (95.141.35.117)
-DEBUG: received command from node 3: version
-DEBUG: Connected to node 3: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 3: verack
-DEBUG: received command from node 3: verack
-Successfully connected to peer 3 (188.117.132.82)
-DEBUG: Event callback on node 9
-DEBUG: Successful connected to node 9.
-DEBUG: sending message to node 9: version
-DEBUG: Connected nodes: 10
-DEBUG: received command from node 10: version
-DEBUG: Connected to node 10: /Shibetoshi:1.14.8/ (43453910)
-DEBUG: sending message to node 10: verack
-DEBUG: received command from node 10: verack
-Successfully connected to peer 10 (37.27.63.117)
-DEBUG: received command from node 1: version
-DEBUG: Connected to node 1: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 1: verack
-DEBUG: received command from node 1: verack
-Successfully connected to peer 1 (135.181.168.83)
-DEBUG: received command from node 5: reject
+DEBUG: Connected nodes: 4
 DEBUG: received command from node 7: sendheaders
 DEBUG: received command from node 7: sendcmpct
 DEBUG: received command from node 7: ping
 DEBUG: sending message to node 7: pong
 DEBUG: received command from node 7: addr
 DEBUG: received command from node 7: feefilter
-DEBUG: received command from node 4: sendheaders
-DEBUG: received command from node 4: sendcmpct
-DEBUG: received command from node 4: ping
-DEBUG: sending message to node 4: pong
-DEBUG: received command from node 4: addr
-DEBUG: received command from node 4: feefilter
-DEBUG: received command from node 2: sendheaders
-DEBUG: received command from node 2: sendcmpct
-DEBUG: received command from node 2: ping
-DEBUG: sending message to node 2: pong
-DEBUG: received command from node 2: addr
-DEBUG: received command from node 2: feefilter
+DEBUG: received command from node 7: getdata
+DEBUG: sending message to node 7: tx
+tx successfully sent to node 7
+DEBUG: received command from node 6: version
+DEBUG: Connected to node 6: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 6: verack
+DEBUG: received command from node 6: verack
+Successfully connected to peer 6 (100.21.235.190)
+DEBUG: sending message to node 6: inv
+DEBUG: received command from node 8: version
+DEBUG: Connected to node 8: /Shibetoshi:1.14.6/ (43461063)
+DEBUG: sending message to node 8: verack
+DEBUG: received command from node 8: verack
+Successfully connected to peer 8 (35.84.106.212)
+DEBUG: received command from node 10: version
+DEBUG: Connected to node 10: /Shibetoshi:1.14.7/ (43461063)
+DEBUG: sending message to node 10: verack
+DEBUG: received command from node 10: verack
+Successfully connected to peer 10 (3.85.120.238)
 DEBUG: received command from node 6: sendheaders
 DEBUG: received command from node 6: sendcmpct
 DEBUG: received command from node 6: ping
 DEBUG: sending message to node 6: pong
 DEBUG: received command from node 6: addr
 DEBUG: received command from node 6: feefilter
-DEBUG: received command from node 3: sendheaders
-DEBUG: received command from node 3: sendcmpct
-DEBUG: received command from node 3: ping
-DEBUG: sending message to node 3: pong
-DEBUG: received command from node 3: addr
-DEBUG: received command from node 3: feefilter
+DEBUG: received command from node 8: sendheaders
+DEBUG: received command from node 8: sendcmpct
+DEBUG: received command from node 8: ping
+DEBUG: sending message to node 8: pong
+DEBUG: received command from node 8: addr
+DEBUG: received command from node 8: feefilter
+DEBUG: Event callback on node 2
+DEBUG: Successful connected to node 2.
+DEBUG: sending message to node 2: version
+DEBUG: Connected nodes: 5
+DEBUG: received command from node 7: reject
+DEBUG: Event callback on node 12
+DEBUG: Successful connected to node 12.
+DEBUG: sending message to node 12: version
+DEBUG: Connected nodes: 6
+DEBUG: Event callback on node 9
+DEBUG: Successful connected to node 9.
+DEBUG: sending message to node 9: version
+DEBUG: Connected nodes: 7
+DEBUG: Event callback on node 1
+DEBUG: Successful connected to node 1.
+DEBUG: sending message to node 1: version
+DEBUG: Connected nodes: 8
+DEBUG: Event callback on node 5
+DEBUG: Successful connected to node 5.
+DEBUG: sending message to node 5: version
+DEBUG: Connected nodes: 9
 DEBUG: received command from node 10: sendheaders
 DEBUG: received command from node 10: sendcmpct
 DEBUG: received command from node 10: ping
 DEBUG: sending message to node 10: pong
 DEBUG: received command from node 10: addr
 DEBUG: received command from node 10: feefilter
-DEBUG: received command from node 1: sendheaders
-DEBUG: received command from node 1: sendcmpct
-DEBUG: received command from node 1: ping
-DEBUG: sending message to node 1: pong
-DEBUG: received command from node 1: addr
-DEBUG: received command from node 1: feefilter
+DEBUG: Event callback on node 11
+DEBUG: Successful connected to node 11.
+DEBUG: sending message to node 11: version
+DEBUG: Connected nodes: 10
+DEBUG: Event callback on node 13
+DEBUG: Successful connected to node 13.
+DEBUG: sending message to node 13: version
+DEBUG: Connected nodes: 11
+DEBUG: Event callback on node 4
+DEBUG: Successful connected to node 4.
+DEBUG: sending message to node 4: version
+DEBUG: Connected nodes: 12
+DEBUG: Event callback on node 3
+DEBUG: Successful connected to node 3.
+DEBUG: sending message to node 3: version
+DEBUG: Connected nodes: 13
+DEBUG: received command from node 2: version
+DEBUG: Connected to node 2: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 2: verack
+DEBUG: received command from node 2: verack
+Successfully connected to peer 2 (165.227.227.139)
+DEBUG: received command from node 12: version
+DEBUG: Connected to node 12: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 12: verack
+DEBUG: received command from node 12: verack
+Successfully connected to peer 12 (142.132.147.162)
 DEBUG: received command from node 9: version
-DEBUG: Connected to node 9: /Shibetoshi:1.14.9/ (43453910)
+DEBUG: Connected to node 9: /Shibetoshi:1.14.9/ (43461063)
 DEBUG: sending message to node 9: verack
 DEBUG: received command from node 9: verack
-Successfully connected to peer 9 (15.235.227.118)
+Successfully connected to peer 9 (185.232.70.226)
+DEBUG: received command from node 1: version
+DEBUG: Connected to node 1: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 1: verack
+DEBUG: received command from node 1: verack
+Successfully connected to peer 1 (95.141.35.117)
+DEBUG: received command from node 5: version
+DEBUG: Connected to node 5: /Shibetoshi:1.14.7/ (43461063)
+DEBUG: sending message to node 5: verack
+DEBUG: received command from node 5: verack
+Successfully connected to peer 5 (89.58.9.219)
+DEBUG: received command from node 11: version
+DEBUG: Connected to node 11: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 11: verack
+DEBUG: received command from node 11: verack
+Successfully connected to peer 11 (188.117.132.82)
+DEBUG: received command from node 13: version
+DEBUG: Connected to node 13: /Shibetoshi:1.14.8/ (43461063)
+DEBUG: sending message to node 13: verack
+DEBUG: received command from node 13: verack
+Successfully connected to peer 13 (37.27.63.117)
+DEBUG: received command from node 4: version
+DEBUG: Connected to node 4: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 4: verack
+DEBUG: received command from node 4: verack
+Successfully connected to peer 4 (135.181.168.83)
+DEBUG: received command from node 2: sendheaders
+DEBUG: received command from node 2: sendcmpct
+DEBUG: received command from node 2: ping
+DEBUG: sending message to node 2: pong
+DEBUG: received command from node 2: addr
+DEBUG: received command from node 2: feefilter
+DEBUG: received command from node 3: version
+DEBUG: Connected to node 3: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 3: verack
+DEBUG: received command from node 3: verack
+Successfully connected to peer 3 (15.235.227.118)
+DEBUG: received command from node 12: sendheaders
+DEBUG: received command from node 12: sendcmpct
+DEBUG: received command from node 12: ping
+DEBUG: sending message to node 12: pong
+DEBUG: received command from node 12: addr
+DEBUG: received command from node 12: feefilter
 DEBUG: received command from node 9: sendheaders
 DEBUG: received command from node 9: sendcmpct
 DEBUG: received command from node 9: ping
 DEBUG: sending message to node 9: pong
 DEBUG: received command from node 9: addr
 DEBUG: received command from node 9: feefilter
-DEBUG: Event callback on node 5
-DEBUG: Disconnected from the remote peer 5.
-DEBUG: check if more nodes are required (connected to already: 10)
-DEBUG: Connected nodes: 9
+DEBUG: received command from node 1: sendheaders
+DEBUG: received command from node 1: sendcmpct
+DEBUG: received command from node 1: ping
+DEBUG: sending message to node 1: pong
+DEBUG: received command from node 1: addr
+DEBUG: received command from node 1: feefilter
+DEBUG: received command from node 5: sendheaders
+DEBUG: received command from node 5: sendcmpct
+DEBUG: received command from node 5: ping
+DEBUG: sending message to node 5: pong
+DEBUG: received command from node 5: addr
+DEBUG: received command from node 5: feefilter
+DEBUG: received command from node 11: sendheaders
+DEBUG: received command from node 11: sendcmpct
+DEBUG: received command from node 11: ping
+DEBUG: sending message to node 11: pong
+DEBUG: received command from node 11: addr
+DEBUG: received command from node 11: feefilter
+DEBUG: received command from node 13: sendheaders
+DEBUG: received command from node 13: sendcmpct
+DEBUG: received command from node 13: ping
+DEBUG: sending message to node 13: pong
+DEBUG: received command from node 13: addr
+DEBUG: received command from node 13: feefilter
+DEBUG: received command from node 4: sendheaders
+DEBUG: received command from node 4: sendcmpct
+DEBUG: received command from node 4: ping
+DEBUG: sending message to node 4: pong
+DEBUG: received command from node 4: addr
+DEBUG: received command from node 4: feefilter
+DEBUG: received command from node 3: sendheaders
+DEBUG: received command from node 3: sendcmpct
+DEBUG: received command from node 3: ping
+DEBUG: sending message to node 3: pong
+DEBUG: received command from node 3: addr
+DEBUG: received command from node 3: feefilter
+DEBUG: received command from node 6: getdata
+DEBUG: sending message to node 6: tx
+tx successfully sent to node 6
+DEBUG: received command from node 6: reject
 DEBUG: timer node 1, delta: 3 secs (timeout is: 15)
 DEBUG: sending message to node 1: ping
-DEBUG: timer node 9, delta: 3 secs (timeout is: 15)
-DEBUG: sending message to node 9: ping
-DEBUG: timer node 8, delta: 3 secs (timeout is: 15)
-DEBUG: Disconnect node 8
-DEBUG: timer node 7, delta: 3 secs (timeout is: 15)
-DEBUG: sending message to node 7: ping
-DEBUG: timer node 6, delta: 3 secs (timeout is: 15)
-DEBUG: sending message to node 6: ping
-DEBUG: timer node 10, delta: 3 secs (timeout is: 15)
-DEBUG: sending message to node 10: ping
-DEBUG: timer node 4, delta: 3 secs (timeout is: 15)
-DEBUG: sending message to node 4: ping
 DEBUG: timer node 3, delta: 3 secs (timeout is: 15)
 DEBUG: sending message to node 3: ping
 DEBUG: timer node 2, delta: 3 secs (timeout is: 15)
 DEBUG: sending message to node 2: ping
-DEBUG: received command from node 7: pong
-DEBUG: received command from node 2: pong
-DEBUG: received command from node 4: pong
-DEBUG: received command from node 6: pong
-DEBUG: received command from node 3: pong
+DEBUG: timer node 5, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 5: ping
+DEBUG: timer node 4, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 4: ping
+DEBUG: timer node 9, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 9: ping
+DEBUG: timer node 8, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 8: ping
+DEBUG: timer node 7, delta: 3 secs (timeout is: 15)
+DEBUG: Disconnect node 7
+DEBUG: timer node 6, delta: 3 secs (timeout is: 15)
+DEBUG: Disconnect node 6
+DEBUG: timer node 12, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 12: ping
+DEBUG: timer node 11, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 11: ping
+DEBUG: timer node 13, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 13: ping
+DEBUG: timer node 10, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 10: ping
+DEBUG: received command from node 8: pong
 DEBUG: received command from node 10: pong
-DEBUG: received command from node 1: pong
+DEBUG: received command from node 2: pong
+DEBUG: received command from node 12: pong
 DEBUG: received command from node 9: pong
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 10: inv
+DEBUG: received command from node 1: pong
+DEBUG: received command from node 5: pong
+DEBUG: received command from node 11: pong
+DEBUG: received command from node 13: pong
+DEBUG: received command from node 4: pong
+DEBUG: received command from node 3: pong
 DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
+DEBUG: received command from node 5: inv
+DEBUG: received command from node 12: inv
 DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
 DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
+DEBUG: received command from node 11: inv
+DEBUG: received command from node 13: inv
+DEBUG: received command from node 8: inv
 DEBUG: received command from node 4: inv
 DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
 DEBUG: received command from node 3: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 9: inv
 DEBUG: timer node 1, delta: 6 secs (timeout is: 15)
 DEBUG: timer node 2, delta: 6 secs (timeout is: 15)
 DEBUG: timer node 3, delta: 6 secs (timeout is: 15)
 DEBUG: timer node 4, delta: 6 secs (timeout is: 15)
-DEBUG: timer node 10, delta: 6 secs (timeout is: 15)
-DEBUG: timer node 6, delta: 6 secs (timeout is: 15)
-DEBUG: timer node 7, delta: 6 secs (timeout is: 15)
+DEBUG: timer node 5, delta: 6 secs (timeout is: 15)
+DEBUG: timer node 8, delta: 6 secs (timeout is: 15)
 DEBUG: timer node 9, delta: 6 secs (timeout is: 15)
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
+DEBUG: timer node 13, delta: 6 secs (timeout is: 15)
+DEBUG: timer node 11, delta: 6 secs (timeout is: 15)
+DEBUG: timer node 10, delta: 6 secs (timeout is: 15)
+DEBUG: timer node 12, delta: 6 secs (timeout is: 15)
 DEBUG: timer node 1, delta: 9 secs (timeout is: 15)
-DEBUG: timer node 9, delta: 9 secs (timeout is: 15)
-DEBUG: timer node 7, delta: 9 secs (timeout is: 15)
-DEBUG: timer node 6, delta: 9 secs (timeout is: 15)
-DEBUG: timer node 10, delta: 9 secs (timeout is: 15)
-DEBUG: timer node 4, delta: 9 secs (timeout is: 15)
 DEBUG: timer node 3, delta: 9 secs (timeout is: 15)
 DEBUG: timer node 2, delta: 9 secs (timeout is: 15)
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
+DEBUG: timer node 5, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 4, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 9, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 8, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 10, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 11, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 12, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 13, delta: 9 secs (timeout is: 15)
 DEBUG: timer node 1, delta: 12 secs (timeout is: 15)
 DEBUG: timer node 2, delta: 12 secs (timeout is: 15)
 DEBUG: timer node 3, delta: 12 secs (timeout is: 15)
 DEBUG: timer node 4, delta: 12 secs (timeout is: 15)
-DEBUG: timer node 10, delta: 12 secs (timeout is: 15)
-DEBUG: timer node 6, delta: 12 secs (timeout is: 15)
-DEBUG: timer node 7, delta: 12 secs (timeout is: 15)
+DEBUG: timer node 5, delta: 12 secs (timeout is: 15)
+DEBUG: timer node 8, delta: 12 secs (timeout is: 15)
 DEBUG: timer node 9, delta: 12 secs (timeout is: 15)
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
+DEBUG: timer node 12, delta: 12 secs (timeout is: 15)
+DEBUG: timer node 11, delta: 12 secs (timeout is: 15)
+DEBUG: timer node 13, delta: 12 secs (timeout is: 15)
+DEBUG: timer node 10, delta: 12 secs (timeout is: 15)
+DEBUG: Event callback on node 13
+DEBUG: Disconnected from the remote peer 13.
+DEBUG: check if more nodes are required (connected to already: 13)
+DEBUG: Connected nodes: 10
 DEBUG: timer node 1, delta: 15 secs (timeout is: 15)
-DEBUG: timer node 9, delta: 15 secs (timeout is: 15)
-DEBUG: timer node 7, delta: 15 secs (timeout is: 15)
-DEBUG: timer node 6, delta: 15 secs (timeout is: 15)
-DEBUG: timer node 10, delta: 15 secs (timeout is: 15)
-DEBUG: timer node 4, delta: 15 secs (timeout is: 15)
 DEBUG: timer node 3, delta: 15 secs (timeout is: 15)
 DEBUG: timer node 2, delta: 15 secs (timeout is: 15)
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
+DEBUG: timer node 5, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 4, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 8, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 11, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 12, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 10, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 9, delta: 15 secs (timeout is: 15)
 DEBUG: timer node 1, delta: 18 secs (timeout is: 15)
 DEBUG: Disconnect node 1
 DEBUG: timer node 2, delta: 18 secs (timeout is: 15)
@@ -441,20 +340,24 @@ DEBUG: timer node 3, delta: 18 secs (timeout is: 15)
 DEBUG: Disconnect node 3
 DEBUG: timer node 4, delta: 18 secs (timeout is: 15)
 DEBUG: Disconnect node 4
+DEBUG: timer node 5, delta: 18 secs (timeout is: 15)
+DEBUG: Disconnect node 5
+DEBUG: timer node 8, delta: 18 secs (timeout is: 15)
+DEBUG: Disconnect node 8
 DEBUG: timer node 10, delta: 18 secs (timeout is: 15)
 DEBUG: Disconnect node 10
-DEBUG: timer node 6, delta: 18 secs (timeout is: 15)
-DEBUG: Disconnect node 6
-DEBUG: timer node 7, delta: 18 secs (timeout is: 15)
-DEBUG: Disconnect node 7
+DEBUG: timer node 12, delta: 18 secs (timeout is: 15)
+DEBUG: Disconnect node 12
 DEBUG: timer node 9, delta: 18 secs (timeout is: 15)
 DEBUG: Disconnect node 9
+DEBUG: timer node 11, delta: 18 secs (timeout is: 15)
+DEBUG: Disconnect node 11
 
 
 Result:
 =============
 Max nodes to connect to: 10
-Successfully connected to nodes: 10
+Successfully connected to nodes: 13
 Informed nodes: 2
 Requested from nodes: 2
 Seen on other nodes: 0
@@ -477,412 +380,309 @@ DEBUG: Trying to connect to 7...
 DEBUG: Trying to connect to 8...
 DEBUG: Trying to connect to 9...
 DEBUG: Trying to connect to 10...
-DEBUG: Event callback on node 8
-DEBUG: Successful connected to node 8.
-DEBUG: sending message to node 8: version
-DEBUG: Connected nodes: 1
-DEBUG: received command from node 8: version
-DEBUG: Connected to node 8: /Shibetoshi:1.14.7/ (43453910)
-DEBUG: sending message to node 8: verack
-DEBUG: received command from node 8: verack
-Successfully connected to peer 8 (3.85.120.238)
-DEBUG: sending message to node 8: inv
-DEBUG: received command from node 8: sendheaders
-DEBUG: received command from node 8: sendcmpct
-DEBUG: received command from node 8: ping
-DEBUG: sending message to node 8: pong
-DEBUG: received command from node 8: addr
-DEBUG: received command from node 8: feefilter
-DEBUG: received command from node 8: getdata
-DEBUG: sending message to node 8: tx
-tx successfully sent to node 8
-DEBUG: Event callback on node 5
-DEBUG: Successful connected to node 5.
-DEBUG: sending message to node 5: version
-DEBUG: Connected nodes: 2
-DEBUG: received command from node 8: reject
-DEBUG: received command from node 5: version
-DEBUG: Connected to node 5: /Shibetoshi:1.14.6/ (43453910)
-DEBUG: sending message to node 5: verack
-DEBUG: received command from node 5: verack
-Successfully connected to peer 5 (198.58.102.18)
-DEBUG: sending message to node 5: inv
+DEBUG: Trying to connect to 11...
+DEBUG: Trying to connect to 12...
+DEBUG: Trying to connect to 13...
 DEBUG: Event callback on node 7
 DEBUG: Successful connected to node 7.
 DEBUG: sending message to node 7: version
-DEBUG: Connected nodes: 3
-DEBUG: Event callback on node 4
-DEBUG: Successful connected to node 4.
-DEBUG: sending message to node 4: version
-DEBUG: Connected nodes: 4
-DEBUG: Event callback on node 2
-DEBUG: Successful connected to node 2.
-DEBUG: sending message to node 2: version
-DEBUG: Connected nodes: 5
+DEBUG: Connected nodes: 1
+DEBUG: received command from node 7: version
+DEBUG: Connected to node 7: /Shibetoshi:1.14.6/ (43461063)
+DEBUG: sending message to node 7: verack
+DEBUG: received command from node 7: verack
+Successfully connected to peer 7 (198.58.102.18)
+DEBUG: sending message to node 7: inv
 DEBUG: Event callback on node 6
 DEBUG: Successful connected to node 6.
 DEBUG: sending message to node 6: version
-DEBUG: Connected nodes: 6
-DEBUG: received command from node 5: sendheaders
-DEBUG: received command from node 5: sendcmpct
-DEBUG: received command from node 5: ping
-DEBUG: sending message to node 5: pong
-DEBUG: received command from node 5: addr
-DEBUG: received command from node 5: feefilter
-DEBUG: Event callback on node 3
-DEBUG: Successful connected to node 3.
-DEBUG: sending message to node 3: version
-DEBUG: Connected nodes: 7
+DEBUG: Connected nodes: 2
+DEBUG: Event callback on node 8
+DEBUG: Successful connected to node 8.
+DEBUG: sending message to node 8: version
+DEBUG: Connected nodes: 3
 DEBUG: Event callback on node 10
 DEBUG: Successful connected to node 10.
 DEBUG: sending message to node 10: version
-DEBUG: Connected nodes: 8
-DEBUG: Event callback on node 1
-DEBUG: Successful connected to node 1.
-DEBUG: sending message to node 1: version
-DEBUG: Connected nodes: 9
-DEBUG: received command from node 5: getdata
-DEBUG: sending message to node 5: tx
-tx successfully sent to node 5
-DEBUG: received command from node 7: version
-DEBUG: Connected to node 7: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 7: verack
-DEBUG: received command from node 7: verack
-Successfully connected to peer 7 (100.21.235.190)
-DEBUG: received command from node 4: version
-DEBUG: Connected to node 4: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 4: verack
-DEBUG: received command from node 4: verack
-Successfully connected to peer 4 (142.132.147.162)
-DEBUG: received command from node 6: version
-DEBUG: Connected to node 6: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 6: verack
-DEBUG: received command from node 6: verack
-Successfully connected to peer 6 (185.232.70.226)
-DEBUG: received command from node 2: version
-DEBUG: Connected to node 2: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 2: verack
-DEBUG: received command from node 2: verack
-Successfully connected to peer 2 (95.141.35.117)
-DEBUG: received command from node 3: version
-DEBUG: Connected to node 3: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 3: verack
-DEBUG: received command from node 3: verack
-Successfully connected to peer 3 (188.117.132.82)
-DEBUG: Event callback on node 9
-DEBUG: Successful connected to node 9.
-DEBUG: sending message to node 9: version
-DEBUG: Connected nodes: 10
-DEBUG: received command from node 10: version
-DEBUG: Connected to node 10: /Shibetoshi:1.14.8/ (43453910)
-DEBUG: sending message to node 10: verack
-DEBUG: received command from node 10: verack
-Successfully connected to peer 10 (37.27.63.117)
-DEBUG: received command from node 1: version
-DEBUG: Connected to node 1: /Shibetoshi:1.14.9/ (43453910)
-DEBUG: sending message to node 1: verack
-DEBUG: received command from node 1: verack
-Successfully connected to peer 1 (135.181.168.83)
-DEBUG: received command from node 5: reject
+DEBUG: Connected nodes: 4
 DEBUG: received command from node 7: sendheaders
 DEBUG: received command from node 7: sendcmpct
 DEBUG: received command from node 7: ping
 DEBUG: sending message to node 7: pong
 DEBUG: received command from node 7: addr
 DEBUG: received command from node 7: feefilter
-DEBUG: received command from node 4: sendheaders
-DEBUG: received command from node 4: sendcmpct
-DEBUG: received command from node 4: ping
-DEBUG: sending message to node 4: pong
-DEBUG: received command from node 4: addr
-DEBUG: received command from node 4: feefilter
-DEBUG: received command from node 2: sendheaders
-DEBUG: received command from node 2: sendcmpct
-DEBUG: received command from node 2: ping
-DEBUG: sending message to node 2: pong
-DEBUG: received command from node 2: addr
-DEBUG: received command from node 2: feefilter
+DEBUG: received command from node 7: getdata
+DEBUG: sending message to node 7: tx
+tx successfully sent to node 7
+DEBUG: received command from node 6: version
+DEBUG: Connected to node 6: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 6: verack
+DEBUG: received command from node 6: verack
+Successfully connected to peer 6 (100.21.235.190)
+DEBUG: sending message to node 6: inv
+DEBUG: received command from node 8: version
+DEBUG: Connected to node 8: /Shibetoshi:1.14.6/ (43461063)
+DEBUG: sending message to node 8: verack
+DEBUG: received command from node 8: verack
+Successfully connected to peer 8 (35.84.106.212)
+DEBUG: received command from node 10: version
+DEBUG: Connected to node 10: /Shibetoshi:1.14.7/ (43461063)
+DEBUG: sending message to node 10: verack
+DEBUG: received command from node 10: verack
+Successfully connected to peer 10 (3.85.120.238)
 DEBUG: received command from node 6: sendheaders
 DEBUG: received command from node 6: sendcmpct
 DEBUG: received command from node 6: ping
 DEBUG: sending message to node 6: pong
 DEBUG: received command from node 6: addr
 DEBUG: received command from node 6: feefilter
-DEBUG: received command from node 3: sendheaders
-DEBUG: received command from node 3: sendcmpct
-DEBUG: received command from node 3: ping
-DEBUG: sending message to node 3: pong
-DEBUG: received command from node 3: addr
-DEBUG: received command from node 3: feefilter
+DEBUG: received command from node 8: sendheaders
+DEBUG: received command from node 8: sendcmpct
+DEBUG: received command from node 8: ping
+DEBUG: sending message to node 8: pong
+DEBUG: received command from node 8: addr
+DEBUG: received command from node 8: feefilter
+DEBUG: Event callback on node 2
+DEBUG: Successful connected to node 2.
+DEBUG: sending message to node 2: version
+DEBUG: Connected nodes: 5
+DEBUG: received command from node 7: reject
+DEBUG: Event callback on node 12
+DEBUG: Successful connected to node 12.
+DEBUG: sending message to node 12: version
+DEBUG: Connected nodes: 6
+DEBUG: Event callback on node 9
+DEBUG: Successful connected to node 9.
+DEBUG: sending message to node 9: version
+DEBUG: Connected nodes: 7
+DEBUG: Event callback on node 1
+DEBUG: Successful connected to node 1.
+DEBUG: sending message to node 1: version
+DEBUG: Connected nodes: 8
+DEBUG: Event callback on node 5
+DEBUG: Successful connected to node 5.
+DEBUG: sending message to node 5: version
+DEBUG: Connected nodes: 9
 DEBUG: received command from node 10: sendheaders
 DEBUG: received command from node 10: sendcmpct
 DEBUG: received command from node 10: ping
 DEBUG: sending message to node 10: pong
 DEBUG: received command from node 10: addr
 DEBUG: received command from node 10: feefilter
-DEBUG: received command from node 1: sendheaders
-DEBUG: received command from node 1: sendcmpct
-DEBUG: received command from node 1: ping
-DEBUG: sending message to node 1: pong
-DEBUG: received command from node 1: addr
-DEBUG: received command from node 1: feefilter
+DEBUG: Event callback on node 11
+DEBUG: Successful connected to node 11.
+DEBUG: sending message to node 11: version
+DEBUG: Connected nodes: 10
+DEBUG: Event callback on node 13
+DEBUG: Successful connected to node 13.
+DEBUG: sending message to node 13: version
+DEBUG: Connected nodes: 11
+DEBUG: Event callback on node 4
+DEBUG: Successful connected to node 4.
+DEBUG: sending message to node 4: version
+DEBUG: Connected nodes: 12
+DEBUG: Event callback on node 3
+DEBUG: Successful connected to node 3.
+DEBUG: sending message to node 3: version
+DEBUG: Connected nodes: 13
+DEBUG: received command from node 2: version
+DEBUG: Connected to node 2: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 2: verack
+DEBUG: received command from node 2: verack
+Successfully connected to peer 2 (165.227.227.139)
+DEBUG: received command from node 12: version
+DEBUG: Connected to node 12: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 12: verack
+DEBUG: received command from node 12: verack
+Successfully connected to peer 12 (142.132.147.162)
 DEBUG: received command from node 9: version
-DEBUG: Connected to node 9: /Shibetoshi:1.14.9/ (43453910)
+DEBUG: Connected to node 9: /Shibetoshi:1.14.9/ (43461063)
 DEBUG: sending message to node 9: verack
 DEBUG: received command from node 9: verack
-Successfully connected to peer 9 (15.235.227.118)
+Successfully connected to peer 9 (185.232.70.226)
+DEBUG: received command from node 1: version
+DEBUG: Connected to node 1: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 1: verack
+DEBUG: received command from node 1: verack
+Successfully connected to peer 1 (95.141.35.117)
+DEBUG: received command from node 5: version
+DEBUG: Connected to node 5: /Shibetoshi:1.14.7/ (43461063)
+DEBUG: sending message to node 5: verack
+DEBUG: received command from node 5: verack
+Successfully connected to peer 5 (89.58.9.219)
+DEBUG: received command from node 11: version
+DEBUG: Connected to node 11: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 11: verack
+DEBUG: received command from node 11: verack
+Successfully connected to peer 11 (188.117.132.82)
+DEBUG: received command from node 13: version
+DEBUG: Connected to node 13: /Shibetoshi:1.14.8/ (43461063)
+DEBUG: sending message to node 13: verack
+DEBUG: received command from node 13: verack
+Successfully connected to peer 13 (37.27.63.117)
+DEBUG: received command from node 4: version
+DEBUG: Connected to node 4: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 4: verack
+DEBUG: received command from node 4: verack
+Successfully connected to peer 4 (135.181.168.83)
+DEBUG: received command from node 2: sendheaders
+DEBUG: received command from node 2: sendcmpct
+DEBUG: received command from node 2: ping
+DEBUG: sending message to node 2: pong
+DEBUG: received command from node 2: addr
+DEBUG: received command from node 2: feefilter
+DEBUG: received command from node 3: version
+DEBUG: Connected to node 3: /Shibetoshi:1.14.9/ (43461063)
+DEBUG: sending message to node 3: verack
+DEBUG: received command from node 3: verack
+Successfully connected to peer 3 (15.235.227.118)
+DEBUG: received command from node 12: sendheaders
+DEBUG: received command from node 12: sendcmpct
+DEBUG: received command from node 12: ping
+DEBUG: sending message to node 12: pong
+DEBUG: received command from node 12: addr
+DEBUG: received command from node 12: feefilter
 DEBUG: received command from node 9: sendheaders
 DEBUG: received command from node 9: sendcmpct
 DEBUG: received command from node 9: ping
 DEBUG: sending message to node 9: pong
 DEBUG: received command from node 9: addr
 DEBUG: received command from node 9: feefilter
-DEBUG: Event callback on node 5
-DEBUG: Disconnected from the remote peer 5.
-DEBUG: check if more nodes are required (connected to already: 10)
-DEBUG: Connected nodes: 9
+DEBUG: received command from node 1: sendheaders
+DEBUG: received command from node 1: sendcmpct
+DEBUG: received command from node 1: ping
+DEBUG: sending message to node 1: pong
+DEBUG: received command from node 1: addr
+DEBUG: received command from node 1: feefilter
+DEBUG: received command from node 5: sendheaders
+DEBUG: received command from node 5: sendcmpct
+DEBUG: received command from node 5: ping
+DEBUG: sending message to node 5: pong
+DEBUG: received command from node 5: addr
+DEBUG: received command from node 5: feefilter
+DEBUG: received command from node 11: sendheaders
+DEBUG: received command from node 11: sendcmpct
+DEBUG: received command from node 11: ping
+DEBUG: sending message to node 11: pong
+DEBUG: received command from node 11: addr
+DEBUG: received command from node 11: feefilter
+DEBUG: received command from node 13: sendheaders
+DEBUG: received command from node 13: sendcmpct
+DEBUG: received command from node 13: ping
+DEBUG: sending message to node 13: pong
+DEBUG: received command from node 13: addr
+DEBUG: received command from node 13: feefilter
+DEBUG: received command from node 4: sendheaders
+DEBUG: received command from node 4: sendcmpct
+DEBUG: received command from node 4: ping
+DEBUG: sending message to node 4: pong
+DEBUG: received command from node 4: addr
+DEBUG: received command from node 4: feefilter
+DEBUG: received command from node 3: sendheaders
+DEBUG: received command from node 3: sendcmpct
+DEBUG: received command from node 3: ping
+DEBUG: sending message to node 3: pong
+DEBUG: received command from node 3: addr
+DEBUG: received command from node 3: feefilter
+DEBUG: received command from node 6: getdata
+DEBUG: sending message to node 6: tx
+tx successfully sent to node 6
+DEBUG: received command from node 6: reject
 DEBUG: timer node 1, delta: 3 secs (timeout is: 15)
 DEBUG: sending message to node 1: ping
-DEBUG: timer node 9, delta: 3 secs (timeout is: 15)
-DEBUG: sending message to node 9: ping
-DEBUG: timer node 8, delta: 3 secs (timeout is: 15)
-DEBUG: Disconnect node 8
-DEBUG: timer node 7, delta: 3 secs (timeout is: 15)
-DEBUG: sending message to node 7: ping
-DEBUG: timer node 6, delta: 3 secs (timeout is: 15)
-DEBUG: sending message to node 6: ping
-DEBUG: timer node 10, delta: 3 secs (timeout is: 15)
-DEBUG: sending message to node 10: ping
-DEBUG: timer node 4, delta: 3 secs (timeout is: 15)
-DEBUG: sending message to node 4: ping
 DEBUG: timer node 3, delta: 3 secs (timeout is: 15)
 DEBUG: sending message to node 3: ping
 DEBUG: timer node 2, delta: 3 secs (timeout is: 15)
 DEBUG: sending message to node 2: ping
-DEBUG: received command from node 7: pong
-DEBUG: received command from node 2: pong
-DEBUG: received command from node 4: pong
-DEBUG: received command from node 6: pong
-DEBUG: received command from node 3: pong
+DEBUG: timer node 5, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 5: ping
+DEBUG: timer node 4, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 4: ping
+DEBUG: timer node 9, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 9: ping
+DEBUG: timer node 8, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 8: ping
+DEBUG: timer node 7, delta: 3 secs (timeout is: 15)
+DEBUG: Disconnect node 7
+DEBUG: timer node 6, delta: 3 secs (timeout is: 15)
+DEBUG: Disconnect node 6
+DEBUG: timer node 12, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 12: ping
+DEBUG: timer node 11, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 11: ping
+DEBUG: timer node 13, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 13: ping
+DEBUG: timer node 10, delta: 3 secs (timeout is: 15)
+DEBUG: sending message to node 10: ping
+DEBUG: received command from node 8: pong
 DEBUG: received command from node 10: pong
-DEBUG: received command from node 1: pong
+DEBUG: received command from node 2: pong
+DEBUG: received command from node 12: pong
 DEBUG: received command from node 9: pong
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 10: inv
+DEBUG: received command from node 1: pong
+DEBUG: received command from node 5: pong
+DEBUG: received command from node 11: pong
+DEBUG: received command from node 13: pong
+DEBUG: received command from node 4: pong
+DEBUG: received command from node 3: pong
 DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
+DEBUG: received command from node 5: inv
+DEBUG: received command from node 12: inv
 DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
 DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
+DEBUG: received command from node 11: inv
+DEBUG: received command from node 13: inv
+DEBUG: received command from node 8: inv
 DEBUG: received command from node 4: inv
 DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
 DEBUG: received command from node 3: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 9: inv
 DEBUG: timer node 1, delta: 6 secs (timeout is: 15)
 DEBUG: timer node 2, delta: 6 secs (timeout is: 15)
 DEBUG: timer node 3, delta: 6 secs (timeout is: 15)
 DEBUG: timer node 4, delta: 6 secs (timeout is: 15)
-DEBUG: timer node 10, delta: 6 secs (timeout is: 15)
-DEBUG: timer node 6, delta: 6 secs (timeout is: 15)
-DEBUG: timer node 7, delta: 6 secs (timeout is: 15)
+DEBUG: timer node 5, delta: 6 secs (timeout is: 15)
+DEBUG: timer node 8, delta: 6 secs (timeout is: 15)
 DEBUG: timer node 9, delta: 6 secs (timeout is: 15)
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
+DEBUG: timer node 13, delta: 6 secs (timeout is: 15)
+DEBUG: timer node 11, delta: 6 secs (timeout is: 15)
+DEBUG: timer node 10, delta: 6 secs (timeout is: 15)
+DEBUG: timer node 12, delta: 6 secs (timeout is: 15)
 DEBUG: timer node 1, delta: 9 secs (timeout is: 15)
-DEBUG: timer node 9, delta: 9 secs (timeout is: 15)
-DEBUG: timer node 7, delta: 9 secs (timeout is: 15)
-DEBUG: timer node 6, delta: 9 secs (timeout is: 15)
-DEBUG: timer node 10, delta: 9 secs (timeout is: 15)
-DEBUG: timer node 4, delta: 9 secs (timeout is: 15)
 DEBUG: timer node 3, delta: 9 secs (timeout is: 15)
 DEBUG: timer node 2, delta: 9 secs (timeout is: 15)
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
+DEBUG: timer node 5, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 4, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 9, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 8, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 10, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 11, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 12, delta: 9 secs (timeout is: 15)
+DEBUG: timer node 13, delta: 9 secs (timeout is: 15)
 DEBUG: timer node 1, delta: 12 secs (timeout is: 15)
 DEBUG: timer node 2, delta: 12 secs (timeout is: 15)
 DEBUG: timer node 3, delta: 12 secs (timeout is: 15)
 DEBUG: timer node 4, delta: 12 secs (timeout is: 15)
-DEBUG: timer node 10, delta: 12 secs (timeout is: 15)
-DEBUG: timer node 6, delta: 12 secs (timeout is: 15)
-DEBUG: timer node 7, delta: 12 secs (timeout is: 15)
+DEBUG: timer node 5, delta: 12 secs (timeout is: 15)
+DEBUG: timer node 8, delta: 12 secs (timeout is: 15)
 DEBUG: timer node 9, delta: 12 secs (timeout is: 15)
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
+DEBUG: timer node 12, delta: 12 secs (timeout is: 15)
+DEBUG: timer node 11, delta: 12 secs (timeout is: 15)
+DEBUG: timer node 13, delta: 12 secs (timeout is: 15)
+DEBUG: timer node 10, delta: 12 secs (timeout is: 15)
+DEBUG: Event callback on node 13
+DEBUG: Disconnected from the remote peer 13.
+DEBUG: check if more nodes are required (connected to already: 13)
+DEBUG: Connected nodes: 10
 DEBUG: timer node 1, delta: 15 secs (timeout is: 15)
-DEBUG: timer node 9, delta: 15 secs (timeout is: 15)
-DEBUG: timer node 7, delta: 15 secs (timeout is: 15)
-DEBUG: timer node 6, delta: 15 secs (timeout is: 15)
-DEBUG: timer node 10, delta: 15 secs (timeout is: 15)
-DEBUG: timer node 4, delta: 15 secs (timeout is: 15)
 DEBUG: timer node 3, delta: 15 secs (timeout is: 15)
 DEBUG: timer node 2, delta: 15 secs (timeout is: 15)
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 7: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 4: inv
-DEBUG: received command from node 2: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 9: inv
+DEBUG: timer node 5, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 4, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 8, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 11, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 12, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 10, delta: 15 secs (timeout is: 15)
+DEBUG: timer node 9, delta: 15 secs (timeout is: 15)
 DEBUG: timer node 1, delta: 18 secs (timeout is: 15)
 DEBUG: Disconnect node 1
 DEBUG: timer node 2, delta: 18 secs (timeout is: 15)
@@ -891,32 +691,54 @@ DEBUG: timer node 3, delta: 18 secs (timeout is: 15)
 DEBUG: Disconnect node 3
 DEBUG: timer node 4, delta: 18 secs (timeout is: 15)
 DEBUG: Disconnect node 4
+DEBUG: timer node 5, delta: 18 secs (timeout is: 15)
+DEBUG: Disconnect node 5
+DEBUG: timer node 8, delta: 18 secs (timeout is: 15)
+DEBUG: Disconnect node 8
 DEBUG: timer node 10, delta: 18 secs (timeout is: 15)
 DEBUG: Disconnect node 10
-DEBUG: timer node 6, delta: 18 secs (timeout is: 15)
-DEBUG: Disconnect node 6
-DEBUG: timer node 7, delta: 18 secs (timeout is: 15)
-DEBUG: Disconnect node 7
+DEBUG: timer node 12, delta: 18 secs (timeout is: 15)
+DEBUG: Disconnect node 12
 DEBUG: timer node 9, delta: 18 secs (timeout is: 15)
 DEBUG: Disconnect node 9
+DEBUG: timer node 11, delta: 18 secs (timeout is: 15)
+DEBUG: Disconnect node 11
 
 
 Result:
 =============
 Max nodes to connect to: 10
-Successfully connected to nodes: 10
+Successfully connected to nodes: 13
 Informed nodes: 2
 Requested from nodes: 2
 Seen on other nodes: 0
 
 Error: The transaction was not relayed back. Your transaction is very likely invalid (or was already broadcasted and picked up by an invalid node)
 ----- sendtx exit=0 -----
------ spvnode: timeout 120 ./spvnode -t -l -c -d -x -p -a nkA4i9AB6ZpLZNAmivbZbnKjJt5Dvw9DZT scan -----
+----- spvnode: timeout 420 ./spvnode -t -l -f 0 -c -d -x -p -a nkA4i9AB6ZpLZNAmivbZbnKjJt5Dvw9DZT scan -----
 DEBUG: [smpv] enabled
 [smpv] enabled via CLI flag
 address: nkA4i9AB6ZpLZNAmivbZbnKjJt5Dvw9DZT
-
-Connected 0 headers, now at height: 0
+----------------------
+txid:           0a43fb0a2414639fc8d28e82f06f34a0674f07086ce29b6326031f910a9007ec
+vout:           0
+address:        nkA4i9AB6ZpLZNAmivbZbnKjJt5Dvw9DZT
+script_pubkey:  76a914af1c8b5e0e88be99c779f5340ff47979ee259a1688ac
+amount:         9.96000000
+height:         41685520
+spendable:      0
+solvable:       0
+Spent Balance: 9.96000000
+----------------------
+txid:           5bc55f56b4a2d5936b6f8e8406b37635051df29a1444096a0ec2283484c83a88
+vout:           0
+address:        nkA4i9AB6ZpLZNAmivbZbnKjJt5Dvw9DZT
+script_pubkey:  76a914af1c8b5e0e88be99c779f5340ff47979ee259a1688ac
+amount:         9.95000000
+height:         41690685
+spendable:      1
+solvable:       1
+Unspent Balance: 9.95000000
 done
 Discover peers...
 Connecting to the p2p network...
@@ -930,752 +752,532 @@ DEBUG: Trying to connect to 7...
 DEBUG: Trying to connect to 8...
 DEBUG: Trying to connect to 9...
 DEBUG: Trying to connect to 10...
-DEBUG: Event callback on node 2
-DEBUG: Successful connected to node 2.
-DEBUG: check if more nodes are required (connected to already: 10): false
-DEBUG: sending message to node 2: version
-DEBUG: Connected nodes: 1
-DEBUG: received command from node 2: version
-DEBUG: Connected to node 2: /Shibetoshi:1.14.7/ (43453909)
-DEBUG: sending message to node 2: verack
-DEBUG: received command from node 2: verack
-DEBUG: sending message to node 2: getheaders
-DEBUG: received command from node 2: sendheaders
-DEBUG: received command from node 2: sendcmpct
-DEBUG: received command from node 2: ping
-DEBUG: sending message to node 2: pong
-DEBUG: received command from node 2: addr
-DEBUG: received command from node 2: feefilter
-DEBUG: received command from node 2: headers
-DEBUG: Got 2000 headers (took 0 s) from node 2
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 41600400
-New headers tip height 41600400 from Fri Mar 13 06:57:57 2026
-
-DEBUG: chain size: 41600400, last time Fri Mar 13 06:57:57 2026
-DEBUG: sending message to node 2: getheaders
-DEBUG: Event callback on node 7
-DEBUG: Successful connected to node 7.
-DEBUG: check if more nodes are required (connected to already: 10): false
-DEBUG: sending message to node 7: version
-DEBUG: Connected nodes: 2
-DEBUG: Event callback on node 10
-DEBUG: Successful connected to node 10.
-DEBUG: check if more nodes are required (connected to already: 10): false
-DEBUG: sending message to node 10: version
-DEBUG: Connected nodes: 3
-DEBUG: Event callback on node 6
-DEBUG: Successful connected to node 6.
-DEBUG: check if more nodes are required (connected to already: 10): false
-DEBUG: sending message to node 6: version
-DEBUG: Connected nodes: 4
-DEBUG: Event callback on node 9
-DEBUG: Successful connected to node 9.
-DEBUG: check if more nodes are required (connected to already: 10): false
-DEBUG: sending message to node 9: version
-DEBUG: Connected nodes: 5
-DEBUG: Event callback on node 8
-DEBUG: Successful connected to node 8.
-DEBUG: check if more nodes are required (connected to already: 10): false
-DEBUG: sending message to node 8: version
-DEBUG: Connected nodes: 6
-DEBUG: Event callback on node 1
-DEBUG: Successful connected to node 1.
-DEBUG: check if more nodes are required (connected to already: 10): false
-DEBUG: sending message to node 1: version
-DEBUG: Connected nodes: 7
-DEBUG: Event callback on node 4
-DEBUG: Successful connected to node 4.
-DEBUG: check if more nodes are required (connected to already: 10): false
-DEBUG: sending message to node 4: version
-DEBUG: Connected nodes: 8
-DEBUG: Event callback on node 4
-DEBUG: Disconnected from the remote peer 4.
-DEBUG: check if more nodes are required (connected to already: 9): true
 DEBUG: Trying to connect to 11...
 DEBUG: Trying to connect to 12...
 DEBUG: Trying to connect to 13...
-DEBUG: Trying to connect to 14...
-DEBUG: Trying to connect to 15...
-DEBUG: Trying to connect to 16...
-DEBUG: Trying to connect to 17...
-DEBUG: Trying to connect to 18...
-DEBUG: Trying to connect to 19...
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: Connected nodes: 7
-DEBUG: Event callback on node 5
-DEBUG: Successful connected to node 5.
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: sending message to node 5: version
-DEBUG: Connected nodes: 8
-DEBUG: Event callback on node 3
-DEBUG: Successful connected to node 3.
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: sending message to node 3: version
-DEBUG: Connected nodes: 9
+DEBUG: Event callback on node 7
+DEBUG: Successful connected to node 7.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 7: version
+DEBUG: Connected nodes: 1
 DEBUG: received command from node 7: version
-DEBUG: Connected to node 7: /Shibetoshi:1.14.6/ (43453909)
+DEBUG: Connected to node 7: /Shibetoshi:1.14.6/ (43461060)
 DEBUG: sending message to node 7: verack
 DEBUG: received command from node 7: verack
-DEBUG: Event callback on node 18
-DEBUG: Successful connected to node 18.
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: sending message to node 18: version
-DEBUG: Connected nodes: 10
-DEBUG: received command from node 2: headers
-DEBUG: Got 2000 headers (took 0 s) from node 2
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 41602400
-New headers tip height 41602400 from Fri Mar 13 18:12:15 2026
-
-DEBUG: chain size: 41602400, last time Fri Mar 13 18:12:15 2026
-DEBUG: sending message to node 2: getheaders
+DEBUG: sending message to node 7: getheaders
+DEBUG: Event callback on node 10
+DEBUG: Successful connected to node 10.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 10: version
+DEBUG: Connected nodes: 2
+DEBUG: Event callback on node 11
+DEBUG: Successful connected to node 11.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 11: version
+DEBUG: Connected nodes: 3
+DEBUG: Event callback on node 1
+DEBUG: Successful connected to node 1.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 1: version
+DEBUG: Connected nodes: 4
 DEBUG: received command from node 7: sendheaders
 DEBUG: received command from node 7: sendcmpct
 DEBUG: received command from node 7: ping
 DEBUG: sending message to node 7: pong
 DEBUG: received command from node 7: addr
 DEBUG: received command from node 7: feefilter
-DEBUG: received command from node 18: version
-DEBUG: Connected to node 18: /Shibetoshi:1.14.6/ (43453909)
-DEBUG: sending message to node 18: verack
-DEBUG: received command from node 18: verack
 DEBUG: received command from node 10: version
-DEBUG: Connected to node 10: /Shibetoshi:1.14.9/ (43453909)
+DEBUG: Connected to node 10: /Shibetoshi:1.14.6/ (43461060)
 DEBUG: sending message to node 10: verack
 DEBUG: received command from node 10: verack
-DEBUG: Event callback on node 19
-DEBUG: Successful connected to node 19.
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: sending message to node 19: version
-DEBUG: Connected nodes: 11
-DEBUG: received command from node 6: version
-DEBUG: Connected to node 6: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 6: verack
-DEBUG: received command from node 6: verack
-DEBUG: Event callback on node 16
-DEBUG: Successful connected to node 16.
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: sending message to node 16: version
-DEBUG: Connected nodes: 12
-DEBUG: Event callback on node 11
-DEBUG: Successful connected to node 11.
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: sending message to node 11: version
-DEBUG: Connected nodes: 13
-DEBUG: received command from node 9: version
-DEBUG: Connected to node 9: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 9: verack
-DEBUG: received command from node 9: verack
-DEBUG: Event callback on node 12
-DEBUG: Successful connected to node 12.
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: sending message to node 12: version
-DEBUG: Connected nodes: 14
-DEBUG: received command from node 8: version
-DEBUG: Connected to node 8: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 8: verack
-DEBUG: received command from node 8: verack
-DEBUG: received command from node 1: version
-DEBUG: Connected to node 1: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 1: verack
-DEBUG: received command from node 1: verack
-DEBUG: Event callback on node 13
-DEBUG: Successful connected to node 13.
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: sending message to node 13: version
-DEBUG: Connected nodes: 15
-DEBUG: received command from node 5: version
-DEBUG: Connected to node 5: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 5: verack
-DEBUG: received command from node 5: verack
-DEBUG: Event callback on node 15
-DEBUG: Successful connected to node 15.
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: sending message to node 15: version
-DEBUG: Connected nodes: 16
-DEBUG: Event callback on node 17
-DEBUG: Successful connected to node 17.
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: sending message to node 17: version
-DEBUG: Connected nodes: 17
-DEBUG: Event callback on node 14
-DEBUG: Successful connected to node 14.
-DEBUG: check if more nodes are required (connected to already: 18): false
-DEBUG: sending message to node 14: version
-DEBUG: Connected nodes: 18
-DEBUG: received command from node 3: version
-DEBUG: Connected to node 3: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 3: verack
-DEBUG: received command from node 3: verack
-DEBUG: Statecheck: amount of connected nodes: 18
-chaintip hash: 34b630c0cd46d0f24f44403fbf86a00ddc3c3a4cb1f6d99a293bc7389e023afb
-chaintip height: 41602400
-DEBUG: sending message to node 1: ping
-DEBUG: sending message to node 3: ping
-DEBUG: sending message to node 7: ping
-DEBUG: sending message to node 6: ping
-DEBUG: sending message to node 2: ping
-DEBUG: sending message to node 5: ping
-DEBUG: sending message to node 10: ping
-DEBUG: sending message to node 9: ping
-DEBUG: sending message to node 8: ping
-DEBUG: Event callback on node 7
-DEBUG: Disconnected from the remote peer 7.
-DEBUG: check if more nodes are required (connected to already: 17): false
-DEBUG: check if more nodes are required (connected to already: 17): false
-DEBUG: Connected nodes: 17
-DEBUG: received command from node 18: sendheaders
-DEBUG: received command from node 18: sendcmpct
-DEBUG: received command from node 18: ping
-DEBUG: sending message to node 18: pong
-DEBUG: received command from node 18: addr
-DEBUG: received command from node 18: feefilter
-DEBUG: received command from node 2: headers
-DEBUG: Got 2000 headers (took 1774473568 s) from node 2
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 41604400
-New headers tip height 41604400 from Sat Mar 14 08:27:28 2026
-
-DEBUG: chain size: 41604400, last time Sat Mar 14 08:27:28 2026
-DEBUG: sending message to node 2: getheaders
-DEBUG: received command from node 2: pong
-DEBUG: received command from node 19: version
-DEBUG: Connected to node 19: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 19: verack
-DEBUG: received command from node 19: verack
-DEBUG: received command from node 10: sendheaders
-DEBUG: received command from node 10: sendcmpct
-DEBUG: received command from node 10: ping
-DEBUG: sending message to node 10: pong
-DEBUG: received command from node 10: addr
-DEBUG: received command from node 10: feefilter
-DEBUG: received command from node 10: pong
-DEBUG: received command from node 6: sendheaders
-DEBUG: received command from node 6: sendcmpct
-DEBUG: received command from node 6: ping
-DEBUG: sending message to node 6: pong
-DEBUG: received command from node 6: addr
-DEBUG: received command from node 6: feefilter
-DEBUG: received command from node 6: pong
-DEBUG: received command from node 16: version
-DEBUG: Connected to node 16: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 16: verack
-DEBUG: received command from node 16: verack
 DEBUG: received command from node 11: version
-DEBUG: Connected to node 11: /Shibetoshi:1.14.9/ (43453909)
+DEBUG: Connected to node 11: /Shibetoshi:1.14.9/ (43461060)
 DEBUG: sending message to node 11: verack
 DEBUG: received command from node 11: verack
-DEBUG: received command from node 12: version
-DEBUG: Connected to node 12: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 12: verack
-DEBUG: received command from node 12: verack
-DEBUG: received command from node 9: sendheaders
-DEBUG: received command from node 9: sendcmpct
-DEBUG: received command from node 9: ping
-DEBUG: sending message to node 9: pong
-DEBUG: received command from node 9: addr
-DEBUG: received command from node 9: feefilter
-DEBUG: received command from node 9: pong
-DEBUG: received command from node 8: sendheaders
-DEBUG: received command from node 8: sendcmpct
-DEBUG: received command from node 8: ping
-DEBUG: sending message to node 8: pong
-DEBUG: received command from node 8: addr
-DEBUG: received command from node 8: feefilter
-DEBUG: received command from node 8: pong
-DEBUG: received command from node 1: sendheaders
-DEBUG: received command from node 1: sendcmpct
-DEBUG: received command from node 1: ping
-DEBUG: sending message to node 1: pong
-DEBUG: received command from node 1: addr
-DEBUG: received command from node 1: feefilter
-DEBUG: received command from node 1: pong
-DEBUG: received command from node 13: version
-DEBUG: Connected to node 13: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 13: verack
-DEBUG: received command from node 13: verack
-DEBUG: received command from node 5: sendheaders
-DEBUG: received command from node 5: sendcmpct
-DEBUG: received command from node 5: ping
-DEBUG: sending message to node 5: pong
-DEBUG: received command from node 5: addr
-DEBUG: received command from node 5: feefilter
-DEBUG: received command from node 5: pong
-DEBUG: received command from node 17: version
-DEBUG: Connected to node 17: /Shibetoshi:1.14.8/ (43453909)
-DEBUG: sending message to node 17: verack
-DEBUG: received command from node 17: verack
-DEBUG: received command from node 15: version
-DEBUG: Connected to node 15: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 15: verack
-DEBUG: received command from node 15: verack
-DEBUG: received command from node 14: version
-DEBUG: Connected to node 14: /Shibetoshi:1.14.9/ (43453909)
-DEBUG: sending message to node 14: verack
-DEBUG: received command from node 14: verack
-DEBUG: received command from node 3: sendheaders
-DEBUG: received command from node 3: sendcmpct
-DEBUG: received command from node 3: ping
-DEBUG: sending message to node 3: pong
-DEBUG: received command from node 3: addr
-DEBUG: received command from node 3: feefilter
-DEBUG: received command from node 3: pong
-DEBUG: sending message to node 15: ping
-DEBUG: sending message to node 16: ping
-DEBUG: sending message to node 18: ping
-DEBUG: sending message to node 17: ping
-DEBUG: sending message to node 11: ping
-DEBUG: sending message to node 14: ping
-DEBUG: sending message to node 12: ping
-DEBUG: sending message to node 19: ping
-DEBUG: sending message to node 13: ping
-DEBUG: received command from node 2: headers
-DEBUG: Got 2000 headers (took 0 s) from node 2
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 41606400
-New headers tip height 41606400 from Sat Mar 14 23:10:04 2026
+DEBUG: received command from node 1: version
+DEBUG: Connected to node 1: /Shibetoshi:1.14.7/ (43461060)
+DEBUG: sending message to node 1: verack
+DEBUG: received command from node 1: verack
+DEBUG: received command from node 7: headers
+DEBUG: Got 1060 headers (took 0 s) from node 7
+DEBUG: start loading block from node 7 at height 43461055 at time: 1774479220
+DEBUG: sending message to node 7: getblocks
+DEBUG: Connected 1055 headers
+DEBUG: Chaintip at height 43461055
+New headers tip height 43461055 from Wed Mar 25 22:53:40 2026
 
-DEBUG: chain size: 41606400, last time Sat Mar 14 23:10:04 2026
-DEBUG: sending message to node 2: getheaders
-DEBUG: received command from node 18: pong
-DEBUG: received command from node 19: sendheaders
-DEBUG: received command from node 19: sendcmpct
-DEBUG: received command from node 19: ping
-DEBUG: sending message to node 19: pong
-DEBUG: received command from node 19: addr
-DEBUG: received command from node 19: feefilter
-DEBUG: received command from node 19: pong
-DEBUG: received command from node 16: sendheaders
-DEBUG: received command from node 16: sendcmpct
-DEBUG: received command from node 16: ping
-DEBUG: sending message to node 16: pong
-DEBUG: received command from node 16: addr
-DEBUG: received command from node 16: feefilter
-DEBUG: received command from node 16: pong
 DEBUG: received command from node 11: sendheaders
 DEBUG: received command from node 11: sendcmpct
 DEBUG: received command from node 11: ping
 DEBUG: sending message to node 11: pong
 DEBUG: received command from node 11: addr
 DEBUG: received command from node 11: feefilter
-DEBUG: received command from node 11: pong
+DEBUG: received command from node 10: sendheaders
+DEBUG: received command from node 10: sendcmpct
+DEBUG: received command from node 10: ping
+DEBUG: sending message to node 10: pong
+DEBUG: received command from node 10: addr
+DEBUG: received command from node 10: feefilter
+DEBUG: Event callback on node 9
+DEBUG: Successful connected to node 9.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 9: version
+DEBUG: Connected nodes: 5
+DEBUG: Event callback on node 6
+DEBUG: Successful connected to node 6.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 6: version
+DEBUG: Connected nodes: 6
+DEBUG: Event callback on node 12
+DEBUG: Successful connected to node 12.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 12: version
+DEBUG: Connected nodes: 7
+DEBUG: Event callback on node 4
+DEBUG: Successful connected to node 4.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 4: version
+DEBUG: Connected nodes: 8
+DEBUG: Event callback on node 5
+DEBUG: Successful connected to node 5.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 5: version
+DEBUG: Connected nodes: 9
+DEBUG: received command from node 1: sendheaders
+DEBUG: received command from node 1: sendcmpct
+DEBUG: received command from node 1: ping
+DEBUG: sending message to node 1: pong
+DEBUG: received command from node 1: addr
+DEBUG: received command from node 1: feefilter
+DEBUG: Event callback on node 2
+DEBUG: Successful connected to node 2.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 2: version
+DEBUG: Connected nodes: 10
+DEBUG: Event callback on node 13
+DEBUG: Successful connected to node 13.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 13: version
+DEBUG: Connected nodes: 11
+DEBUG: Event callback on node 8
+DEBUG: Successful connected to node 8.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 8: version
+DEBUG: Connected nodes: 12
+DEBUG: Event callback on node 3
+DEBUG: Successful connected to node 3.
+DEBUG: check if more nodes are required (connected to already: 13): false
+DEBUG: sending message to node 3: version
+DEBUG: Connected nodes: 13
+DEBUG: received command from node 7: inv
+DEBUG: Get inv request with 5 items
+DEBUG: Requesting 5 blocks
+DEBUG: sending message to node 7: getdata
+DEBUG: received command from node 7: block
+ad5cecbdc2cc657bef4364a92850286c7161e8d6a27fde8d9b58115c2817a5a0|43461056|2026-03-25 22:54:03|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 7: block
+51ddc6fddee41f83019921711a2814bf4b7259374c61ffa140bc9bb6c7a07022|43461057|2026-03-25 22:54:18|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 7: block
+5ed817e7bbbca41f5abb9023f6aa9204bf00eea5566ba641904796abe4481fe5|43461058|2026-03-25 22:54:20|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 7: block
+dcc8080a28e610257eefbe94f92f9456672f685df4768c8dd853d45795eeb381|43461059|2026-03-25 22:54:33|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 7: block
+9d6e2328059b4ed2fcdca309679df3ebac69b41eb068e9bbea5dc521e20992b5|43461060|2026-03-25 22:54:35|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: sending message to node 1: mempool
+DEBUG: sending message to node 2: mempool
+DEBUG: sending message to node 3: mempool
+DEBUG: sending message to node 4: mempool
+DEBUG: sending message to node 5: mempool
+DEBUG: sending message to node 6: mempool
+DEBUG: sending message to node 7: mempool
+DEBUG: sending message to node 8: mempool
+DEBUG: sending message to node 9: mempool
+DEBUG: sending message to node 10: mempool
+DEBUG: sending message to node 11: mempool
+DEBUG: sending message to node 12: mempool
+DEBUG: sending message to node 13: mempool
+DEBUG: [spv] sent 'mempool' to peers
+Sync completed, at height 43461060
+Waiting for new blocks or relevant transactions...
+DEBUG: received command from node 9: version
+DEBUG: Connected to node 9: /Shibetoshi:1.14.9/ (43461060)
+DEBUG: sending message to node 9: verack
+DEBUG: received command from node 9: verack
+DEBUG: received command from node 6: version
+DEBUG: Connected to node 6: /Shibetoshi:1.14.9/ (43461060)
+DEBUG: sending message to node 6: verack
+DEBUG: received command from node 6: verack
+DEBUG: received command from node 12: version
+DEBUG: Connected to node 12: /Shibetoshi:1.14.9/ (43461060)
+DEBUG: sending message to node 12: verack
+DEBUG: received command from node 12: verack
+DEBUG: received command from node 4: version
+DEBUG: Connected to node 4: /Shibetoshi:1.14.9/ (43461060)
+DEBUG: sending message to node 4: verack
+DEBUG: received command from node 4: verack
+DEBUG: received command from node 5: version
+DEBUG: Connected to node 5: /Shibetoshi:1.14.7/ (43461060)
+DEBUG: sending message to node 5: verack
+DEBUG: received command from node 5: verack
+DEBUG: received command from node 2: version
+DEBUG: Connected to node 2: /Shibetoshi:1.14.9/ (43461060)
+DEBUG: sending message to node 2: verack
+DEBUG: received command from node 2: verack
+DEBUG: received command from node 13: version
+DEBUG: Connected to node 13: /Shibetoshi:1.14.8/ (43461060)
+DEBUG: sending message to node 13: verack
+DEBUG: received command from node 13: verack
+DEBUG: received command from node 8: version
+DEBUG: Connected to node 8: /Shibetoshi:1.14.9/ (43461060)
+DEBUG: sending message to node 8: verack
+DEBUG: received command from node 8: verack
+DEBUG: received command from node 3: version
+DEBUG: Connected to node 3: /Shibetoshi:1.14.9/ (43461060)
+DEBUG: sending message to node 3: verack
+DEBUG: received command from node 3: verack
+DEBUG: received command from node 9: sendheaders
+DEBUG: received command from node 9: sendcmpct
+DEBUG: received command from node 9: ping
+DEBUG: sending message to node 9: pong
+DEBUG: received command from node 9: addr
+DEBUG: received command from node 9: feefilter
+DEBUG: received command from node 6: sendheaders
+DEBUG: received command from node 6: sendcmpct
+DEBUG: received command from node 6: ping
+DEBUG: sending message to node 6: pong
+DEBUG: received command from node 6: addr
+DEBUG: received command from node 6: feefilter
 DEBUG: received command from node 12: sendheaders
 DEBUG: received command from node 12: sendcmpct
 DEBUG: received command from node 12: ping
 DEBUG: sending message to node 12: pong
 DEBUG: received command from node 12: addr
 DEBUG: received command from node 12: feefilter
-DEBUG: received command from node 12: pong
+DEBUG: received command from node 4: sendheaders
+DEBUG: received command from node 4: sendcmpct
+DEBUG: received command from node 4: ping
+DEBUG: sending message to node 4: pong
+DEBUG: received command from node 4: addr
+DEBUG: received command from node 4: feefilter
+DEBUG: received command from node 5: sendheaders
+DEBUG: received command from node 5: sendcmpct
+DEBUG: received command from node 5: ping
+DEBUG: sending message to node 5: pong
+DEBUG: received command from node 5: addr
+DEBUG: received command from node 5: feefilter
+DEBUG: received command from node 2: sendheaders
+DEBUG: received command from node 2: sendcmpct
+DEBUG: received command from node 2: ping
+DEBUG: sending message to node 2: pong
+DEBUG: received command from node 2: addr
+DEBUG: received command from node 2: feefilter
+DEBUG: received command from node 8: sendheaders
+DEBUG: received command from node 8: sendcmpct
+DEBUG: received command from node 8: ping
+DEBUG: sending message to node 8: pong
+DEBUG: received command from node 8: addr
+DEBUG: received command from node 8: feefilter
 DEBUG: received command from node 13: sendheaders
 DEBUG: received command from node 13: sendcmpct
 DEBUG: received command from node 13: ping
 DEBUG: sending message to node 13: pong
 DEBUG: received command from node 13: addr
 DEBUG: received command from node 13: feefilter
+DEBUG: received command from node 3: sendheaders
+DEBUG: received command from node 3: sendcmpct
+DEBUG: received command from node 3: ping
+DEBUG: sending message to node 3: pong
+DEBUG: received command from node 3: addr
+DEBUG: received command from node 3: feefilter
+DEBUG: Statecheck: amount of connected nodes: 13
+chaintip hash: 9d6e2328059b4ed2fcdca309679df3ebac69b41eb068e9bbea5dc521e20992b5
+chaintip height: 43461060
+DEBUG: sending message to node 1: ping
+DEBUG: sending message to node 13: ping
+DEBUG: sending message to node 12: ping
+DEBUG: sending message to node 11: ping
+DEBUG: sending message to node 10: ping
+DEBUG: sending message to node 9: ping
+DEBUG: sending message to node 8: ping
+DEBUG: sending message to node 7: ping
+DEBUG: sending message to node 6: ping
+DEBUG: sending message to node 5: ping
+DEBUG: sending message to node 4: ping
+DEBUG: sending message to node 3: ping
+DEBUG: sending message to node 2: ping
+DEBUG: received command from node 7: pong
+DEBUG: received command from node 11: pong
+DEBUG: received command from node 10: pong
+DEBUG: received command from node 1: pong
+DEBUG: received command from node 9: pong
+DEBUG: received command from node 6: pong
+DEBUG: received command from node 12: pong
+DEBUG: received command from node 4: pong
+DEBUG: received command from node 5: pong
+DEBUG: received command from node 2: pong
 DEBUG: received command from node 13: pong
-DEBUG: received command from node 15: sendheaders
-DEBUG: received command from node 15: sendcmpct
-DEBUG: received command from node 15: ping
-DEBUG: sending message to node 15: pong
-DEBUG: received command from node 15: addr
-DEBUG: received command from node 15: feefilter
-DEBUG: received command from node 15: pong
-DEBUG: received command from node 17: sendheaders
-DEBUG: received command from node 17: sendcmpct
-DEBUG: received command from node 17: ping
-DEBUG: sending message to node 17: pong
-DEBUG: received command from node 17: addr
-DEBUG: received command from node 17: feefilter
-DEBUG: received command from node 17: pong
-DEBUG: received command from node 14: sendheaders
-DEBUG: received command from node 14: sendcmpct
-DEBUG: received command from node 14: ping
-DEBUG: sending message to node 14: pong
-DEBUG: received command from node 14: addr
-DEBUG: received command from node 14: feefilter
-DEBUG: received command from node 14: pong
-DEBUG: received command from node 2: headers
-DEBUG: Got 2000 headers (took 0 s) from node 2
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 41608400
-New headers tip height 41608400 from Sun Mar 15 13:40:52 2026
-
-DEBUG: chain size: 41608400, last time Sun Mar 15 13:40:52 2026
-DEBUG: sending message to node 2: getheaders
+DEBUG: received command from node 8: pong
+DEBUG: received command from node 3: pong
+DEBUG: received command from node 1: inv
+DEBUG: received command from node 7: inv
+DEBUG: Get inv request with 1 items
+DEBUG: Requesting 1 blocks
+DEBUG: sending message to node 7: getdata
+DEBUG: received command from node 7: block
+9fc11f12acfc3a7789b8676c0eebd667dc6de6005a8b339d2e5d7c427f4ffd34|43461061|2026-03-25 22:54:42|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 11: inv
+DEBUG: received command from node 10: inv
+DEBUG: received command from node 5: inv
+DEBUG: received command from node 12: inv
+DEBUG: received command from node 6: inv
+DEBUG: received command from node 9: inv
+DEBUG: received command from node 13: inv
+DEBUG: received command from node 8: inv
 DEBUG: received command from node 2: inv
-DEBUG: received command from node 18: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 10: inv
+DEBUG: received command from node 4: inv
+DEBUG: received command from node 3: inv
+DEBUG: Statecheck: amount of connected nodes: 13
+chaintip hash: 9fc11f12acfc3a7789b8676c0eebd667dc6de6005a8b339d2e5d7c427f4ffd34
+chaintip height: 43461061
+DEBUG: Statecheck: amount of connected nodes: 13
+chaintip hash: 9fc11f12acfc3a7789b8676c0eebd667dc6de6005a8b339d2e5d7c427f4ffd34
+chaintip height: 43461061
+DEBUG: received command from node 7: inv
+DEBUG: Get inv request with 1 items
+DEBUG: Requesting 1 blocks
+DEBUG: sending message to node 7: getdata
 DEBUG: received command from node 6: inv
-DEBUG: received command from node 16: inv
+DEBUG: received command from node 5: inv
+DEBUG: received command from node 12: inv
+DEBUG: received command from node 1: inv
+DEBUG: received command from node 9: inv
+DEBUG: received command from node 4: inv
+DEBUG: received command from node 7: block
+ac15eb86241580777326e3b6653bf64f21f5683877fa940097951c427311c6e9|43461062|2026-03-25 22:55:23|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 13: inv
+DEBUG: received command from node 2: inv
 DEBUG: received command from node 11: inv
 DEBUG: received command from node 8: inv
+DEBUG: received command from node 10: inv
+DEBUG: received command from node 3: inv
+DEBUG: Statecheck: amount of connected nodes: 13
+chaintip hash: ac15eb86241580777326e3b6653bf64f21f5683877fa940097951c427311c6e9
+chaintip height: 43461062
+DEBUG: received command from node 7: inv
+DEBUG: Get inv request with 1 items
+DEBUG: Requesting 1 blocks
+DEBUG: sending message to node 7: getdata
+DEBUG: received command from node 6: inv
+DEBUG: received command from node 12: inv
 DEBUG: received command from node 5: inv
 DEBUG: received command from node 1: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 17: inv
+DEBUG: received command from node 7: block
+f7d6e2cf84c1df0d422ba009b51bb325040c53ebde7c333d8e58cc77e2c0b69a|43461063|2026-03-25 22:55:28|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 4: inv
 DEBUG: received command from node 9: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 3: inv
-DEBUG: Event callback on node 2
-DEBUG: Disconnected from the remote peer 2.
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: check if more nodes are required (connected to already: 16): false
-DEBUG: Connected nodes: 16
-DEBUG: Event callback on node 18
-DEBUG: Disconnected from the remote peer 18.
-DEBUG: check if more nodes are required (connected to already: 15): false
-DEBUG: check if more nodes are required (connected to already: 15): false
-DEBUG: Connected nodes: 15
-DEBUG: Event callback on node 17
-DEBUG: Disconnected from the remote peer 17.
-DEBUG: check if more nodes are required (connected to already: 14): false
-DEBUG: check if more nodes are required (connected to already: 14): false
-DEBUG: Connected nodes: 14
-DEBUG: Statecheck: amount of connected nodes: 14
-chaintip hash: d67de6448e6b333af037e914dab7b4220820029e4730bd7666bbc8153be8cb37
-chaintip height: 41608400
-DEBUG: No header response in time (used 1) for node 10
-DEBUG: sending message to node 1: getheaders
-DEBUG: received command from node 1: headers
-DEBUG: Got 2000 headers (took 0 s) from node 1
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 41610400
-New headers tip height 41610400 from Mon Mar 16 03:37:17 2026
-
-DEBUG: chain size: 41610400, last time Mon Mar 16 03:37:17 2026
-DEBUG: sending message to node 1: getheaders
-DEBUG: received command from node 1: headers
-DEBUG: Got 2000 headers (took 0 s) from node 1
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 41612400
-New headers tip height 41612400 from Mon Mar 16 13:10:50 2026
-
-DEBUG: chain size: 41612400, last time Mon Mar 16 13:10:50 2026
-DEBUG: sending message to node 1: getheaders
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 11: inv
+DEBUG: received command from node 2: inv
+DEBUG: received command from node 13: inv
 DEBUG: received command from node 11: inv
 DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 19: inv
 DEBUG: received command from node 10: inv
-DEBUG: received command from node 16: inv
+DEBUG: received command from node 3: inv
+DEBUG: Statecheck: amount of connected nodes: 13
+chaintip hash: f7d6e2cf84c1df0d422ba009b51bb325040c53ebde7c333d8e58cc77e2c0b69a
+chaintip height: 43461063
+DEBUG: Statecheck: amount of connected nodes: 13
+chaintip hash: f7d6e2cf84c1df0d422ba009b51bb325040c53ebde7c333d8e58cc77e2c0b69a
+chaintip height: 43461063
+DEBUG: Event callback on node 13
+DEBUG: Disconnected from the remote peer 13.
+DEBUG: check if more nodes are required (connected to already: 12): false
+DEBUG: check if more nodes are required (connected to already: 12): false
+DEBUG: Connected nodes: 12
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: f7d6e2cf84c1df0d422ba009b51bb325040c53ebde7c333d8e58cc77e2c0b69a
+chaintip height: 43461063
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: f7d6e2cf84c1df0d422ba009b51bb325040c53ebde7c333d8e58cc77e2c0b69a
+chaintip height: 43461063
+DEBUG: received command from node 7: inv
+DEBUG: Get inv request with 1 items
+DEBUG: Requesting 1 blocks
+DEBUG: sending message to node 7: getdata
 DEBUG: received command from node 6: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 12: inv
 DEBUG: received command from node 5: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 1: headers
-DEBUG: Got 2000 headers (took 1 s) from node 1
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 41614400
-New headers tip height 41614400 from Mon Mar 16 22:26:57 2026
-
-DEBUG: chain size: 41614400, last time Mon Mar 16 22:26:57 2026
-DEBUG: sending message to node 1: getheaders
+DEBUG: received command from node 12: inv
 DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
+DEBUG: received command from node 9: inv
+DEBUG: received command from node 7: block
+a8a11ba8413999dc015ac8b10df03980a4d4004c92c9de822c32452b57b66b10|43461064|2026-03-25 22:55:53|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 11: inv
+DEBUG: received command from node 2: inv
+DEBUG: received command from node 8: inv
 DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: Statecheck: amount of connected nodes: 14
-chaintip hash: db55ae4a1c46a9cb60710fa9e6e2dd8c46a32a140e949225efdfa00ba3c4fb2a
-chaintip height: 41614400
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 14: inv
+DEBUG: received command from node 4: inv
 DEBUG: received command from node 3: inv
-DEBUG: received command from node 1: headers
-DEBUG: Got 2000 headers (took 1774473581 s) from node 1
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 41616400
-New headers tip height 41616400 from Tue Mar 17 02:22:12 2026
-
-DEBUG: chain size: 41616400, last time Tue Mar 17 02:22:12 2026
-DEBUG: sending message to node 1: getheaders
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: a8a11ba8413999dc015ac8b10df03980a4d4004c92c9de822c32452b57b66b10
+chaintip height: 43461064
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: a8a11ba8413999dc015ac8b10df03980a4d4004c92c9de822c32452b57b66b10
+chaintip height: 43461064
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: a8a11ba8413999dc015ac8b10df03980a4d4004c92c9de822c32452b57b66b10
+chaintip height: 43461064
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: a8a11ba8413999dc015ac8b10df03980a4d4004c92c9de822c32452b57b66b10
+chaintip height: 43461064
+DEBUG: received command from node 7: inv
+DEBUG: Get inv request with 1 items
+DEBUG: Requesting 1 blocks
+DEBUG: sending message to node 7: getdata
 DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
 DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 1: headers
-DEBUG: Got 2000 headers (took 0 s) from node 1
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 41618400
-New headers tip height 41618400 from Tue Mar 17 08:25:25 2026
-
-DEBUG: chain size: 41618400, last time Tue Mar 17 08:25:25 2026
-DEBUG: sending message to node 1: getheaders
 DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 19: inv
-DEBUG: received command from node 10: inv
-DEBUG: received command from node 10: inv
 DEBUG: received command from node 6: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 11: inv
-DEBUG: received command from node 11: inv
 DEBUG: received command from node 9: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 8: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 14: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 3: inv
-DEBUG: received command from node 1: headers
-DEBUG: Got 2000 headers (took 1 s) from node 1
-DEBUG: Connected 2000 headers
-DEBUG: Chaintip at height 41620400
-New headers tip height 41620400 from Tue Mar 17 12:43:04 2026
-
-DEBUG: chain size: 41620400, last time Tue Mar 17 12:43:04 2026
-DEBUG: sending message to node 1: getheaders
-DEBUG: received command from node 1: inv
-DEBUG: received command from node 19: inv
+DEBUG: received command from node 7: block
+818dcbab6769812538ecd34e1dee7eaeed301176ce8903aa706dfb83c3d480c7|43461065|2026-03-25 22:56:18|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 11: inv
+DEBUG: received command from node 2: inv
 DEBUG: received command from node 10: inv
-DEBUG: received command from node 6: inv
-DEBUG: received command from node 16: inv
-DEBUG: received command from node 11: inv
 DEBUG: received command from node 8: inv
-DEBUG: received command from node 9: inv
-DEBUG: received command from node 12: inv
-DEBUG: received command from node 5: inv
-DEBUG: received command from node 15: inv
-DEBUG: received command from node 13: inv
-DEBUG: received command from node 14: inv
+DEBUG: received command from node 4: inv
 DEBUG: received command from node 3: inv
-DEBUG: Statecheck: amount of connected nodes: 14
-chaintip hash: 5ba89bf782764e2ce3fae8f7eb646673f431298587f790bc4ef4fe7c9e29db70
-chaintip height: 41620400
-DEBUG: received command from node 1: headers
-DEBUG: Got 2000 headers (took 1774473588 s) from node 1
-DEBUG: Connected 2000 he[WARN] No relay-back evidence in sendtx output.
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: 818dcbab6769812538ecd34e1dee7eaeed301176ce8903aa706dfb83c3d480c7
+chaintip height: 43461065
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: 818dcbab6769812538ecd34e1dee7eaeed301176ce8903aa706dfb83c3d480c7
+chaintip height: 43461065
+DEBUG: received command from node 7: inv
+DEBUG: Get inv request with 1 items
+DEBUG: Requesting 1 blocks
+DEBUG: sending message to node 7: getdata
+DEBUG: received command from node 6: inv
+DEBUG: received command from node 5: inv
+DEBUG: received command from node 12: inv
+DEBUG: received command from node 1: inv
+DEBUG: received command from node 9: inv
+DEBUG: received command from node 7: block
+ad5d76a1c125f1955b74c1c32eac8e4dd079dfbea249dcb12b5c92b5fc2c9f07|43461066|2026-03-25 22:56:28|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 2: inv
+DEBUG: received command from node 11: inv
+DEBUG: received command from node 10: inv
+DEBUG: received command from node 8: inv
+DEBUG: received command from node 4: inv
+DEBUG: received command from node 3: inv
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: ad5d76a1c125f1955b74c1c32eac8e4dd079dfbea249dcb12b5c92b5fc2c9f07
+chaintip height: 43461066
+DEBUG: received command from node 7: inv
+DEBUG: Get inv request with 1 items
+DEBUG: Requesting 1 blocks
+DEBUG: sending message to node 7: getdata
+DEBUG: received command from node 6: inv
+DEBUG: received command from node 5: inv
+DEBUG: received command from node 12: inv
+DEBUG: received command from node 1: inv
+DEBUG: received command from node 4: inv
+DEBUG: received command from node 9: inv
+DEBUG: received command from node 7: block
+8d5ca39cae23d700157aa3f03fbd089123e4849d26c9f18955cd0d557278f92d|43461067|2026-03-25 22:56:33|171
+DEBUG: Start parsing 1 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 2: inv
+DEBUG: received command from node 11: inv
+DEBUG: received command from node 10: inv
+DEBUG: received command from node 8: inv
+DEBUG: received command from node 3: inv
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: 8d5ca39cae23d700157aa3f03fbd089123e4849d26c9f18955cd0d557278f92d
+chaintip height: 43461067
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: 8d5ca39cae23d700157aa3f03fbd089123e4849d26c9f18955cd0d557278f92d
+chaintip height: 43461067
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: 8d5ca39cae23d700157aa3f03fbd089123e4849d26c9f18955cd0d557278f92d
+chaintip height: 43461067
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: 8d5ca39cae23d700157aa3f03fbd089123e4849d26c9f18955cd0d557278f92d
+chaintip height: 43461067
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: 8d5ca39cae23d700157aa3f03fbd089123e4849d26c9f18955cd0d557278f92d
+chaintip height: 43461067
+DEBUG: received command from node 7: ping
+DEBUG: sending message to node 7: pong
+DEBUG: received command from node 11: ping
+DEBUG: sending message to node 11: pong
+DEBUG: received command from node 10: ping
+DEBUG: sending message to node 10: pong
+DEBUG: received command from node 1: ping
+DEBUG: sending message to node 1: pong
+DEBUG: received command from node 12: ping
+DEBUG: sending message to node 12: pong
+DEBUG: received command from node 6: ping
+DEBUG: sending message to node 6: pong
+DEBUG: received command from node 4: ping
+DEBUG: sending message to node 4: pong
+DEBUG: received command from node 5: ping
+DEBUG: sending message to node 5: pong
+DEBUG: received command from node 2: ping
+DEBUG: sending message to node 2: pong
+DEBUG: received command from node 9: ping
+DEBUG: sending message to node 9: pong
+DEBUG: received command from node 8: ping
+DEBUG: sending message to node 8: pong
+DEBUG: received command from node 3: ping
+DEBUG: sending message to node 3: pong
+DEBUG: Statecheck: amount of connected nodes: 12
+chaintip hash: 8d5ca39cae23d700157aa3f03fbd089123e4849d26c9f18955cd0d557278f92d
+chaintip height: 43461067
+DEBUG: sending message to node 1: ping
+DEBUG: sending message to node 2: ping
+DEBUG: sending message to node 3: ping
+DEBUG: sending message to node 4: ping
+DEBUG: sending message to node 5: ping
+DEBUG: sending message to node 6: ping
+DEBUG: sending message to node 7: ping
+DEBUG: sending message to node 8: ping
+DEBUG: sending message to node 9: ping
+DEBUG: sending message to node 10: ping
+DEBUG: sending message to node 11: ping
+DEBUG: sending message to node 12: ping
+DEBUG: received command from node 7: pong
+DEBUG: received command from node 11: pong
+DEBUG: received command from node 10: pong
+DEBUG: received command from node 1: pong
+DEBUG: received command from node 9: pong
+DEBUG: received command from node 6: pong
+DEBUG: received command from node 12: pong
+DEBUG: received command from node 4: pong
+DEBUG: received command from node 5: pong
+DEBUG: received command from node 2: pong
+DEBUG: received command from node 8: pong
+DEBUG: received command from node 3: pong
+DEBUG: Statech[WARN] No relay-back evidence in sendtx output.
 [WARN] spvnode witness payload not observed during this run.
-Artifacts in: /tmp/witness_testnet_19129
+[SUCCESS] Relevant-transaction watch mode enabled message observed in spvnode log.
+Artifacts in: /tmp/witness_testnet_19488
