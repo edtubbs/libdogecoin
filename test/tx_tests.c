@@ -910,6 +910,51 @@ void test_tx_negative_version()
     dogecoin_tx_free(tx);
 }
 
+void test_tx_witness_roundtrip()
+{
+    const char* tx_hex = "020000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff00ffffffff010100000000000000000203ff00aa076c6962646f676500000000";
+    size_t outlen = 0;
+    uint8_t tx_data[sizeof("020000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff00ffffffff010100000000000000000203ff00aa076c6962646f676500000000") / 2];
+    utils_hex_to_bin(tx_hex, tx_data, strlen(tx_hex), &outlen);
+
+    dogecoin_tx* tx = dogecoin_tx_new();
+    size_t consumed = 0;
+    u_assert_int_eq(dogecoin_tx_deserialize(tx_data, outlen, tx, &consumed), true);
+    u_assert_int_eq(consumed, outlen);
+    u_assert_int_eq(tx->vin->len, 1);
+
+    dogecoin_tx_in* tx_in = vector_idx(tx->vin, 0);
+    u_assert_int_eq(tx_in->witness_stack->len, 2);
+
+    cstring* witness_item_0 = vector_idx(tx_in->witness_stack, 0);
+    cstring* witness_item_1 = vector_idx(tx_in->witness_stack, 1);
+    u_assert_int_eq(witness_item_0->len, 3);
+    u_assert_mem_eq((const unsigned char*)witness_item_0->str, (const unsigned char*)"\xff\x00\xaa", witness_item_0->len);
+    u_assert_int_eq(witness_item_1->len, 7);
+    u_assert_mem_eq((const unsigned char*)witness_item_1->str, (const unsigned char*)"libdoge", witness_item_1->len);
+
+    cstring* tx_ser = cstr_new_sz(1024);
+    dogecoin_tx_serialize(tx_ser, tx);
+    char* hexbuf = dogecoin_char_vla(tx_ser->len * 2 + 1);
+    utils_bin_to_hex((unsigned char*)tx_ser->str, tx_ser->len, hexbuf);
+    u_assert_str_eq(hexbuf, tx_hex);
+    free(hexbuf);
+    cstr_free(tx_ser, true);
+
+    dogecoin_tx* tx_copy = dogecoin_tx_new();
+    dogecoin_tx_copy(tx_copy, tx);
+    tx_ser = cstr_new_sz(1024);
+    dogecoin_tx_serialize(tx_ser, tx_copy);
+    hexbuf = dogecoin_char_vla(tx_ser->len * 2 + 1);
+    utils_bin_to_hex((unsigned char*)tx_ser->str, tx_ser->len, hexbuf);
+    u_assert_str_eq(hexbuf, tx_hex);
+    free(hexbuf);
+    cstr_free(tx_ser, true);
+
+    dogecoin_tx_free(tx_copy);
+    dogecoin_tx_free(tx);
+}
+
 
 struct script_test {
     char script[32];

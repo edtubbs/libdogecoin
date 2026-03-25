@@ -41,6 +41,13 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 
+static void dogecoin_witness_item_free_cb(void* data)
+{
+    if (data) {
+        cstr_free((cstring*)data, true);
+    }
+}
+
 /**
  * @brief This function frees the memory allocated
  * for a transaction input.
@@ -60,6 +67,10 @@ void dogecoin_tx_in_free(dogecoin_tx_in* tx_in)
     if (tx_in->script_sig) {
         cstr_free(tx_in->script_sig, true);
         tx_in->script_sig = NULL;
+    }
+    if (tx_in->witness_stack) {
+        vector_free(tx_in->witness_stack, true);
+        tx_in->witness_stack = NULL;
     }
 
     dogecoin_mem_zero(tx_in, sizeof(*tx_in));
@@ -100,6 +111,7 @@ dogecoin_tx_in* dogecoin_tx_in_new()
     dogecoin_mem_zero(&tx_in->prevout, sizeof(tx_in->prevout));
     tx_in->sequence = UINT32_MAX;
     tx_in->prevout.n = UINT32_MAX;
+    tx_in->witness_stack = vector_new(1, dogecoin_witness_item_free_cb);
     return tx_in;
 }
 
@@ -517,6 +529,7 @@ int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, do
         /* The witness flag is present, and we support witnesses. */
         flags ^= 1;
         for (i = 0; i < tx->vin->len; i++) {
+            dogecoin_tx_in* tx_in = vector_idx(tx->vin, i);
             if (!deser_varlen(&vlen, &buf))
                 return false;
             for (size_t j = 0; j < vlen; j++) {
@@ -525,7 +538,10 @@ int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, do
                     cstr_free(witness_item, true);
                     return false;
                 }
-                cstr_free(witness_item, true);
+                if (!vector_add(tx_in->witness_stack, witness_item)) {
+                    cstr_free(witness_item, true);
+                    return false;
+                }
             }
         }
     }
@@ -589,9 +605,26 @@ void dogecoin_tx_serialize(cstring* s, const dogecoin_tx* tx)
 {
     ser_s32(s, tx->version);
 
+    dogecoin_bool has_witness = false;
+    unsigned int i;
+    if (tx->vin) {
+        for (i = 0; i < tx->vin->len; i++) {
+            dogecoin_tx_in* tx_in = vector_idx(tx->vin, i);
+            if (tx_in->witness_stack && tx_in->witness_stack->len > 0) {
+                has_witness = true;
+                break;
+            }
+        }
+    }
+
+    if (has_witness) {
+        ser_varlen(s, 0);
+        uint8_t witness_flag = 1;
+        ser_bytes(s, &witness_flag, 1);
+    }
+
     ser_varlen(s, tx->vin ? tx->vin->len : 0);
 
-    unsigned int i;
     if (tx->vin) {
         for (i = 0; i < tx->vin->len; i++) {
             dogecoin_tx_in* tx_in;
@@ -609,6 +642,19 @@ void dogecoin_tx_serialize(cstring* s, const dogecoin_tx* tx)
 
             tx_out = vector_idx(tx->vout, i);
             dogecoin_tx_out_serialize(s, tx_out);
+        }
+    }
+
+    if (has_witness && tx->vin) {
+        for (i = 0; i < tx->vin->len; i++) {
+            dogecoin_tx_in* tx_in = vector_idx(tx->vin, i);
+            ser_varlen(s, tx_in->witness_stack ? tx_in->witness_stack->len : 0);
+            if (tx_in->witness_stack) {
+                for (size_t j = 0; j < tx_in->witness_stack->len; j++) {
+                    cstring* witness_item = vector_idx(tx_in->witness_stack, j);
+                    ser_varstr(s, witness_item);
+                }
+            }
         }
     }
 
@@ -656,6 +702,19 @@ void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src)
         cstr_append_buf(dest->script_sig,
                         src->script_sig->str,
                         src->script_sig->len);
+    }
+
+    if (!src->witness_stack || src->witness_stack->len == 0) {
+        return;
+    }
+
+    if (!dest->witness_stack) {
+        dest->witness_stack = vector_new(src->witness_stack->len, dogecoin_witness_item_free_cb);
+    }
+    for (size_t i = 0; i < src->witness_stack->len; i++) {
+        cstring* witness_item = vector_idx(src->witness_stack, i);
+        cstring* witness_item_copy = cstr_new_buf((const void*)witness_item->str, witness_item->len);
+        vector_add(dest->witness_stack, witness_item_copy);
     }
 }
 
@@ -712,7 +771,7 @@ void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
         for (i = 0; i < src->vin->len; i++) {
             dogecoin_tx_in *tx_in_old, *tx_in_new;
             tx_in_old = vector_idx(src->vin, i);
-            tx_in_new = dogecoin_malloc(sizeof(*tx_in_new));
+            tx_in_new = dogecoin_tx_in_new();
             dogecoin_tx_in_copy(tx_in_new, tx_in_old);
             vector_add(dest->vin, tx_in_new);
         }
@@ -1238,4 +1297,3 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
 int getAddrFromPubkeyHash(const char pubkey_hash[PUBKEYHASHLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]) {
     return dogecoin_pubkey_hash_to_p2pkh_address((char *)utils_hex_to_uint8(pubkey_hash), SCRIPT_PUBKEY_LENGTH, p2pkh_address, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main);
 }
-
