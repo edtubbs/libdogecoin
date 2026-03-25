@@ -46,6 +46,7 @@
 
 #ifdef _MSC_VER
 #include <win/winunistd.h>
+#include <intrin.h>
 #else
 #include <unistd.h>
 #endif
@@ -2645,6 +2646,11 @@ static dogecoin_bool secure_memeq(const uint8_t* lhs, const uint8_t* rhs, const 
     {
         diff |= (uint8_t)(lhs_v[i] ^ rhs_v[i]);
     }
+#if defined(_MSC_VER)
+    _ReadWriteBarrier();
+#elif defined(__GNUC__) || defined(__clang__)
+    __asm__ __volatile__("" : : : "memory");
+#endif
     return diff == 0;
 }
 
@@ -2663,7 +2669,7 @@ static dogecoin_bool yubikey_read_factor_secret(const dogecoin_yubikey_factor_ty
 
     if (test_factor_secret != NULL)
     {
-        if (strlen(test_factor_secret) >= factor_secret_size)
+        if (strnlen(test_factor_secret, factor_secret_size) >= factor_secret_size)
         {
             fprintf(stderr, "ERROR: %s secret too long.\n", yubikey_factor_name(factor_type));
             return false;
@@ -2690,7 +2696,7 @@ static dogecoin_bool yubikey_read_factor_secret(const dogecoin_yubikey_factor_ty
             return false;
         }
 
-        if (strlen(input) >= factor_secret_size)
+        if (strnlen(input, factor_secret_size) >= factor_secret_size)
         {
             fprintf(stderr, "ERROR: %s secret too long.\n", yubikey_factor_name(factor_type));
             return false;
