@@ -745,7 +745,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         if (!deser_varlen(&amount_of_headers, buf)) return;
         uint64_t now = time(NULL);
         if (client->last_headersrequest_time > 0 && now >= client->last_headersrequest_time) {
-            client->nodegroup->log_write_cb("Got %d headers (took %llu s) from node %d\n", amount_of_headers, (unsigned long long)(now - client->last_headersrequest_time), node->nodeid);
+            unsigned long long elapsed_secs = (unsigned long long)(now - client->last_headersrequest_time);
+            client->nodegroup->log_write_cb("Got %d headers (took %llu s) from node %d\n", amount_of_headers, elapsed_secs, node->nodeid);
         } else {
             client->nodegroup->log_write_cb("Got %d headers from node %d\n", amount_of_headers, node->nodeid);
         }
