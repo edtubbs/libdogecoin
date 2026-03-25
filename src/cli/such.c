@@ -656,8 +656,8 @@ static void print_usage()
     printf("seed_to_master_key (-y <file_num>, -j (use_tpm) optional),\n");
     printf("mnemonic_to_key (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
     printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
-    printf("slip0039_split (requires -x <secret_hex>, -o <threshold>, -i <share_count>),\n");
-    printf("slip0039_recover (requires -x <share1,share2,...>),\n");
+    printf("slip39_split (requires -x <secret_hex>, -o <threshold>, -i <share_count>),\n");
+    printf("slip39_recover (requires -x <share1,share2,...>),\n");
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
@@ -1507,7 +1507,7 @@ int main(int argc, char* argv[])
             dogecoin_free(pass);
             }
         }
-    else if (strcmp(cmd, "slip0039_split") == 0) {
+    else if (strcmp(cmd, "slip0039_split") == 0 || strcmp(cmd, "slip39_split") == 0) {
         const uint8_t threshold = (uint8_t)account;
         const uint8_t share_count_u8 = (uint8_t)inputindex;
 
@@ -1546,7 +1546,7 @@ int main(int argc, char* argv[])
         dogecoin_mem_zero(secret, sizeof(secret));
         dogecoin_mem_zero(shares, sizeof(shares));
         }
-    else if (strcmp(cmd, "slip0039_recover") == 0) {
+    else if (strcmp(cmd, "slip0039_recover") == 0 || strcmp(cmd, "slip39_recover") == 0) {
         if (!txhex || strlen(txhex) == 0) {
             return showError("slip0039_recover (requires -x <share1,share2,...>)\n");
             }

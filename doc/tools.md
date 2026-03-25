@@ -27,6 +27,8 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - sign
 - comp2der
 - bip32maintotest
+- slip39_split
+- slip39_recover
 - signmessage
 - verifymessage
 - transaction
@@ -79,6 +81,8 @@ Below is a list of all the commands and the flags that they require. As a remind
 | print_keys                | -p                     | -t   | Print all keys associated with the provided private key.
 | sign                      | -x, -s, -i, -h, -p     | -t   | See the definition of sign_raw_transaction in the Transaction API.
 | comp2der                  | -s                     | None | Convert a compact signature to a DER signature.
+| slip39_split              | -x, -o, -i             | None | Split secret hex data into SLIP-0039 shares where -o is threshold and -i is share count.
+| slip39_recover            | -x                     | None | Recover secret hex data from a comma-separated SLIP-0039 share list.
 | signmessage               | -x, -p                 | None | Sign a message and output a base64 encoded signature and address.
 | verifymessage             | -x, -s, -k             | None | Verify a message by public key recovery of base64 decoded signature and comparison of addresses.
 | transaction               | None                   | None | Start the interactive transaction app. [Usage instructions below.]() |
