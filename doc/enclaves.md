@@ -597,10 +597,12 @@ This command will generate a mnemonic seedphrase and display it on the screen. E
 Enter the shared secret for TOTP when prompted if enabled. The shared secret must be 40 hex characters (*e.g., `f38243e0e3e97a5c8aa5cc481a815add6c119648`*).  If no shared secret is provided, a random one will be generated. The shared secret will be set on the YubiKey (if present) by the host application, and the mnemonic will be generated and displayed. If OTP Slot 1 is already programmed, the host application will prompt you to overwrite it. Ensure that your YubiKey slot configuration is not overwritten unless intended.
 
 ```sh
-optee_libdogecoin -c generate_mnemonic -n <mnemonic_input> -s <shared_secret> -e <entropy_size> -p <password> -f <flags> -z
+optee_libdogecoin -c generate_mnemonic -n <mnemonic_input> -g <language> -s <shared_secret> -e <entropy_size> -p <password> -f <flags> -z
 ```
 
 The `-n` flag is used to provide the mnemonic input for recovery purposes if needed. Replace `<mnemonic_input>` with the mnemonic seedphrase you want to use for recovery. If no mnemonic input is provided, the enclave will generate a random mnemonic seedphrase.
+
+The `-g` flag is used to provide the mnemonic language when validating `-n` mnemonic input (for example `eng`). If `-n` is provided and the mnemonic is not valid for the selected language, the command exits with an error.
 
 The `-s` flag is used to provide the shared secret for TOTP authentication from command line instead of prompting the user. Replace `<shared_secret>` with the shared secret you want to use for TOTP authentication.
 
@@ -695,10 +697,22 @@ This command will generate a mnemonic seedphrase and display it on the screen. E
 Enter the shared secret for TOTP when prompted if enabled. The shared secret must be 40 hex characters (*e.g., `f38243e0e3e97a5c8aa5cc481a815add6c119648`*).  If no shared secret is provided, a random one will be generated. The shared secret will be set on the YubiKey (if present) by the host application, and the mnemonic will be generated and displayed. If OTP Slot 1 is already programmed, the host application will prompt you to overwrite it.
 
 ```sh
-/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c generate_mnemonic -n <mnemonic_input> -s <shared_secret> -e <entropy_size> -p <password> -z
+/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c generate_mnemonic -n <mnemonic_input> -g <language> -s <shared_secret> -e <entropy_size> -p <password> -z
 ```
 
 The `-n` flag is used to provide the mnemonic input for recovery purposes if needed. Replace `<mnemonic_input>` with the mnemonic seedphrase you want to use for recovery. If no mnemonic input is provided, the enclave will generate a random mnemonic seedphrase.
+
+The `-g` flag is used to set the mnemonic language for host-side mnemonic verification commands and flows (for example `eng`).
+
+#### Verify Mnemonic Input
+
+To verify a mnemonic directly from the OpenEnclave host CLI:
+
+```sh
+/doge/libdogecoin/src/openenclave/build/host/host /doge/libdogecoin/src/openenclave/build/enclave/enclave.signed --simulate -c verify_mnemonic -n <mnemonic_input> -g <language>
+```
+
+Replace `<mnemonic_input>` with the seedphrase to check and `<language>` with the language code (for example `eng`).
 
 The `-s` flag is used to provide the shared secret for TOTP authentication from command line instead of prompting the user. Replace `<shared_secret>` with the shared secret you want to use for TOTP authentication.
 

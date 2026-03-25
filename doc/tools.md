@@ -23,6 +23,7 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - seed_to_master_key
 - mnemonic_to_key
 - mnemonic_to_addresses
+- verify_mnemonic
 - print_keys
 - sign
 - comp2der
@@ -45,6 +46,7 @@ Most of these commands require a flag following them to denote things like exist
 | -e, --entropy  | hex_entropy | yes | generate_mnemonic -e <hex_entropy> |
 | -z, --entropy_size  | entropy_size | yes | generate_mnemonic -z <entropy_size> |
 | -n, --mnemonic  | seed_phrase | yes | mnemonic_to_key or mnemonic_to_addresses -n <seed_phrase> |
+| -q, --lang  | language | yes | verify_mnemonic -n <seed_phrase> -q <language> |
 | -a, --pass_phrase  | pass_phrase | no | mnemonic_to_key or mnemonic_to_addresses -n <seed_phrase> -a |
 | -o, --account_int  | account_int | yes | mnemonic_to_key or mnemonic_to_addresses -n <seed_phrase> -o <account_int> |
 | -g, --change_level  | change_level | yes | mnemonic_to_key or mnemonic_to_addresses -n <seed_phrase> -g <change_level> |
@@ -76,6 +78,7 @@ Below is a list of all the commands and the flags that they require. As a remind
 | seed_to_master_key | -y   | -j, -t | Generates an extended master private key from a seed for either mainnet or testnet. |
 | mnemonic_to_key | -n      | -a, -y, -o, g, -i, -t | Generates a private key from a seed phrase with a default path or specified account, change level and index for either mainnet or testnet. |
 | mnemonic_to_addresses     | -n      | -a, -y, -o, g, -i, -t   | Generates an address from a seed phrase with a default path or specified account, change level and index for either mainnet or testnet. |
+| verify_mnemonic           | -n      | -q                       | Verifies a BIP39 mnemonic phrase using the selected language (defaults to `eng` when omitted). |
 | print_keys                | -p                     | -t   | Print all keys associated with the provided private key.
 | sign                      | -x, -s, -i, -h, -p     | -t   | See the definition of sign_raw_transaction in the Transaction API.
 | comp2der                  | -s                     | None | Convert a compact signature to a DER signature.
@@ -179,6 +182,11 @@ Below are some examples on how to use the `such` tool in practice.
     message: bleh
     content: ICrbftD0KamyaB68IoXbeke3w4CpcIvv+Q4pncBNpMk8fF5+xsR9H9gqmfM0JrjlfzZZA3E8AJ0Nug1KWeoVw3g=
     address: D8mQ2sKYpLbFCQLhGeHCPBmkLJRi6kRoSg
+
+#### Verify a BIP39 mnemonic
+
+    ./such -c verify_mnemonic -n "chief prevent advice search broccoli dish pride grow evidence bicycle cushion lady" -q eng
+    Mnemonic is valid
 
 #### Verify an arbitrary message
 
@@ -381,6 +389,7 @@ To utilize checkpoints for faster initial sync, apply the -p flag:
 | `-m`, `--maxnodes` | Max Peers | No | Set max peers: `./spvnode -m 8 scan` |
 | `-a`, `--address` | Address | Yes | Use address: `./spvnode -a "your address here" scan` |
 | `-n`, `--mnemonic` | Mnemonic Seed | Yes | Use BIP39 mnemonic: `./spvnode -n "your mnemonic here" scan` |
+| `-q`, `--lang` | Mnemonic Language | Yes | Mnemonic language for validation: `./spvnode -n "your mnemonic here" -q eng scan` |
 | `-s`, `--pass_phrase` | Passphrase | No | Passphrase for BIP39 seed: `./spvnode -s scan` |
 | `-f`, `--dbfile` | Database File | No | Headers DB file/mem-only (0): `./spvnode -f 0 scan` |
 | `-c`, `--continuous` | Continuous Mode | No | Run continuously: `./spvnode -c scan` |
@@ -413,7 +422,7 @@ The tool provides several callbacks for custom integration:
 ### Best Practices and Notes
 When not specifying -w, spvnode will default to using main_wallet.db. To prevent unintended interactions with main_wallet.db, it's important to be consistent with the use of flags. The best practice is to always use -w and specify a distinct wallet file, especially when using new mnemonics or keys.
 
-When using -n with a mnemonic, instead of main_wallet.db, spvnode will generate main_mnemonic_wallet.db.
+When using -n with a mnemonic, instead of main_wallet.db, spvnode will generate main_mnemonic_wallet.db. Mnemonics provided with `-n` are validated before scan starts; if invalid, `spvnode` exits with an error. Use `-q` to set the mnemonic language (for example, `eng`).
 
 ## Examples
 
