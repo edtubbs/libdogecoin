@@ -49,10 +49,14 @@
  */
 
 #include <inttypes.h>
+#include <stdbool.h>
 #include <libdogecoin.h>
 #include <libdogecoin_ta.h>
 #include <tee_internal_api.h>
 #include <tee_internal_api_extensions.h>
+#ifdef USE_ROCKCHIP_OTP
+#include <drivers/rockchip_otp.h>
+#endif
 
 #define MAX_AUTH_TOKEN_SIZE 64
 
@@ -217,6 +221,217 @@ int fclose(void *stream)
 // Maximum size of a delegate name
 #define MAX_DELEGATE_NAME_SIZE  256
 
+#define MNEMONIC_ACTIVE_OBJECT_ID "mnemonic_active"
+#define MNEMONIC_INDEX_OBJECT_ID "mnemonic_index"
+#define MNEMONIC_OBJECT_ID_PREFIX "mnemonic:"
+#define LEGACY_MNEMONIC_OBJECT_ID "mnemonic"
+#define DEFAULT_MNEMONIC_ID "default"
+#define MAX_MNEMONIC_ID_SIZE 64
+#define MNEMONIC_INDEX_MAX_SIZE 4096
+
+#ifdef USE_ROCKCHIP_OTP
+#define OTP_SEED_WORD_INDEX 0
+#define OTP_SEED_WORD_COUNT (MAX_SEED_SIZE / sizeof(uint32_t))
+#endif
+
+static bool read_persistent_object(const char *obj_id, void *buffer, size_t buffer_len, uint32_t *read_bytes)
+{
+    TEE_ObjectHandle object = TEE_HANDLE_NULL;
+    TEE_Result res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, obj_id, strlen(obj_id) + 1,
+                                              TEE_DATA_FLAG_ACCESS_READ, &object);
+    if (res != TEE_SUCCESS) {
+        return false;
+    }
+
+    res = TEE_ReadObjectData(object, buffer, buffer_len, read_bytes);
+    TEE_CloseObject(object);
+    return res == TEE_SUCCESS;
+}
+
+static TEE_Result write_persistent_object(const char *obj_id, const void *buffer, size_t buffer_len)
+{
+    TEE_ObjectHandle object = TEE_HANDLE_NULL;
+    uint32_t obj_data_flag = TEE_DATA_FLAG_ACCESS_WRITE | TEE_DATA_FLAG_ACCESS_READ |
+                             TEE_DATA_FLAG_ACCESS_WRITE_META | TEE_DATA_FLAG_OVERWRITE;
+    TEE_Result res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE, obj_id, strlen(obj_id) + 1,
+                                                obj_data_flag, TEE_HANDLE_NULL, NULL, 0, &object);
+    if (res != TEE_SUCCESS) {
+        return res;
+    }
+
+    res = TEE_WriteObjectData(object, buffer, buffer_len);
+    if (res != TEE_SUCCESS) {
+        TEE_CloseAndDeletePersistentObject1(object);
+        return res;
+    }
+
+    TEE_CloseObject(object);
+    return TEE_SUCCESS;
+}
+
+static char *next_csv_field(char **cursor)
+{
+    char *field = *cursor;
+    if (!field) {
+        return NULL;
+    }
+    char *comma = strchr(field, ',');
+    if (comma) {
+        *comma = '\0';
+        *cursor = comma + 1;
+    } else {
+        *cursor = NULL;
+    }
+    return field;
+}
+
+static bool valid_mnemonic_id(const char *mnemonic_id)
+{
+    if (!mnemonic_id || !mnemonic_id[0]) {
+        return false;
+    }
+    if (strlen(mnemonic_id) >= MAX_MNEMONIC_ID_SIZE) {
+        return false;
+    }
+    for (size_t i = 0; mnemonic_id[i] != '\0'; i++) {
+        char c = mnemonic_id[i];
+        if (!((c >= 'a' && c <= 'z') ||
+              (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') ||
+              c == '_' || c == '-' || c == '.')) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static TEE_Result build_mnemonic_object_id(const char *mnemonic_id, char *object_id, size_t object_id_size)
+{
+    if (!valid_mnemonic_id(mnemonic_id)) {
+        return TEE_ERROR_BAD_PARAMETERS;
+    }
+    int written = snprintf(object_id, object_id_size, "%s%s", MNEMONIC_OBJECT_ID_PREFIX, mnemonic_id);
+    if (written < 0 || (size_t)written >= object_id_size) {
+        return TEE_ERROR_SHORT_BUFFER;
+    }
+    return TEE_SUCCESS;
+}
+
+static void split_mnemonic_record(char *record, char **mnemonic, char **shared_secret, char **stored_password, char **flags)
+{
+    char *cursor = record;
+    *mnemonic = next_csv_field(&cursor);
+    *shared_secret = next_csv_field(&cursor);
+    *stored_password = next_csv_field(&cursor);
+    *flags = cursor ? cursor : "";
+    if (!*shared_secret) *shared_secret = "";
+    if (!*stored_password) *stored_password = "";
+    if (!*flags) *flags = "";
+}
+
+static TEE_Result verify_access(const char *shared_secret, const char *stored_password, uint32_t auth_token,
+                                const char *password, size_t password_size)
+{
+    const bool has_input_password = password && password_size > 0 && password[0] != '\0';
+    const bool has_stored_password = stored_password && stored_password[0] != '\0';
+    const bool has_shared_secret = shared_secret && shared_secret[0] != '\0';
+
+    if (auth_token == 0 && !has_input_password) {
+        EMSG("Password or auth token required");
+        return TEE_ERROR_SECURITY;
+    }
+
+    if (has_stored_password) {
+        if (!has_input_password || strcmp(password, stored_password) != 0) {
+            EMSG("Password verification failed");
+            return TEE_ERROR_SECURITY;
+        }
+    } else if (has_input_password) {
+        EMSG("Password not expected");
+        return TEE_ERROR_SECURITY;
+    }
+
+    if (has_shared_secret) {
+        TEE_Time current_time;
+        TEE_GetREETime(&current_time);
+        uint32_t totp = get_totp(shared_secret, current_time.seconds / TOTP_TIME_STEP);
+        if (auth_token != totp) {
+            EMSG("TOTP verification failed");
+            return TEE_ERROR_SECURITY;
+        }
+    }
+
+    return TEE_SUCCESS;
+}
+
+static TEE_Result set_active_mnemonic_id(const char *mnemonic_id)
+{
+    return write_persistent_object(MNEMONIC_ACTIVE_OBJECT_ID, mnemonic_id, strlen(mnemonic_id) + 1);
+}
+
+static TEE_Result load_active_mnemonic_record(char *persistent_data, size_t data_len)
+{
+    uint32_t read_bytes = 0;
+    char active_id[MAX_MNEMONIC_ID_SIZE] = DEFAULT_MNEMONIC_ID;
+    char mnemonic_object_id[MAX_MNEMONIC_ID_SIZE + sizeof(MNEMONIC_OBJECT_ID_PREFIX)] = {0};
+    TEE_Result res = TEE_SUCCESS;
+
+    read_persistent_object(MNEMONIC_ACTIVE_OBJECT_ID, active_id, sizeof(active_id), &read_bytes);
+    active_id[sizeof(active_id) - 1] = '\0';
+
+    res = build_mnemonic_object_id(active_id, mnemonic_object_id, sizeof(mnemonic_object_id));
+    if (res == TEE_SUCCESS && read_persistent_object(mnemonic_object_id, persistent_data, data_len, &read_bytes)) {
+        persistent_data[(read_bytes < data_len) ? read_bytes : data_len - 1] = '\0';
+        return TEE_SUCCESS;
+    }
+
+    if (read_persistent_object(LEGACY_MNEMONIC_OBJECT_ID, persistent_data, data_len, &read_bytes)) {
+        persistent_data[(read_bytes < data_len) ? read_bytes : data_len - 1] = '\0';
+        return TEE_SUCCESS;
+    }
+
+    return TEE_ERROR_ITEM_NOT_FOUND;
+}
+
+static void update_mnemonic_index(const char *mnemonic_id)
+{
+    char index_buf[MNEMONIC_INDEX_MAX_SIZE] = {0};
+    uint32_t read_bytes = 0;
+    read_persistent_object(MNEMONIC_INDEX_OBJECT_ID, index_buf, sizeof(index_buf), &read_bytes);
+    index_buf[sizeof(index_buf) - 1] = '\0';
+
+    char needle[MAX_MNEMONIC_ID_SIZE + 2] = {0};
+    snprintf(needle, sizeof(needle), "%s\n", mnemonic_id);
+    if (strstr(index_buf, needle)) {
+        return;
+    }
+
+    size_t used = strlen(index_buf);
+    size_t need = strlen(needle);
+    if (used + need + 1 > sizeof(index_buf)) {
+        EMSG("Mnemonic index full");
+        return;
+    }
+
+    TEE_MemMove(index_buf + used, needle, need + 1);
+    if (write_persistent_object(MNEMONIC_INDEX_OBJECT_ID, index_buf, strlen(index_buf) + 1) != TEE_SUCCESS) {
+        EMSG("Failed to update mnemonic index");
+    }
+}
+
+static TEE_Result store_seed(const SEED seed)
+{
+#ifdef USE_ROCKCHIP_OTP
+    TEE_Result res = rockchip_otp_write_secure((const uint32_t *)seed, OTP_SEED_WORD_INDEX, OTP_SEED_WORD_COUNT);
+    if (res != TEE_SUCCESS) {
+        EMSG("Failed to write seed to OTP, res=0x%08x", res);
+    }
+    return res;
+#else
+    return write_persistent_object("seed_object", seed, sizeof(SEED));
+#endif
+}
+
 uint32_t get_totp(const char* shared_secret, uint64_t timestamp) {
     uint8_t hmac[SHA1_DIGEST_LENGTH];
     uint8_t time_bytes[8];
@@ -255,34 +470,18 @@ static TEE_Result generate_and_store_seed(uint32_t param_types, TEE_Param params
     if (param_types != exp_param_types)
         return TEE_ERROR_BAD_PARAMETERS;
 
-    TEE_ObjectHandle object;
     TEE_Result res;
     SEED seed;
-    uint32_t obj_data_flag = TEE_DATA_FLAG_ACCESS_WRITE | TEE_DATA_FLAG_ACCESS_READ |
-                             TEE_DATA_FLAG_ACCESS_WRITE_META | TEE_DATA_FLAG_OVERWRITE;
 
     // Generate a random seed
     TEE_GenerateRandom(seed, sizeof(seed));
 
-    // Create a persistent object to store the seed
-    res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE,
-                                     "seed_object", sizeof("seed_object"),
-                                     obj_data_flag,
-                                     TEE_HANDLE_NULL, NULL, 0, &object);
+    // Store seed in selected backend
+    res = store_seed(seed);
     if (res != TEE_SUCCESS) {
-        EMSG("Failed to create persistent seed object, res=0x%08x", res);
+        EMSG("Failed to store seed, res=0x%08x", res);
         return res;
     }
-
-    // Write the seed into the persistent object
-    res = TEE_WriteObjectData(object, seed, sizeof(seed));
-    if (res != TEE_SUCCESS) {
-        EMSG("Failed to write seed into persistent object, res=0x%08x", res);
-        TEE_CloseAndDeletePersistentObject1(object);
-        return res;
-    }
-
-    TEE_CloseObject(object);
 
     // Check if the provided buffer is large enough
     if (params[0].memref.size < sizeof(seed)) {
@@ -304,10 +503,7 @@ static TEE_Result generate_and_store_master_key(uint32_t param_types, TEE_Param 
     if (param_types != exp_param_types)
         return TEE_ERROR_BAD_PARAMETERS;
 
-    TEE_ObjectHandle object;
     TEE_Result res;
-    uint32_t obj_data_flag = TEE_DATA_FLAG_ACCESS_WRITE | TEE_DATA_FLAG_ACCESS_READ |
-                             TEE_DATA_FLAG_ACCESS_WRITE_META | TEE_DATA_FLAG_OVERWRITE;
 
     // Initialize the random number generator
     set_rng(&TEE_GenerateRandom);
@@ -324,25 +520,11 @@ static TEE_Result generate_and_store_master_key(uint32_t param_types, TEE_Param 
 
     dogecoin_ecc_stop();
 
-    // Create a persistent object to store the serialized HDNode
-    res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE, "hd_master_privkey", sizeof("hd_master_privkey"),
-                                     obj_data_flag, TEE_HANDLE_NULL, NULL, 0, &object);
+    res = write_persistent_object("hd_master_privkey", hd_master_privkey, HDKEYLEN);
     if (res != TEE_SUCCESS) {
-        EMSG("Failed to create persistent master key object, res=0x%08x", res);
+        EMSG("Failed to store master key, res=0x%08x", res);
         return res;
     }
-
-    // Write the serialized HDNode into the persistent object
-    res = TEE_WriteObjectData(object, hd_master_privkey, HDKEYLEN);
-    if (res != TEE_SUCCESS) {
-        EMSG("Failed to write master key into persistent object, res=0x%08x", res);
-        TEE_CloseAndDeletePersistentObject1(object);
-        return res;
-    }
-
-    TEE_CloseObject(object);
-
-    EMSG("Successfully wrote master key into persistent object");
 
     // Check if the provided buffer is large enough
     if (params[0].memref.size < HDKEYLEN) {
@@ -366,15 +548,13 @@ static TEE_Result generate_and_store_mnemonic(uint32_t param_types, TEE_Param pa
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    TEE_ObjectHandle object;
     TEE_Result res;
-    uint32_t obj_data_flag = TEE_DATA_FLAG_ACCESS_WRITE | TEE_DATA_FLAG_ACCESS_READ |
-                             TEE_DATA_FLAG_ACCESS_WRITE_META | TEE_DATA_FLAG_OVERWRITE;
 
     MNEMONIC mnemonic = {0};
     SEED seed = {0};
     char managed_creds[MAX_MANAGED_CREDS_SIZE] = {0};
     ENTROPY_SIZE entropy_size = {0};
+    char mnemonic_id[MAX_MNEMONIC_ID_SIZE] = DEFAULT_MNEMONIC_ID;
 
     EMSG("Starting mnemonic generation");
 
@@ -422,17 +602,31 @@ static TEE_Result generate_and_store_mnemonic(uint32_t param_types, TEE_Param pa
         return TEE_ERROR_BAD_PARAMETERS;
     }
 
-    // Concatenate the mnemonic and managed credentials
+    // Parse managed credentials as "<shared_secret>,<password>,<flags>[,<mnemonic_id>]"
+    char* creds_cursor = managed_creds;
+    char* shared_secret = next_csv_field(&creds_cursor);
+    char* stored_password = next_csv_field(&creds_cursor);
+    char* flags = next_csv_field(&creds_cursor);
+    char* requested_id = next_csv_field(&creds_cursor);
+
+    if (!shared_secret) shared_secret = "";
+    if (!stored_password) stored_password = "";
+    if (!flags) flags = "";
+    if (requested_id && requested_id[0] != '\0') {
+        if (!valid_mnemonic_id(requested_id)) {
+            EMSG("Invalid mnemonic id");
+            dogecoin_ecc_stop();
+            return TEE_ERROR_BAD_PARAMETERS;
+        }
+        snprintf(mnemonic_id, sizeof(mnemonic_id), "%s", requested_id);
+    }
+
+    // Concatenate the mnemonic and managed credentials (without sentinel placeholders)
     char mnemonic_and_creds[MAX_MNEMONIC_SIZE + MAX_MANAGED_CREDS_SIZE] = {0};
-    snprintf(mnemonic_and_creds, sizeof(mnemonic_and_creds), "%s,%s", mnemonic, managed_creds);
+    snprintf(mnemonic_and_creds, sizeof(mnemonic_and_creds), "%s,%s,%s,%s",
+             mnemonic, shared_secret, stored_password, flags);
 
-    // Split the managed credentials into shared secret and password
-    char* saveptr;
-    char* shared_secret = strtok_r(managed_creds, ",", &saveptr);
-    char* stored_password = strtok_r(NULL, ",", &saveptr);
-
-    // Check if the shared secret or password is present
-    if (!shared_secret && !stored_password) {
+    if (shared_secret[0] == '\0' && stored_password[0] == '\0') {
         EMSG("Shared secret or password required");
         dogecoin_ecc_stop();
         return TEE_ERROR_BAD_PARAMETERS;
@@ -440,30 +634,27 @@ static TEE_Result generate_and_store_mnemonic(uint32_t param_types, TEE_Param pa
 
     dogecoin_ecc_stop();
 
-    // Create a persistent object to store the mnemonic and managed credentials
-    res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE, "mnemonic", sizeof("mnemonic"),
-                                     obj_data_flag, TEE_HANDLE_NULL, NULL, 0, &object);
+    char mnemonic_object_id[MAX_MNEMONIC_ID_SIZE + sizeof(MNEMONIC_OBJECT_ID_PREFIX)] = {0};
+    res = build_mnemonic_object_id(mnemonic_id, mnemonic_object_id, sizeof(mnemonic_object_id));
     if (res != TEE_SUCCESS) {
-        EMSG("Failed to create persistent mnemonic object, res=0x%08x", res);
+        EMSG("Failed to build mnemonic object id, res=0x%08x", res);
         return res;
     }
 
-    // Write the mnemonic and managed credentials into the persistent object
-    res = TEE_WriteObjectData(object, mnemonic_and_creds, strlen(mnemonic_and_creds));
+    res = write_persistent_object(mnemonic_object_id, mnemonic_and_creds, strlen(mnemonic_and_creds) + 1);
     if (res != TEE_SUCCESS) {
-        TEE_CloseAndDeletePersistentObject1(object);
-        EMSG("Failed to write mnemonic and managed credentials into persistent object, res=0x%08x", res);
+        EMSG("Failed to write mnemonic object, res=0x%08x", res);
         return res;
     }
 
-    // Hash and log the mnemonic and managed credentials
+    if (set_active_mnemonic_id(mnemonic_id) != TEE_SUCCESS) {
+        EMSG("Failed to set active mnemonic id");
+    }
+    update_mnemonic_index(mnemonic_id);
+
     uint8_t loghash[SHA256_DIGEST_LENGTH];
-
-    // Compute and log the hash of the mnemonic and managed credentials
-    sha256_raw((const uint8_t*) mnemonic_and_creds, sizeof(mnemonic_and_creds), loghash);
+    sha256_raw((const uint8_t*) mnemonic_and_creds, strlen(mnemonic_and_creds), loghash);
     EMSG("%s", utils_uint8_to_hex((const uint8_t*) loghash, SHA256_DIGEST_LENGTH));
-
-    TEE_CloseObject(object);
 
     // Check if the provided buffer is large enough
     if (params[0].memref.size < strlen(mnemonic)) {
@@ -493,63 +684,32 @@ static TEE_Result generate_extended_public_key(uint32_t param_types, TEE_Param p
     const char* password = (const char*)params[3].memref.buffer;  // Optional password
     size_t password_size = password ? strlen(password) + 1 : 0;
 
-    TEE_ObjectHandle object;
     TEE_Result res;
     char pubkey[HDKEYLEN];
-    uint32_t read_bytes;
 
     char persistent_data[MAX_MNEMONIC_SIZE + MAX_MANAGED_CREDS_SIZE];
+    char *mnemonic = NULL;
+    char *shared_secret = NULL;
+    char *stored_password = NULL;
+    char *flags = NULL;
 
     EMSG("Generating extended public key");
 
-    res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, "mnemonic", sizeof("mnemonic"),
-                                   TEE_DATA_FLAG_ACCESS_READ, &object);
+    res = load_active_mnemonic_record(persistent_data, sizeof(persistent_data));
     if (res != TEE_SUCCESS) {
-        EMSG("Failed to open persistent mnemonic object, res=0x%08x", res);
+        EMSG("Failed to read active mnemonic record, res=0x%08x", res);
         return res;
     }
 
-    res = TEE_ReadObjectData(object, persistent_data, sizeof(persistent_data), &read_bytes);
-    if (res != TEE_SUCCESS) {
-        EMSG("Failed to read mnemonic and managed credentials from persistent object, res=0x%08x", res);
-        TEE_CloseObject(object);
+    split_mnemonic_record(persistent_data, &mnemonic, &shared_secret, &stored_password, &flags);
+    (void)flags;
+    if (!mnemonic) {
+        return TEE_ERROR_SECURITY;
+    }
+
+    res = verify_access(shared_secret, stored_password, auth_token, password, password_size);
+    if (res != TEE_SUCCESS)
         return res;
-    }
-
-    TEE_CloseObject(object);
-
-    // Split the persistent data into mnemonic and managed credentials
-    char* saveptr;
-    char* mnemonic = strtok_r(persistent_data, ",", &saveptr);
-    char* shared_secret = strtok_r(NULL, ",", &saveptr);
-    char* stored_password = strtok_r(NULL, ",", &saveptr);
-
-    // If the auth token is 0 and no password is provided, then return
-    if (auth_token == 0 && !password) {
-        EMSG("Password or auth token required");
-        return TEE_ERROR_SECURITY;
-    }
-
-    // Verify that the password is part of the managed credentials, if supplied
-    if ((password_size > 0 && password && stored_password && strcmp(password, stored_password)) ||
-        (password_size == 0 && stored_password && strcmp(stored_password, "|") != 0) ||
-        (password_size > 0 && !password && stored_password && strcmp(stored_password, "|") != 0)) {
-        EMSG("Password verification failed");
-        return TEE_ERROR_SECURITY;
-    }
-
-    // If a shared secret is present, then perform TOTP verification
-    if (strcmp(shared_secret, "|") != 0) {
-        // Verify TOTP using the managed credentials
-        TEE_Time current_time;
-        TEE_GetREETime(&current_time);
-        uint32_t totp = get_totp(shared_secret, current_time.seconds / TOTP_TIME_STEP);
-
-        if (auth_token != totp) {
-            EMSG("TOTP verification failed");
-            return TEE_ERROR_SECURITY;
-        }
-    }
 
     SEED seed;
     dogecoin_seed_from_mnemonic((const char*)mnemonic, password, seed);
@@ -598,63 +758,32 @@ static TEE_Result generate_address(uint32_t param_types, TEE_Param params[4]) {
     const char* password = (const char*)params[3].memref.buffer;  // Optional password
     size_t password_size = password ? strlen(password) + 1 : 0;
 
-    TEE_ObjectHandle object;
     TEE_Result res;
     char address[P2PKHLEN];
-    uint32_t read_bytes;
 
     char persistent_data[MAX_MNEMONIC_SIZE + MAX_MANAGED_CREDS_SIZE];
+    char *mnemonic = NULL;
+    char *shared_secret = NULL;
+    char *stored_password = NULL;
+    char *flags = NULL;
 
     EMSG("Generating address");
 
-    res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, "mnemonic", sizeof("mnemonic"),
-                                   TEE_DATA_FLAG_ACCESS_READ, &object);
+    res = load_active_mnemonic_record(persistent_data, sizeof(persistent_data));
     if (res != TEE_SUCCESS) {
-        EMSG("Failed to open persistent mnemonic object, res=0x%08x", res);
+        EMSG("Failed to read active mnemonic record, res=0x%08x", res);
         return res;
     }
 
-    res = TEE_ReadObjectData(object, persistent_data, sizeof(persistent_data), &read_bytes);
-    if (res != TEE_SUCCESS) {
-        EMSG("Failed to read mnemonic and managed credentials from persistent object, res=0x%08x", res);
-        TEE_CloseObject(object);
+    split_mnemonic_record(persistent_data, &mnemonic, &shared_secret, &stored_password, &flags);
+    (void)flags;
+    if (!mnemonic) {
+        return TEE_ERROR_SECURITY;
+    }
+
+    res = verify_access(shared_secret, stored_password, auth_token, password, password_size);
+    if (res != TEE_SUCCESS)
         return res;
-    }
-
-    TEE_CloseObject(object);
-
-    // Split the persistent data into mnemonic and managed credentials
-    char* saveptr;
-    char* mnemonic = strtok_r(persistent_data, ",", &saveptr);
-    char* shared_secret = strtok_r(NULL, ",", &saveptr);
-    char* stored_password = strtok_r(NULL, ",", &saveptr);
-
-    // If the auth token is 0 and no password is provided, then return
-    if (auth_token == 0 && !password) {
-        EMSG("Password or auth token required");
-        return TEE_ERROR_SECURITY;
-    }
-
-    // Verify that the password is part of the managed credentials, if supplied
-    if ((password_size > 0 && password && stored_password && strcmp(password, stored_password)) ||
-        (password_size == 0 && stored_password && strcmp(stored_password, "|") != 0) ||
-        (password_size > 0 && !password && stored_password && strcmp(stored_password, "|") != 0)) {
-        EMSG("Password verification failed");
-        return TEE_ERROR_SECURITY;
-    }
-
-    // If a shared secret is present, then perform TOTP verification
-    if (strcmp(shared_secret, "|") != 0) {
-        // Verify TOTP using the managed credentials
-        TEE_Time current_time;
-        TEE_GetREETime(&current_time);
-        uint32_t totp = get_totp(shared_secret, current_time.seconds / TOTP_TIME_STEP);
-
-        if (auth_token != totp) {
-            EMSG("TOTP verification failed");
-            return TEE_ERROR_SECURITY;
-        }
-    }
 
     SEED seed;
     dogecoin_seed_from_mnemonic((const char*)mnemonic, password, seed);
@@ -701,63 +830,32 @@ static TEE_Result sign_message_with_private_key(uint32_t param_types, TEE_Param 
     char *message = (char*)params[0].memref.buffer;
     uint32_t auth_token = params[3].value.a;
 
-    TEE_ObjectHandle object;
     TEE_Result res;
     char *sig = NULL;
-    uint32_t read_bytes;
 
     char persistent_data[MAX_MNEMONIC_SIZE + MAX_MANAGED_CREDS_SIZE];
+    char *mnemonic = NULL;
+    char *shared_secret = NULL;
+    char *stored_password = NULL;
+    char *flags = NULL;
 
     EMSG("Signing message");
 
-    res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, "mnemonic", sizeof("mnemonic"),
-                                   TEE_DATA_FLAG_ACCESS_READ, &object);
+    res = load_active_mnemonic_record(persistent_data, sizeof(persistent_data));
     if (res != TEE_SUCCESS) {
-        EMSG("Failed to open persistent mnemonic object, res=0x%08x", res);
+        EMSG("Failed to read active mnemonic record, res=0x%08x", res);
         return res;
     }
 
-    res = TEE_ReadObjectData(object, persistent_data, sizeof(persistent_data), &read_bytes);
-    if (res != TEE_SUCCESS) {
-        EMSG("Failed to read mnemonic and managed credentials from persistent object, res=0x%08x", res);
-        TEE_CloseObject(object);
+    split_mnemonic_record(persistent_data, &mnemonic, &shared_secret, &stored_password, &flags);
+    (void)flags;
+    if (!mnemonic) {
+        return TEE_ERROR_SECURITY;
+    }
+
+    res = verify_access(shared_secret, stored_password, auth_token, password, password_size);
+    if (res != TEE_SUCCESS)
         return res;
-    }
-
-    TEE_CloseObject(object);
-
-    // Split the persistent data into mnemonic and managed credentials
-    char* saveptr2;
-    char* mnemonic = strtok_r(persistent_data, ",", &saveptr2);
-    char* shared_secret = strtok_r(NULL, ",", &saveptr2);
-    char* stored_password = strtok_r(NULL, ",", &saveptr2);
-
-    // If the auth token is 0 and no password is provided, then return
-    if (auth_token == 0 && !password) {
-        EMSG("Password or auth token required");
-        return TEE_ERROR_SECURITY;
-    }
-
-    // Verify that the password is part of the managed credentials, if supplied
-    if ((password_size > 0 && password && stored_password && strcmp(password, stored_password)) ||
-        (password_size == 0 && stored_password && strcmp(stored_password, "|") != 0) ||
-        (password_size > 0 && !password && stored_password && strcmp(stored_password, "|") != 0)) {
-        EMSG("Password verification failed");
-        return TEE_ERROR_SECURITY;
-    }
-
-    // If a shared secret is present, then perform TOTP verification
-    if (strcmp(shared_secret, "|") != 0) {
-        // Verify TOTP using the managed credentials
-        TEE_Time current_time;
-        TEE_GetREETime(&current_time);
-        uint32_t totp = get_totp(shared_secret, current_time.seconds / TOTP_TIME_STEP);
-
-        if (auth_token != totp) {
-            EMSG("TOTP verification failed");
-            return TEE_ERROR_SECURITY;
-        }
-    }
 
     SEED seed;
     dogecoin_seed_from_mnemonic((const char*)mnemonic, password, seed);
@@ -818,64 +916,33 @@ static TEE_Result sign_transaction_with_private_key(uint32_t param_types, TEE_Pa
     char *raw_tx = (char*)params[0].memref.buffer;
     uint32_t auth_token = params[3].value.a;
 
-    TEE_ObjectHandle object;
     TEE_Result res;
     char *myscriptpubkey = NULL;
     char *signed_tx = NULL;
-    uint32_t read_bytes;
 
     char persistent_data[MAX_MNEMONIC_SIZE + MAX_MANAGED_CREDS_SIZE];
+    char *mnemonic = NULL;
+    char *shared_secret = NULL;
+    char *stored_password = NULL;
+    char *flags = NULL;
 
     EMSG("Signing transaction");
 
-    res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, "mnemonic", sizeof("mnemonic"),
-                                   TEE_DATA_FLAG_ACCESS_READ, &object);
+    res = load_active_mnemonic_record(persistent_data, sizeof(persistent_data));
     if (res != TEE_SUCCESS) {
-        EMSG("Failed to open persistent mnemonic object, res=0x%08x", res);
+        EMSG("Failed to read active mnemonic record, res=0x%08x", res);
         return res;
     }
 
-    res = TEE_ReadObjectData(object, persistent_data, sizeof(persistent_data), &read_bytes);
-    if (res != TEE_SUCCESS) {
-        EMSG("Failed to read mnemonic and managed credentials from persistent object, res=0x%08x", res);
-        TEE_CloseObject(object);
+    split_mnemonic_record(persistent_data, &mnemonic, &shared_secret, &stored_password, &flags);
+    (void)flags;
+    if (!mnemonic) {
+        return TEE_ERROR_SECURITY;
+    }
+
+    res = verify_access(shared_secret, stored_password, auth_token, password, password_size);
+    if (res != TEE_SUCCESS)
         return res;
-    }
-
-    TEE_CloseObject(object);
-
-    // Split the persistent data into mnemonic and managed credentials
-    char* saveptr2;
-    char* mnemonic = strtok_r(persistent_data, ",", &saveptr2);
-    char* shared_secret = strtok_r(NULL, ",", &saveptr2);
-    char* stored_password = strtok_r(NULL, ",", &saveptr2);
-
-    // If the auth token is 0 and no password is provided, then return
-    if (auth_token == 0 && !password) {
-        EMSG("Password or auth token required");
-        return TEE_ERROR_SECURITY;
-    }
-
-    // Verify that the password is part of the managed credentials, if supplied
-    if ((password_size > 0 && password && stored_password && strcmp(password, stored_password)) ||
-        (password_size == 0 && stored_password && strcmp(stored_password, "|") != 0) ||
-        (password_size > 0 && !password && stored_password && strcmp(stored_password, "|") != 0)) {
-        EMSG("Password verification failed");
-        return TEE_ERROR_SECURITY;
-    }
-
-    // If a shared secret is present, then perform TOTP verification
-    if (strcmp(shared_secret, "|") != 0) {
-        // Verify TOTP using the managed credentials
-        TEE_Time current_time;
-        TEE_GetREETime(&current_time);
-        uint32_t totp = get_totp(shared_secret, current_time.seconds / TOTP_TIME_STEP);
-
-        if (auth_token != totp) {
-            EMSG("TOTP verification failed");
-            return TEE_ERROR_SECURITY;
-        }
-    }
 
     SEED seed;
     dogecoin_seed_from_mnemonic((const char*)mnemonic, password, seed);
@@ -947,7 +1014,6 @@ static TEE_Result delegate_key(uint32_t param_types, TEE_Param params[4]) {
     }
 
     TEE_Result res;
-    TEE_ObjectHandle object;
     uint32_t obj_data_flag = TEE_DATA_FLAG_ACCESS_WRITE | TEE_DATA_FLAG_ACCESS_READ |
                              TEE_DATA_FLAG_ACCESS_WRITE_META | TEE_DATA_FLAG_OVERWRITE;
 
@@ -956,45 +1022,26 @@ static TEE_Result delegate_key(uint32_t param_types, TEE_Param params[4]) {
     uint32_t auth_token = params[2].value.a;
     char *delegate_creds = params[3].memref.buffer;
 
-    // Open the mnemonic persistent object
     char persistent_data[MAX_MNEMONIC_SIZE + MAX_MANAGED_CREDS_SIZE];
-    uint32_t read_bytes;
+    char *mnemonic = NULL;
+    char *shared_secret = NULL;
+    char *stored_password = NULL;
+    char *flags = NULL;
 
     EMSG("Delegating key");
 
-    res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, "mnemonic", sizeof("mnemonic"),
-                                   TEE_DATA_FLAG_ACCESS_READ, &object);
+    res = load_active_mnemonic_record(persistent_data, sizeof(persistent_data));
     if (res != TEE_SUCCESS) {
-        EMSG("Failed to open persistent mnemonic object, res=0x%08x", res);
+        EMSG("Failed to read active mnemonic record, res=0x%08x", res);
         return res;
     }
 
-    res = TEE_ReadObjectData(object, persistent_data, sizeof(persistent_data), &read_bytes);
-    if (res != TEE_SUCCESS) {
-        EMSG("Failed to read mnemonic and managed credentials from persistent object, res=0x%08x", res);
-        TEE_CloseObject(object);
-        return res;
-    }
-
-    TEE_CloseObject(object);
-
-    // Split the persistent data into shared_secret, stored_password, and flags
-    char* saveptr;
-    char* mnemonic = strtok_r(persistent_data, ",", &saveptr);
-    char* shared_secret = strtok_r(NULL, ",", &saveptr);
-    char* stored_password = strtok_r(NULL, ",", &saveptr);
-    char* flags = strtok_r(NULL, ",", &saveptr);
+    split_mnemonic_record(persistent_data, &mnemonic, &shared_secret, &stored_password, &flags);
 
     // Split the delegate credentials into delegate_password and password
     char* saveptr2;
     char* delegate_password = strtok_r(delegate_creds, ",", &saveptr2);
     char* password = strtok_r(NULL, ",", &saveptr2);
-
-    // If the auth token is 0 and no password is provided, then return
-    if (auth_token == 0 && !password) {
-        EMSG("Password or auth token required");
-        return TEE_ERROR_SECURITY;
-    }
 
     // Verify flag for delegate key creation
     if (!flags || strcmp(flags, "delegate") != 0) {
@@ -1002,29 +1049,13 @@ static TEE_Result delegate_key(uint32_t param_types, TEE_Param params[4]) {
         return TEE_ERROR_SECURITY;
     }
 
-    // Verify that the password is part of the managed credentials, if supplied
-    if (strcmp(password, stored_password) != 0) {
-        EMSG("Password verification failed");
+    if (verify_access(shared_secret, stored_password, auth_token, password, password ? strlen(password) + 1 : 0) != TEE_SUCCESS)
         return TEE_ERROR_SECURITY;
-    }
 
     // Verify delegate password was provided
-    if (strcmp(delegate_password, "|") == 0) {
+    if (!delegate_password || delegate_password[0] == '\0') {
         EMSG("Delegate password not provided");
         return TEE_ERROR_BAD_PARAMETERS;
-    }
-
-    // If a shared secret is present, then perform TOTP verification
-    if (strcmp(shared_secret, "|") != 0) {
-        // Verify TOTP using the managed credentials
-        TEE_Time current_time;
-        TEE_GetREETime(&current_time);
-        uint32_t totp = get_totp(shared_secret, current_time.seconds / TOTP_TIME_STEP);
-
-        if (auth_token != totp) {
-            EMSG("TOTP verification failed");
-            return TEE_ERROR_SECURITY;
-        }
     }
 
     // Derive the private child key
@@ -1052,6 +1083,7 @@ static TEE_Result delegate_key(uint32_t param_types, TEE_Param params[4]) {
     char delegate_object_id[MAX_DELEGATE_NAME_SIZE];
     snprintf(delegate_object_id, sizeof(delegate_object_id), "%s", key_path_out);
 
+    TEE_ObjectHandle object;
     res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE, delegate_object_id, strlen(delegate_object_id),
                                      obj_data_flag, TEE_HANDLE_NULL, delegate_object_data, strlen(delegate_object_data), &object);
     if (res != TEE_SUCCESS) {
@@ -1322,6 +1354,41 @@ exit:
 	return res;
 }
 
+static TEE_Result list_mnemonic_ids(uint32_t param_types, TEE_Param params[4])
+{
+    const uint32_t exp_param_types =
+        TEE_PARAM_TYPES(TEE_PARAM_TYPE_NONE,
+                        TEE_PARAM_TYPE_MEMREF_OUTPUT,
+                        TEE_PARAM_TYPE_NONE,
+                        TEE_PARAM_TYPE_NONE);
+    char index_buf[MNEMONIC_INDEX_MAX_SIZE] = {0};
+    uint32_t read_bytes = 0;
+
+    if (param_types != exp_param_types)
+        return TEE_ERROR_BAD_PARAMETERS;
+
+    if (!read_persistent_object(MNEMONIC_INDEX_OBJECT_ID, index_buf, sizeof(index_buf), &read_bytes)) {
+        static const char default_entry[] = DEFAULT_MNEMONIC_ID "\n";
+        if (params[1].memref.size < sizeof(default_entry)) {
+            params[1].memref.size = sizeof(default_entry);
+            return TEE_ERROR_SHORT_BUFFER;
+        }
+        TEE_MemMove(params[1].memref.buffer, default_entry, sizeof(default_entry));
+        params[1].memref.size = sizeof(default_entry);
+        return TEE_SUCCESS;
+    }
+
+    size_t out_len = strnlen(index_buf, sizeof(index_buf)) + 1;
+    if (params[1].memref.size < out_len) {
+        params[1].memref.size = out_len;
+        return TEE_ERROR_SHORT_BUFFER;
+    }
+
+    TEE_MemMove(params[1].memref.buffer, index_buf, out_len);
+    params[1].memref.size = out_len;
+    return TEE_SUCCESS;
+}
+
 TEE_Result TA_CreateEntryPoint(void)
 {
 	/* Nothing to do */
@@ -1376,6 +1443,8 @@ TEE_Result TA_InvokeCommandEntryPoint(void __unused *session,
         return delegate_key(param_types, params);
     case TA_LIBDOGECOIN_CMD_EXPORT_DELEGATED_KEY:
         return export_delegate_key(param_types, params);
+    case TA_LIBDOGECOIN_CMD_LIST_MNEMONICS:
+        return list_mnemonic_ids(param_types, params);
 	default:
 		EMSG("Command ID 0x%x is not supported", command);
 		return TEE_ERROR_NOT_SUPPORTED;

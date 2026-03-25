@@ -163,4 +163,13 @@
  */
 #define TA_LIBDOGECOIN_CMD_EXPORT_DELEGATED_KEY            11
 
+/*
+ * TA_LIBDOGECOIN_CMD_LIST_MNEMONICS - List stored mnemonic IDs
+ * param[0] unused
+ * param[1] (memref) Newline-delimited mnemonic ID list
+ * param[2] unused
+ * param[3] unused
+ */
+#define TA_LIBDOGECOIN_CMD_LIST_MNEMONICS                  12
+
 #endif /* __LIBDOGECOIN_TA_H__ */
