@@ -912,9 +912,10 @@ void test_tx_negative_version()
 
 void test_tx_witness_roundtrip()
 {
-    const char* tx_hex = "020000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff00ffffffff010100000000000000000203ff00aa076c6962646f676500000000";
+    /* segwit serialization: version | marker/flag | 1 vin | 1 vout | 2 witness items | locktime */
+    static const char tx_hex[] = "020000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff00ffffffff010100000000000000000203ff00aa076c6962646f676500000000";
     size_t outlen = 0;
-    uint8_t tx_data[sizeof("020000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff00ffffffff010100000000000000000203ff00aa076c6962646f676500000000") / 2];
+    uint8_t tx_data[(sizeof(tx_hex) - 1) / 2];
     utils_hex_to_bin(tx_hex, tx_data, strlen(tx_hex), &outlen);
 
     dogecoin_tx* tx = dogecoin_tx_new();
