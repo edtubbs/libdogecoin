@@ -225,11 +225,13 @@ int fclose(void *stream)
 #define MNEMONIC_INDEX_OBJECT_ID "mnemonic_index"
 #define MNEMONIC_OBJECT_ID_PREFIX "mnemonic:"
 #define LEGACY_MNEMONIC_OBJECT_ID "mnemonic"
+/* Keep this value aligned with src/optee/host/main.c DEFAULT_MNEMONIC_ID. */
 #define DEFAULT_MNEMONIC_ID "default"
 #define MAX_MNEMONIC_ID_SIZE 64
 #define MNEMONIC_INDEX_MAX_SIZE 4096
 
 #ifdef USE_ROCKCHIP_OTP
+/* Seed stored at OTP word index 0, spanning MAX_SEED_SIZE bytes as 32-bit words. */
 #define OTP_SEED_WORD_INDEX 0
 #define OTP_SEED_WORD_COUNT (MAX_SEED_SIZE / sizeof(uint32_t))
 #endif
@@ -237,8 +239,14 @@ int fclose(void *stream)
 static bool read_persistent_object(const char *obj_id, void *buffer, size_t buffer_len, uint32_t *read_bytes)
 {
     TEE_ObjectHandle object = TEE_HANDLE_NULL;
-    TEE_Result res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, obj_id, strlen(obj_id) + 1,
+    size_t obj_id_len = strlen(obj_id);
+    /* Compatibility: legacy objects may have been stored with id length including '\0'. */
+    TEE_Result res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, obj_id, obj_id_len,
                                               TEE_DATA_FLAG_ACCESS_READ, &object);
+    if (res != TEE_SUCCESS) {
+        res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, obj_id, obj_id_len + 1,
+                                       TEE_DATA_FLAG_ACCESS_READ, &object);
+    }
     if (res != TEE_SUCCESS) {
         return false;
     }
@@ -253,7 +261,7 @@ static TEE_Result write_persistent_object(const char *obj_id, const void *buffer
     TEE_ObjectHandle object = TEE_HANDLE_NULL;
     uint32_t obj_data_flag = TEE_DATA_FLAG_ACCESS_WRITE | TEE_DATA_FLAG_ACCESS_READ |
                              TEE_DATA_FLAG_ACCESS_WRITE_META | TEE_DATA_FLAG_OVERWRITE;
-    TEE_Result res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE, obj_id, strlen(obj_id) + 1,
+    TEE_Result res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE, obj_id, strlen(obj_id),
                                                 obj_data_flag, TEE_HANDLE_NULL, NULL, 0, &object);
     if (res != TEE_SUCCESS) {
         return res;
@@ -332,7 +340,7 @@ static void split_mnemonic_record(char *record, char **mnemonic, char **shared_s
 static TEE_Result verify_access(const char *shared_secret, const char *stored_password, uint32_t auth_token,
                                 const char *password, size_t password_size)
 {
-    const bool has_input_password = password && password_size > 0 && password[0] != '\0';
+    const bool has_input_password = password && password[0] != '\0';
     const bool has_stored_password = stored_password && stored_password[0] != '\0';
     const bool has_shared_secret = shared_secret && shared_secret[0] != '\0';
 
@@ -409,7 +417,7 @@ static void update_mnemonic_index(const char *mnemonic_id)
     size_t used = strlen(index_buf);
     size_t need = strlen(needle);
     if (used + need + 1 > sizeof(index_buf)) {
-        EMSG("Mnemonic index full");
+        EMSG("Mnemonic index full (max %zu bytes). Remove unused mnemonics.", sizeof(index_buf));
         return;
     }
 
@@ -425,8 +433,19 @@ static TEE_Result store_seed(const SEED seed)
     TEE_Result res = rockchip_otp_write_secure((const uint32_t *)seed, OTP_SEED_WORD_INDEX, OTP_SEED_WORD_COUNT);
     if (res != TEE_SUCCESS) {
         EMSG("Failed to write seed to OTP, res=0x%08x", res);
+        return res;
     }
-    return res;
+    uint32_t verify_seed[OTP_SEED_WORD_COUNT] = {0};
+    res = rockchip_otp_read_secure(verify_seed, OTP_SEED_WORD_INDEX, OTP_SEED_WORD_COUNT);
+    if (res != TEE_SUCCESS) {
+        EMSG("Failed to verify seed read from OTP, res=0x%08x", res);
+        return res;
+    }
+    if (TEE_MemCompare(verify_seed, seed, sizeof(SEED)) != 0) {
+        EMSG("OTP seed verification mismatch");
+        return TEE_ERROR_SECURITY;
+    }
+    return TEE_SUCCESS;
 #else
     return write_persistent_object("seed_object", seed, sizeof(SEED));
 #endif
@@ -652,10 +671,6 @@ static TEE_Result generate_and_store_mnemonic(uint32_t param_types, TEE_Param pa
     }
     update_mnemonic_index(mnemonic_id);
 
-    uint8_t loghash[SHA256_DIGEST_LENGTH];
-    sha256_raw((const uint8_t*) mnemonic_and_creds, strlen(mnemonic_and_creds), loghash);
-    EMSG("%s", utils_uint8_to_hex((const uint8_t*) loghash, SHA256_DIGEST_LENGTH));
-
     // Check if the provided buffer is large enough
     if (params[0].memref.size < strlen(mnemonic)) {
         params[0].memref.size = strlen(mnemonic);
@@ -702,7 +717,7 @@ static TEE_Result generate_extended_public_key(uint32_t param_types, TEE_Param p
     }
 
     split_mnemonic_record(persistent_data, &mnemonic, &shared_secret, &stored_password, &flags);
-    (void)flags;
+    (void)flags; /* Parsed for record format compatibility; not used in this command path. */
     if (!mnemonic) {
         return TEE_ERROR_SECURITY;
     }
@@ -776,7 +791,7 @@ static TEE_Result generate_address(uint32_t param_types, TEE_Param params[4]) {
     }
 
     split_mnemonic_record(persistent_data, &mnemonic, &shared_secret, &stored_password, &flags);
-    (void)flags;
+    (void)flags; /* Parsed for record format compatibility; not used in this command path. */
     if (!mnemonic) {
         return TEE_ERROR_SECURITY;
     }
@@ -848,7 +863,7 @@ static TEE_Result sign_message_with_private_key(uint32_t param_types, TEE_Param 
     }
 
     split_mnemonic_record(persistent_data, &mnemonic, &shared_secret, &stored_password, &flags);
-    (void)flags;
+    (void)flags; /* Parsed for record format compatibility; not used in this command path. */
     if (!mnemonic) {
         return TEE_ERROR_SECURITY;
     }
@@ -935,7 +950,7 @@ static TEE_Result sign_transaction_with_private_key(uint32_t param_types, TEE_Pa
     }
 
     split_mnemonic_record(persistent_data, &mnemonic, &shared_secret, &stored_password, &flags);
-    (void)flags;
+    (void)flags; /* Parsed for record format compatibility; not used in this command path. */
     if (!mnemonic) {
         return TEE_ERROR_SECURITY;
     }
@@ -1369,12 +1384,13 @@ static TEE_Result list_mnemonic_ids(uint32_t param_types, TEE_Param params[4])
 
     if (!read_persistent_object(MNEMONIC_INDEX_OBJECT_ID, index_buf, sizeof(index_buf), &read_bytes)) {
         static const char default_entry[] = DEFAULT_MNEMONIC_ID "\n";
-        if (params[1].memref.size < sizeof(default_entry)) {
-            params[1].memref.size = sizeof(default_entry);
+        size_t default_entry_len = strlen(default_entry) + 1;
+        if (params[1].memref.size < default_entry_len) {
+            params[1].memref.size = default_entry_len;
             return TEE_ERROR_SHORT_BUFFER;
         }
-        TEE_MemMove(params[1].memref.buffer, default_entry, sizeof(default_entry));
-        params[1].memref.size = sizeof(default_entry);
+        TEE_MemMove(params[1].memref.buffer, default_entry, default_entry_len);
+        params[1].memref.size = default_entry_len;
         return TEE_SUCCESS;
     }
 

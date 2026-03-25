@@ -40,6 +40,8 @@
 
 #include <sys/time.h>
 
+#define DEFAULT_MNEMONIC_ID "default"
+
 /* TEE resources */
 struct test_ctx {
     TEEC_Context ctx;
@@ -185,7 +187,7 @@ TEEC_Result generate_mnemonic(struct test_ctx *ctx, const char *shared_secret, c
              shared_secret ? shared_secret : "",
              password ? password : "",
              flags ? flags : "",
-             mnemonic_id ? mnemonic_id : "default");
+             mnemonic_id ? mnemonic_id : DEFAULT_MNEMONIC_ID);
 
     // Prepare the operation
     memset(&op, 0, sizeof(op));
@@ -478,10 +480,10 @@ TEEC_Result delegate_key_ta(struct test_ctx *ctx, const char* custom_path, const
 
     char delegate_creds[MAX_MANAGED_CREDS_SIZE] = {0}; // Buffer for delegated credentials
 
-    // Prepare the delegated credentials as "<delegate_password>,<password>"
+    // Prepare delegated credentials as "<delegate_password>,<password>" (empty field when unset)
     snprintf(delegate_creds, sizeof(delegate_creds), "%s,%s",
-        delegate_password && strlen(delegate_password) > 0 ? delegate_password : "",
-        password && strlen(password) > 0 ? password : "");
+        delegate_password && delegate_password[0] != '\0' ? delegate_password : "",
+        password && password[0] != '\0' ? password : "");
 
     // Construct key path from account, change_level, and address_index
     char key_path[KEYPATHMAXLEN];
@@ -699,7 +701,7 @@ int main(int argc, const char* argv[])
     char* delegate_password = NULL;
     dogecoin_bool yubikey = false;
     char* flags = "";
-    char* mnemonic_id = "default";
+    char* mnemonic_id = DEFAULT_MNEMONIC_ID;
 
     while ((opt = getopt_long_only(argc, (char *const *)argv, "c:o:l:i:m:t:n:s:e:p:d:a:f:r:h:kz", long_options, &long_index)) != -1) {
         switch (opt) {
