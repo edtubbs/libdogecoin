@@ -28,7 +28,7 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - comp2der
 - bip32maintotest
 - signmessage
-- verify_message
+- verifymessage
 - transaction
 
 So an example run of `such` could be something like this:
@@ -80,98 +80,13 @@ Below is a list of all the commands and the flags that they require. As a remind
 | sign                      | -x, -s, -i, -h, -p     | -t   | See the definition of sign_raw_transaction in the Transaction API.
 | comp2der                  | -s                     | None | Convert a compact signature to a DER signature.
 | signmessage               | -x, -p                 | None | Sign a message and output a base64 encoded signature and address.
-| verify_message             | -x, -s, -k             | None | Verify a message by public key recovery of base64 decoded signature and comparison of addresses.
+| verifymessage             | -x, -s, -k             | None | Verify a message by public key recovery of base64 decoded signature and comparison of addresses.
 | transaction               | None                   | None | Start the interactive transaction app. [Usage instructions below.]() |
 
 Lastly, to display the version of `such`, simply run the following command, which overrides any previous ones specified:
 ```
 ./such -v
 ```
-
-### Detailed `such` usage
-
-`such` is command-driven (`-c <command>`) and most workflows are a sequence of small commands. The fastest way to use it is:
-
-1. Generate or provide key material.
-2. Derive addresses/child keys as needed.
-3. Sign or build transactions/messages.
-4. Optionally encrypt/decrypt mnemonic/master-key backups.
-
-#### Command patterns
-
-- Keypair generation (new wallet key):
-  ```
-  ./such -c generate_private_key
-  ./such -c generate_public_key -p <wif_private_key>
-  ```
-- Address derivation from existing pubkey:
-  ```
-  ./such -c p2pkh -k <hex_pubkey>
-  ```
-- HD master/child derivation:
-  ```
-  ./such -c bip32_extended_master_key
-  ./such -c derive_child_keys -p <ext_key> -m "m/44'/3'/0'/0/0"
-  ./such -c print_keys -p <ext_key>
-  ```
-- BIP39 mnemonic to key/address:
-  ```
-  ./such -c generate_mnemonic
-  ./such -c mnemonic_to_key -n "<seed phrase>" -o 0 -g 0 -i 0
-  ./such -c mnemonic_to_addresses -n "<seed phrase>" -o 0 -g 0 -i 0
-  ```
-- Message signing/verification:
-  ```
-  ./such -c signmessage -x "message text" -p <wif_private_key>
-  ./such -c verifymessage -x "message text" -s <base64_signature> -k <p2pkh_address>
-  ```
-
-#### Practical end-to-end workflows
-
-##### 1) New key -> public key -> address
-```
-./such -c generate_private_key
-./such -c generate_public_key -p <wif_private_key_from_previous_step>
-./such -c p2pkh -k <hex_public_key_if_you_already_have_one>
-```
-Use this when you want a straightforward non-HD key flow.
-
-##### 2) Mnemonic wallet flow (BIP39/BIP44)
-```
-./such -c generate_mnemonic
-./such -c mnemonic_to_addresses -n "<seed phrase>" -o 0 -g 0 -i 0
-./such -c mnemonic_to_key -n "<seed phrase>" -o 0 -g 0 -i 0
-```
-This is the default wallet-style flow: derive receive address and corresponding signing key from the same path.
-
-##### 3) Interactive transaction flow
-```
-./such -c transaction
-```
-Inside the menu, a typical sequence is:
-- `add transaction`
-- add one or more UTXOs
-- add one or more outputs
-- finalize transaction
-- sign transaction
-- (optional) broadcast transaction
-
-##### 4) Non-interactive signing helpers
-```
-./such -c sign -x <raw_tx_hex> -s <script_pubkey_hex> -i <vin_index> -h <sighash_type> -p <wif_private_key>
-./such -c comp2der -s <compact_signature_hex>
-```
-Use this path if you already have raw transaction data and need deterministic one-shot signing steps.
-
-##### 5) Encrypted backup flow (mnemonic/master key)
-```
-./such -c generate_mnemonic -y <file_num> [-j] [-w]
-./such -c decrypt_mnemonic -y <file_num> [-j]
-./such -c bip32_extended_master_key -y <file_num> [-j] [-w]
-./such -c decrypt_master_key -y <file_num> [-j]
-./such -c seed_to_master_key -y <file_num> [-j]
-```
-Use `-j` when using TPM-backed encryption/decryption, and `-w` only when you intentionally want to overwrite an existing encrypted file.
 
 ### Examples
 Below are some examples on how to use the `such` tool in practice.
