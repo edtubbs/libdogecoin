@@ -658,6 +658,8 @@ static void print_usage()
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
+    printf("addwitness (-x <raw hex tx> -i <input index> -s <witness item hex>),\n");
+    printf("printwitness (-x <raw hex tx>),\n");
     printf("comp2der (-s <compact signature>),\n");
     printf("bip32maintotest (-p <extended hd master key>),\n");
     printf("signmessage (-x '<message>' -p <private key>),\n");
@@ -675,6 +677,25 @@ static bool showError(const char* er)
     dogecoin_ecc_stop();
     return 1;
     }
+
+static void such_witness_item_free_cb(void* data) {
+    cstr_free((cstring*)data, true);
+}
+
+static void print_tx_witness_stack(const dogecoin_tx* tx)
+{
+    if (!tx) return;
+    for (size_t vin_index = 0; vin_index < tx->vin->len; vin_index++) {
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, vin_index);
+        size_t witness_items = (tx_in && tx_in->witness_stack) ? tx_in->witness_stack->len : 0;
+        printf("input[%zu] witness items: %zu\n", vin_index, witness_items);
+        for (size_t wit_index = 0; wit_index < witness_items; wit_index++) {
+            cstring* witness_item = vector_idx(tx_in->witness_stack, wit_index);
+            char* witness_hex = utils_uint8_to_hex((const uint8_t*)witness_item->str, witness_item->len);
+            printf("  witness[%zu]: %s\n", wit_index, witness_hex ? witness_hex : "");
+        }
+    }
+}
 
 int main(int argc, char* argv[])
     {
@@ -1105,6 +1126,74 @@ int main(int argc, char* argv[])
             cstr_free(signed_tx, true);
             free(signed_tx_hex);
             }
+        dogecoin_tx_free(tx);
+        }
+    else if (strcmp(cmd, "addwitness") == 0) {
+        if (!txhex || !scripthex) {
+            return showError("Missing tx-hex or witness-hex (use -x, -s)\n");
+            }
+        if (strlen(txhex) > 1024 * 100) {
+            return showError("tx too large (max 100kb)\n");
+            }
+
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex");
+            }
+        dogecoin_free(data_bin);
+
+        if ((size_t)inputindex >= tx->vin->len) {
+            dogecoin_tx_free(tx);
+            return showError("Inputindex out of range");
+            }
+
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, inputindex);
+        if (!tx_in->witness_stack) {
+            tx_in->witness_stack = vector_new(1, such_witness_item_free_cb);
+        }
+
+        uint8_t* witness_data = dogecoin_malloc(strlen(scripthex) / 2 + 1);
+        utils_hex_to_bin(scripthex, witness_data, strlen(scripthex), &outlen);
+        cstring* witness_item = cstr_new_buf(witness_data, outlen);
+        vector_add(tx_in->witness_stack, witness_item);
+        dogecoin_free(witness_data);
+
+        cstring* with_witness_tx = cstr_new_sz(1024);
+        dogecoin_tx_serialize(with_witness_tx, tx);
+
+        char* with_witness_tx_hex = dogecoin_char_vla(with_witness_tx->len * 2 + 1);
+        utils_bin_to_hex((unsigned char*)with_witness_tx->str, with_witness_tx->len, with_witness_tx_hex);
+        printf("tx with witness: %s\n", with_witness_tx_hex);
+        print_tx_witness_stack(tx);
+
+        cstr_free(with_witness_tx, true);
+        free(with_witness_tx_hex);
+        dogecoin_tx_free(tx);
+        }
+    else if (strcmp(cmd, "printwitness") == 0) {
+        if (!txhex) {
+            return showError("Missing tx-hex (use -x)\n");
+            }
+        if (strlen(txhex) > 1024 * 100) {
+            return showError("tx too large (max 100kb)\n");
+            }
+
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex");
+            }
+        dogecoin_free(data_bin);
+        print_tx_witness_stack(tx);
         dogecoin_tx_free(tx);
         }
     else if (strcmp(cmd, "comp2der") == 0) {

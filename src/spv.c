@@ -811,6 +811,22 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
                 dogecoin_bool ok = dogecoin_spv_handle_mempool_tx_hex(client, hex);
 
+                dogecoin_tx* mempool_tx = dogecoin_tx_new();
+                if (dogecoin_tx_deserialize((const unsigned char*)buf->p, (size_t)hdr->data_len, mempool_tx, NULL)) {
+                    size_t vin_index;
+                    for (vin_index = 0; vin_index < mempool_tx->vin->len; vin_index++) {
+                        dogecoin_tx_in* tx_in = vector_idx(mempool_tx->vin, vin_index);
+                        size_t witness_items = (tx_in && tx_in->witness_stack) ? tx_in->witness_stack->len : 0;
+                        client->nodegroup->log_write_cb("[smpv] tx witness vin=%zu items=%zu\n", vin_index, witness_items);
+                        for (size_t wit_index = 0; wit_index < witness_items; wit_index++) {
+                            cstring* witness_item = vector_idx(tx_in->witness_stack, wit_index);
+                            char* witness_hex = utils_uint8_to_hex((const uint8_t*)witness_item->str, witness_item->len);
+                            client->nodegroup->log_write_cb("[smpv] tx witness vin=%zu idx=%zu hex=%s\n", vin_index, wit_index, witness_hex ? witness_hex : "");
+                        }
+                    }
+                }
+                dogecoin_tx_free(mempool_tx);
+
                 if (client->nodegroup && client->nodegroup->log_write_cb) {
                     client->nodegroup->log_write_cb(
                         "[smpv] mempool tx seen len=%u dispatched=%s\n",
