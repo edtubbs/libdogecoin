@@ -182,6 +182,27 @@ int main() {
 	dogecoin_free(privkeywif);
 	// END ===========================================
 
+	// SUCH CLI EQUIVALENT EXAMPLES
+	printf("\n\nSUCH CLI EQUIVALENT EXAMPLES:\n\n");
+	printf("The following `such` commands map to the C calls used above:\n\n");
+	printf("1) New key flow:\n");
+	printf("   ./such -c generate_private_key\n");
+	printf("   ./such -c generate_public_key -p <wif_private_key>\n");
+	printf("   ./such -c p2pkh -k <hex_pubkey>\n\n");
+	printf("2) HD/mnemonic flow:\n");
+	printf("   ./such -c bip32_extended_master_key\n");
+	printf("   ./such -c derive_child_keys -p <ext_key> -m \"m/44'/3'/0'/0/0\"\n");
+	printf("   ./such -c mnemonic_to_addresses -n \"<seed phrase>\" -o 0 -g 0 -i 0\n");
+	printf("   ./such -c mnemonic_to_key -n \"<seed phrase>\" -o 0 -g 0 -i 0\n\n");
+	printf("3) Message signing flow:\n");
+	printf("   ./such -c signmessage -x \"This is just a test message\" -p <wif_private_key>\n");
+	printf("   ./such -c verifymessage -x \"This is just a test message\" -s <base64_signature> -k <address>\n\n");
+	printf("4) Transaction flow:\n");
+	printf("   ./such -c transaction\n");
+	printf("   # Or one-shot signing:\n");
+	printf("   ./such -c sign -x <raw_tx_hex> -s <script_pubkey_hex> -i 0 -h 1 -p <wif_private_key>\n\n");
+	// END ===========================================
+
 	// BIP44 EXAMPLE
 	printf("\n\nBIP44 EXAMPLE:\n\n");
 
