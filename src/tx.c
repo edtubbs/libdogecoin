@@ -695,6 +695,15 @@ void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src)
     memcpy_safe(&dest->prevout, &src->prevout, sizeof(dest->prevout));
     dest->sequence = src->sequence;
 
+    if (dest->script_sig) {
+        cstr_free(dest->script_sig, true);
+        dest->script_sig = NULL;
+    }
+    if (dest->witness_stack) {
+        vector_free(dest->witness_stack, true);
+        dest->witness_stack = NULL;
+    }
+
     if (!src->script_sig) {
         dest->script_sig = NULL;
     } else {
@@ -708,13 +717,19 @@ void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src)
         return;
     }
 
+    dest->witness_stack = vector_new(src->witness_stack->len, dogecoin_witness_item_free_cb);
     if (!dest->witness_stack) {
-        dest->witness_stack = vector_new(src->witness_stack->len, dogecoin_witness_item_free_cb);
+        return;
     }
     for (size_t i = 0; i < src->witness_stack->len; i++) {
         cstring* witness_item = vector_idx(src->witness_stack, i);
         cstring* witness_item_copy = cstr_new_buf((const void*)witness_item->str, witness_item->len);
-        vector_add(dest->witness_stack, witness_item_copy);
+        if (!witness_item_copy || !vector_add(dest->witness_stack, witness_item_copy)) {
+            cstr_free(witness_item_copy, true);
+            vector_free(dest->witness_stack, true);
+            dest->witness_stack = NULL;
+            return;
+        }
     }
 }
 
