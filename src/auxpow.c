@@ -67,12 +67,14 @@ uint256_t* check_merkle_branch(uint256_t* hash, const vector_t* merkle_branch, i
 
     for (size_t i = 0; i < merkle_branch->len; ++i) {
         uint256_t* next_branch_hash = (uint256_t*)vector_idx(merkle_branch, i);
+        uint256_t next_hash;
 
         if (index & 1) {
-            dogecoin_hash_2_inputs(*next_branch_hash, *current_hash, *current_hash);
+            dogecoin_hash_2_inputs(*next_branch_hash, *current_hash, next_hash);
         } else {
-            dogecoin_hash_2_inputs(*current_hash, *next_branch_hash, *current_hash);
+            dogecoin_hash_2_inputs(*current_hash, *next_branch_hash, next_hash);
         }
+        memcpy(current_hash, next_hash, sizeof(next_hash));
 
         index >>= 1;
     }

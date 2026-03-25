@@ -1308,6 +1308,7 @@ void sha256d_2_input(const uint8_t left[SHA256_DIGEST_LENGTH], const uint8_t rig
     sha256_finalize(&context, digest);
 
     MEMSET_BZERO(mid, sizeof(mid));
+    MEMSET_BZERO(&context, sizeof(context));
 }
 
 void sha256_reset(sha256_context* ctx) {
