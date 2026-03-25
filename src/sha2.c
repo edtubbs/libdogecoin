@@ -1294,20 +1294,48 @@ void sha256_raw(const sha2_byte* data, size_t len, uint8_t digest[SHA256_DIGEST_
 void sha256d_2_input(const uint8_t left[SHA256_DIGEST_LENGTH], const uint8_t right[SHA256_DIGEST_LENGTH], uint8_t digest[SHA256_DIGEST_LENGTH])
 {
     uint8_t mid[SHA256_DIGEST_LENGTH];
+    uint8_t block[SHA256_BLOCK_LENGTH];
     sha256_context context;
 
     sha256_init(&context);
-    MEMCPY_BCOPY(context.buffer, left, SHA256_DIGEST_LENGTH);
-    MEMCPY_BCOPY(context.buffer + SHA256_DIGEST_LENGTH, right, SHA256_DIGEST_LENGTH);
-    sha256_transform(&context, (const sha2_word32*)context.buffer);
-    context.bitcount = SHA256_BLOCK_LENGTH << 3;
-    sha256_finalize(&context, mid);
+    MEMCPY_BCOPY(block, left, SHA256_DIGEST_LENGTH);
+    MEMCPY_BCOPY(block + SHA256_DIGEST_LENGTH, right, SHA256_DIGEST_LENGTH);
+    sha256_transform(&context, (const sha2_word32*)block);
+
+    MEMSET_BZERO(block, sizeof(block));
+    block[0] = 0x80;
+    block[SHA256_BLOCK_LENGTH - 2] = 0x02;
+    sha256_transform(&context, (const sha2_word32*)block);
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+    for (int j = 0; j < 8; j++) {
+        sha2_word32 word = context.state[j];
+        REVERSE32(word, word);
+        memcpy_safe(mid + (j * sizeof(word)), &word, sizeof(word));
+    }
+#else
+    MEMCPY_BCOPY(mid, context.state, SHA256_DIGEST_LENGTH);
+#endif
 
     sha256_init(&context);
-    sha256_write(&context, mid, SHA256_DIGEST_LENGTH);
-    sha256_finalize(&context, digest);
+    MEMSET_BZERO(block, sizeof(block));
+    MEMCPY_BCOPY(block, mid, SHA256_DIGEST_LENGTH);
+    block[SHA256_DIGEST_LENGTH] = 0x80;
+    block[SHA256_BLOCK_LENGTH - 2] = 0x01;
+    sha256_transform(&context, (const sha2_word32*)block);
+
+#if BYTE_ORDER == LITTLE_ENDIAN
+    for (int j = 0; j < 8; j++) {
+        sha2_word32 word = context.state[j];
+        REVERSE32(word, word);
+        memcpy_safe(digest + (j * sizeof(word)), &word, sizeof(word));
+    }
+#else
+    MEMCPY_BCOPY(digest, context.state, SHA256_DIGEST_LENGTH);
+#endif
 
     MEMSET_BZERO(mid, sizeof(mid));
+    MEMSET_BZERO(block, sizeof(block));
     MEMSET_BZERO(&context, sizeof(context));
 }
 
