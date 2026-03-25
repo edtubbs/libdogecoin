@@ -1291,64 +1291,76 @@ void sha256_raw(const sha2_byte* data, size_t len, uint8_t digest[SHA256_DIGEST_
     sha256_finalize(&context, digest);
 }
 
-void sha256d_2_input(const uint8_t left[SHA256_DIGEST_LENGTH], const uint8_t right[SHA256_DIGEST_LENGTH], uint8_t digest[SHA256_DIGEST_LENGTH])
+void sha256d64(const uint8_t* input, size_t blocks, uint8_t* digest)
 {
-    uint8_t mid[SHA256_DIGEST_LENGTH];
-    uint8_t block[SHA256_BLOCK_LENGTH];
     sha2_word64* length_ptr;
     sha2_word64 bitcount;
     sha256_context context;
+    uint8_t block[SHA256_BLOCK_LENGTH];
+    uint8_t mid[SHA256_DIGEST_LENGTH];
 
-    sha256_init(&context);
-    MEMCPY_BCOPY(block, left, SHA256_DIGEST_LENGTH);
-    MEMCPY_BCOPY(block + SHA256_DIGEST_LENGTH, right, SHA256_DIGEST_LENGTH);
-    sha256_transform(&context, (const sha2_word32*)block);
+    while (blocks--) {
+        sha256_init(&context);
+        MEMCPY_BCOPY(block, input, SHA256_BLOCK_LENGTH);
+        sha256_transform(&context, (const sha2_word32*)block);
 
-    MEMSET_BZERO(block, sizeof(block));
-    block[0] = 0x80;
-    bitcount = SHA256_BLOCK_LENGTH << 3;
+        MEMSET_BZERO(block, sizeof(block));
+        block[0] = 0x80;
+        bitcount = SHA256_BLOCK_LENGTH << 3;
 #if BYTE_ORDER == LITTLE_ENDIAN
-    REVERSE64(bitcount, bitcount);
+        REVERSE64(bitcount, bitcount);
 #endif
-    length_ptr = (sha2_word64*)&block[SHA256_SHORT_BLOCK_LENGTH];
-    *length_ptr = bitcount;
-    sha256_transform(&context, (const sha2_word32*)block);
+        length_ptr = (sha2_word64*)&block[SHA256_SHORT_BLOCK_LENGTH];
+        *length_ptr = bitcount;
+        sha256_transform(&context, (const sha2_word32*)block);
 
 #if BYTE_ORDER == LITTLE_ENDIAN
-    for (int j = 0; j < 8; j++) {
-        sha2_word32 word = context.state[j];
-        REVERSE32(word, word);
-        memcpy_safe(mid + (j * sizeof(word)), &word, sizeof(word));
-    }
+        for (int j = 0; j < 8; j++) {
+            sha2_word32 word = context.state[j];
+            REVERSE32(word, word);
+            memcpy_safe(mid + (j * sizeof(word)), &word, sizeof(word));
+        }
 #else
-    MEMCPY_BCOPY(mid, context.state, SHA256_DIGEST_LENGTH);
+        MEMCPY_BCOPY(mid, context.state, SHA256_DIGEST_LENGTH);
 #endif
 
-    sha256_init(&context);
-    MEMSET_BZERO(block, sizeof(block));
-    MEMCPY_BCOPY(block, mid, SHA256_DIGEST_LENGTH);
-    block[SHA256_DIGEST_LENGTH] = 0x80;
-    bitcount = SHA256_DIGEST_LENGTH << 3;
+        sha256_init(&context);
+        MEMSET_BZERO(block, sizeof(block));
+        MEMCPY_BCOPY(block, mid, SHA256_DIGEST_LENGTH);
+        block[SHA256_DIGEST_LENGTH] = 0x80;
+        bitcount = SHA256_DIGEST_LENGTH << 3;
 #if BYTE_ORDER == LITTLE_ENDIAN
-    REVERSE64(bitcount, bitcount);
+        REVERSE64(bitcount, bitcount);
 #endif
-    length_ptr = (sha2_word64*)&block[SHA256_SHORT_BLOCK_LENGTH];
-    *length_ptr = bitcount;
-    sha256_transform(&context, (const sha2_word32*)block);
+        length_ptr = (sha2_word64*)&block[SHA256_SHORT_BLOCK_LENGTH];
+        *length_ptr = bitcount;
+        sha256_transform(&context, (const sha2_word32*)block);
 
 #if BYTE_ORDER == LITTLE_ENDIAN
-    for (int j = 0; j < 8; j++) {
-        sha2_word32 word = context.state[j];
-        REVERSE32(word, word);
-        memcpy_safe(digest + (j * sizeof(word)), &word, sizeof(word));
-    }
+        for (int j = 0; j < 8; j++) {
+            sha2_word32 word = context.state[j];
+            REVERSE32(word, word);
+            memcpy_safe(digest + (j * sizeof(word)), &word, sizeof(word));
+        }
 #else
-    MEMCPY_BCOPY(digest, context.state, SHA256_DIGEST_LENGTH);
+        MEMCPY_BCOPY(digest, context.state, SHA256_DIGEST_LENGTH);
 #endif
+        input += SHA256_BLOCK_LENGTH;
+        digest += SHA256_DIGEST_LENGTH;
+    }
 
     MEMSET_BZERO(mid, sizeof(mid));
     MEMSET_BZERO(block, sizeof(block));
     MEMSET_BZERO(&context, sizeof(context));
+}
+
+void sha256d_2_input(const uint8_t left[SHA256_DIGEST_LENGTH], const uint8_t right[SHA256_DIGEST_LENGTH], uint8_t digest[SHA256_DIGEST_LENGTH])
+{
+    uint8_t block[SHA256_BLOCK_LENGTH];
+    MEMCPY_BCOPY(block, left, SHA256_DIGEST_LENGTH);
+    MEMCPY_BCOPY(block + SHA256_DIGEST_LENGTH, right, SHA256_DIGEST_LENGTH);
+    sha256d64(block, 1, digest);
+    MEMSET_BZERO(block, sizeof(block));
 }
 
 void sha256_reset(sha256_context* ctx) {
