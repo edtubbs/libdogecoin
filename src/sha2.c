@@ -1295,6 +1295,8 @@ void sha256d_2_input(const uint8_t left[SHA256_DIGEST_LENGTH], const uint8_t rig
 {
     uint8_t mid[SHA256_DIGEST_LENGTH];
     uint8_t block[SHA256_BLOCK_LENGTH];
+    sha2_word64* length_ptr;
+    sha2_word64 bitcount;
     sha256_context context;
 
     sha256_init(&context);
@@ -1304,7 +1306,12 @@ void sha256d_2_input(const uint8_t left[SHA256_DIGEST_LENGTH], const uint8_t rig
 
     MEMSET_BZERO(block, sizeof(block));
     block[0] = 0x80;
-    block[SHA256_BLOCK_LENGTH - 2] = 0x02;
+    bitcount = SHA256_BLOCK_LENGTH << 3;
+#if BYTE_ORDER == LITTLE_ENDIAN
+    REVERSE64(bitcount, bitcount);
+#endif
+    length_ptr = (sha2_word64*)&block[SHA256_SHORT_BLOCK_LENGTH];
+    *length_ptr = bitcount;
     sha256_transform(&context, (const sha2_word32*)block);
 
 #if BYTE_ORDER == LITTLE_ENDIAN
@@ -1321,7 +1328,12 @@ void sha256d_2_input(const uint8_t left[SHA256_DIGEST_LENGTH], const uint8_t rig
     MEMSET_BZERO(block, sizeof(block));
     MEMCPY_BCOPY(block, mid, SHA256_DIGEST_LENGTH);
     block[SHA256_DIGEST_LENGTH] = 0x80;
-    block[SHA256_BLOCK_LENGTH - 2] = 0x01;
+    bitcount = SHA256_DIGEST_LENGTH << 3;
+#if BYTE_ORDER == LITTLE_ENDIAN
+    REVERSE64(bitcount, bitcount);
+#endif
+    length_ptr = (sha2_word64*)&block[SHA256_SHORT_BLOCK_LENGTH];
+    *length_ptr = bitcount;
     sha256_transform(&context, (const sha2_word32*)block);
 
 #if BYTE_ORDER == LITTLE_ENDIAN
