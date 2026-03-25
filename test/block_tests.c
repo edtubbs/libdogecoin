@@ -198,13 +198,13 @@ void test_auxpow_block()
     assert(block->header->auxpow->is == false);
     dogecoin_auxpow_block_free(block);
 
-    assert(get_expected_index(0, 0, 1) == 0);
-    assert(get_expected_index(0, 98, 5) == 24);
-    assert(get_expected_index(1, 98, 5) == 1);
-    assert(get_expected_index(123456789, 98, 10) == 981);
+    assert(get_expected_index(0, 0, 1) == 0);               /* zero nonce/chain, single slot tree */
+    assert(get_expected_index(0, 98, 5) == 24);             /* Dogecoin chain id (98), 32-slot tree */
+    assert(get_expected_index(1, 98, 5) == 1);              /* nonce perturbation changes chosen slot */
+    assert(get_expected_index(123456789, 98, 10) == 981);   /* large nonce, 1024-slot tree */
 
     uint256_t base_hash = {0};
-    base_hash[0] = 1;
+    base_hash[0] = 1; /* deterministic non-zero leaf hash byte for branch checks */
 
     vector_t* merkle_branch = vector_new(1, dogecoin_free);
     assert(merkle_branch != NULL);
@@ -219,7 +219,7 @@ void test_auxpow_block()
 
     uint256_t* branch_hash = dogecoin_calloc(1, sizeof(uint256_t));
     assert(branch_hash != NULL);
-    (*branch_hash)[0] = 2;
+    (*branch_hash)[0] = 2; /* deterministic sibling hash byte distinct from base_hash */
     assert(vector_add(merkle_branch, branch_hash) == true);
 
     uint256_t* even_expected = Hash((const uint256_t*)&base_hash, (const uint256_t*)branch_hash);
