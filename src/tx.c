@@ -713,18 +713,23 @@ void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src)
                         src->script_sig->len);
     }
 
+    dest->witness_stack = vector_new((src->witness_stack && src->witness_stack->len > 0) ? src->witness_stack->len : 1, dogecoin_witness_item_free_cb);
+    if (!dest->witness_stack) {
+        return;
+    }
     if (!src->witness_stack || src->witness_stack->len == 0) {
         return;
     }
 
-    dest->witness_stack = vector_new(src->witness_stack->len, dogecoin_witness_item_free_cb);
-    if (!dest->witness_stack) {
-        return;
-    }
     for (size_t i = 0; i < src->witness_stack->len; i++) {
         cstring* witness_item = vector_idx(src->witness_stack, i);
         cstring* witness_item_copy = cstr_new_buf((const void*)witness_item->str, witness_item->len);
-        if (!witness_item_copy || !vector_add(dest->witness_stack, witness_item_copy)) {
+        if (!witness_item_copy) {
+            vector_free(dest->witness_stack, true);
+            dest->witness_stack = NULL;
+            return;
+        }
+        if (!vector_add(dest->witness_stack, witness_item_copy)) {
             cstr_free(witness_item_copy, true);
             vector_free(dest->witness_stack, true);
             dest->witness_stack = NULL;
