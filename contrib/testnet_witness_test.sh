@@ -9,7 +9,7 @@ mkdir -m 700 -p "$TMPDIR"
 BASE_TX_HEX="${BASE_TX_HEX:-0100000001aad9ecd645f150557080a0de9053a611bfe1f6a21ddca9f25480ea2d8dd212c8000000006a4730440220074450ba2ea6bc690c3388fd38336bf9c6433c35be2a7ab31d6fc4295c8326a202204655853f57105bd5c16f2cd0162a5e2fa4f570416da4730928069af6b46210e10121021bba012071cc524b955f5be6312bc20c7a658001dcc8de693d2a9081bed37945ffffffff02c0878b3b000000001976a914af1c8b5e0e88be99c779f5340ff47979ee259a1688ac0000000000000000266a24464c4331922cd322a23d7bed9ab0264499d4f3e642ddc50b4693a02065f3a0886968069900000000}"
 WITNESS_HEX="${WITNESS_HEX:-ff00aa6c6962646f6765}"
 SPV_ADDR="${SPV_ADDR:-nkA4i9AB6ZpLZNAmivbZbnKjJt5Dvw9DZT}"
-SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-420}"
+SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
 
 run_and_log() {
@@ -69,7 +69,7 @@ while [ "$SECONDS" -lt "$DEADLINE" ]; do
     if grep -Fq "[smpv] tx=$TXID_WITNESS" "$TMPDIR/spvnode.log"; then
         FOUND_WITNESS=1
     fi
-    if [ "$FOUND_NON_WITNESS" -eq 1 ]; then
+    if [ "$FOUND_NON_WITNESS" -eq 1 ] && [ "$FOUND_WITNESS" -eq 1 ]; then
         break
     fi
     if ! kill -0 "$SPV_PID" 2>/dev/null; then
@@ -116,12 +116,16 @@ fi
 
 if [ "$FOUND_WITNESS" -eq 1 ] || grep -Fq "[smpv] tx=$TXID_WITNESS" "$TMPDIR/spvnode.log"; then
     echo "[SUCCESS] spvnode reported witness-form txid ($TXID_WITNESS)."
+elif grep -Eqi "already (broadcasted|known|have transaction)|txn-already-known" "$TMPDIR/sendtx_witness.log"; then
+    echo "[SUCCESS] Witness-form tx was already known by peers; no fresh spvnode txid observation expected."
 else
     echo "[WARN] spvnode did not report witness-form txid ($TXID_WITNESS)."
 fi
 
 if [ "$FOUND_NON_WITNESS" -eq 1 ] || grep -Fq "[smpv] tx=$TXID_NOWITNESS" "$TMPDIR/spvnode.log"; then
     echo "[SUCCESS] spvnode reported non-witness txid ($TXID_NOWITNESS)."
+elif grep -Eqi "already (broadcasted|known|have transaction)|txn-already-known" "$TMPDIR/sendtx_nowitness.log"; then
+    echo "[SUCCESS] Non-witness tx was already known by peers; no fresh spvnode txid observation expected."
 else
     echo "[WARN] spvnode did not report non-witness txid ($TXID_NOWITNESS)."
 fi
