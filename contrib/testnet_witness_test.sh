@@ -42,8 +42,8 @@ if ! echo "$SUCH_OUT" | grep -q "witness\[0\]: $WITNESS_HEX"; then
     exit 1
 fi
 
-echo "[3/5] Start spvnode in SMPV mode (checkpointed header sync)"
-run_and_log "spvnode" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -f 0 -c -d -x -p -a "$SPV_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1 &
+echo "[3/5] Start spvnode in SMPV + block mode (checkpointed header sync)"
+run_and_log "spvnode" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -f 0 -c -d -x -p -b -a "$SPV_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1 &
 SPV_PID=$!
 sleep 45
 
