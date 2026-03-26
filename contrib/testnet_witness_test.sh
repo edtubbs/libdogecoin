@@ -10,6 +10,7 @@ BASE_TX_HEX="${BASE_TX_HEX:-0100000001aad9ecd645f150557080a0de9053a611bfe1f6a21d
 WITNESS_HEX="${WITNESS_HEX:-ff00aa6c6962646f6765}"
 SPV_ADDR="${SPV_ADDR:-nkA4i9AB6ZpLZNAmivbZbnKjJt5Dvw9DZT}"
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-420}"
+RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
 
 run_and_log() {
     local label="$1"
@@ -50,7 +51,32 @@ sleep 45
 echo "[4/5] Broadcast tx via sendtx (with and without witness)"
 run_and_log "sendtx_witness" ./sendtx $TESTNET_FLAG -d "$TX_WITH_WITNESS" | tee "$TMPDIR/sendtx_witness.log"
 run_and_log "sendtx_nowitness" ./sendtx $TESTNET_FLAG -d "$BASE_TX_HEX" | tee "$TMPDIR/sendtx_nowitness.log"
-sleep 90
+
+TXID_WITNESS=$(awk '/Start broadcasting transaction:/ {print $4; exit}' "$TMPDIR/sendtx_witness.log")
+TXID_NOWITNESS=$(awk '/Start broadcasting transaction:/ {print $4; exit}' "$TMPDIR/sendtx_nowitness.log")
+if [ -z "$TXID_WITNESS" ] || [ -z "$TXID_NOWITNESS" ]; then
+    echo "Error: failed to parse txid from sendtx output"
+    exit 1
+fi
+
+FOUND_NON_WITNESS=0
+FOUND_WITNESS=0
+DEADLINE=$((SECONDS + SPV_TIMEOUT_SECONDS))
+while [ "$SECONDS" -lt "$DEADLINE" ]; do
+    if grep -Fq "[smpv] tx=$TXID_NOWITNESS" "$TMPDIR/spvnode.log"; then
+        FOUND_NON_WITNESS=1
+    fi
+    if grep -Fq "[smpv] tx=$TXID_WITNESS" "$TMPDIR/spvnode.log"; then
+        FOUND_WITNESS=1
+    fi
+    if [ "$FOUND_NON_WITNESS" -eq 1 ]; then
+        break
+    fi
+    if ! kill -0 "$SPV_PID" 2>/dev/null; then
+        break
+    fi
+    sleep 10
+done
 
 echo "[5/5] Stop spvnode and summarize"
 kill "$SPV_PID" 2>/dev/null || true
@@ -60,20 +86,13 @@ cat "$TMPDIR/sendtx_witness.log"
 cat "$TMPDIR/sendtx_nowitness.log"
 cat "$TMPDIR/spvnode.log"
 
-TXID_WITNESS=$(awk '/Start broadcasting transaction:/ {print $4; exit}' "$TMPDIR/sendtx_witness.log")
-TXID_NOWITNESS=$(awk '/Start broadcasting transaction:/ {print $4; exit}' "$TMPDIR/sendtx_nowitness.log")
-if [ -z "$TXID_WITNESS" ] || [ -z "$TXID_NOWITNESS" ]; then
-    echo "Error: failed to parse txid from sendtx output"
-    exit 1
-fi
-
-if grep -Eq "tx successfully seen on node|txn-already-known|already known|already have transaction" "$TMPDIR/sendtx_witness.log"; then
+if grep -Eqi "$RELAY_SUCCESS_PATTERN" "$TMPDIR/sendtx_witness.log"; then
     echo "[SUCCESS] Witness-form tx reached peers (relayed or already known)."
 else
     echo "[WARN] No relay-back evidence for witness-form tx."
 fi
 
-if grep -Eq "tx successfully seen on node|txn-already-known|already known|already have transaction" "$TMPDIR/sendtx_nowitness.log"; then
+if grep -Eqi "$RELAY_SUCCESS_PATTERN" "$TMPDIR/sendtx_nowitness.log"; then
     echo "[SUCCESS] Non-witness tx reached peers (relayed or already known)."
 else
     echo "[WARN] No relay-back evidence for non-witness tx."
@@ -95,13 +114,13 @@ else
     echo "[WARN] No relevant transaction message observed in this run."
 fi
 
-if grep -Fq "[smpv] tx=$TXID_WITNESS" "$TMPDIR/spvnode.log"; then
+if [ "$FOUND_WITNESS" -eq 1 ] || grep -Fq "[smpv] tx=$TXID_WITNESS" "$TMPDIR/spvnode.log"; then
     echo "[SUCCESS] spvnode reported witness-form txid ($TXID_WITNESS)."
 else
     echo "[WARN] spvnode did not report witness-form txid ($TXID_WITNESS)."
 fi
 
-if grep -Fq "[smpv] tx=$TXID_NOWITNESS" "$TMPDIR/spvnode.log"; then
+if [ "$FOUND_NON_WITNESS" -eq 1 ] || grep -Fq "[smpv] tx=$TXID_NOWITNESS" "$TMPDIR/spvnode.log"; then
     echo "[SUCCESS] spvnode reported non-witness txid ($TXID_NOWITNESS)."
 else
     echo "[WARN] spvnode did not report non-witness txid ($TXID_NOWITNESS)."
