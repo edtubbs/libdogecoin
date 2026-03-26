@@ -47,21 +47,36 @@ run_and_log "spvnode" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l 
 SPV_PID=$!
 sleep 45
 
-echo "[4/5] Broadcast tx via sendtx"
-run_and_log "sendtx" ./sendtx $TESTNET_FLAG -d "$TX_WITH_WITNESS" | tee "$TMPDIR/sendtx.log"
+echo "[4/5] Broadcast tx via sendtx (with and without witness)"
+run_and_log "sendtx_witness" ./sendtx $TESTNET_FLAG -d "$TX_WITH_WITNESS" | tee "$TMPDIR/sendtx_witness.log"
+run_and_log "sendtx_nowitness" ./sendtx $TESTNET_FLAG -d "$BASE_TX_HEX" | tee "$TMPDIR/sendtx_nowitness.log"
 sleep 90
 
 echo "[5/5] Stop spvnode and summarize"
 kill "$SPV_PID" 2>/dev/null || true
 wait "$SPV_PID" 2>/dev/null || true
 
-cat "$TMPDIR/sendtx.log"
+cat "$TMPDIR/sendtx_witness.log"
+cat "$TMPDIR/sendtx_nowitness.log"
 cat "$TMPDIR/spvnode.log"
 
-if grep -Eq "tx successfully seen on node|txn-already-known|already known|already have transaction" "$TMPDIR/sendtx.log"; then
-    echo "[SUCCESS] Transaction reached peers (relayed or already known)."
+TXID_WITNESS=$(awk '/Start broadcasting transaction:/ {print $4; exit}' "$TMPDIR/sendtx_witness.log")
+TXID_NOWITNESS=$(awk '/Start broadcasting transaction:/ {print $4; exit}' "$TMPDIR/sendtx_nowitness.log")
+if [ -z "$TXID_WITNESS" ] || [ -z "$TXID_NOWITNESS" ]; then
+    echo "Error: failed to parse txid from sendtx output"
+    exit 1
+fi
+
+if grep -Eq "tx successfully seen on node|txn-already-known|already known|already have transaction" "$TMPDIR/sendtx_witness.log"; then
+    echo "[SUCCESS] Witness-form tx reached peers (relayed or already known)."
 else
-    echo "[WARN] No relay-back evidence in sendtx output."
+    echo "[WARN] No relay-back evidence for witness-form tx."
+fi
+
+if grep -Eq "tx successfully seen on node|txn-already-known|already known|already have transaction" "$TMPDIR/sendtx_nowitness.log"; then
+    echo "[SUCCESS] Non-witness tx reached peers (relayed or already known)."
+else
+    echo "[WARN] No relay-back evidence for non-witness tx."
 fi
 
 if grep -Fq "$WITNESS_HEX" "$TMPDIR/spvnode.log"; then
@@ -78,6 +93,18 @@ elif grep -Fq "Waiting for new blocks or relevant transactions..." "$TMPDIR/spvn
     echo "[SUCCESS] Relevant-transaction watch mode enabled message observed in spvnode log."
 else
     echo "[WARN] No relevant transaction message observed in this run."
+fi
+
+if grep -Fq "[smpv] tx=$TXID_WITNESS" "$TMPDIR/spvnode.log"; then
+    echo "[SUCCESS] spvnode reported witness-form txid ($TXID_WITNESS)."
+else
+    echo "[WARN] spvnode did not report witness-form txid ($TXID_WITNESS)."
+fi
+
+if grep -Fq "[smpv] tx=$TXID_NOWITNESS" "$TMPDIR/spvnode.log"; then
+    echo "[SUCCESS] spvnode reported non-witness txid ($TXID_NOWITNESS)."
+else
+    echo "[WARN] spvnode did not report non-witness txid ($TXID_NOWITNESS)."
 fi
 
 echo "Artifacts in: $TMPDIR"
