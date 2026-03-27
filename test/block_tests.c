@@ -37,13 +37,13 @@ struct blockheadertest {
 
 static const struct blockheadertest block_header_tests[] =
         {
-                {"010000000000000000000000000000000000000000000000000000000000000000000000696ad20e2dd4365c7459b4a4a5af743d5e92c6da3229e6532cd605f6533f2a5b24a6a152f0ff0f1e67860100", "1a91e3dace36e2be3bf030a65679fe821aa1d6ef92e7c9902eb318182c355691", 1, 1386325540, 504365040, 99943, &dogecoin_chainparams_main, "1000100000000000000000000000000000000000000000000000000000000000"}, // mainnet genesis block
-                {"020162000d6f03470d329026cd1fc720c0609cd378ca8691a117bd1aa46f01fb09b1a8468a15bf6f0b0e83f2e5036684169eafb9406468d4f075c999fb5b2a78fbb827ee41fb11548441361b00000000", "60323982f9c5ff1b5a954eac9dc1269352835f47c2c5222691d80f0d50dcf053", 6422786, 1410464577, 456540548, 0, &dogecoin_chainparams_main, ""}, // mainnet height 371337
-                {"020162002107cd08bec145c55ba8ffcbb4a9c0e836dfca383aa6ca1b380259a670aeb56fe5ea77d4f004afc5a0d31af1b89d5ebd9fd60cd7da7f4dcd96b0db1096a5bb1a7afb115488632e1b00000000","aff80f7b4dc8c667ebf4c76a6a62f9c4479844a37421ca2bf5abb485f4579fb6", 6422786, 1410464634, 456024968, 0, &dogecoin_chainparams_main, ""}, // mainnet height 371339
-                {"03016200c96fd9d1b98330440082bcc1e58a39fe5a522f42defc501bff9b68f7b67ed99e1144e430166c54e9b911d8e059c03d0f972e7ab971c51f5505ff0bb21fee6fb1d88a9d5be132051a00000000", "c91f5a44a752c7549c1c689af5aeb42639582011d887282f976d550477abe25a", 6422787, 1537051352, 436548321, 0, &dogecoin_chainparams_main, ""}, // mainnet height 2391337
-                {"0401620057bd4aa5170622b624bff774a087ea879a288226925c7cd5f3ead6ca4b6146e227b0e3699361bf58440971cfb28e16d9bab909769668ef3aac26220c6c0dc5fbda52595f9a97031a00000000", "8d7e4e91b571025ca109f2a0aeaf114ecc6aa2feec7f8bf23d405ac026c65d5e", 6422788, 1599689434, 436443034, 0, &dogecoin_chainparams_main, ""}, // mainnet height 3391337
+                {"010000000000000000000000000000000000000000000000000000000000000000000000696ad20e2dd4365c7459b4a4a5af743d5e92c6da3229e6532cd605f6533f2a5b24a6a152f0ff0f1e67860100", "1a91e3dace36e2be3bf030a65679fe821aa1d6ef92e7c9902eb318182c355691", 1, 1386325540, 504365040, 99943, &dogecoin_chainparams_main, "1000100000000000000000000000000000000000000000000000000000000000"}, // genesis hash
+                {"020162000d6f03470d329026cd1fc720c0609cd378ca8691a117bd1aa46f01fb09b1a8468a15bf6f0b0e83f2e5036684169eafb9406468d4f075c999fb5b2a78fbb827ee41fb11548441361b00000000", "60323982f9c5ff1b5a954eac9dc1269352835f47c2c5222691d80f0d50dcf053", 6422786, 1410464577, 456540548, 0, &dogecoin_chainparams_main, ""}, // 331337
+                {"020162002107cd08bec145c55ba8ffcbb4a9c0e836dfca383aa6ca1b380259a670aeb56fe5ea77d4f004afc5a0d31af1b89d5ebd9fd60cd7da7f4dcd96b0db1096a5bb1a7afb115488632e1b00000000","aff80f7b4dc8c667ebf4c76a6a62f9c4479844a37421ca2bf5abb485f4579fb6", 6422786, 1410464634, 456024968, 0, &dogecoin_chainparams_main, ""}, // 331339
+                {"03016200c96fd9d1b98330440082bcc1e58a39fe5a522f42defc501bff9b68f7b67ed99e1144e430166c54e9b911d8e059c03d0f972e7ab971c51f5505ff0bb21fee6fb1d88a9d5be132051a00000000", "c91f5a44a752c7549c1c689af5aeb42639582011d887282f976d550477abe25a", 6422787, 1537051352, 436548321, 0, &dogecoin_chainparams_main, ""}, // 2391337
+                {"0401620057bd4aa5170622b624bff774a087ea879a288226925c7cd5f3ead6ca4b6146e227b0e3699361bf58440971cfb28e16d9bab909769668ef3aac26220c6c0dc5fbda52595f9a97031a00000000", "8d7e4e91b571025ca109f2a0aeaf114ecc6aa2feec7f8bf23d405ac026c65d5e", 6422788, 1599689434, 436443034, 0, &dogecoin_chainparams_main, ""}, // 3391337
                 // end mainnet blocks
-                {"020162002770a8b89647bbb542f044754a07dc6e56545793f5dcecdf43826ae0cb7192a12466d048e51b0f8a3cbaaf8a624b9aa1212ce4c2a4feba0750f7ad14feb75f54c69de053837b091e00000000", "8afc65a42c47b5ed5862194fb846171ba4afb999a1b4cce149f56c328d8a90e4", 6422786, 1407229382, 503937923, 0, &dogecoin_chainparams_test, ""} // testnet height 158391
+                {"020162002770a8b89647bbb542f044754a07dc6e56545793f5dcecdf43826ae0cb7192a12466d048e51b0f8a3cbaaf8a624b9aa1212ce4c2a4feba0750f7ad14feb75f54c69de053837b091e00000000", "8afc65a42c47b5ed5862194fb846171ba4afb999a1b4cce149f56c328d8a90e4", 6422786, 1407229382, 503937923, 0, &dogecoin_chainparams_test, ""} // 158391
         };
 
 void test_block_header()
@@ -116,13 +116,13 @@ void test_block_header()
         cstr_free(serialized, true);
     }
 
-    /* Known-good mainnet block pair (heights 371337 -> 371338) for serialization/hash checks. */
+    /* blockheader */
     dogecoin_block_header bheader, bheaderprev, bheadercheck;
-    bheader.version = 6422786; // mainnet height 371338
-    bheader.timestamp = 1410464609; // mainnet height 371338
-    bheader.nonce = 0; // mainnet height 371338
-    bheader.bits = 456184976; // mainnet height 371338
-    char *prevblock_hex_o = "60323982f9c5ff1b5a954eac9dc1269352835f47c2c5222691d80f0d50dcf053"; // previous block hash (height 371337)
+    bheader.version = 6422786; // 371338
+    bheader.timestamp = 1410464609; // 371338
+    bheader.nonce = 0; // 371338
+    bheader.bits = 456184976; // 371338
+    char *prevblock_hex_o = "60323982f9c5ff1b5a954eac9dc1269352835f47c2c5222691d80f0d50dcf053"; // 371337
     char *prevblock_hex = dogecoin_malloc(strlen(prevblock_hex_o)+1);
     memcpy_safe(prevblock_hex, prevblock_hex_o, strlen(prevblock_hex_o));
     utils_reverse_hex(prevblock_hex, 64);
@@ -130,7 +130,7 @@ void test_block_header()
     utils_hex_to_bin(prevblock_hex, bheader.prev_block, 64, &outlen);
     dogecoin_free(prevblock_hex);
 
-    char *merkleroot_hex_o = "366747b6b22fab0a5ef71d433c14e5949b601c1f103984181364618b83eef67d"; // merkle root used in height 371338 header
+    char *merkleroot_hex_o = "366747b6b22fab0a5ef71d433c14e5949b601c1f103984181364618b83eef67d"; // 427928
     char *merkleroot_hex = dogecoin_malloc(strlen(merkleroot_hex_o)+1);
     memcpy_safe(merkleroot_hex, merkleroot_hex_o, strlen(merkleroot_hex_o));
     utils_reverse_hex(merkleroot_hex, 64);
@@ -138,12 +138,12 @@ void test_block_header()
     utils_hex_to_bin(merkleroot_hex, bheader.merkle_root, 64, &outlen);
     dogecoin_free(merkleroot_hex);
 
-    bheaderprev.version = 6422786; // mainnet height 371337
-    bheaderprev.timestamp = 1410464577; // mainnet height 371337
-    bheaderprev.nonce = 0; // mainnet height 371337
-    bheaderprev.bits = 456540548; // mainnet height 371337
+    bheaderprev.version = 6422786; // 371337
+    bheaderprev.timestamp = 1410464577; // 371337
+    bheaderprev.nonce = 0; // 371337
+    bheaderprev.bits = 456540548; // 371337
 
-    prevblock_hex_o = "46a8b109fb016fa41abd17a19186ca78d39c60c020c71fcd2690320d47036f0d"; // previous block hash (height 371336)
+    prevblock_hex_o = "46a8b109fb016fa41abd17a19186ca78d39c60c020c71fcd2690320d47036f0d"; // 371336
     prevblock_hex = dogecoin_malloc(strlen(prevblock_hex_o)+1);
     memcpy_safe(prevblock_hex, prevblock_hex_o, strlen(prevblock_hex_o));
     utils_reverse_hex(prevblock_hex, 64);
@@ -151,7 +151,7 @@ void test_block_header()
     utils_hex_to_bin(prevblock_hex, bheaderprev.prev_block, 64, &outlen);
     dogecoin_free(prevblock_hex);
 
-    merkleroot_hex_o = "ee27b8fb782a5bfb99c975f0d4686440b9af9e16846603e5f2830e0b6fbf158a"; // merkle root used in height 371337 header
+    merkleroot_hex_o = "ee27b8fb782a5bfb99c975f0d4686440b9af9e16846603e5f2830e0b6fbf158a"; // 371337
     merkleroot_hex = dogecoin_malloc(strlen(merkleroot_hex_o)+1);
     memcpy_safe(merkleroot_hex, merkleroot_hex_o, strlen(merkleroot_hex_o));
     utils_reverse_hex(merkleroot_hex, 64);
