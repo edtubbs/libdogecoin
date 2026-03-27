@@ -189,6 +189,7 @@ void test_block_header()
 
 void test_auxpow_block()
 {
+    /* Constructor wires all nested pointers and keeps auxpow state disabled by default. */
     dogecoin_auxpow_block* block = dogecoin_auxpow_block_new();
     assert(block != NULL);
     assert(block->header != NULL);
@@ -209,10 +210,12 @@ void test_auxpow_block()
     vector_t* merkle_branch = vector_new(1, dogecoin_free);
     assert(merkle_branch != NULL);
 
+    /* Empty branch returns the original hash unchanged. */
     uint256_t* passthrough_hash = check_merkle_branch(&base_hash, merkle_branch, 0);
     assert(memcmp(passthrough_hash, base_hash, sizeof(uint256_t)) == 0);
     dogecoin_free(passthrough_hash);
 
+    /* A negative branch index is accepted and should still produce an allocated result. */
     uint256_t* sentinel_hash = check_merkle_branch(&base_hash, merkle_branch, -1);
     assert(sentinel_hash != NULL);
     dogecoin_free(sentinel_hash);
@@ -222,12 +225,14 @@ void test_auxpow_block()
     (*branch_hash)[0] = 2; /* deterministic sibling hash byte distinct from base_hash */
     assert(vector_add(merkle_branch, branch_hash) == true);
 
+    /* Branch index 0 hashes (base_hash || sibling). */
     uint256_t* even_expected = Hash((const uint256_t*)&base_hash, (const uint256_t*)branch_hash);
     uint256_t* even_actual = check_merkle_branch(&base_hash, merkle_branch, 0);
     assert(memcmp(even_expected, even_actual, sizeof(uint256_t)) == 0);
     dogecoin_free(even_expected);
     dogecoin_free(even_actual);
 
+    /* Branch index 1 hashes (sibling || base_hash). */
     uint256_t* odd_expected = Hash((const uint256_t*)branch_hash, (const uint256_t*)&base_hash);
     uint256_t* odd_actual = check_merkle_branch(&base_hash, merkle_branch, 1);
     assert(memcmp(odd_expected, odd_actual, sizeof(uint256_t)) == 0);
