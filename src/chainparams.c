@@ -135,7 +135,7 @@ const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[] = {
     {41595117, "ff15d3837501029b27f34419ceb76c283be15159b6aecca38e11cd9f55f2ec85", 1773263888, 0x1e03ee2d},
     {41598400, "5fab0f828e47da930d5a010ab6d6204b185362e062f70b24b16f696135fdc9e5", 1773338705, 0x1d01f16d},
     {43460000, "081459dd31613e9380e1ad2e51a946fd3adb0239eeefe6e021651e26479f26ba", 1774476529, 0x1e0bffff},
-    {43461365, "503ae997cd378f4c7b24c6ef1ad5f27b41909005ffe029fa835defcf7c5fbf0f", 1774484364, 0x1e0fffff}};
+    {43621651, "d7f35815bac483a63c5490824f4d34ac95e21769d93e252e8032623663c32b39", 1774605818, 0x1e0bffff}};
 
 const dogecoin_chainparams* chain_from_b58_prefix(const char* address) {
     /* determine address prefix for network chainparams */
