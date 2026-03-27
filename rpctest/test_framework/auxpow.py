@@ -17,29 +17,29 @@ def computeAuxpow (block, target, ok):
 
   # Start by building the merge-mining coinbase.  The merkle tree
   # consists only of the block hash as root.
-  coinbase = "fabe" + binascii.hexlify("m" * 2)
+  coinbase = "fabe" + binascii.hexlify("m" * 2) # merged-mining marker (0xfa, 0xbe, 'm', 'm')
   coinbase += block
-  coinbase += "01000000" + ("00" * 4)
+  coinbase += "01000000" + ("00" * 4) # chain merkle branch size=1, nonce=0
 
   # Construct "vector" of transaction inputs.
-  vin = "01"
-  vin += ("00" * 32) + ("ff" * 4)
+  vin = "01" # one transaction input
+  vin += ("00" * 32) + ("ff" * 4) # coinbase prevout: null hash + index 0xffffffff
   vin += ("%02x" % (len (coinbase) / 2)) + coinbase
-  vin += ("ff" * 4)
+  vin += ("ff" * 4) # input sequence = 0xffffffff
 
   # Build up the full coinbase transaction.  It consists only
   # of the input and has no outputs.
-  tx = "01000000" + vin + "00" + ("00" * 4)
+  tx = "01000000" + vin + "00" + ("00" * 4) # version=1, vout_count=0, locktime=0
   txHash = doubleHashHex (tx)
 
   # Construct the parent block header.  It need not be valid, just good
   # enough for auxpow purposes.
-  header = "01000000"
-  header += "00" * 32
+  header = "01000000" # parent header version=1
+  header += "00" * 32 # previous block hash placeholder
   header += reverseHex (txHash)
-  header += "00" * 4
-  header += "00" * 4
-  header += "00" * 4
+  header += "00" * 4 # timestamp placeholder
+  header += "00" * 4 # nBits placeholder
+  header += "00" * 4 # nonce (incremented in mineBlock)
 
   # Mine the block.
   (header, blockhash) = mineBlock (header, target, ok)
@@ -47,12 +47,12 @@ def computeAuxpow (block, target, ok):
   # Build the MerkleTx part of the auxpow.
   auxpow = tx
   auxpow += blockhash
-  auxpow += "00"
-  auxpow += "00" * 4
+  auxpow += "00" # coinbase merkle branch length=0
+  auxpow += "00" * 4 # coinbase merkle index=0
 
   # Extend to full auxpow.
-  auxpow += "00"
-  auxpow += "00" * 4
+  auxpow += "00" # chain merkle branch length=0
+  auxpow += "00" * 4 # chain merkle index=0
   auxpow += header
 
   return auxpow
@@ -76,7 +76,7 @@ def mineBlock (header, target, ok):
 
   data = bytearray (binascii.unhexlify (header))
   while True:
-    assert data[79] < 255
+    assert data[79] < 255 # mutate low byte of nonce in 80-byte block header
     data[79] += 1
     hexData = binascii.hexlify (data)
 
