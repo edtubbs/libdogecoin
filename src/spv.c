@@ -886,9 +886,10 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 if (((check_node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
                     check_node->version_handshake &&
                     (headers_target_nodeid < 0 || check_node->nodeid == headers_target_nodeid) &&
-                    check_node->bestknownheight == longest_chain_height &&
                     (check_node->state & NODE_HEADERSYNC) != NODE_HEADERSYNC &&
-                    (check_node->state & NODE_BLOCKSYNC) != NODE_BLOCKSYNC)
+                    (check_node->state & NODE_BLOCKSYNC) != NODE_BLOCKSYNC &&
+                    ((request_blocks && check_node->bestknownheight == longest_chain_height) ||
+                     (!request_blocks && check_node->bestknownheight > tip_height)))
                 {
                     if (request_blocks) {
                         dogecoin_net_spv_node_request_headers_or_blocks(check_node, true);
