@@ -21,6 +21,15 @@ void dogecoin_transaction_context_free(struct dogecoin_transaction_context* ctx)
 struct dogecoin_eckey_context* dogecoin_eckey_context_new(void);
 void dogecoin_eckey_context_free(struct dogecoin_eckey_context* ctx);
 
+static size_t dogecoin_refcount_lock_size(void)
+{
+#ifdef _WIN32
+    return sizeof(CRITICAL_SECTION);
+#else
+    return sizeof(pthread_mutex_t);
+#endif
+}
+
 static void dogecoin_context_cleanup(dogecoin_context* ctx)
 {
     if (!ctx) return;
@@ -57,15 +66,8 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
     ctx->chain_params = testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
     ctx->enable_net = enable_net ? 1 : 0;
     ctx->refcount = 1;
-    ctx->refcount_lock = dogecoin_calloc(1, 
-#ifdef _WIN32
-                                         sizeof(CRITICAL_SECTION)
-#else
-                                         sizeof(pthread_mutex_t)
-#endif
-                                         );
+    ctx->refcount_lock = dogecoin_calloc(1, dogecoin_refcount_lock_size());
     if (!ctx->refcount_lock) {
-        dogecoin_context_cleanup(ctx);
         dogecoin_free(ctx);
         return NULL;
     }
@@ -73,7 +75,8 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
     InitializeCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
 #else
     if (pthread_mutex_init((pthread_mutex_t*)ctx->refcount_lock, NULL) != 0) {
-        dogecoin_context_cleanup(ctx);
+        dogecoin_free(ctx->refcount_lock);
+        ctx->refcount_lock = NULL;
         dogecoin_free(ctx);
         return NULL;
     }
@@ -112,6 +115,7 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
 void dogecoin_context_acquire(dogecoin_context* ctx)
 {
     if (!ctx) return;
+    if (!ctx->refcount_lock) return;
 #ifdef _WIN32
     EnterCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
 #else
@@ -129,6 +133,7 @@ void dogecoin_context_release(dogecoin_context* ctx)
 {
     dogecoin_bool should_free = false;
     if (!ctx) return;
+    if (!ctx->refcount_lock) return;
 #ifdef _WIN32
     EnterCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
 #else
