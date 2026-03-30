@@ -74,6 +74,7 @@ typedef struct dogecoin_context_ {
     struct dogecoin_eckey_context* key_ctx;
     void* ecc_ctx;
     void* rng_state;
+    void* refcount_lock;
     int enable_net;
     int error_code;
     uint32_t refcount;

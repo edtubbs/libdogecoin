@@ -10,6 +10,12 @@
 
 #include "secp256k1/include/secp256k1.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
+
 struct dogecoin_transaction_context* dogecoin_transaction_context_new(void);
 void dogecoin_transaction_context_free(struct dogecoin_transaction_context* ctx);
 struct dogecoin_eckey_context* dogecoin_eckey_context_new(void);
@@ -22,10 +28,19 @@ static void dogecoin_context_cleanup(dogecoin_context* ctx)
     if (ctx->key_ctx) dogecoin_eckey_context_free(ctx->key_ctx);
     if (ctx->rng_state) free_fast_random_context((struct fast_random_context*)ctx->rng_state);
     if (ctx->ecc_ctx) secp256k1_context_destroy((secp256k1_context*)ctx->ecc_ctx);
+    if (ctx->refcount_lock) {
+#ifdef _WIN32
+        DeleteCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
+#else
+        pthread_mutex_destroy((pthread_mutex_t*)ctx->refcount_lock);
+#endif
+        dogecoin_free(ctx->refcount_lock);
+    }
     ctx->tx_ctx = NULL;
     ctx->key_ctx = NULL;
     ctx->rng_state = NULL;
     ctx->ecc_ctx = NULL;
+    ctx->refcount_lock = NULL;
 }
 
 static void dogecoin_context_zero_error(dogecoin_context* ctx)
@@ -42,6 +57,27 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
     ctx->chain_params = testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
     ctx->enable_net = enable_net ? 1 : 0;
     ctx->refcount = 1;
+    ctx->refcount_lock = dogecoin_calloc(1, 
+#ifdef _WIN32
+                                         sizeof(CRITICAL_SECTION)
+#else
+                                         sizeof(pthread_mutex_t)
+#endif
+                                         );
+    if (!ctx->refcount_lock) {
+        dogecoin_context_cleanup(ctx);
+        dogecoin_free(ctx);
+        return NULL;
+    }
+#ifdef _WIN32
+    InitializeCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
+#else
+    if (pthread_mutex_init((pthread_mutex_t*)ctx->refcount_lock, NULL) != 0) {
+        dogecoin_context_cleanup(ctx);
+        dogecoin_free(ctx);
+        return NULL;
+    }
+#endif
     ctx->ecc_ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN | SECP256K1_CONTEXT_VERIFY);
     if (!ctx->ecc_ctx) {
         dogecoin_context_cleanup(ctx);
@@ -76,16 +112,36 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
 void dogecoin_context_acquire(dogecoin_context* ctx)
 {
     if (!ctx) return;
+#ifdef _WIN32
+    EnterCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
+#else
+    pthread_mutex_lock((pthread_mutex_t*)ctx->refcount_lock);
+#endif
     ctx->refcount++;
+#ifdef _WIN32
+    LeaveCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
+#else
+    pthread_mutex_unlock((pthread_mutex_t*)ctx->refcount_lock);
+#endif
 }
 
 void dogecoin_context_release(dogecoin_context* ctx)
 {
+    dogecoin_bool should_free = false;
     if (!ctx) return;
-    if (ctx->refcount > 1) {
-        ctx->refcount--;
-        return;
-    }
+#ifdef _WIN32
+    EnterCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
+#else
+    pthread_mutex_lock((pthread_mutex_t*)ctx->refcount_lock);
+#endif
+    if (ctx->refcount > 0) ctx->refcount--;
+    if (ctx->refcount == 0) should_free = true;
+#ifdef _WIN32
+    LeaveCriticalSection((CRITICAL_SECTION*)ctx->refcount_lock);
+#else
+    pthread_mutex_unlock((pthread_mutex_t*)ctx->refcount_lock);
+#endif
+    if (!should_free) return;
     dogecoin_context_cleanup(ctx);
     dogecoin_free(ctx);
 }
