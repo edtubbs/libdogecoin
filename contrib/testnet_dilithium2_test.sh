@@ -156,13 +156,19 @@ build_transaction() {
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Dilithium2 commitment"
 
-    info "Embedding Dilithium2 public key in witness for input 0..."
+    info "Embedding Dilithium2 public key in witness[0] for input 0..."
     ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$DILITHIUM2_PK")
     echo "$ADD_WITNESS_OUTPUT"
     TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_WITH_WITNESS" ] || error "Failed to append Dilithium2 public key witness item"
 
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
+    info "Embedding Dilithium2 signature in witness[1] for input 0..."
+    ADD_SIG_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$DILITHIUM2_SIG")
+    echo "$ADD_SIG_WITNESS_OUTPUT"
+    TX_WITH_WITNESS_SIG=$(echo "$ADD_SIG_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
+    [ -n "$TX_WITH_WITNESS_SIG" ] || error "Failed to append Dilithium2 signature witness item"
+
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS_SIG" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
     [ -n "$SIGNED_TX" ] || error "Failed to sign transaction"
@@ -170,12 +176,13 @@ build_transaction() {
     cat > "$TMPDIR/tx_info.txt" <<EOF
 RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
 TX_WITH_COMMIT=$TX_WITH_COMMIT
-TX_WITH_WITNESS=$TX_WITH_WITNESS
+TX_WITH_WITNESS=$TX_WITH_WITNESS_SIG
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
 TX_SIGHASH_HEX=$TX_SIGHASH_HEX
 DILITHIUM2_SIG=$DILITHIUM2_SIG
 DILITHIUM2_COMMIT=$DILITHIUM2_COMMIT
 WITNESS_PQC_PUBKEY=$DILITHIUM2_PK
+WITNESS_PQC_SIG=$DILITHIUM2_SIG
 SIGNED_TX=$SIGNED_TX
 OPRETURN_SCRIPT=6a2444494c32${DILITHIUM2_COMMIT}
 EOF
@@ -227,15 +234,19 @@ verify_commitment() {
     WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
     echo "$WITNESS_OUTPUT" > "$TMPDIR/dilithium2_witness.txt"
     WITNESS_DILITHIUM2_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
+    WITNESS_DILITHIUM2_SIG=$(echo "$WITNESS_OUTPUT" | awk '/witness\[1\]:/ {print $2; exit}')
     if [ -z "$WITNESS_DILITHIUM2_PK" ]; then
         error "Failed to extract Dilithium2 public key from witness"
+    fi
+    if [ -z "$WITNESS_DILITHIUM2_SIG" ]; then
+        error "Failed to extract Dilithium2 signature from witness"
     fi
     if [ "$WITNESS_DILITHIUM2_PK" != "$DILITHIUM2_PK" ]; then
         error "Witness Dilithium2 public key does not match expected public key"
     fi
     success "Witness carries expected Dilithium2 public key"
 
-    VERIFY_OUTPUT=$(./such -c dilithium2_verify -k "$WITNESS_DILITHIUM2_PK" -x "$TX_SIGHASH_HEX" -s "$DILITHIUM2_SIG")
+    VERIFY_OUTPUT=$(./such -c dilithium2_verify -k "$WITNESS_DILITHIUM2_PK" -x "$TX_SIGHASH_HEX" -s "$WITNESS_DILITHIUM2_SIG")
     echo "$VERIFY_OUTPUT"
     echo "$VERIFY_OUTPUT" > "$TMPDIR/dilithium2_verify.txt"
     if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid|VALID"; then
@@ -243,7 +254,7 @@ verify_commitment() {
         error "Off-chain Dilithium2 signature verification failed"
     fi
 
-    COMMIT_OUTPUT=$(./such -c dilithium2_commit -k "$WITNESS_DILITHIUM2_PK" -s "$DILITHIUM2_SIG")
+    COMMIT_OUTPUT=$(./such -c dilithium2_commit -k "$WITNESS_DILITHIUM2_PK" -s "$WITNESS_DILITHIUM2_SIG")
     echo "$COMMIT_OUTPUT" > "$TMPDIR/dilithium2_commit_verify.txt"
     REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
     if [ -z "$REGENERATED_COMMIT" ]; then

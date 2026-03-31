@@ -107,23 +107,27 @@ commitment32 = SHA256(public_key_bytes || signature_bytes)
 
 This keeps Phase 1 commitment publication consensus-neutral while still binding the off-chain PQ proof to a concrete transaction authorization digest.
 
-===Phase 1: Witness-Carried PQ Public Key (Optional Transport)===
+===Phase 1: Witness-Carried PQ Public Key and Signature (Optional Transport)===
 
-For implementations that support witness serialization, this proposal allows attaching the PQ public key bytes in the input witness stack of the same transaction that carries the OP_RETURN commitment.
+For implementations that support witness serialization, this proposal allows attaching both the PQ public key and the PQ signature bytes in the input witness stack of the same transaction that carries the OP_RETURN commitment.
 
 In libdogecoin tooling, a practical flow is:
 
 # build tx with tagged OP_RETURN commitment output;
-# append witness item 0 for the spending input with the PQ public key hex; and
+# append witness item 0 for the spending input with the PQ public key hex;
+# append witness item 1 for the same input with the PQ signature hex; and
 # sign/broadcast transaction normally.
 
 This keeps the on-chain commitment format unchanged while making the public key retrievable from transaction witness data for later verifier-side reconstruction:
 
 <source>
-commitment32 == SHA256(witness_pubkey_bytes || pq_signature_bytes)
+commitment32 == SHA256(witness_item0_pubkey_bytes || witness_item1_signature_bytes)
 </source>
 
-When witness data is present, off-chain verification SHOULD prefer witness-carried PQ public key bytes for commitment reconstruction and signature verification context.
+When witness data is present, off-chain verification SHOULD use witness item 0 (PQ public key) and witness item 1 (PQ signature) as the canonical on-chain PQ data source for:
+
+* <code>PQ_VERIFY(witness_item0_pubkey, message32, witness_item1_signature)</code>, and
+* commitment reconstruction check against OP_RETURN-tagged commitment payload.
 
 ===Phase 1: Base Transaction Binding===
 
