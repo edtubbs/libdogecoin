@@ -583,7 +583,8 @@ For end-to-end testnet command flow, use the provided scripts:
 - `contrib/testnet_falcon_test.sh`
 - `contrib/testnet_dilithium2_test.sh`
 
-These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, and SPV monitoring commands.
+These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, witness public-key attachment, and SPV monitoring commands.
+By default they run on testnet (`NETWORK=testnet`). To run the same flow on mainnet, set `NETWORK=mainnet` and provide a funded mainnet WIF/address context.
 
 ### Automated Testing Script
 
@@ -597,12 +598,12 @@ Run it to perform end-to-end testing:
 ./contrib/testnet_falcon_test.sh
 ```
 
-This script automates:
+These scripts automate:
 - Testnet wallet generation
 - Falcon keypair generation
-- Message signing
+- tx_sighash signing
 - Commitment generation
-- Transaction building guidance
+- Witness carriage of PQC public key
 - SPV monitoring instructions
 
 For protocol rationale/specification details, see:

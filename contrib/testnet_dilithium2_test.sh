@@ -16,7 +16,14 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-TESTNET_FLAG="-t"
+NETWORK="${NETWORK:-testnet}"
+NETWORK_FLAG="-t"
+if [ "$NETWORK" = "mainnet" ]; then
+    NETWORK_FLAG=""
+elif [ "$NETWORK" != "testnet" ]; then
+    echo "Unsupported NETWORK value: $NETWORK (expected testnet|mainnet)" >&2
+    exit 1
+fi
 TMPDIR=$(mktemp -d /tmp/dilithium2_testnet_XXXXXX)
 chmod 700 "$TMPDIR"
 BROADCASTED=0
@@ -64,10 +71,10 @@ generate_testnet_wallet() {
     if [ -n "$TESTNET_PRIVKEY_WIF" ]; then
         PRIVKEY_WIF="$TESTNET_PRIVKEY_WIF"
     else
-        run_and_log "such generate_private_key" ./such -c generate_private_key $TESTNET_FLAG | tee "$TMPDIR/testnet_key.txt"
+        run_and_log "such generate_private_key" ./such -c generate_private_key $NETWORK_FLAG | tee "$TMPDIR/testnet_key.txt"
         PRIVKEY_WIF=$(grep "^private key wif:" "$TMPDIR/testnet_key.txt" | cut -d: -f2 | tr -d ' ')
     fi
-    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $TESTNET_FLAG | tee "$TMPDIR/testnet_addr.txt"
+    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $NETWORK_FLAG | tee "$TMPDIR/testnet_addr.txt"
     TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
     success "Wallet ready: $TESTNET_ADDR"
     echo "  Private Key (WIF): $PRIVKEY_WIF"
@@ -76,7 +83,7 @@ generate_testnet_wallet() {
 
 get_testnet_coins() {
     echo ""
-    echo "Send testnet DOGE to: $TESTNET_ADDR"
+    echo "Send ${NETWORK} DOGE to: $TESTNET_ADDR"
     echo "Wallet private key (WIF): $PRIVKEY_WIF"
     echo "Faucet: https://faucet.doge.toys/"
     echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
@@ -155,7 +162,7 @@ build_transaction() {
     TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_WITH_WITNESS" ] || error "Failed to append Dilithium2 public key witness item"
 
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $TESTNET_FLAG)
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
     [ -n "$SIGNED_TX" ] || error "Failed to sign transaction"
@@ -175,7 +182,7 @@ EOF
 
     read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
-        SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $TESTNET_FLAG "$SIGNED_TX" || true)
+        SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $NETWORK_FLAG "$SIGNED_TX" || true)
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
         if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
             success "Broadcast accepted or already known by peers"
@@ -195,7 +202,7 @@ monitor_spvnode() {
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Dilithium2 validation log before next step..."
         set +e
-        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
+        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
         SPV_EXIT=$?
         set -e
         cat "$TMPDIR/spvnode.log"

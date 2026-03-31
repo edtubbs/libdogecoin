@@ -21,7 +21,14 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-TESTNET_FLAG="-t"
+NETWORK="${NETWORK:-testnet}"
+NETWORK_FLAG="-t"
+if [ "$NETWORK" = "mainnet" ]; then
+    NETWORK_FLAG=""
+elif [ "$NETWORK" != "testnet" ]; then
+    echo "Unsupported NETWORK value: $NETWORK (expected testnet|mainnet)" >&2
+    exit 1
+fi
 TMPDIR="/tmp/falcon_testnet_$$"
 mkdir -m 700 -p "$TMPDIR"
 BROADCASTED=0
@@ -88,11 +95,11 @@ generate_testnet_wallet() {
         PRIVKEY_WIF="$TESTNET_PRIVKEY_WIF"
         echo "private key wif: $PRIVKEY_WIF" > "$TMPDIR/testnet_key.txt"
     else
-        run_and_log "such generate_private_key" ./such -c generate_private_key $TESTNET_FLAG | tee "$TMPDIR/testnet_key.txt"
+        run_and_log "such generate_private_key" ./such -c generate_private_key $NETWORK_FLAG | tee "$TMPDIR/testnet_key.txt"
         PRIVKEY_WIF=$(grep "^private key wif:" "$TMPDIR/testnet_key.txt" | cut -d: -f2 | tr -d ' ')
     fi
 
-    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $TESTNET_FLAG | tee "$TMPDIR/testnet_addr.txt"
+    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $NETWORK_FLAG | tee "$TMPDIR/testnet_addr.txt"
     TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
     PUBKEY=$(grep "^public key hex:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
     
@@ -100,7 +107,7 @@ generate_testnet_wallet() {
     echo "  Address: $TESTNET_ADDR"
     echo "  Private Key (WIF): $PRIVKEY_WIF"
     echo "  Public Key: $PUBKEY"
-    echo "  [FUNDING] Send testnet DOGE to this address: $TESTNET_ADDR"
+    echo "  [FUNDING] Send ${NETWORK} DOGE to this address: $TESTNET_ADDR"
     
     # Save to file for later use
     cat > "$TMPDIR/wallet.txt" <<EOF
@@ -119,7 +126,7 @@ get_testnet_coins() {
     echo "  REQUEST TESTNET COINS"
     echo "=========================================="
     echo ""
-    echo "Send testnet DOGE to: $TESTNET_ADDR"
+    echo "Send ${NETWORK} DOGE to: $TESTNET_ADDR"
     echo "Wallet private key (WIF): $PRIVKEY_WIF"
     echo ""
     echo "Faucets:"
@@ -239,7 +246,7 @@ build_transaction() {
     fi
 
     info "Signing transaction with commitment output..."
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $TESTNET_FLAG)
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
 
@@ -253,7 +260,7 @@ build_transaction() {
     echo ""
     read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
-        SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $TESTNET_FLAG "$SIGNED_TX" || true)
+        SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $NETWORK_FLAG "$SIGNED_TX" || true)
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
         if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
             success "Broadcast accepted or already known by peers"
@@ -287,11 +294,11 @@ monitor_spvnode() {
     echo "After broadcasting your transaction, monitor it with header-first sync:"
     echo ""
     echo "  # -l no prompt, -c continuous, -d debug, -x smpv, -p checkpoint, -a address"
-    echo "  ./spvnode $TESTNET_FLAG -l -c -d -x -p -a \"$TESTNET_ADDR\" scan"
+    echo "  ./spvnode $NETWORK_FLAG -l -c -d -x -p -a \"$TESTNET_ADDR\" scan"
     echo ""
     echo "Then switch to full block scan mode (or use -b directly):"
     echo ""
-    echo "  ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a \"$TESTNET_ADDR\" scan"
+    echo "  ./spvnode $NETWORK_FLAG -l -c -d -x -p -b -a \"$TESTNET_ADDR\" scan"
     echo ""
     echo "The SPV node will:"
     echo "  - Sync testnet blockchain headers"
@@ -305,7 +312,7 @@ monitor_spvnode() {
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Falcon validation log before next step..."
         set +e
-        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
+        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
         SPV_EXIT=$?
         set -e
         cat "$TMPDIR/spvnode.log"
