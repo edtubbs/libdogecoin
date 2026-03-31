@@ -21,6 +21,7 @@ TMPDIR=$(mktemp -d /tmp/dilithium2_testnet_XXXXXX)
 chmod 700 "$TMPDIR"
 BROADCASTED=0
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
+SPV_FROM_HEIGHT="${SPV_FROM_HEIGHT:-0}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
 # sendtx can report success either as immediate relay or as "already known".
@@ -114,8 +115,16 @@ generate_commitment() {
 
 build_transaction() {
     info "Build unsigned testnet tx with such, then paste hex below:"
-    read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
-    read -p "Enter scriptPubKey hex for input 0: " SCRIPT_PUBKEY
+    if [ -z "$RAW_UNSIGNED_TX" ]; then
+        read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
+    else
+        info "Using RAW_UNSIGNED_TX from environment"
+    fi
+    if [ -z "$SCRIPT_PUBKEY" ]; then
+        read -p "Enter scriptPubKey hex for input 0: " SCRIPT_PUBKEY
+    else
+        info "Using SCRIPT_PUBKEY from environment"
+    fi
 
     # Reject placeholder prevout (32-byte txid + 4-byte vout = 36 bytes = 72 hex chars).
     if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(00){36}'; then
@@ -140,7 +149,13 @@ build_transaction() {
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Dilithium2 commitment"
 
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_COMMIT" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $TESTNET_FLAG)
+    info "Embedding Dilithium2 public key in witness for input 0..."
+    ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$DILITHIUM2_PK")
+    echo "$ADD_WITNESS_OUTPUT"
+    TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
+    [ -n "$TX_WITH_WITNESS" ] || error "Failed to append Dilithium2 public key witness item"
+
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $TESTNET_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
     [ -n "$SIGNED_TX" ] || error "Failed to sign transaction"
@@ -148,10 +163,12 @@ build_transaction() {
     cat > "$TMPDIR/tx_info.txt" <<EOF
 RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
 TX_WITH_COMMIT=$TX_WITH_COMMIT
+TX_WITH_WITNESS=$TX_WITH_WITNESS
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
 TX_SIGHASH_HEX=$TX_SIGHASH_HEX
 DILITHIUM2_SIG=$DILITHIUM2_SIG
 DILITHIUM2_COMMIT=$DILITHIUM2_COMMIT
+WITNESS_PQC_PUBKEY=$DILITHIUM2_PK
 SIGNED_TX=$SIGNED_TX
 OPRETURN_SCRIPT=6a2444494c32${DILITHIUM2_COMMIT}
 EOF
@@ -178,7 +195,7 @@ monitor_spvnode() {
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Dilithium2 validation log before next step..."
         set +e
-        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
+        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
         SPV_EXIT=$?
         set -e
         cat "$TMPDIR/spvnode.log"
@@ -200,7 +217,18 @@ monitor_spvnode() {
 
 verify_commitment() {
     info "Step 8: Off-chain verification"
-    VERIFY_OUTPUT=$(./such -c dilithium2_verify -k "$DILITHIUM2_PK" -x "$TX_SIGHASH_HEX" -s "$DILITHIUM2_SIG")
+    WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
+    echo "$WITNESS_OUTPUT" > "$TMPDIR/dilithium2_witness.txt"
+    WITNESS_DILITHIUM2_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
+    if [ -z "$WITNESS_DILITHIUM2_PK" ]; then
+        error "Failed to extract Dilithium2 public key from witness"
+    fi
+    if [ "$WITNESS_DILITHIUM2_PK" != "$DILITHIUM2_PK" ]; then
+        error "Witness Dilithium2 public key does not match expected public key"
+    fi
+    success "Witness carries expected Dilithium2 public key"
+
+    VERIFY_OUTPUT=$(./such -c dilithium2_verify -k "$WITNESS_DILITHIUM2_PK" -x "$TX_SIGHASH_HEX" -s "$DILITHIUM2_SIG")
     echo "$VERIFY_OUTPUT"
     echo "$VERIFY_OUTPUT" > "$TMPDIR/dilithium2_verify.txt"
     if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid|VALID"; then
@@ -208,7 +236,7 @@ verify_commitment() {
         error "Off-chain Dilithium2 signature verification failed"
     fi
 
-    COMMIT_OUTPUT=$(./such -c dilithium2_commit -k "$DILITHIUM2_PK" -s "$DILITHIUM2_SIG")
+    COMMIT_OUTPUT=$(./such -c dilithium2_commit -k "$WITNESS_DILITHIUM2_PK" -s "$DILITHIUM2_SIG")
     echo "$COMMIT_OUTPUT" > "$TMPDIR/dilithium2_commit_verify.txt"
     REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
     if [ -z "$REGENERATED_COMMIT" ]; then

@@ -107,6 +107,24 @@ commitment32 = SHA256(public_key_bytes || signature_bytes)
 
 This keeps Phase 1 commitment publication consensus-neutral while still binding the off-chain PQ proof to a concrete transaction authorization digest.
 
+===Phase 1: Witness-Carried PQ Public Key (Optional Transport)===
+
+For implementations that support witness serialization, this proposal allows attaching the PQ public key bytes in the input witness stack of the same transaction that carries the OP_RETURN commitment.
+
+In libdogecoin tooling, a practical flow is:
+
+# build tx with tagged OP_RETURN commitment output;
+# append witness item 0 for the spending input with the PQ public key hex; and
+# sign/broadcast transaction normally.
+
+This keeps the on-chain commitment format unchanged while making the public key retrievable from transaction witness data for later verifier-side reconstruction:
+
+<source>
+commitment32 == SHA256(witness_pubkey_bytes || pq_signature_bytes)
+</source>
+
+When witness data is present, off-chain verification SHOULD prefer witness-carried PQ public key bytes for commitment reconstruction and signature verification context.
+
 ===Phase 1: Base Transaction Binding===
 
 Because the OP_RETURN commitment payload is itself derived from the PQ signature, implementers must avoid circular dependency between:
@@ -211,6 +229,8 @@ Current reference behavior exists in libdogecoin components that:
 Current CLI wiring reflects this implementation model:
 
 * <code>such -c tx_sighash32</code> derives transaction-bound digest bytes for a selected input;
+* <code>such -c addwitness</code> appends witness stack items to a chosen input (used for PQ public key carriage);
+* <code>such -c printwitness</code> inspects witness stack items for verifier extraction workflows;
 * <code>such -c falcon_sign</code> / <code>dilithium2_sign</code> accept message bytes via <code>-x</code> (including tx_sighash32 hex);
 * <code>such -c falcon_commit</code> / <code>dilithium2_commit</code> derive commitment32 from public key + signature; and
 * <code>such -c raccoong_commit</code> derives Raccoon-G-44 commitment32 from public key + signature;

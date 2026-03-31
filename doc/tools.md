@@ -492,6 +492,8 @@ The `such` tool includes PQC commands for Falcon-512 and Dilithium2 commitments.
 | - | - | - |
 | falcon_keygen | None | Generates a Falcon-512 keypair (public key: 897 bytes, secret key: 1281 bytes) |
 | tx_sighash32 | -x, -s, -i, -h | Derives transaction input sighash32 used by signing flows |
+| addwitness | -x, -i, -s | Appends witness item bytes to a transaction input (for example PQ public key carriage) |
+| printwitness | -x | Prints per-input witness stack items from a raw transaction |
 | falcon_sign | -p, -x | Signs message bytes (typically tx_sighash32 hex) with Falcon-512 secret key. Returns signature (~660 bytes) |
 | falcon_verify | -k, -x, -s | Verifies a Falcon-512 signature against message bytes and public key |
 | falcon_commit | -k, -s | Generates a 32-byte SHA256 commitment from public key and signature for OP_RETURN |
@@ -558,6 +560,21 @@ Output:
 ```
 Generating Falcon-512 commitment...
 Commitment (32 bytes): a1b2c3d4e5f6789...
+```
+
+#### Attach PQ public key in witness and inspect it:
+```bash
+# Append Falcon public key as witness item 0 on input 0
+TX_WITH_WITNESS=$(./such -c addwitness -x <tx_with_commit_hex> -i 0 -s <falcon_public_key_hex> | awk '/tx with witness:/ {print $4}')
+
+# Verify witness contents
+./such -c printwitness -x $TX_WITH_WITNESS
+```
+
+Output:
+```
+input[0] witness items: 1
+  witness[0]: <falcon_public_key_hex>
 ```
 
 ### Testnet Workflow Helpers

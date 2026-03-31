@@ -20,6 +20,7 @@ TMPDIR=$(mktemp -d /tmp/raccoong_testnet_XXXXXX)
 chmod 700 "$TMPDIR"
 BROADCASTED=0
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
+SPV_FROM_HEIGHT="${SPV_FROM_HEIGHT:-0}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
 
@@ -104,8 +105,16 @@ derive_hd_child() {
 
 build_transaction() {
     info "Build unsigned testnet tx with such, then paste hex below:"
-    read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
-    read -p "Enter scriptPubKey hex for input 0: " SCRIPT_PUBKEY
+    if [ -z "$RAW_UNSIGNED_TX" ]; then
+        read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
+    else
+        info "Using RAW_UNSIGNED_TX from environment"
+    fi
+    if [ -z "$SCRIPT_PUBKEY" ]; then
+        read -p "Enter scriptPubKey hex for input 0: " SCRIPT_PUBKEY
+    else
+        info "Using SCRIPT_PUBKEY from environment"
+    fi
 
     # Reject placeholder prevout (32-byte txid + 4-byte vout = 36 bytes = 72 hex chars).
     if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(00){36}'; then
@@ -133,10 +142,29 @@ build_transaction() {
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Raccoon-G commitment"
 
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_COMMIT" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $TESTNET_FLAG)
+    info "Embedding Raccoon-G public key in witness for input 0..."
+    ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$RACCOONG_PK")
+    echo "$ADD_WITNESS_OUTPUT"
+    TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
+    [ -n "$TX_WITH_WITNESS" ] || error "Failed to append Raccoon-G public key witness item"
+
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $TESTNET_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
     [ -n "$SIGNED_TX" ] || error "Failed to sign transaction"
+
+    cat > "$TMPDIR/tx_info.txt" <<EOF
+RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
+TX_WITH_COMMIT=$TX_WITH_COMMIT
+TX_WITH_WITNESS=$TX_WITH_WITNESS
+SCRIPT_PUBKEY=$SCRIPT_PUBKEY
+TX_SIGHASH_HEX=$TX_SIGHASH_HEX
+RACCOONG_SIG=$RACCOONG_SIG
+RACCOONG_COMMIT=$RACCOONG_COMMIT
+WITNESS_PQC_PUBKEY=$RACCOONG_PK
+SIGNED_TX=$SIGNED_TX
+OPRETURN_SCRIPT=6a2452434734${RACCOONG_COMMIT}
+EOF
 
     read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
@@ -160,7 +188,7 @@ monitor_spvnode() {
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan and waiting for [raccoong-commit] Valid marker..."
         : > "$TMPDIR/spvnode.log"
-        ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1 &
+        ./spvnode $TESTNET_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1 &
         SPV_PID=$!
         DEADLINE=$(( $(date +%s) + SPV_TIMEOUT_SECONDS ))
         FOUND_VALID=0
@@ -196,14 +224,25 @@ monitor_spvnode() {
 
 verify_commitment() {
     info "Step 8: Off-chain verification"
-    VERIFY_OUTPUT=$(./such -c raccoong_verify -k "$RACCOONG_PK" -x "$TX_SIGHASH_HEX" -s "$RACCOONG_SIG")
+    WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
+    echo "$WITNESS_OUTPUT" > "$TMPDIR/raccoong_witness.txt"
+    WITNESS_RACCOONG_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
+    if [ -z "$WITNESS_RACCOONG_PK" ]; then
+        error "Failed to extract Raccoon-G public key from witness"
+    fi
+    if [ "$WITNESS_RACCOONG_PK" != "$RACCOONG_PK" ]; then
+        error "Witness Raccoon-G public key does not match expected public key"
+    fi
+    success "Witness carries expected Raccoon-G public key"
+
+    VERIFY_OUTPUT=$(./such -c raccoong_verify -k "$WITNESS_RACCOONG_PK" -x "$TX_SIGHASH_HEX" -s "$RACCOONG_SIG")
     echo "$VERIFY_OUTPUT"
     echo "$VERIFY_OUTPUT" > "$TMPDIR/raccoong_verify.txt"
     if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid|VALID"; then
         error "Off-chain Raccoon-G signature verification failed"
     fi
 
-    COMMIT_OUTPUT=$(./such -c raccoong_commit -k "$RACCOONG_PK" -s "$RACCOONG_SIG")
+    COMMIT_OUTPUT=$(./such -c raccoong_commit -k "$WITNESS_RACCOONG_PK" -s "$RACCOONG_SIG")
     echo "$COMMIT_OUTPUT" > "$TMPDIR/raccoong_commit_verify.txt"
     REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
     [ -n "$REGENERATED_COMMIT" ] || error "Failed to parse regenerated Raccoon-G commitment"

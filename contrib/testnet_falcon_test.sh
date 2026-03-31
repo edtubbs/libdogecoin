@@ -26,6 +26,7 @@ TMPDIR="/tmp/falcon_testnet_$$"
 mkdir -m 700 -p "$TMPDIR"
 BROADCASTED=0
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
+SPV_FROM_HEIGHT="${SPV_FROM_HEIGHT:-0}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
 # sendtx can report success either as immediate relay or as "already known".
@@ -169,13 +170,22 @@ EOF
 # Step 6: Build transaction with OP_RETURN
 build_transaction() {
     info "Step 4: Building transaction and deriving tx_sighash32..."
-    
-    echo "Create an unsigned testnet transaction with such first:"
-    echo "  ./such -c transaction"
-    echo ""
-    echo "Then paste the unsigned raw tx hex below."
-    read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
-    read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
+
+    if [ -z "$RAW_UNSIGNED_TX" ]; then
+        echo "Create an unsigned testnet transaction with such first:"
+        echo "  ./such -c transaction"
+        echo ""
+        echo "Then paste the unsigned raw tx hex below."
+        read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
+    else
+        info "Using RAW_UNSIGNED_TX from environment"
+    fi
+
+    if [ -z "$SCRIPT_PUBKEY" ]; then
+        read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
+    else
+        info "Using SCRIPT_PUBKEY from environment"
+    fi
 
     # Reject placeholder prevout (32-byte txid + 4-byte vout = 36 bytes = 72 hex chars).
     if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(00){36}'; then
@@ -220,8 +230,16 @@ build_transaction() {
         error "Failed to append Falcon commitment to transaction"
     fi
 
+    info "Step 6b: Embedding Falcon public key in witness for input 0..."
+    ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$FALCON_PK")
+    echo "$ADD_WITNESS_OUTPUT"
+    TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
+    if [ -z "$TX_WITH_WITNESS" ]; then
+        error "Failed to append Falcon public key witness item"
+    fi
+
     info "Signing transaction with commitment output..."
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_COMMIT" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $TESTNET_FLAG)
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $TESTNET_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
 
@@ -250,10 +268,12 @@ build_transaction() {
     cat > "$TMPDIR/tx_info.txt" <<EOF
 RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
 TX_WITH_COMMIT=$TX_WITH_COMMIT
+TX_WITH_WITNESS=$TX_WITH_WITNESS
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
 TX_SIGHASH_HEX=$TX_SIGHASH_HEX
 FALCON_SIG=$FALCON_SIG
 FALCON_COMMIT=$FALCON_COMMIT
+WITNESS_PQC_PUBKEY=$FALCON_PK
 SIGNED_TX=$SIGNED_TX
 OPRETURN_SCRIPT=6a24464c4331${FALCON_COMMIT}
 EOF
@@ -285,7 +305,7 @@ monitor_spvnode() {
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Falcon validation log before next step..."
         set +e
-        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
+        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $TESTNET_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
         SPV_EXIT=$?
         set -e
         cat "$TMPDIR/spvnode.log"
@@ -308,7 +328,18 @@ monitor_spvnode() {
 # Step 8: Verify commitment off-chain
 verify_commitment() {
     info "Step 8: Verifying commitment off-chain..."
-    VERIFY_OUTPUT=$(./such -c falcon_verify -k "$FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$FALCON_SIG")
+    WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
+    echo "$WITNESS_OUTPUT" > "$TMPDIR/falcon_witness.txt"
+    WITNESS_FALCON_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
+    if [ -z "$WITNESS_FALCON_PK" ]; then
+        error "Failed to extract Falcon public key from witness"
+    fi
+    if [ "$WITNESS_FALCON_PK" != "$FALCON_PK" ]; then
+        error "Witness Falcon public key does not match expected public key"
+    fi
+    success "Witness carries expected Falcon public key"
+
+    VERIFY_OUTPUT=$(./such -c falcon_verify -k "$WITNESS_FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$FALCON_SIG")
     echo "$VERIFY_OUTPUT"
     echo "$VERIFY_OUTPUT" > "$TMPDIR/falcon_verify.txt"
     if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid"; then
@@ -316,7 +347,7 @@ verify_commitment() {
         error "Off-chain Falcon signature verification failed"
     fi
 
-    COMMIT_OUTPUT=$(./such -c falcon_commit -k "$FALCON_PK" -s "$FALCON_SIG")
+    COMMIT_OUTPUT=$(./such -c falcon_commit -k "$WITNESS_FALCON_PK" -s "$FALCON_SIG")
     echo "$COMMIT_OUTPUT" > "$TMPDIR/falcon_commit_verify.txt"
     REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
     if [ -z "$REGENERATED_COMMIT" ]; then
