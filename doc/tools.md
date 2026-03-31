@@ -582,6 +582,12 @@ input[0] witness items: 1
 For end-to-end testnet command flow, use the provided scripts:
 - `contrib/testnet_falcon_test.sh`
 - `contrib/testnet_dilithium2_test.sh`
+- `contrib/testnet_raccoong_test.sh`
+
+For end-to-end mainnet command flow, use:
+- `contrib/mainnet_falcon_test.sh`
+- `contrib/mainnet_dilithium2_test.sh`
+- `contrib/mainnet_raccoong_test.sh`
 
 These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, witness public-key attachment, and SPV monitoring commands.
 By default they run on testnet (`NETWORK=testnet`). To run the same flow on mainnet, set `NETWORK=mainnet` and provide a funded mainnet WIF/address context.
