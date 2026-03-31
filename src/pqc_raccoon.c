@@ -168,7 +168,30 @@ static const char* get_raccoong_alg_name(void)
 
 dogecoin_bool dogecoin_raccoong44_is_available(void)
 {
-    return get_raccoong_alg_name() != NULL;
+    const char* alg_name = get_raccoong_alg_name();
+    if (!alg_name) {
+        return false;
+    }
+
+    OQS_SIG* alg = OQS_SIG_new(alg_name);
+    if (!alg) {
+        return false;
+    }
+
+    dogecoin_bool ok = false;
+    uint8_t* pk = (uint8_t*)dogecoin_malloc(alg->length_public_key);
+    uint8_t* sk = (uint8_t*)dogecoin_malloc(alg->length_secret_key);
+    if (pk && sk) {
+        ok = (OQS_SIG_keypair(alg, pk, sk) == OQS_SUCCESS);
+    }
+    if (pk) {
+        dogecoin_free(pk);
+    }
+    if (sk) {
+        dogecoin_free(sk);
+    }
+    OQS_SIG_free(alg);
+    return ok;
 }
 
 dogecoin_bool dogecoin_raccoong44_keypair(uint8_t** pk, size_t* pk_len,
