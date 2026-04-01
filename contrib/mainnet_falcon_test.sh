@@ -29,7 +29,7 @@ elif [ "$NETWORK" != "testnet" ]; then
     echo "Unsupported NETWORK value: $NETWORK (expected testnet|mainnet)" >&2
     exit 1
 fi
-TMPDIR="/tmp/falcon_testnet_$$"
+TMPDIR="/tmp/falcon_mainnet_$$"
 mkdir -m 700 -p "$TMPDIR"
 BROADCASTED=0
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
@@ -38,6 +38,15 @@ SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
 SPV_HEADERS_FILE="${SPV_HEADERS_FILE:-$TMPDIR/spv_headers.db}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
+FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
+FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
+UTXO_TXID="${UTXO_TXID:-47b3d05da56bd1b4738e0160fa9c4b8ce62b93ff6492eb45d447b54660742375}"
+UTXO_VOUT="${UTXO_VOUT:-1}"
+UTXO_VALUE_DOGE="${UTXO_VALUE_DOGE:-42}"
+SCRIPT_PUBKEY="${SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}"
+SEND_AMOUNT_DOGE="${SEND_AMOUNT_DOGE:-41.98}"
+TX_FEE_DOGE="${TX_FEE_DOGE:-0.02}"
+RUN_LOG="$TMPDIR/mainnet_falcon_run.log"
 # sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
 
@@ -89,72 +98,103 @@ check_tools() {
     success "All tools available"
 }
 
-# Step 1: Generate testnet wallet
-generate_testnet_wallet() {
-    info "Step 1: Generating testnet wallet..."
-
-    if [ -n "$TESTNET_PRIVKEY_WIF" ]; then
-        PRIVKEY_WIF="$TESTNET_PRIVKEY_WIF"
-        echo "private key wif: $PRIVKEY_WIF" > "$TMPDIR/testnet_key.txt"
-    else
-        run_and_log "such generate_private_key" ./such -c generate_private_key $NETWORK_FLAG | tee "$TMPDIR/testnet_key.txt"
-        PRIVKEY_WIF=$(grep "^private key wif:" "$TMPDIR/testnet_key.txt" | cut -d: -f2 | tr -d ' ')
+create_unsigned_tx() {
+    info "Step 4: Creating unsigned spend-back transaction to funded address..."
+    local send_koinu fee_koinu value_koinu
+    send_koinu=$(python3 - <<PY
+from decimal import Decimal
+print(int((Decimal("$SEND_AMOUNT_DOGE") * Decimal(100000000)).to_integral_value()))
+PY
+)
+    fee_koinu=$(python3 - <<PY
+from decimal import Decimal
+print(int((Decimal("$TX_FEE_DOGE") * Decimal(100000000)).to_integral_value()))
+PY
+)
+    value_koinu=$(python3 - <<PY
+from decimal import Decimal
+print(int((Decimal("$UTXO_VALUE_DOGE") * Decimal(100000000)).to_integral_value()))
+PY
+)
+    local check_total
+    check_total=$((send_koinu + fee_koinu))
+    if [ "$check_total" -gt "$value_koinu" ]; then
+        error "SEND_AMOUNT_DOGE + TX_FEE_DOGE exceeds UTXO_VALUE_DOGE"
     fi
 
-    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $NETWORK_FLAG | tee "$TMPDIR/testnet_addr.txt"
-    TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
-    PUBKEY=$(grep "^public key hex:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
-    
-    success "Testnet wallet generated"
+    RAW_UNSIGNED_TX=$(python3 - <<PY
+import struct
+def varint(n):
+    if n < 0xfd:
+        return bytes([n])
+    if n <= 0xffff:
+        return b'\\xfd' + struct.pack('<H', n)
+    if n <= 0xffffffff:
+        return b'\\xfe' + struct.pack('<I', n)
+    return b'\\xff' + struct.pack('<Q', n)
+
+txid = "$UTXO_TXID"
+vout = int("$UTXO_VOUT")
+amount = int("$send_koinu")
+addr_hash = "5a29227bb518c38cae5a9a195cafc56b22d7272b"
+
+version = struct.pack('<I', 1)
+vin_count = varint(1)
+prevout = bytes.fromhex(txid)[::-1] + struct.pack('<I', vout)
+script_sig = b''
+seq = struct.pack('<I', 0xffffffff)
+vout_count = varint(1)
+pk_script = bytes.fromhex("76a914" + addr_hash + "88ac")
+tx_out = struct.pack('<Q', amount) + varint(len(pk_script)) + pk_script
+locktime = struct.pack('<I', 0)
+raw = version + vin_count + prevout + varint(len(script_sig)) + script_sig + seq + vout_count + tx_out + locktime
+print(raw.hex())
+PY
+)
+    [ -n "$RAW_UNSIGNED_TX" ] || error "Failed to build unsigned tx"
+    info "Unsigned tx created from provided mainnet UTXO"
+}
+
+load_mainnet_wallet() {
+    info "Step 1: Using provided funded mainnet wallet..."
+    PRIVKEY_WIF="$FUNDED_WIF"
+    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $NETWORK_FLAG | tee "$TMPDIR/mainnet_addr.txt"
+    TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/mainnet_addr.txt" | cut -d: -f2 | tr -d ' ')
+    PUBKEY=$(grep "^public key hex:" "$TMPDIR/mainnet_addr.txt" | cut -d: -f2 | tr -d ' ')
+    if [ "$TESTNET_ADDR" != "$FUNDED_ADDR" ]; then
+        error "Provided WIF does not map to expected funded address"
+    fi
+    success "Mainnet funded wallet loaded"
     echo "  Address: $TESTNET_ADDR"
     echo "  Private Key (WIF): $PRIVKEY_WIF"
     echo "  Public Key: $PUBKEY"
-    echo "  [FUNDING] Send ${NETWORK} DOGE to this address: $TESTNET_ADDR"
-    
-    # Save to file for later use
     cat > "$TMPDIR/wallet.txt" <<EOF
-TESTNET_ADDR=$TESTNET_ADDR
+MAINNET_ADDR=$TESTNET_ADDR
 PRIVKEY_WIF=$PRIVKEY_WIF
 PUBKEY=$PUBKEY
+FUNDED_UTXO_TXID=$UTXO_TXID
+FUNDED_UTXO_VOUT=$UTXO_VOUT
+FUNDED_UTXO_VALUE_DOGE=$UTXO_VALUE_DOGE
+SCRIPT_PUBKEY=$SCRIPT_PUBKEY
+SEND_AMOUNT_DOGE=$SEND_AMOUNT_DOGE
+TX_FEE_DOGE=$TX_FEE_DOGE
 EOF
 }
 
-# Step 2: Get testnet coins
-get_testnet_coins() {
-    info "Step 2: Getting testnet coins..."
-    
-    echo ""
-    echo "=========================================="
-    echo "  REQUEST TESTNET COINS"
-    echo "=========================================="
-    echo ""
-    echo "Send ${NETWORK} DOGE to: $TESTNET_ADDR"
-    echo "Wallet private key (WIF): $PRIVKEY_WIF"
-    echo ""
-    echo "Faucets:"
-    echo "  1. https://faucet.doge.toys/"
-    echo "  2. https://faucet.triangleplatform.com/dogecoin/testnet"
-    echo "  3. https://dogecoin-faucet.ruan.dev/"
-    echo "  4. Discord: Dogecoin community #testnet channel"
-    echo "  5. Reddit: r/dogecoindev"
-    echo ""
-    echo "Note: some faucets require browser CAPTCHA or may rate-limit by IP."
-    echo ""
-    echo "[FAUCET] Preferred: https://faucet.doge.toys/"
-    echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
-    if [ "$NON_INTERACTIVE" -eq 1 ]; then
-        FAUCET_TXID="${FAUCET_TXID:-}"
-        info "NON_INTERACTIVE=1, skipping funding prompt."
-    else
-        read -p "Optional faucet txid (for log): " FAUCET_TXID
-        info "Press Enter after you have received coins..."
-        read
-    fi
-    if [ -n "$FAUCET_TXID" ]; then
-        echo "FAUCET_TXID=$FAUCET_TXID" > "$TMPDIR/faucet.txt"
-    fi
-    
-    success "Assuming coins received. Continuing..."
+log_run_context() {
+    {
+        echo "RUN_CONTEXT"
+        echo "NETWORK=$NETWORK"
+        echo "WIF=$PRIVKEY_WIF"
+        echo "ADDRESS=$TESTNET_ADDR"
+        echo "UTXO_TXID=$UTXO_TXID"
+        echo "UTXO_VOUT=$UTXO_VOUT"
+        echo "UTXO_VALUE_DOGE=$UTXO_VALUE_DOGE"
+        echo "SCRIPT_PUBKEY=$SCRIPT_PUBKEY"
+        echo "SEND_AMOUNT_DOGE=$SEND_AMOUNT_DOGE"
+        echo "TX_FEE_DOGE=$TX_FEE_DOGE"
+        echo "SPV_HEADERS_FILE=$SPV_HEADERS_FILE"
+    } | tee -a "$RUN_LOG"
 }
 
 # Step 3: Generate Falcon-512 keypair
@@ -185,27 +225,7 @@ EOF
 build_transaction() {
     info "Step 4: Building transaction and deriving tx_sighash32..."
 
-    if [ -z "$RAW_UNSIGNED_TX" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
-        error "RAW_UNSIGNED_TX must be set in NON_INTERACTIVE mode"
-    fi
-    if [ -z "$RAW_UNSIGNED_TX" ]; then
-        echo "Create an unsigned testnet transaction with such first:"
-        echo "  ./such -c transaction"
-        echo ""
-        echo "Then paste the unsigned raw tx hex below."
-        read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
-    else
-        info "Using RAW_UNSIGNED_TX from environment"
-    fi
-
-    if [ -z "$SCRIPT_PUBKEY" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
-        error "SCRIPT_PUBKEY must be set in NON_INTERACTIVE mode"
-    fi
-    if [ -z "$SCRIPT_PUBKEY" ]; then
-        read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
-    else
-        info "Using SCRIPT_PUBKEY from environment"
-    fi
+    create_unsigned_tx
 
     # Reject placeholder prevout (32-byte txid + 4-byte vout = 36 bytes = 72 hex chars).
     if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(00){36}'; then
@@ -217,7 +237,7 @@ build_transaction() {
     fi
 
     SIGHASH_OUTPUT=$(run_and_log "such tx_sighash32" ./such -c tx_sighash32 -x "$RAW_UNSIGNED_TX" -s "$SCRIPT_PUBKEY" -i 0 -h 1)
-    echo "$SIGHASH_OUTPUT"
+    echo "$SIGHASH_OUTPUT" | tee -a "$RUN_LOG"
     TX_SIGHASH_HEX=$(echo "$SIGHASH_OUTPUT" | grep "^tx_sighash32:" | cut -d: -f2 | tr -d ' ')
     if [ -z "$TX_SIGHASH_HEX" ] || [ ${#TX_SIGHASH_HEX} -ne 64 ]; then
         echo "$SIGHASH_OUTPUT"
@@ -242,7 +262,7 @@ build_transaction() {
     success "Commitment generated from tx-bound Falcon signature"
 
     ADD_COMMIT_OUTPUT=$(run_and_log "such falcon_add_commit_tx" ./such -c falcon_add_commit_tx -x "$RAW_UNSIGNED_TX" -s "$FALCON_COMMIT")
-    echo "$ADD_COMMIT_OUTPUT"
+    echo "$ADD_COMMIT_OUTPUT" | tee -a "$RUN_LOG"
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
 
     if [ -z "$TX_WITH_COMMIT" ]; then
@@ -252,13 +272,13 @@ build_transaction() {
 
     info "Step 6b: Embedding Falcon public key and signature in witness for input 0..."
     ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness (pubkey)" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$FALCON_PK")
-    echo "$ADD_WITNESS_OUTPUT"
+    echo "$ADD_WITNESS_OUTPUT" | tee -a "$RUN_LOG"
     TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
     if [ -z "$TX_WITH_WITNESS" ]; then
         error "Failed to append Falcon public key witness item"
     fi
     ADD_WITNESS_SIG_OUTPUT=$(run_and_log "such addwitness (signature)" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$FALCON_SIG")
-    echo "$ADD_WITNESS_SIG_OUTPUT"
+    echo "$ADD_WITNESS_SIG_OUTPUT" | tee -a "$RUN_LOG"
     TX_WITH_WITNESS_SIG=$(echo "$ADD_WITNESS_SIG_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
     if [ -z "$TX_WITH_WITNESS_SIG" ]; then
         error "Failed to append Falcon signature witness item"
@@ -266,7 +286,7 @@ build_transaction() {
 
     info "Signing transaction with commitment output..."
     SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS_SIG" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
-    echo "$SIGN_OUTPUT"
+    echo "$SIGN_OUTPUT" | tee -a "$RUN_LOG"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
 
     if [ -z "$SIGNED_TX" ]; then
@@ -285,7 +305,7 @@ build_transaction() {
     fi
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
         SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $NETWORK_FLAG "$SIGNED_TX" || true)
-        echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
+        echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g' | tee "$TMPDIR/sendtx.log" | tee -a "$RUN_LOG"
         if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
             success "Broadcast accepted or already known by peers"
             BROADCASTED=1
@@ -326,7 +346,7 @@ monitor_spvnode() {
     echo "  ./spvnode $NETWORK_FLAG -l -c -d -x -p -b -a \"$TESTNET_ADDR\" scan"
     echo ""
     echo "The SPV node will:"
-    echo "  - Sync testnet blockchain headers"
+    echo "  - Sync mainnet blockchain headers"
     echo "  - Track wallet activity for: $TESTNET_ADDR"
     echo "  - Download and scan blocks in full mode"
     echo "  - Detect Falcon commitments"
@@ -340,7 +360,7 @@ monitor_spvnode() {
         run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
         SPV_EXIT=$?
         set -e
-        cat "$TMPDIR/spvnode.log"
+        cat "$TMPDIR/spvnode.log" | tee -a "$RUN_LOG"
         if ! grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode.log"; then
             echo "----- spvnode log tail -----"
             tail -n 80 "$TMPDIR/spvnode.log"
@@ -361,7 +381,7 @@ monitor_spvnode() {
 verify_commitment() {
     info "Step 8: Verifying commitment off-chain..."
     WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
-    echo "$WITNESS_OUTPUT" > "$TMPDIR/falcon_witness.txt"
+    echo "$WITNESS_OUTPUT" | tee "$TMPDIR/falcon_witness.txt" | tee -a "$RUN_LOG" >/dev/null
     WITNESS_FALCON_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
     WITNESS_FALCON_SIG=$(echo "$WITNESS_OUTPUT" | awk '/witness\[1\]:/ {print $2; exit}')
     if [ -z "$WITNESS_FALCON_PK" ]; then
@@ -377,9 +397,16 @@ verify_commitment() {
         error "Witness Falcon signature does not match expected signature"
     fi
     success "Witness carries expected Falcon public key"
+    {
+        echo "WITNESS_VALIDATION"
+        echo "witness[0]=$WITNESS_FALCON_PK"
+        echo "witness[1]=$WITNESS_FALCON_SIG"
+        echo "tx_sighash32=$TX_SIGHASH_HEX"
+        echo "expected_commit=$FALCON_COMMIT"
+    } | tee -a "$RUN_LOG"
 
     VERIFY_OUTPUT=$(./such -c falcon_verify -k "$WITNESS_FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$WITNESS_FALCON_SIG")
-    echo "$VERIFY_OUTPUT"
+    echo "$VERIFY_OUTPUT" | tee -a "$RUN_LOG"
     echo "$VERIFY_OUTPUT" > "$TMPDIR/falcon_verify.txt"
     if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid"; then
         echo "$VERIFY_OUTPUT"
@@ -403,19 +430,23 @@ verify_commitment() {
     echo "  Expected commitment: $FALCON_COMMIT"
     echo "  Regenerated commitment: $REGENERATED_COMMIT"
     echo ""
+    {
+        echo "commitment_regenerated=$REGENERATED_COMMIT"
+        echo "commitment_match=true"
+    } | tee -a "$RUN_LOG"
 }
 
 # Main workflow
 main() {
     echo ""
     echo "=========================================="
-    echo "  Falcon-512 Testnet Integration Test"
+    echo "  Falcon-512 Mainnet Integration Test"
     echo "=========================================="
     echo ""
     
     check_tools
-    generate_testnet_wallet
-    get_testnet_coins
+    load_mainnet_wallet
+    log_run_context
     generate_falcon_keypair
     build_transaction
     monitor_spvnode
@@ -429,13 +460,14 @@ main() {
     success "All test data saved in: $TMPDIR"
     echo ""
     echo "Files:"
-    echo "  - $TMPDIR/wallet.txt (testnet wallet)"
+    echo "  - $TMPDIR/wallet.txt (mainnet wallet)"
     echo "  - $TMPDIR/falcon_keys.txt (Falcon keypair)"
     echo "  - $TMPDIR/falcon_sig.txt (tx_sighash signature)"
     echo "  - $TMPDIR/falcon_commit.txt (tx-bound commitment)"
     echo "  - $TMPDIR/tx_info.txt (transaction info)"
     echo "  - $TMPDIR/spvnode.log (SPV validation log)"
     echo "  - $TMPDIR/falcon_verify.txt (off-chain verify result)"
+    echo "  - $RUN_LOG (full run log with WIF/address + witness validation artifacts)"
     echo ""
 }
 
