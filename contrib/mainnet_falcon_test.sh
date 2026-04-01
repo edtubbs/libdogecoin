@@ -237,16 +237,22 @@ build_transaction() {
         error "Failed to append Falcon commitment to transaction"
     fi
 
-    info "Step 6b: Embedding Falcon public key in witness for input 0..."
-    ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$FALCON_PK")
+    info "Step 6b: Embedding Falcon public key and signature in witness for input 0..."
+    ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness (pubkey)" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$FALCON_PK")
     echo "$ADD_WITNESS_OUTPUT"
     TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
     if [ -z "$TX_WITH_WITNESS" ]; then
         error "Failed to append Falcon public key witness item"
     fi
+    ADD_WITNESS_SIG_OUTPUT=$(run_and_log "such addwitness (signature)" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$FALCON_SIG")
+    echo "$ADD_WITNESS_SIG_OUTPUT"
+    TX_WITH_WITNESS_SIG=$(echo "$ADD_WITNESS_SIG_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
+    if [ -z "$TX_WITH_WITNESS_SIG" ]; then
+        error "Failed to append Falcon signature witness item"
+    fi
 
     info "Signing transaction with commitment output..."
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS_SIG" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
 
@@ -276,6 +282,7 @@ build_transaction() {
 RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
 TX_WITH_COMMIT=$TX_WITH_COMMIT
 TX_WITH_WITNESS=$TX_WITH_WITNESS
+TX_WITH_WITNESS_SIG=$TX_WITH_WITNESS_SIG
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
 TX_SIGHASH_HEX=$TX_SIGHASH_HEX
 FALCON_SIG=$FALCON_SIG
@@ -338,15 +345,22 @@ verify_commitment() {
     WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
     echo "$WITNESS_OUTPUT" > "$TMPDIR/falcon_witness.txt"
     WITNESS_FALCON_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
+    WITNESS_FALCON_SIG=$(echo "$WITNESS_OUTPUT" | awk '/witness\[1\]:/ {print $2; exit}')
     if [ -z "$WITNESS_FALCON_PK" ]; then
         error "Failed to extract Falcon public key from witness"
+    fi
+    if [ -z "$WITNESS_FALCON_SIG" ]; then
+        error "Failed to extract Falcon signature from witness"
     fi
     if [ "$WITNESS_FALCON_PK" != "$FALCON_PK" ]; then
         error "Witness Falcon public key does not match expected public key"
     fi
+    if [ "$WITNESS_FALCON_SIG" != "$FALCON_SIG" ]; then
+        error "Witness Falcon signature does not match expected signature"
+    fi
     success "Witness carries expected Falcon public key"
 
-    VERIFY_OUTPUT=$(./such -c falcon_verify -k "$WITNESS_FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$FALCON_SIG")
+    VERIFY_OUTPUT=$(./such -c falcon_verify -k "$WITNESS_FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$WITNESS_FALCON_SIG")
     echo "$VERIFY_OUTPUT"
     echo "$VERIFY_OUTPUT" > "$TMPDIR/falcon_verify.txt"
     if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid"; then
@@ -354,7 +368,7 @@ verify_commitment() {
         error "Off-chain Falcon signature verification failed"
     fi
 
-    COMMIT_OUTPUT=$(./such -c falcon_commit -k "$WITNESS_FALCON_PK" -s "$FALCON_SIG")
+    COMMIT_OUTPUT=$(./such -c falcon_commit -k "$WITNESS_FALCON_PK" -s "$WITNESS_FALCON_SIG")
     echo "$COMMIT_OUTPUT" > "$TMPDIR/falcon_commit_verify.txt"
     REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
     if [ -z "$REGENERATED_COMMIT" ]; then
