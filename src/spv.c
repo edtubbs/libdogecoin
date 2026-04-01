@@ -412,10 +412,10 @@ void dogecoin_net_spv_fill_block_locator(dogecoin_spv_client *client, vector_t *
     int64_t min_timestamp = client->oldest_item_of_interest - BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S; /* ensure we going back ~300 blocks */
     if (client->headers_db->getchaintip(client->headers_db_ctx)->height == 0) {
         if (client->use_checkpoints && client->oldest_item_of_interest > BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S) {
-            const dogecoin_checkpoint *checkpoint = memcmp(client->chainparams, &dogecoin_chainparams_main, 4) == 0 ? dogecoin_mainnet_checkpoint_array : dogecoin_testnet_checkpoint_array;
+            const dogecoin_checkpoint *checkpoint = (client->chainparams == &dogecoin_chainparams_main) ? dogecoin_mainnet_checkpoint_array : dogecoin_testnet_checkpoint_array;
             size_t mainnet_checkpoint_size = sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]);
             size_t testnet_checkpoint_size = sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]);
-            size_t length = memcmp(client->chainparams, &dogecoin_chainparams_main, 8) == 0 ? mainnet_checkpoint_size : testnet_checkpoint_size;
+            size_t length = (client->chainparams == &dogecoin_chainparams_main) ? mainnet_checkpoint_size : testnet_checkpoint_size;
             int i;
             for (i = length - 1; i >= 0; i--) {
                 if (checkpoint[i].timestamp < min_timestamp) {
