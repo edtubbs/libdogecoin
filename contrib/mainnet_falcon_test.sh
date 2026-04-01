@@ -33,9 +33,9 @@ TMPDIR="/tmp/falcon_testnet_$$"
 mkdir -m 700 -p "$TMPDIR"
 BROADCASTED=0
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
-SPV_FROM_HEIGHT="${SPV_FROM_HEIGHT:-0}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
+SPV_HEADERS_FILE="${SPV_HEADERS_FILE:-$TMPDIR/spv_headers.db}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 # sendtx can report success either as immediate relay or as "already known".
@@ -337,7 +337,7 @@ monitor_spvnode() {
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Falcon validation log before next step..."
         set +e
-        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
+        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
         SPV_EXIT=$?
         set -e
         cat "$TMPDIR/spvnode.log"

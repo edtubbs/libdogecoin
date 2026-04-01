@@ -27,8 +27,8 @@ TMPDIR=$(mktemp -d /tmp/raccoong_testnet_XXXXXX)
 chmod 700 "$TMPDIR"
 BROADCASTED=0
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
-SPV_FROM_HEIGHT="${SPV_FROM_HEIGHT:-0}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
+SPV_HEADERS_FILE="${SPV_HEADERS_FILE:-$TMPDIR/spv_headers.db}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
@@ -218,7 +218,7 @@ monitor_spvnode() {
     if [ "$BROADCASTED" -eq 1 ]; then
         info "Running spvnode scan and waiting for [raccoong-commit] Valid marker..."
         : > "$TMPDIR/spvnode.log"
-        ./spvnode $NETWORK_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1 &
+        ./spvnode $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1 &
         SPV_PID=$!
         DEADLINE=$(( $(date +%s) + SPV_TIMEOUT_SECONDS ))
         FOUND_VALID=0
