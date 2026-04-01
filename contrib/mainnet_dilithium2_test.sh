@@ -31,6 +31,8 @@ SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
 SPV_FROM_HEIGHT="${SPV_FROM_HEIGHT:-0}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
+NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
+AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 # sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
 
@@ -87,9 +89,14 @@ get_testnet_coins() {
     echo "Wallet private key (WIF): $PRIVKEY_WIF"
     echo "Faucet: https://faucet.doge.toys/"
     echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
-    read -p "Optional faucet txid (for log): " FAUCET_TXID
-    info "Press Enter after funding the address..."
-    read
+    if [ "$NON_INTERACTIVE" -eq 1 ]; then
+        FAUCET_TXID="${FAUCET_TXID:-}"
+        info "NON_INTERACTIVE=1, skipping funding prompt."
+    else
+        read -p "Optional faucet txid (for log): " FAUCET_TXID
+        info "Press Enter after funding the address..."
+        read
+    fi
     if [ -n "$FAUCET_TXID" ]; then
         echo "FAUCET_TXID=$FAUCET_TXID" > "$TMPDIR/faucet.txt"
     fi
@@ -122,10 +129,16 @@ generate_commitment() {
 
 build_transaction() {
     info "Build unsigned testnet tx with such, then paste hex below:"
+    if [ -z "$RAW_UNSIGNED_TX" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
+        error "RAW_UNSIGNED_TX must be set in NON_INTERACTIVE mode"
+    fi
     if [ -z "$RAW_UNSIGNED_TX" ]; then
         read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
     else
         info "Using RAW_UNSIGNED_TX from environment"
+    fi
+    if [ -z "$SCRIPT_PUBKEY" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
+        error "SCRIPT_PUBKEY must be set in NON_INTERACTIVE mode"
     fi
     if [ -z "$SCRIPT_PUBKEY" ]; then
         read -p "Enter scriptPubKey hex for input 0: " SCRIPT_PUBKEY
@@ -180,7 +193,12 @@ SIGNED_TX=$SIGNED_TX
 OPRETURN_SCRIPT=6a2444494c32${DILITHIUM2_COMMIT}
 EOF
 
-    read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
+    DO_BROADCAST="n"
+    if [ "$AUTO_BROADCAST" -eq 1 ]; then
+        DO_BROADCAST="y"
+    elif [ "$NON_INTERACTIVE" -eq 0 ]; then
+        read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
+    fi
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
         SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $NETWORK_FLAG "$SIGNED_TX" || true)
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
