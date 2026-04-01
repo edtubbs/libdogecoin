@@ -1,0 +1,271 @@
+
+==========================================
+  Falcon-512 Mainnet Integration Test
+==========================================
+
+[0;34m[INFO][0m Checking required tools...
+[0;32m[SUCCESS][0m All tools available
+[0;34m[INFO][0m Step 1: Using provided funded mainnet wallet...
+----- such generate_public_key: ./such -c generate_public_key -p QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w -----
+public key hex: 03c15308abaf34326d0274d022c70cd15db84809822154dc894001066ce6b97482
+p2pkh address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+----- such generate_public_key exit=0 -----
+[0;32m[SUCCESS][0m Mainnet funded wallet loaded
+  Address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  Private Key (WIF): QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w
+  Public Key: 03c15308abaf34326d0274d022c70cd15db84809822154dc894001066ce6b97482
+RUN_CONTEXT
+NETWORK=mainnet
+WIF=QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w
+ADDRESS=DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+SCRIPT_PUBKEY=76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+SPV_HEADERS_FILE=/tmp/falcon_mainnet_37516/spv_headers.db
+INCLUDE_WITNESS_ITEMS=0
+[0;34m[INFO][0m Step 3: Generating Falcon-512 keypair...
+----- such falcon_keygen: ./such -c falcon_keygen -----
+Generating Falcon-512 keypair...
+
+=== Falcon-512 Keypair Generated ===
+public key:  096e96c1c1154014b359ace33a5eda9be60da52649312e318b56ea516e130662ea50dbbe7318a237b2230086de169bda818c5de15bcad32e2c335cf0d003518f0f5823aa48531b0b8aec94152dc819964608a0e48c4a9617424b65b401dd2107a6d2b1b0313eba14e02e82c57a33c0c1950e429507a02df479c1cee98927dc4bccfbe9ed966a39a6dde5068bc879464cbb48957f4fa505d71705aa23707f98fc18e39b06278aad93a2761217a1e6616b2eb4721979d76702da7153d5d221bccd009b72a7fa9d588eb9c540367869a7422a90b17d59c903bd5f5f3b09bf07812d1c93455fe12eda975f8a43403b4d2c1361956a281b6d73a908facf4f0193e8d8b199118819ecdca8cb2fe053ac35e2a3e45a07ed19aac4e3d996a8d0f43023a439dc676307ccac9d248c19b85fc7a3d885e258a435b718d259b2a5061116232a8d0d074142e84a8cad099a5900463982b432c202971c41fa059a8ca338e006242a57f8cc60ee08c1b8300127f36b40a1d0ab6c8083e40797cbaa4cb3e6ba575548cd7875e390ab5702af0e2bd97e810c8f9664c5808132534c165bab56d23a262872b288b443081f88996e741f6d0b28edd53583cc6b35210339aef086b15bcd542b441348bb65cda1b6f2037965c55666c5511f4e7251219e320fc363803217137acae851413fc7e1274b0f894c10f9804688683241f619a008b88656a053e5ab207934910b888b007a477accca73d490b0f4839763aa7cd941c7897ac64b292b9b61a960b398bde9c645f99c9a36da0f94752bf6a944463e86117629e43b05e96b805a11bdaa711f892e1d4a665d96e45cd0331a78e7797a5a0c835496f09e48619f103c79dcd482713a34b3f0d34e74e08a44b45647b8493d043ca9cd86a8fb6a411f1c6ef84e28d89dbb23c548c063483ba7ae79b510e5f1561444f31f25b7345195a78baae163d2e4733acac472b6abb72b081d5af6a8458dabec346853a5cf165277cc68369a92de0299a87a5728bf8bbe977441137a13e19d69eca4fb69eeeb87e50f85268929ca3e0c873ab5003b4bcf6f3f1ce7f175e0fa18bd16a8d6c186a001f6fb4368dda3724c177bc81347ad49e513288c28ecbf83d921c082d8b975f89db6b72a2e74460d7ab3c53a59a0689c35b53d3a5655da08cc59f1e1d4f49e444562d450684b6d64039c2e1c712e103027e9617c4dd8d8b4c6439eddf75af6179a56f8509611527f194e2dc0f82962a03d8d6acc94b79afeb2c7fed699
+secret key:  590f50ff0bf08207fdbc081f80083f09140f39f39f3debf1010c10f90c3087e82e0417f004ffd005042ff8f80f030830c1f870feebdf0603f002f47144ebbe0308513df40f800fa14803cd00ebb085fbf07af85cf8f80144f040810430fde3b17f0010bd1fd1fffc1fcb046036ec0187df9046e43f83d80ffe0ff0041ff14113c0c013e03f1811fc0b8fbcf3e1400451be17fffcf0307d07cfb82be041ebc040f7c07e1c70420010be13304013edc3f810431fff82e4608117c14217e0830470c1f8407908308007d1b9105f3ee840c1300fff0c4f81ebc140ffef07d82101085205f830faf3befcf7d04318310a2041071bef3f005f3f0c5081ff6f74ec2f42083180e3cfbe001f42f01fbe083e43045ffe17f03d07b102e410bf002fc21fcfbe042ec30fdf8123e0bf147efee41f0300117c0bc27ee7ce820bf17c0bc081efd13c0020fcfc1104085ffefbfffcf440fe0fcec007f1ff13bd440faffe07ee81fc307c101f84fc803b04400413f101fc11440bdffd0fb04408507de42081ef80411be17dfbd043ffce43fbefbff81fba081f3cf7c106f80f3c1410bc102ec0f7e17b006ffcd83f48f84ffe002087100f801fe2bf0c3082ffbe8313fd45f372400bf0ba17ffbf24207d17d07fe02042040ec3081141042f010bf082083f420400bff7aefc188f41e3f202fbb03e1bf085f47dfd0fd003139fc31030040fdffb0c5044043e4100414013f1ff03be41e7efc01000bf0fee7fffc17df83eff1031400020850bff41dc2fc307cfc30400c3e3cf42085179081001dfc0410071bef86043e3c0400bc03f0440befc3e4108003ef07043f3a1bc142ffdfbd181e7af3c080f81f020c5f8203f13adc41c1f81fbe0400bc084f851bf084fbb0c0fc72bcf40f050ff003204fc0000fc31fffc6dfe041002201efff7fe3bff5efa0c20c3087189f86f81f43ff80bd0c213fffe0be07dfc0e810be0fdfc1f4203ff810b903f03e13fe400bf03d040000e81f0003b0fef84ec0141087ffffc114207c1c0104f800400440c3005f03fc4f3b1fdfba0010fe17effe002086185f810b9fc3fc117f00be3d0e6dbfcdc0e0e0cf111f610d9fbcbfbeb2701f92118e90fec0609e20d111be0050300e8fddf0b03010102edbdc2e830f212201af42f04aee1f5ef0b29210206021104f4ee0bdbf4ecf9e30a22def8df0110050aeb0f0c141df0e8ef001dfb21120503dcfde1fffdd02bfb27251417affefe4a1729e315faebf732e4f00c22371c0e2109da00d7b1101e311df9e7b9e6f7f4dedcf3fa031f16e7fd1c1305f6da121a0d202313edf22e0b1008ede909f223f80403e8d71701e43421a9fd100b060114e7fe11e1fae5f4e52512f202fa26011614db17faf9d610fee6271ffb001111e0ead9daf6f20fdb1a2cfb1b09ee060ef8130bf1f8e3eb220510e928e0e61707fff30006cf3405e2edfdfc09fa0715341908e626c628f809d0d2dd06242f123c3313f1e706a3f1ea270800ece105eff3f6e4f1c8f1e50306c4e5fc07191df5ecc102ec0fece0f3ed21fe1df9fd1714eff9190fcd0311f4fd09f4160312072b1a13d3fa13d5f2ebf7060f0314ebe6dae70618fff92005f7f81aeef5c6e40c10ea0bf735d91af7e02a220f11f8f4c621ed14ceeaf8f8f70cda0feae4dee7050d12df082f023220f2f00f08fa08fd011a4927c515160af5ffd2ee1ffd1342010bf206f3f4ceeb11f527302f390525221227cfded1142afd172901122a23f0ea22e40df0f4f1ecee0621f0f20402f1f5e7fffc440d140f01eb0312f8e7281b1e
+pk length:   897 bytes
+sk length:   1281 bytes
+
+⚠️  Keep your secret key safe! Anyone with it can sign messages.
+----- such falcon_keygen exit=0 -----
+[0;32m[SUCCESS][0m Falcon-512 keypair generated
+  Public Key (1794 chars): 096e96c1c1154014b359ace33a5eda9be60da52649312e318b56ea516e130662...
+  Secret Key (2562 chars): 590f50ff0bf08207fdbc081f80083f09140f39f39f3debf1010c10f90c3087e8...
+[0;34m[INFO][0m Step 4: Building transaction and deriving tx_sighash32...
+[0;34m[INFO][0m Using RAW_UNSIGNED_TX from environment
+[0;34m[INFO][0m Using SCRIPT_PUBKEY from environment
+----- such tx_sighash32: ./such -c tx_sighash32 -x 0100000001c88395a326117cadcfc1dd8e7bdbb8400d5e35a7df80eeee60bf2804423a16560000000000ffffffff01805cfbf9000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac00000000 -s 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac -i 0 -h 1 -----
+tx_sighash32: 405549cd5dcc838c65f5dc263bc7acf9a6a6fc9e0fe53b5265f86e26af09b92b
+----- such tx_sighash32 exit=0 -----
+[0;32m[SUCCESS][0m Derived tx_sighash32: 405549cd5dcc838c65f5dc263bc7acf9a6a6fc9e0fe53b5265f86e26af09b92b
+[0;34m[INFO][0m Step 5: Signing tx_sighash32 with Falcon-512...
+----- such falcon_sign: ./such -c falcon_sign -p 590f50ff0bf08207fdbc081f80083f09140f39f39f3debf1010c10f90c3087e82e0417f004ffd005042ff8f80f030830c1f870feebdf0603f002f47144ebbe0308513df40f800fa14803cd00ebb085fbf07af85cf8f80144f040810430fde3b17f0010bd1fd1fffc1fcb046036ec0187df9046e43f83d80ffe0ff0041ff14113c0c013e03f1811fc0b8fbcf3e1400451be17fffcf0307d07cfb82be041ebc040f7c07e1c70420010be13304013edc3f810431fff82e4608117c14217e0830470c1f8407908308007d1b9105f3ee840c1300fff0c4f81ebc140ffef07d82101085205f830faf3befcf7d04318310a2041071bef3f005f3f0c5081ff6f74ec2f42083180e3cfbe001f42f01fbe083e43045ffe17f03d07b102e410bf002fc21fcfbe042ec30fdf8123e0bf147efee41f0300117c0bc27ee7ce820bf17c0bc081efd13c0020fcfc1104085ffefbfffcf440fe0fcec007f1ff13bd440faffe07ee81fc307c101f84fc803b04400413f101fc11440bdffd0fb04408507de42081ef80411be17dfbd043ffce43fbefbff81fba081f3cf7c106f80f3c1410bc102ec0f7e17b006ffcd83f48f84ffe002087100f801fe2bf0c3082ffbe8313fd45f372400bf0ba17ffbf24207d17d07fe02042040ec3081141042f010bf082083f420400bff7aefc188f41e3f202fbb03e1bf085f47dfd0fd003139fc31030040fdffb0c5044043e4100414013f1ff03be41e7efc01000bf0fee7fffc17df83eff1031400020850bff41dc2fc307cfc30400c3e3cf42085179081001dfc0410071bef86043e3c0400bc03f0440befc3e4108003ef07043f3a1bc142ffdfbd181e7af3c080f81f020c5f8203f13adc41c1f81fbe0400bc084f851bf084fbb0c0fc72bcf40f050ff003204fc0000fc31fffc6dfe041002201efff7fe3bff5efa0c20c3087189f86f81f43ff80bd0c213fffe0be07dfc0e810be0fdfc1f4203ff810b903f03e13fe400bf03d040000e81f0003b0fef84ec0141087ffffc114207c1c0104f800400440c3005f03fc4f3b1fdfba0010fe17effe002086185f810b9fc3fc117f00be3d0e6dbfcdc0e0e0cf111f610d9fbcbfbeb2701f92118e90fec0609e20d111be0050300e8fddf0b03010102edbdc2e830f212201af42f04aee1f5ef0b29210206021104f4ee0bdbf4ecf9e30a22def8df0110050aeb0f0c141df0e8ef001dfb21120503dcfde1fffdd02bfb27251417affefe4a1729e315faebf732e4f00c22371c0e2109da00d7b1101e311df9e7b9e6f7f4dedcf3fa031f16e7fd1c1305f6da121a0d202313edf22e0b1008ede909f223f80403e8d71701e43421a9fd100b060114e7fe11e1fae5f4e52512f202fa26011614db17faf9d610fee6271ffb001111e0ead9daf6f20fdb1a2cfb1b09ee060ef8130bf1f8e3eb220510e928e0e61707fff30006cf3405e2edfdfc09fa0715341908e626c628f809d0d2dd06242f123c3313f1e706a3f1ea270800ece105eff3f6e4f1c8f1e50306c4e5fc07191df5ecc102ec0fece0f3ed21fe1df9fd1714eff9190fcd0311f4fd09f4160312072b1a13d3fa13d5f2ebf7060f0314ebe6dae70618fff92005f7f81aeef5c6e40c10ea0bf735d91af7e02a220f11f8f4c621ed14ceeaf8f8f70cda0feae4dee7050d12df082f023220f2f00f08fa08fd011a4927c515160af5ffd2ee1ffd1342010bf206f3f4ceeb11f527302f390525221227cfded1142afd172901122a23f0ea22e40df0f4f1ecee0621f0f20402f1f5e7fffc440d140f01eb0312f8e7281b1e -x 405549cd5dcc838c65f5dc263bc7acf9a6a6fc9e0fe53b5265f86e26af09b92b -----
+Signing message with Falcon-512...
+
+=== Falcon-512 Signature Generated ===
+signature:   3927feeab9b9b31d59743ff9c3dcd2336629afc6991d87c0caa068bba50d89e36f026a0c276a4c49213463766b7e7a5156d2b0cefa44f9dea85cfca32ee8b0ea0224d3933c7970e7733ffc64622654265d3bc41153782e8c48a19fb92fe779ace733e577646449165ac0865258c25f9185b83788d39cc461aab17c227f5ff646388ccefb372d8b60d6fc95f318d6cced189644673410865dfccd1025a327d09b29a9a637726761c892baeda3d2047f57e48140297a9481f622bd299115b96d95be26ba097c866c79af7c49bbc33476399e737b57234a27011b57282a4fed9193fe10aed2d92842538c43e98eb05ff9501d2a89d3182a247b19639fe254498732039d44366c5b7b815e66aaa4f0b3d0700e0ad8d328ac50d522ac515923b21d81ef8b37b30717058912763a9fb084dda18596c96fa118ae8ac8832d13db731c9dd8d13b6959956e08faccf9cc50057ac186628d754aa4c224493e3127ece56deea76d23cf1c981b3fc56ce3087e0087dfabf695a26f455aa5fdbc73c514f5c0e1eab6e5d9ef631414e7e55acec24e0ca5eb22cbaa97da504b0475b1f6f7297262223fea0b74e3710f4fa196d34bb09a889c25afa54c303c0db9b2acafd6bd6e9295f14a0fcc8125a7b14ffe75dd4927baf28294512d066cfe9e11ef8861b2488b698e96dde511471131842cc4ea332010a3c71e4e15f6fb4fac35db43638f2d95d48a430e32ace411aaa245b63902ab49e8b7e79492b8e7455199f9e51d27fca32aaf740aafeb25fc02135e6cd115ca773265a564689265b6b9b5d3dec36e0e83081a4f06de4193374857be4d8c77901c0a978faf248ea2914c4b19b45a538f6b75ed07d120452892bc152c643ba9008b23157f0239b893394edf14abc2d62b5e8317dbc60ba79a379e88c411ae190a80
+sig length:  656 bytes
+msg length:  32 bytes
+----- such falcon_sign exit=0 -----
+[0;32m[SUCCESS][0m Falcon signature generated from tx_sighash32
+[0;34m[INFO][0m Step 6: Generating commitment from Falcon signature...
+----- such falcon_commit: ./such -c falcon_commit -k 096e96c1c1154014b359ace33a5eda9be60da52649312e318b56ea516e130662ea50dbbe7318a237b2230086de169bda818c5de15bcad32e2c335cf0d003518f0f5823aa48531b0b8aec94152dc819964608a0e48c4a9617424b65b401dd2107a6d2b1b0313eba14e02e82c57a33c0c1950e429507a02df479c1cee98927dc4bccfbe9ed966a39a6dde5068bc879464cbb48957f4fa505d71705aa23707f98fc18e39b06278aad93a2761217a1e6616b2eb4721979d76702da7153d5d221bccd009b72a7fa9d588eb9c540367869a7422a90b17d59c903bd5f5f3b09bf07812d1c93455fe12eda975f8a43403b4d2c1361956a281b6d73a908facf4f0193e8d8b199118819ecdca8cb2fe053ac35e2a3e45a07ed19aac4e3d996a8d0f43023a439dc676307ccac9d248c19b85fc7a3d885e258a435b718d259b2a5061116232a8d0d074142e84a8cad099a5900463982b432c202971c41fa059a8ca338e006242a57f8cc60ee08c1b8300127f36b40a1d0ab6c8083e40797cbaa4cb3e6ba575548cd7875e390ab5702af0e2bd97e810c8f9664c5808132534c165bab56d23a262872b288b443081f88996e741f6d0b28edd53583cc6b35210339aef086b15bcd542b441348bb65cda1b6f2037965c55666c5511f4e7251219e320fc363803217137acae851413fc7e1274b0f894c10f9804688683241f619a008b88656a053e5ab207934910b888b007a477accca73d490b0f4839763aa7cd941c7897ac64b292b9b61a960b398bde9c645f99c9a36da0f94752bf6a944463e86117629e43b05e96b805a11bdaa711f892e1d4a665d96e45cd0331a78e7797a5a0c835496f09e48619f103c79dcd482713a34b3f0d34e74e08a44b45647b8493d043ca9cd86a8fb6a411f1c6ef84e28d89dbb23c548c063483ba7ae79b510e5f1561444f31f25b7345195a78baae163d2e4733acac472b6abb72b081d5af6a8458dabec346853a5cf165277cc68369a92de0299a87a5728bf8bbe977441137a13e19d69eca4fb69eeeb87e50f85268929ca3e0c873ab5003b4bcf6f3f1ce7f175e0fa18bd16a8d6c186a001f6fb4368dda3724c177bc81347ad49e513288c28ecbf83d921c082d8b975f89db6b72a2e74460d7ab3c53a59a0689c35b53d3a5655da08cc59f1e1d4f49e444562d450684b6d64039c2e1c712e103027e9617c4dd8d8b4c6439eddf75af6179a56f8509611527f194e2dc0f82962a03d8d6acc94b79afeb2c7fed699 -s 3927feeab9b9b31d59743ff9c3dcd2336629afc6991d87c0caa068bba50d89e36f026a0c276a4c49213463766b7e7a5156d2b0cefa44f9dea85cfca32ee8b0ea0224d3933c7970e7733ffc64622654265d3bc41153782e8c48a19fb92fe779ace733e577646449165ac0865258c25f9185b83788d39cc461aab17c227f5ff646388ccefb372d8b60d6fc95f318d6cced189644673410865dfccd1025a327d09b29a9a637726761c892baeda3d2047f57e48140297a9481f622bd299115b96d95be26ba097c866c79af7c49bbc33476399e737b57234a27011b57282a4fed9193fe10aed2d92842538c43e98eb05ff9501d2a89d3182a247b19639fe254498732039d44366c5b7b815e66aaa4f0b3d0700e0ad8d328ac50d522ac515923b21d81ef8b37b30717058912763a9fb084dda18596c96fa118ae8ac8832d13db731c9dd8d13b6959956e08faccf9cc50057ac186628d754aa4c224493e3127ece56deea76d23cf1c981b3fc56ce3087e0087dfabf695a26f455aa5fdbc73c514f5c0e1eab6e5d9ef631414e7e55acec24e0ca5eb22cbaa97da504b0475b1f6f7297262223fea0b74e3710f4fa196d34bb09a889c25afa54c303c0db9b2acafd6bd6e9295f14a0fcc8125a7b14ffe75dd4927baf28294512d066cfe9e11ef8861b2488b698e96dde511471131842cc4ea332010a3c71e4e15f6fb4fac35db43638f2d95d48a430e32ace411aaa245b63902ab49e8b7e79492b8e7455199f9e51d27fca32aaf740aafeb25fc02135e6cd115ca773265a564689265b6b9b5d3dec36e0e83081a4f06de4193374857be4d8c77901c0a978faf248ea2914c4b19b45a538f6b75ed07d120452892bc152c643ba9008b23157f0239b893394edf14abc2d62b5e8317dbc60ba79a379e88c411ae190a80 -----
+Generating Falcon-512 commitment...
+
+=== Falcon-512 Commitment Generated ===
+commitment:  46c25d3d8c15ac0118e2e1dea91fdfb0881960baa48878286ebfd184bb182b49
+length:      32 bytes
+
+This commitment can be included in an OP_RETURN output:
+OP_RETURN script: 6a24464c433146c25d3d8c15ac0118e2e1dea91fdfb0881960baa48878286ebfd184bb182b49
+
+To verify off-chain:
+1. Get the full signature from the signer
+2. Recompute: commit = SHA256(public_key || signature)
+3. Compare with this on-chain commitment
+----- such falcon_commit exit=0 -----
+[0;32m[SUCCESS][0m Commitment generated from tx-bound Falcon signature
+----- such falcon_add_commit_tx: ./such -c falcon_add_commit_tx -x 0100000001c88395a326117cadcfc1dd8e7bdbb8400d5e35a7df80eeee60bf2804423a16560000000000ffffffff01805cfbf9000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac00000000 -s 46c25d3d8c15ac0118e2e1dea91fdfb0881960baa48878286ebfd184bb182b49 -----
+tx with commitment: 0100000001c88395a326117cadcfc1dd8e7bdbb8400d5e35a7df80eeee60bf2804423a16560000000000ffffffff02805cfbf9000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac0000000000000000266a24464c433146c25d3d8c15ac0118e2e1dea91fdfb0881960baa48878286ebfd184bb182b4900000000
+----- such falcon_add_commit_tx exit=0 -----
+[0;34m[INFO][0m Step 6b/6c: Non-witness flow enabled (INCLUDE_WITNESS_ITEMS=0); signing tx with commitment only
+[0;34m[INFO][0m Signing transaction with commitment output...
+----- such sign: ./such -c sign -x 0100000001c88395a326117cadcfc1dd8e7bdbb8400d5e35a7df80eeee60bf2804423a16560000000000ffffffff02805cfbf9000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac0000000000000000266a24464c433146c25d3d8c15ac0118e2e1dea91fdfb0881960baa48878286ebfd184bb182b4900000000 -s 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac -i 0 -h 1 -p QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w -----
+script: 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+script-type: TX_PUBKEYHASH
+inputindex: 0
+sighashtype: 1
+hash: dfdf067d1f0496e7011caf76a55e75ff36aeb7c8b437e15c76a882401c24cf21
+
+Signature created:
+signature compact: cd12e001c03b56817db0659aab2b4998db4914a0ef804632b7d04f554f0a2955792dff149384b30aa9825ca7bb1e8ba8dcd50973ba2ff2792ac2e29b81c56481
+signature DER (+hashtype): 3045022100cd12e001c03b56817db0659aab2b4998db4914a0ef804632b7d04f554f0a29550220792dff149384b30aa9825ca7bb1e8ba8dcd50973ba2ff2792ac2e29b81c5648101
+signed TX: 0100000001c88395a326117cadcfc1dd8e7bdbb8400d5e35a7df80eeee60bf2804423a1656000000006b483045022100cd12e001c03b56817db0659aab2b4998db4914a0ef804632b7d04f554f0a29550220792dff149384b30aa9825ca7bb1e8ba8dcd50973ba2ff2792ac2e29b81c56481012103c15308abaf34326d0274d022c70cd15db84809822154dc894001066ce6b97482ffffffff02805cfbf9000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac0000000000000000266a24464c433146c25d3d8c15ac0118e2e1dea91fdfb0881960baa48878286ebfd184bb182b4900000000
+----- such sign exit=0 -----
+[0;32m[SUCCESS][0m Signed transaction with Falcon commitment ready
+  Signed TX: 0100000001c88395a326117cadcfc1dd8e7bdbb8400d5e35a7df80eeee60bf2804423a1656000000...
+
+----- sendtx: ./sendtx 0100000001c88395a326117cadcfc1dd8e7bdbb8400d5e35a7df80eeee60bf2804423a1656000000006b483045022100cd12e001c03b56817db0659aab2b4998db4914a0ef804632b7d04f554f0a29550220792dff149384b30aa9825ca7bb1e8ba8dcd50973ba2ff2792ac2e29b81c56481012103c15308abaf34326d0274d022c70cd15db84809822154dc894001066ce6b97482ffffffff02805cfbf9000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac0000000000000000266a24464c433146c25d3d8c15ac0118e2e1dea91fdfb0881960baa48878286ebfd184bb182b4900000000 -----
+Start broadcasting transaction: b13803e3b8b0c29ad05a1c16156a3d4aeddae74643da6ba4c389ba2b35435824 with timeout 15 seconds
+Trying to connect to nodes...
+Successfully connected to peer 24 (184.171.208.58)
+Successfully connected to peer 23 (108.94.159.213)
+Successfully connected to peer 16 (108.234.193.105)
+Successfully connected to peer 4 (136.37.70.170)
+Successfully connected to peer 22 (5.78.24.135)
+Successfully connected to peer 17 (207.244.141.40)
+Successfully connected to peer 11 (78.48.91.152)
+Successfully connected to peer 2 (178.254.26.47)
+Successfully connected to peer 15 (142.132.208.112)
+Successfully connected to peer 3 (157.90.211.32)
+Successfully connected to peer 20 (148.251.122.88)
+Successfully connected to peer 25 (168.119.136.54)
+Successfully connected to peer 1 (138.201.123.116)
+Successfully connected to peer 8 (149.202.10.56)
+Successfully connected to peer 9 (167.235.95.225)
+Successfully connected to peer 10 (116.203.88.165)
+Successfully connected to peer 7 (65.21.201.156)
+Successfully connected to peer 5 (95.216.16.111)
+Successfully connected to peer 14 (95.216.181.123)
+Successfully connected to peer 12 (135.181.141.137)
+Successfully connected to peer 18 (121.182.80.151)
+Successfully connected to peer 19 (47.129.203.20)
+Successfully connected to peer 6 (112.207.114.41)
+Successfully connected to peer 13 (144.6.50.249)
+Successfully connected to peer 21 (116.86.228.220)
+tx successfully sent to node 24
+tx successfully sent to node 23
+
+
+Result:
+=============
+Max nodes to connect to: 10
+Successfully connected to nodes: 25
+Informed nodes: 2
+Requested from nodes: 2
+Seen on other nodes: 0
+
+sendtx-note: The transaction was not relayed back. Your transaction is very likely invalid (or was already broadcasted and picked up by an invalid node)
+----- sendtx exit=0 -----
+[0;32m[SUCCESS][0m Broadcast accepted or already known by peers
+[0;34m[INFO][0m Step 7: Monitoring with SPV node...
+
+After broadcasting your transaction, monitor it with block scan mode:
+
+  # -l no prompt, -c continuous, -d debug, -x smpv, -p checkpoint, -a address
+  ./spvnode  -l -c -d -x -p -a "DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr" scan
+
+Then switch to full block scan mode (or use -b directly):
+
+  ./spvnode  -l -c -d -x -p -b -a "DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr" scan
+
+The SPV node will:
+  - Sync mainnet blockchain headers
+  - Track wallet activity for: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  - Download and scan blocks in full mode
+  - Detect Falcon commitments
+  - Log: [falcon-commit] Valid at height=X txpos=Y commit=46c25d3d8c15ac0118e2e1dea91fdfb0881960baa48878286ebfd184bb182b49
+
+[0;34m[INFO][0m SPV sync may take time. Be patient!
+[0;34m[INFO][0m Running spvnode scan (timeout 180s) and requiring Falcon validation log before next step...
+----- spvnode scan: stdbuf -oL -eL timeout 180 ./spvnode -l -h /tmp/falcon_mainnet_37516/spv_headers.db -c -d -x -p -b -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr scan -----
+DEBUG: [oqs] falcon_512=enabled falcon_1024=enabled ml_dsa_44=enabled raccoon_g_44=enabled (liboqs)
+DEBUG: [smpv] enabled
+[smpv] enabled via CLI flag
+address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+
+Connected 0 headers, now at height: 0
+done
+Discover peers...
+Connecting to the p2p network...
+DEBUG: Trying to connect to 1...
+DEBUG: Trying to connect to 2...
+DEBUG: Trying to connect to 3...
+DEBUG: Trying to connect to 4...
+DEBUG: Trying to connect to 5...
+DEBUG: Trying to connect to 6...
+DEBUG: Trying to connect to 7...
+DEBUG: Trying to connect to 8...
+DEBUG: Trying to connect to 9...
+DEBUG: Trying to connect to 10...
+DEBUG: Trying to connect to 11...
+DEBUG: Trying to connect to 12...
+DEBUG: Trying to connect to 13...
+DEBUG: Trying to connect to 14...
+DEBUG: Trying to connect to 15...
+DEBUG: Trying to connect to 16...
+DEBUG: Trying to connect to 17...
+DEBUG: Trying to connect to 18...
+DEBUG: Trying to connect to 19...
+DEBUG: Trying to connect to 20...
+DEBUG: Trying to connect to 21...
+DEBUG: Trying to connect to 22...
+DEBUG: Trying to connect to 23...
+DEBUG: Trying to connect to 24...
+DEBUG: Trying to connect to 25...
+DEBUG: Event callback on node 8
+DEBUG: Successful connected to node 8.
+DEBUG: check if more nodes are required (connected to already: 25): false
+DEBUG: sending message to node 8: version
+DEBUG: Connected nodes: 1
+DEBUG: Event callback on node 23
+DEBUG: Successful connected to node 23.
+DEBUG: check if more nodes are required (connected to already: 25): false
+DEBUG: sending message to node 23: version
+DEBUG: Connected nodes: 2
+DEBUG: Event callback on node 13
+DEBUG: Successful connected to node 13.
+DEBUG: check if more nodes are required (connected to already: 25): false
+DEBUG: sending message to node 13: version
+DEBUG: Connected nodes: 3
+DEBUG: received command from node 8: version
+DEBUG: Connected to node 8: /Shibetoshi:1.14.9/ (6148416)
+DEBUG: sending message to node 8: verack
+----- spvnode scan exit=124 -----
+[0;34m[INFO][0m Initial scan did not validate commitment; retrying once with a fresh headers DB...
+----- spvnode scan retry: timeout 180 ./spvnode -l -h /tmp/falcon_mainnet_37516/spv_headers_retry.db -c -d -x -p -b -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr scan -----
+----- spvnode scan retry exit=124 -----
+----- spvnode log tail -----
+----- spvnode scan: stdbuf -oL -eL timeout 180 ./spvnode -l -h /tmp/falcon_mainnet_37516/spv_headers.db -c -d -x -p -b -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr scan -----
+DEBUG: [oqs] falcon_512=enabled falcon_1024=enabled ml_dsa_44=enabled raccoon_g_44=enabled (liboqs)
+DEBUG: [smpv] enabled
+[smpv] enabled via CLI flag
+address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+
+Connected 0 headers, now at height: 0
+done
+Discover peers...
+Connecting to the p2p network...
+DEBUG: Trying to connect to 1...
+DEBUG: Trying to connect to 2...
+DEBUG: Trying to connect to 3...
+DEBUG: Trying to connect to 4...
+DEBUG: Trying to connect to 5...
+DEBUG: Trying to connect to 6...
+DEBUG: Trying to connect to 7...
+DEBUG: Trying to connect to 8...
+DEBUG: Trying to connect to 9...
+DEBUG: Trying to connect to 10...
+DEBUG: Trying to connect to 11...
+DEBUG: Trying to connect to 12...
+DEBUG: Trying to connect to 13...
+DEBUG: Trying to connect to 14...
+DEBUG: Trying to connect to 15...
+DEBUG: Trying to connect to 16...
+DEBUG: Trying to connect to 17...
+DEBUG: Trying to connect to 18...
+DEBUG: Trying to connect to 19...
+DEBUG: Trying to connect to 20...
+DEBUG: Trying to connect to 21...
+DEBUG: Trying to connect to 22...
+DEBUG: Trying to connect to 23...
+DEBUG: Trying to connect to 24...
+DEBUG: Trying to connect to 25...
+DEBUG: Event callback on node 8
+DEBUG: Successful connected to node 8.
+DEBUG: check if more nodes are required (connected to already: 25): false
+DEBUG: sending message to node 8: version
+DEBUG: Connected nodes: 1
+DEBUG: Event callback on node 23
+DEBUG: Successful connected to node 23.
+DEBUG: check if more nodes are required (connected to already: 25): false
+DEBUG: sending message to node 23: version
+DEBUG: Connected nodes: 2
+DEBUG: Event callback on node 13
+DEBUG: Successful connected to node 13.
+DEBUG: check if more nodes are required (connected to already: 25): false
+DEBUG: sending message to node 13: version
+DEBUG: Connected nodes: 3
+DEBUG: received command from node 8: version
+DEBUG: Connected to node 8: /Shibetoshi:1.14.9/ (6148416)
+DEBUG: sending message to node 8: verack
+----- spvnode scan exit=124 -----
+----- spvnode retry log tail -----
+----- spvnode scan retry: timeout 180 ./spvnode -l -h /tmp/falcon_mainnet_37516/spv_headers_retry.db -c -d -x -p -b -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr scan -----
+----- spvnode scan retry exit=124 -----
+[0;31m[ERROR][0m spvnode timed out before Falcon commitment validation was observed
