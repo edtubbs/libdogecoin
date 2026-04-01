@@ -223,14 +223,16 @@ build_transaction() {
     TX_WITH_WITNESS="$TX_WITH_COMMIT"
     TX_WITH_WITNESS_SIG="$TX_WITH_COMMIT"
     if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
-        info "Step 6b: Embedding Falcon public key and signature in witness for input 0..."
-        ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness (pubkey)" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$FALCON_PK")
+        info "Step 6b: Embedding Falcon public key in witness[0] for input 0..."
+        ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$FALCON_PK")
         echo "$ADD_WITNESS_OUTPUT" | tee -a "$RUN_LOG"
         TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
         if [ -z "$TX_WITH_WITNESS" ]; then
             error "Failed to append Falcon public key witness item"
         fi
-        ADD_WITNESS_SIG_OUTPUT=$(run_and_log "such addwitness (signature)" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$FALCON_SIG")
+
+        info "Step 6c: Embedding Falcon signature in witness[1] for input 0..."
+        ADD_WITNESS_SIG_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$FALCON_SIG")
         echo "$ADD_WITNESS_SIG_OUTPUT" | tee -a "$RUN_LOG"
         TX_WITH_WITNESS_SIG=$(echo "$ADD_WITNESS_SIG_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
         if [ -z "$TX_WITH_WITNESS_SIG" ]; then
@@ -238,7 +240,7 @@ build_transaction() {
         fi
         TX_FOR_SIGNING="$TX_WITH_WITNESS_SIG"
     else
-        info "Step 6b: Skipping witness items (INCLUDE_WITNESS_ITEMS=0)"
+        info "Step 6b/6c: Non-witness flow enabled (INCLUDE_WITNESS_ITEMS=0); signing tx with commitment only"
     fi
 
     info "Signing transaction with commitment output..."
@@ -293,7 +295,7 @@ monitor_spvnode() {
     info "Step 7: Monitoring with SPV node..."
     
     echo ""
-    echo "After broadcasting your transaction, monitor it with header-first sync:"
+    echo "After broadcasting your transaction, monitor it with block scan mode:"
     echo ""
     echo "  # -l no prompt, -c continuous, -d debug, -x smpv, -p checkpoint, -a address"
     echo "  ./spvnode $NETWORK_FLAG -l -c -d -x -p -a \"$TESTNET_ADDR\" scan"
