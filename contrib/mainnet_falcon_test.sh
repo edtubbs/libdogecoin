@@ -41,12 +41,8 @@ AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-1}"
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
-UTXO_TXID="${UTXO_TXID:-47b3d05da56bd1b4738e0160fa9c4b8ce62b93ff6492eb45d447b54660742375}"
-UTXO_VOUT="${UTXO_VOUT:-1}"
-UTXO_VALUE_DOGE="${UTXO_VALUE_DOGE:-42}"
-SCRIPT_PUBKEY="${SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}"
-SEND_AMOUNT_DOGE="${SEND_AMOUNT_DOGE:-41.98}"
-TX_FEE_DOGE="${TX_FEE_DOGE:-0.02}"
+RAW_UNSIGNED_TX="${RAW_UNSIGNED_TX:-}"
+SCRIPT_PUBKEY="${SCRIPT_PUBKEY:-}"
 RUN_LOG="$TMPDIR/mainnet_falcon_run.log"
 # sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
@@ -99,63 +95,6 @@ check_tools() {
     success "All tools available"
 }
 
-create_unsigned_tx() {
-    info "Step 4: Creating unsigned spend-back transaction to funded address..."
-    local send_koinu fee_koinu value_koinu
-    send_koinu=$(python3 - <<PY
-from decimal import Decimal
-print(int((Decimal("$SEND_AMOUNT_DOGE") * Decimal(100000000)).to_integral_value()))
-PY
-)
-    fee_koinu=$(python3 - <<PY
-from decimal import Decimal
-print(int((Decimal("$TX_FEE_DOGE") * Decimal(100000000)).to_integral_value()))
-PY
-)
-    value_koinu=$(python3 - <<PY
-from decimal import Decimal
-print(int((Decimal("$UTXO_VALUE_DOGE") * Decimal(100000000)).to_integral_value()))
-PY
-)
-    local check_total
-    check_total=$((send_koinu + fee_koinu))
-    if [ "$check_total" -gt "$value_koinu" ]; then
-        error "SEND_AMOUNT_DOGE + TX_FEE_DOGE exceeds UTXO_VALUE_DOGE"
-    fi
-
-    RAW_UNSIGNED_TX=$(python3 - <<PY
-import struct
-def varint(n):
-    if n < 0xfd:
-        return bytes([n])
-    if n <= 0xffff:
-        return b'\\xfd' + struct.pack('<H', n)
-    if n <= 0xffffffff:
-        return b'\\xfe' + struct.pack('<I', n)
-    return b'\\xff' + struct.pack('<Q', n)
-
-txid = "$UTXO_TXID"
-vout = int("$UTXO_VOUT")
-amount = int("$send_koinu")
-addr_hash = "5a29227bb518c38cae5a9a195cafc56b22d7272b"
-
-version = struct.pack('<I', 1)
-vin_count = varint(1)
-prevout = bytes.fromhex(txid)[::-1] + struct.pack('<I', vout)
-script_sig = b''
-seq = struct.pack('<I', 0xffffffff)
-vout_count = varint(1)
-pk_script = bytes.fromhex("76a914" + addr_hash + "88ac")
-tx_out = struct.pack('<Q', amount) + varint(len(pk_script)) + pk_script
-locktime = struct.pack('<I', 0)
-raw = version + vin_count + prevout + varint(len(script_sig)) + script_sig + seq + vout_count + tx_out + locktime
-print(raw.hex())
-PY
-)
-    [ -n "$RAW_UNSIGNED_TX" ] || error "Failed to build unsigned tx"
-    info "Unsigned tx created from provided mainnet UTXO"
-}
-
 load_mainnet_wallet() {
     info "Step 1: Using provided funded mainnet wallet..."
     PRIVKEY_WIF="$FUNDED_WIF"
@@ -173,12 +112,6 @@ load_mainnet_wallet() {
 MAINNET_ADDR=$TESTNET_ADDR
 PRIVKEY_WIF=$PRIVKEY_WIF
 PUBKEY=$PUBKEY
-FUNDED_UTXO_TXID=$UTXO_TXID
-FUNDED_UTXO_VOUT=$UTXO_VOUT
-FUNDED_UTXO_VALUE_DOGE=$UTXO_VALUE_DOGE
-SCRIPT_PUBKEY=$SCRIPT_PUBKEY
-SEND_AMOUNT_DOGE=$SEND_AMOUNT_DOGE
-TX_FEE_DOGE=$TX_FEE_DOGE
 EOF
 }
 
@@ -188,12 +121,7 @@ log_run_context() {
         echo "NETWORK=$NETWORK"
         echo "WIF=$PRIVKEY_WIF"
         echo "ADDRESS=$TESTNET_ADDR"
-        echo "UTXO_TXID=$UTXO_TXID"
-        echo "UTXO_VOUT=$UTXO_VOUT"
-        echo "UTXO_VALUE_DOGE=$UTXO_VALUE_DOGE"
         echo "SCRIPT_PUBKEY=$SCRIPT_PUBKEY"
-        echo "SEND_AMOUNT_DOGE=$SEND_AMOUNT_DOGE"
-        echo "TX_FEE_DOGE=$TX_FEE_DOGE"
         echo "SPV_HEADERS_FILE=$SPV_HEADERS_FILE"
         echo "INCLUDE_WITNESS_ITEMS=$INCLUDE_WITNESS_ITEMS"
     } | tee -a "$RUN_LOG"
@@ -226,8 +154,27 @@ EOF
 # Step 6: Build transaction with OP_RETURN
 build_transaction() {
     info "Step 4: Building transaction and deriving tx_sighash32..."
+    if [ -z "$RAW_UNSIGNED_TX" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
+        error "RAW_UNSIGNED_TX must be set in NON_INTERACTIVE mode"
+    fi
+    if [ -z "$RAW_UNSIGNED_TX" ]; then
+        echo "Create an unsigned mainnet transaction with such first:"
+        echo "  ./such -c transaction"
+        echo ""
+        echo "Then paste the unsigned raw tx hex below."
+        read -p "Enter unsigned raw tx hex: " RAW_UNSIGNED_TX
+    else
+        info "Using RAW_UNSIGNED_TX from environment"
+    fi
 
-    create_unsigned_tx
+    if [ -z "$SCRIPT_PUBKEY" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
+        error "SCRIPT_PUBKEY must be set in NON_INTERACTIVE mode"
+    fi
+    if [ -z "$SCRIPT_PUBKEY" ]; then
+        read -p "Enter scriptPubKey hex for input 0 (UTXO being spent): " SCRIPT_PUBKEY
+    else
+        info "Using SCRIPT_PUBKEY from environment"
+    fi
 
     # Reject placeholder prevout (32-byte txid + 4-byte vout = 36 bytes = 72 hex chars).
     if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(00){36}'; then
@@ -365,15 +312,29 @@ monitor_spvnode() {
     
     info "SPV sync may take time. Be patient!"
     if [ "$BROADCASTED" -eq 1 ]; then
+        local spv_cmd=("./spvnode" $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$TESTNET_ADDR" scan)
         info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Falcon validation log before next step..."
         set +e
-        run_and_log "spvnode scan" stdbuf -oL -eL timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$TESTNET_ADDR" scan | tee "$TMPDIR/spvnode.log" | tee -a "$RUN_LOG"
+        run_and_log "spvnode scan" stdbuf -oL -eL timeout "$SPV_TIMEOUT_SECONDS" "${spv_cmd[@]}" | tee "$TMPDIR/spvnode.log" | tee -a "$RUN_LOG"
         SPV_EXIT=$?
         set -e
         if ! grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode.log"; then
+            local retry_headers="$TMPDIR/spv_headers_retry.db"
+            info "Initial scan did not validate commitment; retrying once with a fresh headers DB..."
+            set +e
+            run_and_log "spvnode scan retry" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -h "$retry_headers" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode_retry.log" 2>&1
+            SPV_RETRY_EXIT=$?
+            set -e
+            cat "$TMPDIR/spvnode_retry.log" | tee -a "$RUN_LOG"
+        fi
+        if ! grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode.log" && ! grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode_retry.log" 2>/dev/null; then
             echo "----- spvnode log tail -----"
             tail -n 80 "$TMPDIR/spvnode.log"
-            if [ "$SPV_EXIT" -eq 124 ]; then
+            if [ -f "$TMPDIR/spvnode_retry.log" ]; then
+                echo "----- spvnode retry log tail -----"
+                tail -n 80 "$TMPDIR/spvnode_retry.log"
+            fi
+            if [ "${SPV_RETRY_EXIT:-$SPV_EXIT}" -eq 124 ]; then
                 error "spvnode timed out before Falcon commitment validation was observed"
             else
                 error "Falcon commitment was not validated by spvnode before proceeding"
