@@ -38,6 +38,7 @@ SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
 SPV_HEADERS_FILE="${SPV_HEADERS_FILE:-$TMPDIR/spv_headers.db}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
+INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-1}"
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 UTXO_TXID="${UTXO_TXID:-47b3d05da56bd1b4738e0160fa9c4b8ce62b93ff6492eb45d447b54660742375}"
@@ -159,8 +160,8 @@ load_mainnet_wallet() {
     info "Step 1: Using provided funded mainnet wallet..."
     PRIVKEY_WIF="$FUNDED_WIF"
     run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $NETWORK_FLAG | tee "$TMPDIR/mainnet_addr.txt"
-    TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/mainnet_addr.txt" | cut -d: -f2 | tr -d ' ')
-    PUBKEY=$(grep "^public key hex:" "$TMPDIR/mainnet_addr.txt" | cut -d: -f2 | tr -d ' ')
+    TESTNET_ADDR=$(awk -F': ' '/p2pkh address:/ {print $2; exit}' "$TMPDIR/mainnet_addr.txt" | tr -d ' \r\n')
+    PUBKEY=$(awk -F': ' '/^public key hex:/ {print $2; exit}' "$TMPDIR/mainnet_addr.txt" | tr -d ' \r\n')
     if [ "$TESTNET_ADDR" != "$FUNDED_ADDR" ]; then
         error "Provided WIF does not map to expected funded address"
     fi
@@ -194,6 +195,7 @@ log_run_context() {
         echo "SEND_AMOUNT_DOGE=$SEND_AMOUNT_DOGE"
         echo "TX_FEE_DOGE=$TX_FEE_DOGE"
         echo "SPV_HEADERS_FILE=$SPV_HEADERS_FILE"
+        echo "INCLUDE_WITNESS_ITEMS=$INCLUDE_WITNESS_ITEMS"
     } | tee -a "$RUN_LOG"
 }
 
@@ -270,22 +272,30 @@ build_transaction() {
         error "Failed to append Falcon commitment to transaction"
     fi
 
-    info "Step 6b: Embedding Falcon public key and signature in witness for input 0..."
-    ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness (pubkey)" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$FALCON_PK")
-    echo "$ADD_WITNESS_OUTPUT" | tee -a "$RUN_LOG"
-    TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-    if [ -z "$TX_WITH_WITNESS" ]; then
-        error "Failed to append Falcon public key witness item"
-    fi
-    ADD_WITNESS_SIG_OUTPUT=$(run_and_log "such addwitness (signature)" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$FALCON_SIG")
-    echo "$ADD_WITNESS_SIG_OUTPUT" | tee -a "$RUN_LOG"
-    TX_WITH_WITNESS_SIG=$(echo "$ADD_WITNESS_SIG_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-    if [ -z "$TX_WITH_WITNESS_SIG" ]; then
-        error "Failed to append Falcon signature witness item"
+    TX_FOR_SIGNING="$TX_WITH_COMMIT"
+    TX_WITH_WITNESS="$TX_WITH_COMMIT"
+    TX_WITH_WITNESS_SIG="$TX_WITH_COMMIT"
+    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
+        info "Step 6b: Embedding Falcon public key and signature in witness for input 0..."
+        ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness (pubkey)" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$FALCON_PK")
+        echo "$ADD_WITNESS_OUTPUT" | tee -a "$RUN_LOG"
+        TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
+        if [ -z "$TX_WITH_WITNESS" ]; then
+            error "Failed to append Falcon public key witness item"
+        fi
+        ADD_WITNESS_SIG_OUTPUT=$(run_and_log "such addwitness (signature)" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$FALCON_SIG")
+        echo "$ADD_WITNESS_SIG_OUTPUT" | tee -a "$RUN_LOG"
+        TX_WITH_WITNESS_SIG=$(echo "$ADD_WITNESS_SIG_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
+        if [ -z "$TX_WITH_WITNESS_SIG" ]; then
+            error "Failed to append Falcon signature witness item"
+        fi
+        TX_FOR_SIGNING="$TX_WITH_WITNESS_SIG"
+    else
+        info "Step 6b: Skipping witness items (INCLUDE_WITNESS_ITEMS=0)"
     fi
 
     info "Signing transaction with commitment output..."
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS_SIG" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT" | tee -a "$RUN_LOG"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
 
@@ -380,32 +390,41 @@ monitor_spvnode() {
 # Step 8: Verify commitment off-chain
 verify_commitment() {
     info "Step 8: Verifying commitment off-chain..."
-    WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
-    echo "$WITNESS_OUTPUT" | tee "$TMPDIR/falcon_witness.txt" | tee -a "$RUN_LOG" >/dev/null
-    WITNESS_FALCON_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
-    WITNESS_FALCON_SIG=$(echo "$WITNESS_OUTPUT" | awk '/witness\[1\]:/ {print $2; exit}')
-    if [ -z "$WITNESS_FALCON_PK" ]; then
-        error "Failed to extract Falcon public key from witness"
+    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
+        WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
+        echo "$WITNESS_OUTPUT" | tee "$TMPDIR/falcon_witness.txt" | tee -a "$RUN_LOG" >/dev/null
+        WITNESS_FALCON_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
+        WITNESS_FALCON_SIG=$(echo "$WITNESS_OUTPUT" | awk '/witness\[1\]:/ {print $2; exit}')
+        if [ -z "$WITNESS_FALCON_PK" ]; then
+            error "Failed to extract Falcon public key from witness"
+        fi
+        if [ -z "$WITNESS_FALCON_SIG" ]; then
+            error "Failed to extract Falcon signature from witness"
+        fi
+        if [ "$WITNESS_FALCON_PK" != "$FALCON_PK" ]; then
+            error "Witness Falcon public key does not match expected public key"
+        fi
+        if [ "$WITNESS_FALCON_SIG" != "$FALCON_SIG" ]; then
+            error "Witness Falcon signature does not match expected signature"
+        fi
+        success "Witness carries expected Falcon public key"
+        {
+            echo "WITNESS_VALIDATION"
+            echo "witness[0]=$WITNESS_FALCON_PK"
+            echo "witness[1]=$WITNESS_FALCON_SIG"
+            echo "tx_sighash32=$TX_SIGHASH_HEX"
+            echo "expected_commit=$FALCON_COMMIT"
+        } | tee -a "$RUN_LOG"
+    else
+        {
+            echo "WITNESS_VALIDATION"
+            echo "witness_items=skipped"
+            echo "tx_sighash32=$TX_SIGHASH_HEX"
+            echo "expected_commit=$FALCON_COMMIT"
+        } | tee -a "$RUN_LOG"
     fi
-    if [ -z "$WITNESS_FALCON_SIG" ]; then
-        error "Failed to extract Falcon signature from witness"
-    fi
-    if [ "$WITNESS_FALCON_PK" != "$FALCON_PK" ]; then
-        error "Witness Falcon public key does not match expected public key"
-    fi
-    if [ "$WITNESS_FALCON_SIG" != "$FALCON_SIG" ]; then
-        error "Witness Falcon signature does not match expected signature"
-    fi
-    success "Witness carries expected Falcon public key"
-    {
-        echo "WITNESS_VALIDATION"
-        echo "witness[0]=$WITNESS_FALCON_PK"
-        echo "witness[1]=$WITNESS_FALCON_SIG"
-        echo "tx_sighash32=$TX_SIGHASH_HEX"
-        echo "expected_commit=$FALCON_COMMIT"
-    } | tee -a "$RUN_LOG"
 
-    VERIFY_OUTPUT=$(./such -c falcon_verify -k "$WITNESS_FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$WITNESS_FALCON_SIG")
+    VERIFY_OUTPUT=$(./such -c falcon_verify -k "$FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$FALCON_SIG")
     echo "$VERIFY_OUTPUT" | tee -a "$RUN_LOG"
     echo "$VERIFY_OUTPUT" > "$TMPDIR/falcon_verify.txt"
     if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid"; then
@@ -413,7 +432,7 @@ verify_commitment() {
         error "Off-chain Falcon signature verification failed"
     fi
 
-    COMMIT_OUTPUT=$(./such -c falcon_commit -k "$WITNESS_FALCON_PK" -s "$WITNESS_FALCON_SIG")
+    COMMIT_OUTPUT=$(./such -c falcon_commit -k "$FALCON_PK" -s "$FALCON_SIG")
     echo "$COMMIT_OUTPUT" > "$TMPDIR/falcon_commit_verify.txt"
     REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
     if [ -z "$REGENERATED_COMMIT" ]; then
