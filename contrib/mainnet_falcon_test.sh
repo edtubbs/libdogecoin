@@ -32,10 +32,15 @@ fi
 TMPDIR="/tmp/falcon_mainnet_$$"
 mkdir -m 700 -p "$TMPDIR"
 BROADCASTED=0
+BROADCAST_TXID=""
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
 SPV_HEADERS_FILE="${SPV_HEADERS_FILE:-$TMPDIR/spv_headers.db}"
+SPV_WALLET_FILE="${SPV_WALLET_FILE:-$TMPDIR/spv_wallet.db}"
+REST_HOST="${REST_HOST:-127.0.0.1}"
+REST_PORT="${REST_PORT:-$((18080 + ($$ % 1000)))}"
+REST_SERVER="${REST_SERVER:-${REST_HOST}:${REST_PORT}}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-1}"
@@ -80,6 +85,9 @@ check_tools() {
             error "$tool not found. Please build libdogecoin first."
         fi
     done
+    if ! command -v curl &> /dev/null; then
+        error "curl not found. Required for REST tx monitoring."
+    fi
     
     # Check if built with liboqs and tx_sighash helper
     if ! ./such -c help 2>&1 | grep -q falcon_keygen; then
@@ -87,6 +95,9 @@ check_tools() {
     fi
     if ! ./such -c help 2>&1 | grep -q tx_sighash32; then
         error "such missing tx_sighash32 command"
+    fi
+    if ! command -v curl &> /dev/null; then
+        error "curl not found. Required for REST tx monitoring."
     fi
     if [ "$SPV_REQUIRE_VALIDATION" -ne 1 ]; then
         error "SPV_REQUIRE_VALIDATION must be 1 for full-run mode"
@@ -123,8 +134,28 @@ log_run_context() {
         echo "ADDRESS=$TESTNET_ADDR"
         echo "SCRIPT_PUBKEY=$SCRIPT_PUBKEY"
         echo "SPV_HEADERS_FILE=$SPV_HEADERS_FILE"
+        echo "SPV_WALLET_FILE=$SPV_WALLET_FILE"
+        echo "REST_SERVER=$REST_SERVER"
         echo "INCLUDE_WITNESS_ITEMS=$INCLUDE_WITNESS_ITEMS"
     } | tee -a "$RUN_LOG"
+}
+
+wait_for_rest_tx() {
+    local txid="$1"
+    local timeout="$2"
+    local start_ts now_ts
+    start_ts=$(date +%s)
+    while true; do
+        if curl -fsS "http://${REST_SERVER}/smpvTx?id=${txid}" 2>/dev/null | grep -Fq "\"txid\": \"${txid}\""; then
+            date +%s
+            return 0
+        fi
+        now_ts=$(date +%s)
+        if [ $((now_ts - start_ts)) -ge "$timeout" ]; then
+            return 1
+        fi
+        sleep 1
+    done
 }
 
 # Step 3: Generate Falcon-512 keypair
@@ -265,6 +296,10 @@ build_transaction() {
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
         SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $NETWORK_FLAG "$SIGNED_TX" || true)
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g' | tee "$TMPDIR/sendtx.log" | tee -a "$RUN_LOG"
+        BROADCAST_TXID=$(echo "$SENDTX_OUTPUT" | sed -n 's/^Start broadcasting transaction:[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1)
+        if [ -z "$BROADCAST_TXID" ]; then
+            error "Failed to parse broadcast txid from sendtx output"
+        fi
         if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
             success "Broadcast accepted or already known by peers"
             BROADCASTED=1
@@ -286,6 +321,7 @@ FALCON_SIG=$FALCON_SIG
 FALCON_COMMIT=$FALCON_COMMIT
 WITNESS_PQC_PUBKEY=$FALCON_PK
 SIGNED_TX=$SIGNED_TX
+TXID=$BROADCAST_TXID
 OPRETURN_SCRIPT=6a24464c4331${FALCON_COMMIT}
 EOF
 }
@@ -320,23 +356,43 @@ monitor_spvnode() {
         local elapsed_seconds
         local spv_pipe_pid
         local spv_exit_code
-        info "Running spvnode scan until 'Found relevant transaction!' is observed..."
+        local commit_match_line=""
+        local rest_timeout_remaining
+        rm -f "$SPV_WALLET_FILE"
+        info "Running spvnode scan with REST monitoring until txid and witness-based commitment validation are both confirmed..."
         scan_start_ts=$(date +%s)
         : > "$TMPDIR/spvnode.log"
+        if [ -f "$SPV_HEADERS_FILE" ]; then
+            info "Reusing headers file: $SPV_HEADERS_FILE"
+        fi
+        spv_cmd+=(-w "$SPV_WALLET_FILE" -u "$REST_SERVER")
         set +e
         stdbuf -oL -eL "${spv_cmd[@]}" | tee "$TMPDIR/spvnode.log" | tee -a "$RUN_LOG" &
         spv_pipe_pid=$!
         set -e
+        rest_timeout_remaining="$SPV_TIMEOUT_SECONDS"
+        if ! found_ts=$(wait_for_rest_tx "$BROADCAST_TXID" "$rest_timeout_remaining"); then
+            echo "----- spvnode log tail -----"
+            tail -n 120 "$TMPDIR/spvnode.log"
+            kill "$spv_pipe_pid" 2>/dev/null || true
+            set +e
+            wait "$spv_pipe_pid"
+            set -e
+            error "Timed out waiting for txid $BROADCAST_TXID in /smpvTx"
+        fi
+        elapsed_seconds=$((found_ts - scan_start_ts))
+        success "Broadcast txid observed via REST after ${elapsed_seconds}s (txid=$BROADCAST_TXID)"
+        {
+            echo "SPV_TIMING"
+            echo "txid_seen_via_rest_at=${found_ts}"
+            echo "scan_elapsed_seconds=${elapsed_seconds}"
+            echo "broadcast_txid=${BROADCAST_TXID}"
+        } | tee -a "$RUN_LOG"
         while true; do
-            if grep -Fq "Found relevant transaction!" "$TMPDIR/spvnode.log"; then
-                found_ts=$(date +%s)
-                elapsed_seconds=$((found_ts - scan_start_ts))
-                success "Relevant transaction observed after ${elapsed_seconds}s"
-                {
-                    echo "SPV_TIMING"
-                    echo "relevant_tx_found_at=${found_ts}"
-                    echo "scan_elapsed_seconds=${elapsed_seconds}"
-                } | tee -a "$RUN_LOG"
+            commit_match_line=$(grep -F "[falcon-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$FALCON_COMMIT" | grep -F "source=witness" | tail -n1 || true)
+            if [ -n "$commit_match_line" ]; then
+                success "spvnode confirmed witness-based Falcon commitment validation for expected commit"
+                echo "$commit_match_line" | tee -a "$RUN_LOG"
                 break
             fi
             if ! kill -0 "$spv_pipe_pid" 2>/dev/null; then
@@ -348,6 +404,15 @@ monitor_spvnode() {
                 tail -n 80 "$TMPDIR/spvnode.log"
                 error "spvnode exited before 'Found relevant transaction!' was observed (exit=${spv_exit_code})"
             fi
+            if [ $(( $(date +%s) - found_ts )) -ge "$SPV_TIMEOUT_SECONDS" ]; then
+                echo "----- spvnode log tail -----"
+                tail -n 120 "$TMPDIR/spvnode.log"
+                kill "$spv_pipe_pid" 2>/dev/null || true
+                set +e
+                wait "$spv_pipe_pid"
+                set -e
+                error "Timed out waiting for witness-based Falcon commitment validation after txid detection"
+            fi
             sleep 1
         done
         if kill -0 "$spv_pipe_pid" 2>/dev/null; then
@@ -356,11 +421,6 @@ monitor_spvnode() {
             set +e
             wait "$spv_pipe_pid"
             set -e
-        fi
-        if grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode.log"; then
-            success "spvnode confirmed Falcon commitment validation"
-        else
-            info "Relevant transaction was observed; Falcon validation line was not yet present in the current log window"
         fi
     else
         error "Transaction was not broadcast; cannot continue full-run validation flow"
