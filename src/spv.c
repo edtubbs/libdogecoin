@@ -85,6 +85,36 @@ static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 
+#ifdef USE_LIBOQS
+static dogecoin_bool spv_extract_witness_pubkey_sig(const dogecoin_tx* tx,
+                                                    const uint8_t** out_pk, size_t* out_pk_len,
+                                                    const uint8_t** out_sig, size_t* out_sig_len,
+                                                    size_t* out_vin_index)
+{
+    if (!tx || !out_pk || !out_pk_len || !out_sig || !out_sig_len || !out_vin_index) {
+        return false;
+    }
+    for (size_t vin_index = 0; vin_index < tx->vin->len; vin_index++) {
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, vin_index);
+        if (!tx_in || !tx_in->witness_stack || tx_in->witness_stack->len < 2) {
+            continue;
+        }
+        cstring* witness_pk = vector_idx(tx_in->witness_stack, 0);
+        cstring* witness_sig = vector_idx(tx_in->witness_stack, 1);
+        if (!witness_pk || !witness_sig || witness_pk->len == 0 || witness_sig->len == 0) {
+            continue;
+        }
+        *out_pk = (const uint8_t*)witness_pk->str;
+        *out_pk_len = witness_pk->len;
+        *out_sig = (const uint8_t*)witness_sig->str;
+        *out_sig_len = witness_sig->len;
+        *out_vin_index = vin_index;
+        return true;
+    }
+    return false;
+}
+#endif
+
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
 void dogecoin_net_spv_node_handshake_done(dogecoin_node *node);
@@ -699,22 +729,73 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 if (dogecoin_tx_extract_falcon512_commit(tx, falcon_commit_data)) {
                     char falcon_commit_hex[65];
                     utils_bin_to_hex(falcon_commit_data, 32, falcon_commit_hex);
-                    client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s\n",
-                                                     pindex->height, i, falcon_commit_hex);
+                    const uint8_t* witness_pk = NULL;
+                    const uint8_t* witness_sig = NULL;
+                    size_t witness_pk_len = 0;
+                    size_t witness_sig_len = 0;
+                    size_t witness_vin_index = 0;
+                    if (spv_extract_witness_pubkey_sig(tx, &witness_pk, &witness_pk_len, &witness_sig, &witness_sig_len, &witness_vin_index)) {
+                        uint8_t witness_commit_data[32];
+                        if (dogecoin_falcon512_commit_bytes(witness_pk, witness_pk_len, witness_sig, witness_sig_len, witness_commit_data) &&
+                            memcmp(witness_commit_data, falcon_commit_data, 32) == 0) {
+                            client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s witness_vin=%zu source=witness\n",
+                                                             pindex->height, i, falcon_commit_hex, witness_vin_index);
+                        } else {
+                            client->nodegroup->log_write_cb("[falcon-commit] Invalid at height=%d txpos=%u commit=%s witness_vin=%zu reason=commit_mismatch\n",
+                                                             pindex->height, i, falcon_commit_hex, witness_vin_index);
+                        }
+                    } else {
+                        client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s source=op_return_only\n",
+                                                         pindex->height, i, falcon_commit_hex);
+                    }
                 }
                 uint8_t dilithium_commit_data[32];
                 if (dogecoin_tx_extract_dilithium2_commit(tx, dilithium_commit_data)) {
                     char dilithium_commit_hex[65];
                     utils_bin_to_hex(dilithium_commit_data, 32, dilithium_commit_hex);
-                    client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s\n",
-                                                     pindex->height, i, dilithium_commit_hex);
+                    const uint8_t* witness_pk = NULL;
+                    const uint8_t* witness_sig = NULL;
+                    size_t witness_pk_len = 0;
+                    size_t witness_sig_len = 0;
+                    size_t witness_vin_index = 0;
+                    if (spv_extract_witness_pubkey_sig(tx, &witness_pk, &witness_pk_len, &witness_sig, &witness_sig_len, &witness_vin_index)) {
+                        uint8_t witness_commit_data[32];
+                        if (dogecoin_dilithium2_commit_bytes(witness_pk, witness_pk_len, witness_sig, witness_sig_len, witness_commit_data) &&
+                            memcmp(witness_commit_data, dilithium_commit_data, 32) == 0) {
+                            client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s witness_vin=%zu source=witness\n",
+                                                             pindex->height, i, dilithium_commit_hex, witness_vin_index);
+                        } else {
+                            client->nodegroup->log_write_cb("[dilithium-commit] Invalid at height=%d txpos=%u commit=%s witness_vin=%zu reason=commit_mismatch\n",
+                                                             pindex->height, i, dilithium_commit_hex, witness_vin_index);
+                        }
+                    } else {
+                        client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s source=op_return_only\n",
+                                                         pindex->height, i, dilithium_commit_hex);
+                    }
                 }
                 uint8_t raccoong_commit_data[32];
                 if (dogecoin_tx_extract_raccoong44_commit(tx, raccoong_commit_data)) {
                     char raccoong_commit_hex[65];
                     utils_bin_to_hex(raccoong_commit_data, 32, raccoong_commit_hex);
-                    client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s\n",
-                                                     pindex->height, i, raccoong_commit_hex);
+                    const uint8_t* witness_pk = NULL;
+                    const uint8_t* witness_sig = NULL;
+                    size_t witness_pk_len = 0;
+                    size_t witness_sig_len = 0;
+                    size_t witness_vin_index = 0;
+                    if (spv_extract_witness_pubkey_sig(tx, &witness_pk, &witness_pk_len, &witness_sig, &witness_sig_len, &witness_vin_index)) {
+                        uint8_t witness_commit_data[32];
+                        if (dogecoin_raccoong44_commit_bytes(witness_pk, witness_pk_len, witness_sig, witness_sig_len, witness_commit_data) &&
+                            memcmp(witness_commit_data, raccoong_commit_data, 32) == 0) {
+                            client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s witness_vin=%zu source=witness\n",
+                                                             pindex->height, i, raccoong_commit_hex, witness_vin_index);
+                        } else {
+                            client->nodegroup->log_write_cb("[raccoong-commit] Invalid at height=%d txpos=%u commit=%s witness_vin=%zu reason=commit_mismatch\n",
+                                                             pindex->height, i, raccoong_commit_hex, witness_vin_index);
+                        }
+                    } else {
+                        client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s source=op_return_only\n",
+                                                         pindex->height, i, raccoong_commit_hex);
+                    }
                 }
 #endif
                 
