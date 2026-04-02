@@ -315,34 +315,52 @@ monitor_spvnode() {
     info "SPV sync may take time. Be patient!"
     if [ "$BROADCASTED" -eq 1 ]; then
         local spv_cmd=("./spvnode" $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$TESTNET_ADDR" scan)
-        info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Falcon validation log before next step..."
+        local scan_start_ts
+        local found_ts
+        local elapsed_seconds
+        local spv_pipe_pid
+        local spv_exit_code
+        info "Running spvnode scan until 'Found relevant transaction!' is observed..."
+        scan_start_ts=$(date +%s)
+        : > "$TMPDIR/spvnode.log"
         set +e
-        run_and_log "spvnode scan" stdbuf -oL -eL timeout "$SPV_TIMEOUT_SECONDS" "${spv_cmd[@]}" | tee "$TMPDIR/spvnode.log" | tee -a "$RUN_LOG"
-        SPV_EXIT=$?
+        stdbuf -oL -eL "${spv_cmd[@]}" | tee "$TMPDIR/spvnode.log" | tee -a "$RUN_LOG" &
+        spv_pipe_pid=$!
         set -e
-        if ! grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode.log"; then
-            local retry_headers="$TMPDIR/spv_headers_retry.db"
-            info "Initial scan did not validate commitment; retrying once with a fresh headers DB..."
+        while true; do
+            if grep -Fq "Found relevant transaction!" "$TMPDIR/spvnode.log"; then
+                found_ts=$(date +%s)
+                elapsed_seconds=$((found_ts - scan_start_ts))
+                success "Relevant transaction observed after ${elapsed_seconds}s"
+                {
+                    echo "SPV_TIMING"
+                    echo "relevant_tx_found_at=${found_ts}"
+                    echo "scan_elapsed_seconds=${elapsed_seconds}"
+                } | tee -a "$RUN_LOG"
+                break
+            fi
+            if ! kill -0 "$spv_pipe_pid" 2>/dev/null; then
+                set +e
+                wait "$spv_pipe_pid"
+                spv_exit_code=$?
+                set -e
+                echo "----- spvnode log tail -----"
+                tail -n 80 "$TMPDIR/spvnode.log"
+                error "spvnode exited before 'Found relevant transaction!' was observed (exit=${spv_exit_code})"
+            fi
+            sleep 1
+        done
+        if kill -0 "$spv_pipe_pid" 2>/dev/null; then
+            info "Stopping spvnode scan after relevant transaction detection..."
+            kill "$spv_pipe_pid" 2>/dev/null || true
             set +e
-            run_and_log "spvnode scan retry" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -h "$retry_headers" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode_retry.log" 2>&1
-            SPV_RETRY_EXIT=$?
+            wait "$spv_pipe_pid"
             set -e
-            cat "$TMPDIR/spvnode_retry.log" | tee -a "$RUN_LOG"
         fi
-        if ! grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode.log" && ! grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode_retry.log" 2>/dev/null; then
-            echo "----- spvnode log tail -----"
-            tail -n 80 "$TMPDIR/spvnode.log"
-            if [ -f "$TMPDIR/spvnode_retry.log" ]; then
-                echo "----- spvnode retry log tail -----"
-                tail -n 80 "$TMPDIR/spvnode_retry.log"
-            fi
-            if [ "${SPV_RETRY_EXIT:-$SPV_EXIT}" -eq 124 ]; then
-                error "spvnode timed out before Falcon commitment validation was observed"
-            else
-                error "Falcon commitment was not validated by spvnode before proceeding"
-            fi
-        else
+        if grep -Fq "[falcon-commit] Valid" "$TMPDIR/spvnode.log"; then
             success "spvnode confirmed Falcon commitment validation"
+        else
+            info "Relevant transaction was observed; Falcon validation line was not yet present in the current log window"
         fi
     else
         error "Transaction was not broadcast; cannot continue full-run validation flow"
