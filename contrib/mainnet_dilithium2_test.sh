@@ -38,7 +38,7 @@ REST_PORT="${REST_PORT:-$((19080 + ($$ % 1000)))}"
 REST_SERVER="${REST_SERVER:-${REST_HOST}:${REST_PORT}}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
-INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-1}"
+INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-0}"
 # sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
 
@@ -267,8 +267,14 @@ monitor_spvnode() {
         local spv_pipe_pid
         local spv_exit_code
         local commit_match_line=""
+        local expected_commit_source="source=op_return_only"
+        local expected_commit_mode="op_return_only"
+        if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
+            expected_commit_source="source=witness"
+            expected_commit_mode="witness-based"
+        fi
         rm -f "$SPV_WALLET_FILE"
-        info "Running spvnode scan with REST monitoring until txid and witness-based commitment validation are both confirmed..."
+        info "Running spvnode scan with REST monitoring until txid and ${expected_commit_mode} commitment validation are both confirmed..."
         scan_start_ts=$(date +%s)
         : > "$TMPDIR/spvnode.log"
         stdbuf -oL -eL ./spvnode $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -w "$SPV_WALLET_FILE" -u "$REST_SERVER" -c -d -x -p -b -a "$TESTNET_ADDR" scan | tee "$TMPDIR/spvnode.log" &
@@ -291,9 +297,9 @@ monitor_spvnode() {
             echo "broadcast_txid=${BROADCAST_TXID}"
         } | tee -a "$TMPDIR/spvnode.log"
         while true; do
-            commit_match_line=$(grep -F "[dilithium-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$DILITHIUM2_COMMIT" | grep -F "source=witness" | tail -n1 || true)
+            commit_match_line=$(grep -F "[dilithium-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$DILITHIUM2_COMMIT" | grep -F "$expected_commit_source" | tail -n1 || true)
             if [ -n "$commit_match_line" ]; then
-                success "spvnode confirmed witness-based Dilithium2 commitment validation for expected commit"
+                success "spvnode confirmed ${expected_commit_mode} Dilithium2 commitment validation for expected commit"
                 echo "$commit_match_line" | tee -a "$TMPDIR/spvnode.log"
                 break
             fi
@@ -304,7 +310,7 @@ monitor_spvnode() {
                 set -e
                 echo "----- spvnode log tail -----"
                 tail -n 80 "$TMPDIR/spvnode.log"
-                error "spvnode exited before witness-based Dilithium2 commitment validation was observed (exit=${spv_exit_code})"
+                error "spvnode exited before ${expected_commit_mode} Dilithium2 commitment validation was observed (exit=${spv_exit_code})"
             fi
             if [ $(( $(date +%s) - found_ts )) -ge "$SPV_TIMEOUT_SECONDS" ]; then
                 echo "----- spvnode log tail -----"
@@ -313,7 +319,7 @@ monitor_spvnode() {
                 set +e
                 wait "$spv_pipe_pid"
                 set -e
-                error "Timed out waiting for witness-based Dilithium2 commitment validation after txid detection"
+                error "Timed out waiting for ${expected_commit_mode} Dilithium2 commitment validation after txid detection"
             fi
             sleep 1
         done

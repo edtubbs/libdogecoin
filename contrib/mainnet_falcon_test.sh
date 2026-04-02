@@ -43,7 +43,7 @@ REST_PORT="${REST_PORT:-$((18080 + ($$ % 1000)))}"
 REST_SERVER="${REST_SERVER:-${REST_HOST}:${REST_PORT}}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
-INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-1}"
+INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-0}"
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 RAW_UNSIGNED_TX="${RAW_UNSIGNED_TX:-}"
@@ -357,9 +357,15 @@ monitor_spvnode() {
         local spv_pipe_pid
         local spv_exit_code
         local commit_match_line=""
+        local expected_commit_source="source=op_return_only"
+        local expected_commit_mode="op_return_only"
+        if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
+            expected_commit_source="source=witness"
+            expected_commit_mode="witness-based"
+        fi
         local rest_timeout_remaining
         rm -f "$SPV_WALLET_FILE"
-        info "Running spvnode scan with REST monitoring until txid and witness-based commitment validation are both confirmed..."
+        info "Running spvnode scan with REST monitoring until txid and ${expected_commit_mode} commitment validation are both confirmed..."
         scan_start_ts=$(date +%s)
         : > "$TMPDIR/spvnode.log"
         if [ -f "$SPV_HEADERS_FILE" ]; then
@@ -389,9 +395,9 @@ monitor_spvnode() {
             echo "broadcast_txid=${BROADCAST_TXID}"
         } | tee -a "$RUN_LOG"
         while true; do
-            commit_match_line=$(grep -F "[falcon-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$FALCON_COMMIT" | grep -F "source=witness" | tail -n1 || true)
+            commit_match_line=$(grep -F "[falcon-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$FALCON_COMMIT" | grep -F "$expected_commit_source" | tail -n1 || true)
             if [ -n "$commit_match_line" ]; then
-                success "spvnode confirmed witness-based Falcon commitment validation for expected commit"
+                success "spvnode confirmed ${expected_commit_mode} Falcon commitment validation for expected commit"
                 echo "$commit_match_line" | tee -a "$RUN_LOG"
                 break
             fi
@@ -411,7 +417,7 @@ monitor_spvnode() {
                 set +e
                 wait "$spv_pipe_pid"
                 set -e
-                error "Timed out waiting for witness-based Falcon commitment validation after txid detection"
+                error "Timed out waiting for ${expected_commit_mode} Falcon commitment validation after txid detection"
             fi
             sleep 1
         done
