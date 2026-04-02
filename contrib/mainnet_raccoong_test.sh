@@ -31,6 +31,7 @@ SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_HEADERS_FILE="${SPV_HEADERS_FILE:-$TMPDIR/spv_headers.db}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
+INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-1}"
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -162,17 +163,25 @@ build_transaction() {
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Raccoon-G commitment"
 
-    info "Embedding Raccoon-G public key and signature in witness for input 0..."
-    ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness (pubkey)" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$RACCOONG_PK")
-    echo "$ADD_WITNESS_OUTPUT"
-    TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-    [ -n "$TX_WITH_WITNESS" ] || error "Failed to append Raccoon-G public key witness item"
-    ADD_WITNESS_SIG_OUTPUT=$(run_and_log "such addwitness (signature)" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$RACCOONG_SIG")
-    echo "$ADD_WITNESS_SIG_OUTPUT"
-    TX_WITH_WITNESS_SIG=$(echo "$ADD_WITNESS_SIG_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-    [ -n "$TX_WITH_WITNESS_SIG" ] || error "Failed to append Raccoon-G signature witness item"
+    TX_FOR_SIGNING="$TX_WITH_COMMIT"
+    TX_WITH_WITNESS="$TX_WITH_COMMIT"
+    TX_WITH_WITNESS_SIG="$TX_WITH_COMMIT"
+    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
+        info "Embedding Raccoon-G public key and signature in witness for input 0..."
+        ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness (pubkey)" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$RACCOONG_PK")
+        echo "$ADD_WITNESS_OUTPUT"
+        TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
+        [ -n "$TX_WITH_WITNESS" ] || error "Failed to append Raccoon-G public key witness item"
+        ADD_WITNESS_SIG_OUTPUT=$(run_and_log "such addwitness (signature)" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$RACCOONG_SIG")
+        echo "$ADD_WITNESS_SIG_OUTPUT"
+        TX_WITH_WITNESS_SIG=$(echo "$ADD_WITNESS_SIG_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
+        [ -n "$TX_WITH_WITNESS_SIG" ] || error "Failed to append Raccoon-G signature witness item"
+        TX_FOR_SIGNING="$TX_WITH_WITNESS_SIG"
+    else
+        info "Non-witness flow enabled (INCLUDE_WITNESS_ITEMS=0); signing tx with commitment only"
+    fi
 
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_WITH_WITNESS_SIG" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
     [ -n "$SIGNED_TX" ] || error "Failed to sign transaction"
@@ -268,32 +277,40 @@ monitor_spvnode() {
 
 verify_commitment() {
     info "Step 8: Off-chain verification"
-    WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
-    echo "$WITNESS_OUTPUT" > "$TMPDIR/raccoong_witness.txt"
-    WITNESS_RACCOONG_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
-    WITNESS_RACCOONG_SIG=$(echo "$WITNESS_OUTPUT" | awk '/witness\[1\]:/ {print $2; exit}')
-    if [ -z "$WITNESS_RACCOONG_PK" ]; then
-        error "Failed to extract Raccoon-G public key from witness"
+    local VERIFY_PK="$RACCOONG_PK"
+    local VERIFY_SIG="$RACCOONG_SIG"
+    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
+        WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
+        echo "$WITNESS_OUTPUT" > "$TMPDIR/raccoong_witness.txt"
+        WITNESS_RACCOONG_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
+        WITNESS_RACCOONG_SIG=$(echo "$WITNESS_OUTPUT" | awk '/witness\[1\]:/ {print $2; exit}')
+        if [ -z "$WITNESS_RACCOONG_PK" ]; then
+            error "Failed to extract Raccoon-G public key from witness"
+        fi
+        if [ -z "$WITNESS_RACCOONG_SIG" ]; then
+            error "Failed to extract Raccoon-G signature from witness"
+        fi
+        if [ "$WITNESS_RACCOONG_PK" != "$RACCOONG_PK" ]; then
+            error "Witness Raccoon-G public key does not match expected public key"
+        fi
+        if [ "$WITNESS_RACCOONG_SIG" != "$RACCOONG_SIG" ]; then
+            error "Witness Raccoon-G signature does not match expected signature"
+        fi
+        VERIFY_PK="$WITNESS_RACCOONG_PK"
+        VERIFY_SIG="$WITNESS_RACCOONG_SIG"
+        success "Witness carries expected Raccoon-G public key"
+    else
+        info "Witness validation skipped (INCLUDE_WITNESS_ITEMS=0); using generated key/signature for off-chain verify"
     fi
-    if [ -z "$WITNESS_RACCOONG_SIG" ]; then
-        error "Failed to extract Raccoon-G signature from witness"
-    fi
-    if [ "$WITNESS_RACCOONG_PK" != "$RACCOONG_PK" ]; then
-        error "Witness Raccoon-G public key does not match expected public key"
-    fi
-    if [ "$WITNESS_RACCOONG_SIG" != "$RACCOONG_SIG" ]; then
-        error "Witness Raccoon-G signature does not match expected signature"
-    fi
-    success "Witness carries expected Raccoon-G public key"
 
-    VERIFY_OUTPUT=$(./such -c raccoong_verify -k "$WITNESS_RACCOONG_PK" -x "$TX_SIGHASH_HEX" -s "$WITNESS_RACCOONG_SIG")
+    VERIFY_OUTPUT=$(./such -c raccoong_verify -k "$VERIFY_PK" -x "$TX_SIGHASH_HEX" -s "$VERIFY_SIG")
     echo "$VERIFY_OUTPUT"
     echo "$VERIFY_OUTPUT" > "$TMPDIR/raccoong_verify.txt"
     if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid|VALID"; then
         error "Off-chain Raccoon-G signature verification failed"
     fi
 
-    COMMIT_OUTPUT=$(./such -c raccoong_commit -k "$WITNESS_RACCOONG_PK" -s "$WITNESS_RACCOONG_SIG")
+    COMMIT_OUTPUT=$(./such -c raccoong_commit -k "$VERIFY_PK" -s "$VERIFY_SIG")
     echo "$COMMIT_OUTPUT" > "$TMPDIR/raccoong_commit_verify.txt"
     REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
     [ -n "$REGENERATED_COMMIT" ] || error "Failed to parse regenerated Raccoon-G commitment"

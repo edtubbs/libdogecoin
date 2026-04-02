@@ -129,6 +129,11 @@ When witness data is present, off-chain verification SHOULD use witness item 0 (
 * <code>PQ_VERIFY(witness_item0_pubkey, message32, witness_item1_signature)</code>, and
 * commitment reconstruction check against OP_RETURN-tagged commitment payload.
 
+Implementations MAY also run in a non-witness transport mode (for example where witness carriage is intentionally disabled). In this mode, off-chain verifiers use the generated PQ key/signature artifacts directly, and still MUST validate:
+
+* <code>PQ_VERIFY(pubkey, message32, signature)</code>, and
+* <code>SHA256(pubkey || signature)</code> equals the tagged OP_RETURN commitment payload.
+
 ===Phase 1: Base Transaction Binding===
 
 Because the OP_RETURN commitment payload is itself derived from the PQ signature, implementers must avoid circular dependency between:
@@ -240,6 +245,12 @@ Current CLI wiring reflects this implementation model:
 * <code>such -c raccoong_commit</code> derives Raccoon-G-44 commitment32 from public key + signature;
 * <code>such -c falcon_add_commit_tx</code> / <code>dilithium2_add_commit_tx</code> / <code>raccoong_add_commit_tx</code> attach canonical tagged commitments to raw tx outputs; and
 * <code>such -c raccoong_hd_derive</code> / <code>raccoong_hd_derive_pub</code> expose HD derivation behavior used for wallet path modeling.
+
+Current end-to-end script behavior is aligned across mainnet and testnet flows:
+
+* witness mode (default): <code>INCLUDE_WITNESS_ITEMS=1</code> appends PQ pubkey/signature to witness items [0]/[1];
+* non-witness mode: <code>INCLUDE_WITNESS_ITEMS=0</code> skips witness carriage and verifies against generated PQ artifacts; and
+* SPV scanning runs until relevant transaction detection and records elapsed timing telemetry.
 
 ==Deployment==
 

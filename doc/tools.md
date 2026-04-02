@@ -589,7 +589,18 @@ For end-to-end mainnet command flow, use:
 - `contrib/mainnet_dilithium2_test.sh`
 - `contrib/mainnet_raccoong_test.sh`
 
-These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, witness public-key attachment, and SPV monitoring commands.
+These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, optional witness public-key/signature attachment, and SPV monitoring commands.
+All PQC E2E scripts support both paths:
+
+- `INCLUDE_WITNESS_ITEMS=1` (default): attach PQ public key and PQ signature into witness items `[0]` and `[1]`.
+- `INCLUDE_WITNESS_ITEMS=0`: non-witness mode; sign/broadcast commitment transaction without witness PQ payload.
+
+For non-interactive execution (recommended for reproducible reruns/log capture), set:
+
+- `NON_INTERACTIVE=1`
+- `AUTO_BROADCAST=1`
+- `RAW_UNSIGNED_TX=<unsigned_raw_tx_hex>`
+- `SCRIPT_PUBKEY=<prevout_script_pubkey_hex>`
 By default they run on testnet (`NETWORK=testnet`). To run the same flow on mainnet, set `NETWORK=mainnet` and provide a funded mainnet WIF/address context.
 
 ### Automated Testing Script
