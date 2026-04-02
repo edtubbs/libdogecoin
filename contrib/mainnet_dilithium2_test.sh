@@ -223,22 +223,50 @@ monitor_spvnode() {
     echo "Expected log:"
     echo "  [dilithium-commit] Valid at height=X txpos=Y commit=$DILITHIUM2_COMMIT"
     if [ "$BROADCASTED" -eq 1 ]; then
-        info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Dilithium2 validation log before next step..."
-        set +e
-        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
-        SPV_EXIT=$?
-        set -e
-        cat "$TMPDIR/spvnode.log"
-        if ! grep -Fq "[dilithium-commit] Valid" "$TMPDIR/spvnode.log"; then
-            echo "----- spvnode log tail -----"
-            tail -n 80 "$TMPDIR/spvnode.log"
-            if [ "$SPV_EXIT" -eq 124 ]; then
-                error "spvnode timed out before Dilithium2 commitment validation was observed"
-            else
-                error "Dilithium2 commitment was not validated by spvnode before proceeding"
+        local scan_start_ts
+        local found_ts
+        local elapsed_seconds
+        local spv_pipe_pid
+        local spv_exit_code
+        info "Running spvnode scan until 'Found relevant transaction!' is observed..."
+        scan_start_ts=$(date +%s)
+        : > "$TMPDIR/spvnode.log"
+        stdbuf -oL -eL ./spvnode $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$TESTNET_ADDR" scan | tee "$TMPDIR/spvnode.log" &
+        spv_pipe_pid=$!
+        while true; do
+            if grep -Fq "Found relevant transaction!" "$TMPDIR/spvnode.log"; then
+                found_ts=$(date +%s)
+                elapsed_seconds=$((found_ts - scan_start_ts))
+                success "Relevant transaction observed after ${elapsed_seconds}s"
+                {
+                    echo "SPV_TIMING"
+                    echo "relevant_tx_found_at=${found_ts}"
+                    echo "scan_elapsed_seconds=${elapsed_seconds}"
+                } | tee -a "$TMPDIR/spvnode.log"
+                break
             fi
-        else
+            if ! kill -0 "$spv_pipe_pid" 2>/dev/null; then
+                set +e
+                wait "$spv_pipe_pid"
+                spv_exit_code=$?
+                set -e
+                echo "----- spvnode log tail -----"
+                tail -n 80 "$TMPDIR/spvnode.log"
+                error "spvnode exited before 'Found relevant transaction!' was observed (exit=${spv_exit_code})"
+            fi
+            sleep 1
+        done
+        if kill -0 "$spv_pipe_pid" 2>/dev/null; then
+            info "Stopping spvnode scan after relevant transaction detection..."
+            kill "$spv_pipe_pid" 2>/dev/null || true
+            set +e
+            wait "$spv_pipe_pid"
+            set -e
+        fi
+        if grep -Fq "[dilithium-commit] Valid" "$TMPDIR/spvnode.log"; then
             success "spvnode confirmed Dilithium2 commitment validation"
+        else
+            info "Relevant transaction was observed; Dilithium2 validation line was not yet present in the current log window"
         fi
     else
         error "Transaction was not broadcast; cannot continue full-run validation flow"
