@@ -160,6 +160,72 @@ static dogecoin_bool spv_extract_scriptsig_pubkey_sig(const dogecoin_tx* tx,
     }
     return false;
 }
+
+static dogecoin_bool spv_validate_falcon_scriptsig_commit(const uint8_t* item0, size_t item0_len,
+                                                          const uint8_t* item1, size_t item1_len,
+                                                          const uint8_t expected_commit[32],
+                                                          const uint8_t** out_pk, size_t* out_pk_len,
+                                                          const uint8_t** out_sig, size_t* out_sig_len)
+{
+    uint8_t commit_data[32];
+    if (dogecoin_falcon512_commit_bytes(item0, item0_len, item1, item1_len, commit_data) &&
+        memcmp(commit_data, expected_commit, 32) == 0) {
+        *out_pk = item0; *out_pk_len = item0_len;
+        *out_sig = item1; *out_sig_len = item1_len;
+        return true;
+    }
+    if (dogecoin_falcon512_commit_bytes(item1, item1_len, item0, item0_len, commit_data) &&
+        memcmp(commit_data, expected_commit, 32) == 0) {
+        *out_pk = item1; *out_pk_len = item1_len;
+        *out_sig = item0; *out_sig_len = item0_len;
+        return true;
+    }
+    return false;
+}
+
+static dogecoin_bool spv_validate_dilithium_scriptsig_commit(const uint8_t* item0, size_t item0_len,
+                                                             const uint8_t* item1, size_t item1_len,
+                                                             const uint8_t expected_commit[32],
+                                                             const uint8_t** out_pk, size_t* out_pk_len,
+                                                             const uint8_t** out_sig, size_t* out_sig_len)
+{
+    uint8_t commit_data[32];
+    if (dogecoin_dilithium2_commit_bytes(item0, item0_len, item1, item1_len, commit_data) &&
+        memcmp(commit_data, expected_commit, 32) == 0) {
+        *out_pk = item0; *out_pk_len = item0_len;
+        *out_sig = item1; *out_sig_len = item1_len;
+        return true;
+    }
+    if (dogecoin_dilithium2_commit_bytes(item1, item1_len, item0, item0_len, commit_data) &&
+        memcmp(commit_data, expected_commit, 32) == 0) {
+        *out_pk = item1; *out_pk_len = item1_len;
+        *out_sig = item0; *out_sig_len = item0_len;
+        return true;
+    }
+    return false;
+}
+
+static dogecoin_bool spv_validate_raccoong_scriptsig_commit(const uint8_t* item0, size_t item0_len,
+                                                            const uint8_t* item1, size_t item1_len,
+                                                            const uint8_t expected_commit[32],
+                                                            const uint8_t** out_pk, size_t* out_pk_len,
+                                                            const uint8_t** out_sig, size_t* out_sig_len)
+{
+    uint8_t commit_data[32];
+    if (dogecoin_raccoong44_commit_bytes(item0, item0_len, item1, item1_len, commit_data) &&
+        memcmp(commit_data, expected_commit, 32) == 0) {
+        *out_pk = item0; *out_pk_len = item0_len;
+        *out_sig = item1; *out_sig_len = item1_len;
+        return true;
+    }
+    if (dogecoin_raccoong44_commit_bytes(item1, item1_len, item0, item0_len, commit_data) &&
+        memcmp(commit_data, expected_commit, 32) == 0) {
+        *out_pk = item1; *out_pk_len = item1_len;
+        *out_sig = item0; *out_sig_len = item0_len;
+        return true;
+    }
+    return false;
+}
 #endif
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
@@ -782,9 +848,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     size_t scriptsig_sig_len = 0;
                     size_t scriptsig_vin_index = 0;
                     if (spv_extract_scriptsig_pubkey_sig(tx, &scriptsig_pk, &scriptsig_pk_len, &scriptsig_sig, &scriptsig_sig_len, &scriptsig_vin_index)) {
-                        uint8_t scriptsig_commit_data[32];
-                        if (dogecoin_falcon512_commit_bytes(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len, scriptsig_commit_data) &&
-                            memcmp(scriptsig_commit_data, falcon_commit_data, 32) == 0) {
+                        if (spv_validate_falcon_scriptsig_commit(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len,
+                                                                 falcon_commit_data, &scriptsig_pk, &scriptsig_pk_len,
+                                                                 &scriptsig_sig, &scriptsig_sig_len)) {
                             client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig\n",
                                                              pindex->height, i, falcon_commit_hex, scriptsig_vin_index);
                         } else {
@@ -806,9 +872,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     size_t scriptsig_sig_len = 0;
                     size_t scriptsig_vin_index = 0;
                     if (spv_extract_scriptsig_pubkey_sig(tx, &scriptsig_pk, &scriptsig_pk_len, &scriptsig_sig, &scriptsig_sig_len, &scriptsig_vin_index)) {
-                        uint8_t scriptsig_commit_data[32];
-                        if (dogecoin_dilithium2_commit_bytes(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len, scriptsig_commit_data) &&
-                            memcmp(scriptsig_commit_data, dilithium_commit_data, 32) == 0) {
+                        if (spv_validate_dilithium_scriptsig_commit(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len,
+                                                                    dilithium_commit_data, &scriptsig_pk, &scriptsig_pk_len,
+                                                                    &scriptsig_sig, &scriptsig_sig_len)) {
                             client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig\n",
                                                              pindex->height, i, dilithium_commit_hex, scriptsig_vin_index);
                         } else {
@@ -830,9 +896,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     size_t scriptsig_sig_len = 0;
                     size_t scriptsig_vin_index = 0;
                     if (spv_extract_scriptsig_pubkey_sig(tx, &scriptsig_pk, &scriptsig_pk_len, &scriptsig_sig, &scriptsig_sig_len, &scriptsig_vin_index)) {
-                        uint8_t scriptsig_commit_data[32];
-                        if (dogecoin_raccoong44_commit_bytes(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len, scriptsig_commit_data) &&
-                            memcmp(scriptsig_commit_data, raccoong_commit_data, 32) == 0) {
+                        if (spv_validate_raccoong_scriptsig_commit(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len,
+                                                                   raccoong_commit_data, &scriptsig_pk, &scriptsig_pk_len,
+                                                                   &scriptsig_sig, &scriptsig_sig_len)) {
                             client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig\n",
                                                              pindex->height, i, raccoong_commit_hex, scriptsig_vin_index);
                         } else {

@@ -250,9 +250,11 @@ wait_for_rest_tx() {
     local txid="$1"
     local timeout="$2"
     local start_ts now_ts
+    local txid_le
     start_ts=$(date +%s)
+    txid_le=$(echo "$txid" | sed 's/../& /g' | awk '{for(i=NF;i>=1;i--) printf $i}' | tr -d '\n')
     while true; do
-        if curl -fsS "http://${REST_SERVER}/smpvTx?id=${txid}" 2>/dev/null | grep -Fq "\"txid\": \"${txid}\""; then
+        if curl -fsS "http://${REST_SERVER}/getUTXOs" 2>/dev/null | grep -Fqi "txid:[[:space:]]*${txid_le}"; then
             date +%s
             return 0
         fi
@@ -504,7 +506,7 @@ monitor_spvnode() {
             set +e
             wait "$spv_pipe_pid"
             set -e
-            error "Timed out waiting for txid $BROADCAST_TXID in /smpvTx"
+            error "Timed out waiting for txid $BROADCAST_TXID in /getUTXOs"
         fi
         elapsed_seconds=$((found_ts - scan_start_ts))
         success "Broadcast txid observed via REST after ${elapsed_seconds}s (txid=$BROADCAST_TXID)"
