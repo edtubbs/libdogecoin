@@ -38,7 +38,6 @@ REST_PORT="${REST_PORT:-$((19080 + ($$ % 1000)))}"
 REST_SERVER="${REST_SERVER:-${REST_HOST}:${REST_PORT}}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
-INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-0}"
 # sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
 
@@ -196,23 +195,11 @@ build_transaction() {
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Dilithium2 commitment"
 
-    TX_FOR_SIGNING="$TX_WITH_COMMIT"
-    TX_WITH_WITNESS="$TX_WITH_COMMIT"
-    TX_WITH_WITNESS_SIG="$TX_WITH_COMMIT"
-    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
-        info "Embedding Dilithium2 public key and signature in witness for input 0..."
-        ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness (pubkey)" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$DILITHIUM2_PK")
-        echo "$ADD_WITNESS_OUTPUT"
-        TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-        [ -n "$TX_WITH_WITNESS" ] || error "Failed to append Dilithium2 public key witness item"
-        ADD_WITNESS_SIG_OUTPUT=$(run_and_log "such addwitness (signature)" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$DILITHIUM2_SIG")
-        echo "$ADD_WITNESS_SIG_OUTPUT"
-        TX_WITH_WITNESS_SIG=$(echo "$ADD_WITNESS_SIG_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-        [ -n "$TX_WITH_WITNESS_SIG" ] || error "Failed to append Dilithium2 signature witness item"
-        TX_FOR_SIGNING="$TX_WITH_WITNESS_SIG"
-    else
-        info "Non-witness flow enabled (INCLUDE_WITNESS_ITEMS=0); signing tx with commitment only"
-    fi
+    info "Embedding Dilithium2 public key/signature in scriptSig for input 0..."
+    ADD_SCRIPTSIG_PQC_OUTPUT=$(run_and_log "such addscriptsigpqc" ./such -c addscriptsigpqc -x "$TX_WITH_COMMIT" -i 0 -k "$DILITHIUM2_PK" -s "$DILITHIUM2_SIG")
+    echo "$ADD_SCRIPTSIG_PQC_OUTPUT"
+    TX_FOR_SIGNING=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | grep "^tx with scriptsig pqc:" | cut -d: -f2- | tr -d ' ')
+    [ -n "$TX_FOR_SIGNING" ] || error "Failed to append Dilithium2 public key/signature to scriptSig"
 
     SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
@@ -222,13 +209,12 @@ build_transaction() {
     cat > "$TMPDIR/tx_info.txt" <<EOF
 RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
 TX_WITH_COMMIT=$TX_WITH_COMMIT
-TX_WITH_WITNESS=$TX_WITH_WITNESS
-TX_WITH_WITNESS_SIG=$TX_WITH_WITNESS_SIG
+TX_WITH_SCRIPTSIG_PQC=$TX_FOR_SIGNING
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
 TX_SIGHASH_HEX=$TX_SIGHASH_HEX
 DILITHIUM2_SIG=$DILITHIUM2_SIG
 DILITHIUM2_COMMIT=$DILITHIUM2_COMMIT
-WITNESS_PQC_PUBKEY=$DILITHIUM2_PK
+SCRIPTSIG_PQC_PUBKEY=$DILITHIUM2_PK
 SIGNED_TX=$SIGNED_TX
 TXID=$BROADCAST_TXID
 OPRETURN_SCRIPT=6a2444494c32${DILITHIUM2_COMMIT}
@@ -267,12 +253,8 @@ monitor_spvnode() {
         local spv_pipe_pid
         local spv_exit_code
         local commit_match_line=""
-        local expected_commit_source="source=op_return_only"
-        local expected_commit_mode="op_return_only"
-        if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
-            expected_commit_source="source=witness"
-            expected_commit_mode="witness-based"
-        fi
+        local expected_commit_source="source=scriptsig"
+        local expected_commit_mode="scriptsig"
         rm -f "$SPV_WALLET_FILE"
         info "Running spvnode scan with REST monitoring until txid and ${expected_commit_mode} commitment validation are both confirmed..."
         scan_start_ts=$(date +%s)
@@ -339,29 +321,25 @@ verify_commitment() {
     info "Step 8: Off-chain verification"
     local VERIFY_PK="$DILITHIUM2_PK"
     local VERIFY_SIG="$DILITHIUM2_SIG"
-    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
-        WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
-        echo "$WITNESS_OUTPUT" > "$TMPDIR/dilithium2_witness.txt"
-        WITNESS_DILITHIUM2_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
-        WITNESS_DILITHIUM2_SIG=$(echo "$WITNESS_OUTPUT" | awk '/witness\[1\]:/ {print $2; exit}')
-        if [ -z "$WITNESS_DILITHIUM2_PK" ]; then
-            error "Failed to extract Dilithium2 public key from witness"
-        fi
-        if [ -z "$WITNESS_DILITHIUM2_SIG" ]; then
-            error "Failed to extract Dilithium2 signature from witness"
-        fi
-        if [ "$WITNESS_DILITHIUM2_PK" != "$DILITHIUM2_PK" ]; then
-            error "Witness Dilithium2 public key does not match expected public key"
-        fi
-        if [ "$WITNESS_DILITHIUM2_SIG" != "$DILITHIUM2_SIG" ]; then
-            error "Witness Dilithium2 signature does not match expected signature"
-        fi
-        VERIFY_PK="$WITNESS_DILITHIUM2_PK"
-        VERIFY_SIG="$WITNESS_DILITHIUM2_SIG"
-        success "Witness carries expected Dilithium2 public key"
-    else
-        info "Witness validation skipped (INCLUDE_WITNESS_ITEMS=0); using generated key/signature for off-chain verify"
+    SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$SIGNED_TX")
+    echo "$SCRIPTSIG_OUTPUT" > "$TMPDIR/dilithium2_scriptsig_pqc.txt"
+    SCRIPTSIG_DILITHIUM2_PK=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
+    SCRIPTSIG_DILITHIUM2_SIG=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
+    if [ -z "$SCRIPTSIG_DILITHIUM2_PK" ]; then
+        error "Failed to extract Dilithium2 public key from scriptSig"
     fi
+    if [ -z "$SCRIPTSIG_DILITHIUM2_SIG" ]; then
+        error "Failed to extract Dilithium2 signature from scriptSig"
+    fi
+    if [ "$SCRIPTSIG_DILITHIUM2_PK" != "$DILITHIUM2_PK" ]; then
+        error "scriptSig Dilithium2 public key does not match expected public key"
+    fi
+    if [ "$SCRIPTSIG_DILITHIUM2_SIG" != "$DILITHIUM2_SIG" ]; then
+        error "scriptSig Dilithium2 signature does not match expected signature"
+    fi
+    VERIFY_PK="$SCRIPTSIG_DILITHIUM2_PK"
+    VERIFY_SIG="$SCRIPTSIG_DILITHIUM2_SIG"
+    success "scriptSig carries expected Dilithium2 public key/signature"
 
     VERIFY_OUTPUT=$(./such -c dilithium2_verify -k "$VERIFY_PK" -x "$TX_SIGHASH_HEX" -s "$VERIFY_SIG")
     echo "$VERIFY_OUTPUT"

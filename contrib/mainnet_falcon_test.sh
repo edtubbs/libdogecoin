@@ -43,7 +43,6 @@ REST_PORT="${REST_PORT:-$((18080 + ($$ % 1000)))}"
 REST_SERVER="${REST_SERVER:-${REST_HOST}:${REST_PORT}}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
-INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-0}"
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 RAW_UNSIGNED_TX="${RAW_UNSIGNED_TX:-}"
@@ -136,7 +135,6 @@ log_run_context() {
         echo "SPV_HEADERS_FILE=$SPV_HEADERS_FILE"
         echo "SPV_WALLET_FILE=$SPV_WALLET_FILE"
         echo "REST_SERVER=$REST_SERVER"
-        echo "INCLUDE_WITNESS_ITEMS=$INCLUDE_WITNESS_ITEMS"
     } | tee -a "$RUN_LOG"
 }
 
@@ -250,28 +248,12 @@ build_transaction() {
         error "Failed to append Falcon commitment to transaction"
     fi
 
-    TX_FOR_SIGNING="$TX_WITH_COMMIT"
-    TX_WITH_WITNESS="$TX_WITH_COMMIT"
-    TX_WITH_WITNESS_SIG="$TX_WITH_COMMIT"
-    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
-        info "Step 6b: Embedding Falcon public key in witness[0] for input 0..."
-        ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$FALCON_PK")
-        echo "$ADD_WITNESS_OUTPUT" | tee -a "$RUN_LOG"
-        TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-        if [ -z "$TX_WITH_WITNESS" ]; then
-            error "Failed to append Falcon public key witness item"
-        fi
-
-        info "Step 6c: Embedding Falcon signature in witness[1] for input 0..."
-        ADD_WITNESS_SIG_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$FALCON_SIG")
-        echo "$ADD_WITNESS_SIG_OUTPUT" | tee -a "$RUN_LOG"
-        TX_WITH_WITNESS_SIG=$(echo "$ADD_WITNESS_SIG_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-        if [ -z "$TX_WITH_WITNESS_SIG" ]; then
-            error "Failed to append Falcon signature witness item"
-        fi
-        TX_FOR_SIGNING="$TX_WITH_WITNESS_SIG"
-    else
-        info "Step 6b/6c: Non-witness flow enabled (INCLUDE_WITNESS_ITEMS=0); signing tx with commitment only"
+    info "Step 6b: Embedding Falcon public key and signature in scriptSig (input 0)..."
+    ADD_SCRIPTSIG_PQC_OUTPUT=$(run_and_log "such addscriptsigpqc" ./such -c addscriptsigpqc -x "$TX_WITH_COMMIT" -i 0 -k "$FALCON_PK" -s "$FALCON_SIG")
+    echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | tee -a "$RUN_LOG"
+    TX_FOR_SIGNING=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | grep "^tx with scriptsig pqc:" | cut -d: -f2- | tr -d ' ')
+    if [ -z "$TX_FOR_SIGNING" ]; then
+        error "Failed to append Falcon public key/signature to scriptSig"
     fi
 
     info "Signing transaction with commitment output..."
@@ -313,13 +295,12 @@ build_transaction() {
     cat > "$TMPDIR/tx_info.txt" <<EOF
 RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
 TX_WITH_COMMIT=$TX_WITH_COMMIT
-TX_WITH_WITNESS=$TX_WITH_WITNESS
-TX_WITH_WITNESS_SIG=$TX_WITH_WITNESS_SIG
+TX_WITH_SCRIPTSIG_PQC=$TX_FOR_SIGNING
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
 TX_SIGHASH_HEX=$TX_SIGHASH_HEX
 FALCON_SIG=$FALCON_SIG
 FALCON_COMMIT=$FALCON_COMMIT
-WITNESS_PQC_PUBKEY=$FALCON_PK
+SCRIPTSIG_PQC_PUBKEY=$FALCON_PK
 SIGNED_TX=$SIGNED_TX
 TXID=$BROADCAST_TXID
 OPRETURN_SCRIPT=6a24464c4331${FALCON_COMMIT}
@@ -357,12 +338,8 @@ monitor_spvnode() {
         local spv_pipe_pid
         local spv_exit_code
         local commit_match_line=""
-        local expected_commit_source="source=op_return_only"
-        local expected_commit_mode="op_return_only"
-        if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
-            expected_commit_source="source=witness"
-            expected_commit_mode="witness-based"
-        fi
+        local expected_commit_source="source=scriptsig"
+        local expected_commit_mode="scriptsig"
         local rest_timeout_remaining
         rm -f "$SPV_WALLET_FILE"
         info "Running spvnode scan with REST monitoring until txid and ${expected_commit_mode} commitment validation are both confirmed..."
@@ -436,39 +413,30 @@ monitor_spvnode() {
 # Step 8: Verify commitment off-chain
 verify_commitment() {
     info "Step 8: Verifying commitment off-chain..."
-    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
-        WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
-        echo "$WITNESS_OUTPUT" | tee "$TMPDIR/falcon_witness.txt" | tee -a "$RUN_LOG" >/dev/null
-        WITNESS_FALCON_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
-        WITNESS_FALCON_SIG=$(echo "$WITNESS_OUTPUT" | awk '/witness\[1\]:/ {print $2; exit}')
-        if [ -z "$WITNESS_FALCON_PK" ]; then
-            error "Failed to extract Falcon public key from witness"
-        fi
-        if [ -z "$WITNESS_FALCON_SIG" ]; then
-            error "Failed to extract Falcon signature from witness"
-        fi
-        if [ "$WITNESS_FALCON_PK" != "$FALCON_PK" ]; then
-            error "Witness Falcon public key does not match expected public key"
-        fi
-        if [ "$WITNESS_FALCON_SIG" != "$FALCON_SIG" ]; then
-            error "Witness Falcon signature does not match expected signature"
-        fi
-        success "Witness carries expected Falcon public key"
-        {
-            echo "WITNESS_VALIDATION"
-            echo "witness[0]=$WITNESS_FALCON_PK"
-            echo "witness[1]=$WITNESS_FALCON_SIG"
-            echo "tx_sighash32=$TX_SIGHASH_HEX"
-            echo "expected_commit=$FALCON_COMMIT"
-        } | tee -a "$RUN_LOG"
-    else
-        {
-            echo "WITNESS_VALIDATION"
-            echo "witness_items=skipped"
-            echo "tx_sighash32=$TX_SIGHASH_HEX"
-            echo "expected_commit=$FALCON_COMMIT"
-        } | tee -a "$RUN_LOG"
+    SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$SIGNED_TX")
+    echo "$SCRIPTSIG_OUTPUT" | tee "$TMPDIR/falcon_scriptsig_pqc.txt" | tee -a "$RUN_LOG" >/dev/null
+    SCRIPTSIG_FALCON_PK=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
+    SCRIPTSIG_FALCON_SIG=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
+    if [ -z "$SCRIPTSIG_FALCON_PK" ]; then
+        error "Failed to extract Falcon public key from scriptSig"
     fi
+    if [ -z "$SCRIPTSIG_FALCON_SIG" ]; then
+        error "Failed to extract Falcon signature from scriptSig"
+    fi
+    if [ "$SCRIPTSIG_FALCON_PK" != "$FALCON_PK" ]; then
+        error "scriptSig Falcon public key does not match expected public key"
+    fi
+    if [ "$SCRIPTSIG_FALCON_SIG" != "$FALCON_SIG" ]; then
+        error "scriptSig Falcon signature does not match expected signature"
+    fi
+    success "scriptSig carries expected Falcon public key/signature"
+    {
+        echo "SCRIPTSIG_VALIDATION"
+        echo "scriptsig_pqc_pubkey=$SCRIPTSIG_FALCON_PK"
+        echo "scriptsig_pqc_signature=$SCRIPTSIG_FALCON_SIG"
+        echo "tx_sighash32=$TX_SIGHASH_HEX"
+        echo "expected_commit=$FALCON_COMMIT"
+    } | tee -a "$RUN_LOG"
 
     VERIFY_OUTPUT=$(./such -c falcon_verify -k "$FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$FALCON_SIG")
     echo "$VERIFY_OUTPUT" | tee -a "$RUN_LOG"
@@ -532,7 +500,7 @@ main() {
     echo "  - $TMPDIR/tx_info.txt (transaction info)"
     echo "  - $TMPDIR/spvnode.log (SPV validation log)"
     echo "  - $TMPDIR/falcon_verify.txt (off-chain verify result)"
-    echo "  - $RUN_LOG (full run log with WIF/address + witness validation artifacts)"
+    echo "  - $RUN_LOG (full run log with WIF/address + scriptSig validation artifacts)"
     echo ""
 }
 
