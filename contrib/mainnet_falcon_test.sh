@@ -45,6 +45,11 @@ NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
+FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-52fdbbef70164cdd95ea78e7e95857ccd029550e60bfeb2ad0c80e734a7a472d}"
+FUNDED_UTXO_VOUT="${FUNDED_UTXO_VOUT:-0}"
+UTXO_API_URL="${UTXO_API_URL:-https://api.blockcypher.com/v1/doge/main/addrs/${FUNDED_ADDR}?unspentOnly=true&includeScript=true}"
+AUTO_PREPARE_TX_FROM_UTXO="${AUTO_PREPARE_TX_FROM_UTXO:-1}"
+TX_FEE_KOINU="${TX_FEE_KOINU:-100000}"
 RAW_UNSIGNED_TX="${RAW_UNSIGNED_TX:-}"
 SCRIPT_PUBKEY="${SCRIPT_PUBKEY:-}"
 RUN_LOG="$TMPDIR/mainnet_falcon_run.log"
@@ -131,11 +136,150 @@ log_run_context() {
         echo "NETWORK=$NETWORK"
         echo "WIF=$PRIVKEY_WIF"
         echo "ADDRESS=$TESTNET_ADDR"
+        echo "FUNDED_UTXO_TXID=$FUNDED_UTXO_TXID"
+        echo "FUNDED_UTXO_VOUT=$FUNDED_UTXO_VOUT"
+        echo "UTXO_API_URL=$UTXO_API_URL"
+        echo "TX_FEE_KOINU=$TX_FEE_KOINU"
         echo "SCRIPT_PUBKEY=$SCRIPT_PUBKEY"
         echo "SPV_HEADERS_FILE=$SPV_HEADERS_FILE"
         echo "SPV_WALLET_FILE=$SPV_WALLET_FILE"
         echo "REST_SERVER=$REST_SERVER"
     } | tee -a "$RUN_LOG"
+}
+
+prepare_tx_from_funded_utxo() {
+    info "Step 4a: Fetching funded UTXO and constructing unsigned transaction..."
+    local utxo_json="$TMPDIR/utxos.json"
+    local selected
+    local selected_txid
+    local selected_vout
+    local selected_value
+    local selected_script
+    local send_value
+
+    run_and_log "fetch funded UTXOs" curl -fsS "$UTXO_API_URL" > "$utxo_json"
+    cat "$utxo_json" >> "$RUN_LOG"
+    echo "" >> "$RUN_LOG"
+
+    selected=$(python3 - "$utxo_json" "$FUNDED_UTXO_TXID" "$FUNDED_UTXO_VOUT" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+want_txid = sys.argv[2].lower()
+want_vout = int(sys.argv[3])
+with open(path, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+rows = []
+for key in ("txrefs", "unconfirmed_txrefs"):
+    rows.extend(data.get(key, []) or [])
+
+for r in rows:
+    txid = (r.get("tx_hash") or "").lower()
+    vout = r.get("tx_output_n")
+    spent = bool(r.get("spent", False))
+    if txid == want_txid and vout == want_vout and not spent:
+        value = int(r.get("value", 0))
+        script = r.get("script") or ""
+        conf = int(r.get("confirmations", 0))
+        print(f"txid={txid}")
+        print(f"vout={vout}")
+        print(f"value={value}")
+        print(f"script={script}")
+        print(f"confirmations={conf}")
+        sys.exit(0)
+
+print("ERROR: requested funded UTXO not found or already spent", file=sys.stderr)
+sys.exit(1)
+PY
+)
+
+    selected_txid=$(echo "$selected" | awk -F= '/^txid=/{print $2; exit}')
+    selected_vout=$(echo "$selected" | awk -F= '/^vout=/{print $2; exit}')
+    selected_value=$(echo "$selected" | awk -F= '/^value=/{print $2; exit}')
+    selected_script=$(echo "$selected" | awk -F= '/^script=/{print $2; exit}')
+    if [ -z "$selected_txid" ] || [ -z "$selected_vout" ] || [ -z "$selected_value" ] || [ -z "$selected_script" ]; then
+        error "Failed to parse selected UTXO details"
+    fi
+    if [ "$selected_value" -le "$TX_FEE_KOINU" ]; then
+        error "Selected UTXO value ($selected_value) must be greater than TX_FEE_KOINU ($TX_FEE_KOINU)"
+    fi
+    send_value=$((selected_value - TX_FEE_KOINU))
+
+    RAW_UNSIGNED_TX=$(python3 - "$selected_txid" "$selected_vout" "$send_value" "$selected_script" <<'PY'
+import sys
+
+txid_hex = sys.argv[1].strip().lower()
+vout = int(sys.argv[2])
+value = int(sys.argv[3])
+script_hex = sys.argv[4].strip().lower()
+
+if len(txid_hex) != 64:
+    raise SystemExit("invalid txid length")
+if len(script_hex) % 2 != 0:
+    raise SystemExit("invalid script hex length")
+
+def le_u32(n: int) -> str:
+    return n.to_bytes(4, "little", signed=False).hex()
+
+def le_u64(n: int) -> str:
+    return n.to_bytes(8, "little", signed=False).hex()
+
+def varint(n: int) -> str:
+    if n < 0xfd:
+        return f"{n:02x}"
+    if n <= 0xffff:
+        return "fd" + n.to_bytes(2, "little").hex()
+    if n <= 0xffffffff:
+        return "fe" + n.to_bytes(4, "little").hex()
+    return "ff" + n.to_bytes(8, "little").hex()
+
+version = "01000000"
+vin_count = "01"
+prev_txid_le = bytes.fromhex(txid_hex)[::-1].hex()
+prev_vout = le_u32(vout)
+script_sig_len = "00"
+sequence = "ffffffff"
+vout_count = "01"
+value_le = le_u64(value)
+script_len = varint(len(script_hex) // 2)
+locktime = "00000000"
+
+raw = (
+    version
+    + vin_count
+    + prev_txid_le
+    + prev_vout
+    + script_sig_len
+    + sequence
+    + vout_count
+    + value_le
+    + script_len
+    + script_hex
+    + locktime
+)
+print(raw)
+PY
+)
+    SCRIPT_PUBKEY="$selected_script"
+
+    {
+        echo "UTXO_SELECTION"
+        echo "selected_txid=$selected_txid"
+        echo "selected_vout=$selected_vout"
+        echo "selected_value_koinu=$selected_value"
+        echo "tx_fee_koinu=$TX_FEE_KOINU"
+        echo "send_value_koinu=$send_value"
+        echo "selected_script_pubkey=$SCRIPT_PUBKEY"
+        echo "raw_unsigned_tx=$RAW_UNSIGNED_TX"
+    } | tee -a "$RUN_LOG"
+
+    success "Prepared RAW_UNSIGNED_TX and SCRIPT_PUBKEY from funded UTXO"
+    echo "  UTXO: ${selected_txid}:${selected_vout}"
+    echo "  UTXO value: $selected_value koinu"
+    echo "  Fee: $TX_FEE_KOINU koinu"
+    echo "  Output value: $send_value koinu"
 }
 
 wait_for_rest_tx() {
@@ -183,6 +327,9 @@ EOF
 # Step 6: Build transaction with OP_RETURN
 build_transaction() {
     info "Step 4: Building transaction and deriving tx_sighash32..."
+    if { [ -z "$RAW_UNSIGNED_TX" ] || [ -z "$SCRIPT_PUBKEY" ]; } && [ "$AUTO_PREPARE_TX_FROM_UTXO" -eq 1 ]; then
+        prepare_tx_from_funded_utxo
+    fi
     if [ -z "$RAW_UNSIGNED_TX" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
         error "RAW_UNSIGNED_TX must be set in NON_INTERACTIVE mode"
     fi
