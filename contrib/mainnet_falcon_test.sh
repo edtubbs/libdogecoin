@@ -276,6 +276,9 @@ generate_falcon_keypair() {
     if [ -z "$FALCON_PK" ] || [ -z "$FALCON_SK" ]; then
         error "Failed to generate Falcon keypair"
     fi
+    if [ "$FALCON_PK" = "$FALCON_SK" ]; then
+        error "Falcon public and secret keys are identical; expected different key material"
+    fi
     
     success "Falcon-512 keypair generated"
     echo "  Public Key (${#FALCON_PK} chars): ${FALCON_PK:0:64}..."
@@ -366,6 +369,35 @@ build_transaction() {
     if [ -z "$TX_FOR_SIGNING" ]; then
         error "Failed to append Falcon public key/signature to scriptSig"
     fi
+    info "Step 6c: Verifying scriptSig carries Falcon public key/signature before signing..."
+    PRE_SIGN_SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$TX_FOR_SIGNING")
+    echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | tee "$TMPDIR/falcon_scriptsig_pqc_presign.txt" | tee -a "$RUN_LOG" >/dev/null
+    PRE_SIGN_FALCON_ITEM_A=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
+    PRE_SIGN_FALCON_ITEM_B=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
+    if [ -z "$PRE_SIGN_FALCON_ITEM_A" ] || [ -z "$PRE_SIGN_FALCON_ITEM_B" ]; then
+        error "scriptSig pre-sign check missing Falcon PQC payload"
+    fi
+    PRE_SIGN_FALCON_PK=""
+    PRE_SIGN_FALCON_SIG=""
+    for candidate_pk in "$PRE_SIGN_FALCON_ITEM_A" "$PRE_SIGN_FALCON_ITEM_B"; do
+        for candidate_sig in "$PRE_SIGN_FALCON_ITEM_A" "$PRE_SIGN_FALCON_ITEM_B"; do
+            if [ "$candidate_pk" = "$candidate_sig" ]; then
+                continue
+            fi
+            if ./such -c falcon_verify -k "$candidate_pk" -x "$TX_SIGHASH_HEX" -s "$candidate_sig" 2>/dev/null | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid"; then
+                PRE_SIGN_FALCON_PK="$candidate_pk"
+                PRE_SIGN_FALCON_SIG="$candidate_sig"
+                break 2
+            fi
+        done
+    done
+    if [ -z "$PRE_SIGN_FALCON_PK" ] || [ -z "$PRE_SIGN_FALCON_SIG" ]; then
+        error "scriptSig pre-sign payload could not be validated as Falcon pk/signature pair"
+    fi
+    if [ "$PRE_SIGN_FALCON_PK" != "$FALCON_PK" ] || [ "$PRE_SIGN_FALCON_SIG" != "$FALCON_SIG" ]; then
+        error "scriptSig pre-sign payload does not match expected Falcon key/signature pair"
+    fi
+    success "scriptSig pre-sign payload check passed"
 
     info "Signing transaction with commitment output..."
     SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
@@ -488,6 +520,11 @@ monitor_spvnode() {
                 success "spvnode confirmed ${expected_commit_mode} Falcon commitment validation for expected commit"
                 echo "$commit_match_line" | tee -a "$RUN_LOG"
                 break
+            fi
+            op_return_only_line=$(grep -F "[falcon-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$FALCON_COMMIT" | grep -F "source=op_return_only" | tail -n1 || true)
+            if [ -n "$op_return_only_line" ]; then
+                echo "$op_return_only_line" | tee -a "$RUN_LOG"
+                error "spvnode validated commitment as source=op_return_only; expected source=scriptsig"
             fi
             if ! kill -0 "$spv_pipe_pid" 2>/dev/null; then
                 set +e

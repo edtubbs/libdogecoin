@@ -780,14 +780,14 @@ static dogecoin_bool extract_scriptsig_pqc_items(const cstring* script_sig,
         }
         off += push_len;
     }
-    if (!item0 || !item1) {
-        return false;
-    }
-    *out_pk = item0;
-    *out_pk_len = item0_len;
-    *out_sig = item1;
-    *out_sig_len = item1_len;
-    return true;
+            if (!item0 || !item1) {
+                return false;
+            }
+            *out_pk = item0;
+            *out_pk_len = item0_len;
+            *out_sig = item1;
+            *out_sig_len = item1_len;
+            return true;
 }
 
 int main(int argc, char* argv[])
@@ -1314,8 +1314,10 @@ int main(int argc, char* argv[])
                 printf("  scriptsig_pqc: none\n");
                 continue;
             }
-            char* pk_hex = utils_uint8_to_hex(pqc_pk, pqc_pk_len);
-            char* sig_hex = utils_uint8_to_hex(pqc_sig, pqc_sig_len);
+            char* pk_hex_tmp = utils_uint8_to_hex(pqc_pk, pqc_pk_len);
+            char* pk_hex = pk_hex_tmp ? strdup(pk_hex_tmp) : NULL;
+            char* sig_hex_tmp = utils_uint8_to_hex(pqc_sig, pqc_sig_len);
+            char* sig_hex = sig_hex_tmp ? strdup(sig_hex_tmp) : NULL;
             printf("  scriptsig_pqc_pubkey: %s\n", pk_hex ? pk_hex : "");
             printf("  scriptsig_pqc_signature: %s\n", sig_hex ? sig_hex : "");
             if (pk_hex) dogecoin_free(pk_hex);

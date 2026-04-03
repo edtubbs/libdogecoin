@@ -112,7 +112,18 @@ generate_dilithium2_keypair() {
     run_and_log "such dilithium2_keygen" ./such -c dilithium2_keygen | tee "$TMPDIR/dilithium2_keys.txt"
     DILITHIUM2_PK=$(grep "^public key:" "$TMPDIR/dilithium2_keys.txt" | cut -d: -f2 | tr -d ' ')
     DILITHIUM2_SK=$(grep "^secret key:" "$TMPDIR/dilithium2_keys.txt" | cut -d: -f2 | tr -d ' ')
-    [ -n "$DILITHIUM2_PK" ] || error "Failed to generate Dilithium2 keypair"
+    [ -n "$DILITHIUM2_PK" ] || error "Failed to parse Dilithium2 public key"
+    [ -n "$DILITHIUM2_SK" ] || error "Failed to parse Dilithium2 secret key"
+    if [ "$DILITHIUM2_PK" = "$DILITHIUM2_SK" ]; then
+        error "Dilithium2 public and secret keys are identical; expected different key material"
+    fi
+    echo "DILITHIUM2_KEYPAIR"
+    echo "dilithium2_pk_len=${#DILITHIUM2_PK}"
+    echo "dilithium2_sk_len=${#DILITHIUM2_SK}"
+    echo "dilithium2_pk_prefix=${DILITHIUM2_PK:0:64}"
+    echo "dilithium2_pk_suffix=${DILITHIUM2_PK: -64}"
+    echo "dilithium2_sk_prefix=${DILITHIUM2_SK:0:64}"
+    echo "dilithium2_sk_suffix=${DILITHIUM2_SK: -64}"
     success "Dilithium2 keypair generated"
 }
 
@@ -179,6 +190,32 @@ build_transaction() {
     echo "$ADD_SCRIPTSIG_PQC_OUTPUT"
     TX_FOR_SIGNING=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | grep "^tx with scriptsig pqc:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_FOR_SIGNING" ] || error "Failed to append Dilithium2 public key/signature to scriptSig"
+    info "Verifying scriptSig carries Dilithium2 public key/signature before signing..."
+    PRE_SIGN_SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$TX_FOR_SIGNING")
+    echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | tee "$TMPDIR/dilithium2_scriptsig_pqc_presign.txt"
+    PRE_SIGN_DILITHIUM2_ITEM_A=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
+    PRE_SIGN_DILITHIUM2_ITEM_B=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
+    [ -n "$PRE_SIGN_DILITHIUM2_ITEM_A" ] || error "scriptSig pre-sign check missing first Dilithium2 item"
+    [ -n "$PRE_SIGN_DILITHIUM2_ITEM_B" ] || error "scriptSig pre-sign check missing second Dilithium2 item"
+    PRE_SIGN_DILITHIUM2_PK=""
+    PRE_SIGN_DILITHIUM2_SIG=""
+    for candidate_pk in "$PRE_SIGN_DILITHIUM2_ITEM_A" "$PRE_SIGN_DILITHIUM2_ITEM_B"; do
+        for candidate_sig in "$PRE_SIGN_DILITHIUM2_ITEM_A" "$PRE_SIGN_DILITHIUM2_ITEM_B"; do
+            if [ "$candidate_pk" = "$candidate_sig" ]; then
+                continue
+            fi
+            if ./such -c dilithium2_verify -k "$candidate_pk" -x "$TX_SIGHASH_HEX" -s "$candidate_sig" 2>/dev/null | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid|VALID"; then
+                PRE_SIGN_DILITHIUM2_PK="$candidate_pk"
+                PRE_SIGN_DILITHIUM2_SIG="$candidate_sig"
+                break 2
+            fi
+        done
+    done
+    [ -n "$PRE_SIGN_DILITHIUM2_PK" ] || error "scriptSig pre-sign payload could not be validated as Dilithium2 pk/signature pair"
+    [ -n "$PRE_SIGN_DILITHIUM2_SIG" ] || error "scriptSig pre-sign payload could not be validated as Dilithium2 pk/signature pair"
+    [ "$PRE_SIGN_DILITHIUM2_PK" = "$DILITHIUM2_PK" ] || error "scriptSig pre-sign public key mismatch"
+    [ "$PRE_SIGN_DILITHIUM2_SIG" = "$DILITHIUM2_SIG" ] || error "scriptSig pre-sign signature mismatch"
+    success "scriptSig pre-sign payload check passed"
 
     SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
@@ -262,6 +299,11 @@ monitor_spvnode() {
                 success "spvnode confirmed ${expected_commit_mode} Dilithium2 commitment validation for expected commit"
                 echo "$commit_match_line" | tee -a "$TMPDIR/spvnode.log"
                 break
+            fi
+            op_return_only_line=$(grep -F "[dilithium-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$DILITHIUM2_COMMIT" | grep -F "source=op_return_only" | tail -n1 || true)
+            if [ -n "$op_return_only_line" ]; then
+                echo "$op_return_only_line" | tee -a "$TMPDIR/spvnode.log"
+                error "spvnode validated commitment as source=op_return_only; expected source=scriptsig"
             fi
             if ! kill -0 "$spv_pipe_pid" 2>/dev/null; then
                 set +e

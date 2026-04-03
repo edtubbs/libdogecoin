@@ -108,6 +108,9 @@ generate_raccoong_keypair() {
     RACCOONG_SK=$(grep "^secret key:" "$TMPDIR/raccoong_keys.txt" | cut -d: -f2 | tr -d ' ')
     [ -n "$RACCOONG_PK" ] || error "Failed to generate Raccoon-G keypair"
     [ -n "$RACCOONG_SK" ] || error "Failed to generate Raccoon-G keypair"
+    if [ "$RACCOONG_PK" = "$RACCOONG_SK" ]; then
+        error "Raccoon-G public and secret keys are identical; expected different key material"
+    fi
     success "Raccoon-G-44 keypair generated"
 }
 
@@ -172,6 +175,32 @@ build_transaction() {
     echo "$ADD_SCRIPTSIG_PQC_OUTPUT"
     TX_FOR_SIGNING=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | grep "^tx with scriptsig pqc:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_FOR_SIGNING" ] || error "Failed to append Raccoon-G public key/signature to scriptSig"
+    info "Verifying scriptSig carries Raccoon-G public key/signature before signing..."
+    PRE_SIGN_SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$TX_FOR_SIGNING")
+    echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" > "$TMPDIR/raccoong_scriptsig_pqc_presign.txt"
+    PRE_SIGN_RACCOONG_ITEM_A=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
+    PRE_SIGN_RACCOONG_ITEM_B=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
+    [ -n "$PRE_SIGN_RACCOONG_ITEM_A" ] || error "scriptSig pre-sign check missing first Raccoon-G item"
+    [ -n "$PRE_SIGN_RACCOONG_ITEM_B" ] || error "scriptSig pre-sign check missing second Raccoon-G item"
+    PRE_SIGN_RACCOONG_PK=""
+    PRE_SIGN_RACCOONG_SIG=""
+    for candidate_pk in "$PRE_SIGN_RACCOONG_ITEM_A" "$PRE_SIGN_RACCOONG_ITEM_B"; do
+        for candidate_sig in "$PRE_SIGN_RACCOONG_ITEM_A" "$PRE_SIGN_RACCOONG_ITEM_B"; do
+            if [ "$candidate_pk" = "$candidate_sig" ]; then
+                continue
+            fi
+            if ./such -c raccoong_verify -k "$candidate_pk" -x "$TX_SIGHASH_HEX" -s "$candidate_sig" 2>/dev/null | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid|VALID"; then
+                PRE_SIGN_RACCOONG_PK="$candidate_pk"
+                PRE_SIGN_RACCOONG_SIG="$candidate_sig"
+                break 2
+            fi
+        done
+    done
+    [ -n "$PRE_SIGN_RACCOONG_PK" ] || error "scriptSig pre-sign payload could not be validated as Raccoon-G pk/signature pair"
+    [ -n "$PRE_SIGN_RACCOONG_SIG" ] || error "scriptSig pre-sign payload could not be validated as Raccoon-G pk/signature pair"
+    [ "$PRE_SIGN_RACCOONG_PK" = "$RACCOONG_PK" ] || error "scriptSig pre-sign public key mismatch"
+    [ "$PRE_SIGN_RACCOONG_SIG" = "$RACCOONG_SIG" ] || error "scriptSig pre-sign signature mismatch"
+    success "scriptSig pre-sign payload check passed"
 
     SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
@@ -255,6 +284,11 @@ monitor_spvnode() {
                 success "spvnode confirmed ${expected_commit_mode} Raccoon-G commitment validation for expected commit"
                 echo "$commit_match_line" | tee -a "$TMPDIR/spvnode.log"
                 break
+            fi
+            op_return_only_line=$(grep -F "[raccoong-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$RACCOONG_COMMIT" | grep -F "source=op_return_only" | tail -n1 || true)
+            if [ -n "$op_return_only_line" ]; then
+                echo "$op_return_only_line" | tee -a "$TMPDIR/spvnode.log"
+                error "spvnode validated commitment as source=op_return_only; expected source=scriptsig"
             fi
             if ! kill -0 "$spv_pipe_pid" 2>/dev/null; then
                 set +e
