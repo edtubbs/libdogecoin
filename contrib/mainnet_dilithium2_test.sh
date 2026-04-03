@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Dilithium2 Testnet Integration Test Script
+# Dilithium2 Mainnet Integration Test Script
 #
 # Prerequisites:
 #   - libdogecoin built with --enable-liboqs
@@ -38,6 +38,8 @@ REST_PORT="${REST_PORT:-$((19080 + ($$ % 1000)))}"
 REST_SERVER="${REST_SERVER:-${REST_HOST}:${REST_PORT}}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
+FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
+FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 # sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
 
@@ -94,38 +96,15 @@ check_tools() {
     success "All tools available"
 }
 
-generate_testnet_wallet() {
-    info "Generating testnet wallet..."
-    if [ -n "$TESTNET_PRIVKEY_WIF" ]; then
-        PRIVKEY_WIF="$TESTNET_PRIVKEY_WIF"
-    else
-        run_and_log "such generate_private_key" ./such -c generate_private_key $NETWORK_FLAG | tee "$TMPDIR/testnet_key.txt"
-        PRIVKEY_WIF=$(grep "^private key wif:" "$TMPDIR/testnet_key.txt" | cut -d: -f2 | tr -d ' ')
+load_mainnet_wallet() {
+    info "Using provided funded mainnet wallet..."
+    PRIVKEY_WIF="$FUNDED_WIF"
+    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $NETWORK_FLAG | tee "$TMPDIR/mainnet_addr.txt"
+    TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/mainnet_addr.txt" | cut -d: -f2 | tr -d ' ')
+    if [ "$TESTNET_ADDR" != "$FUNDED_ADDR" ]; then
+        error "Provided WIF does not map to expected funded address"
     fi
-    run_and_log "such generate_public_key" ./such -c generate_public_key -p "$PRIVKEY_WIF" $NETWORK_FLAG | tee "$TMPDIR/testnet_addr.txt"
-    TESTNET_ADDR=$(grep "p2pkh address:" "$TMPDIR/testnet_addr.txt" | cut -d: -f2 | tr -d ' ')
-    success "Wallet ready: $TESTNET_ADDR"
-    echo "  Private Key (WIF): $PRIVKEY_WIF"
-    echo "  [FUNDING] Send testnet DOGE to this address: $TESTNET_ADDR"
-}
-
-get_testnet_coins() {
-    echo ""
-    echo "Send ${NETWORK} DOGE to: $TESTNET_ADDR"
-    echo "Wallet private key (WIF): $PRIVKEY_WIF"
-    echo "Faucet: https://faucet.doge.toys/"
-    echo "[FAUCET] Request coins for address: $TESTNET_ADDR"
-    if [ "$NON_INTERACTIVE" -eq 1 ]; then
-        FAUCET_TXID="${FAUCET_TXID:-}"
-        info "NON_INTERACTIVE=1, skipping funding prompt."
-    else
-        read -p "Optional faucet txid (for log): " FAUCET_TXID
-        info "Press Enter after funding the address..."
-        read
-    fi
-    if [ -n "$FAUCET_TXID" ]; then
-        echo "FAUCET_TXID=$FAUCET_TXID" > "$TMPDIR/faucet.txt"
-    fi
+    success "Mainnet funded wallet loaded: $TESTNET_ADDR"
 }
 
 generate_dilithium2_keypair() {
@@ -154,7 +133,7 @@ generate_commitment() {
 }
 
 build_transaction() {
-    info "Build unsigned testnet tx with such, then paste hex below:"
+    info "Build unsigned mainnet tx with such, then paste hex below:"
     if [ -z "$RAW_UNSIGNED_TX" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
         error "RAW_UNSIGNED_TX must be set in NON_INTERACTIVE mode"
     fi
@@ -364,12 +343,11 @@ verify_commitment() {
 main() {
     echo ""
     echo "=========================================="
-    echo "  Dilithium2 Testnet Integration Test"
+    echo "  Dilithium2 Mainnet Integration Test"
     echo "=========================================="
     echo ""
     check_tools
-    generate_testnet_wallet
-    get_testnet_coins
+    load_mainnet_wallet
     generate_dilithium2_keypair
     build_transaction
     monitor_spvnode
