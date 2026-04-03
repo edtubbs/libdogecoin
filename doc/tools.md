@@ -492,8 +492,10 @@ The `such` tool includes PQC commands for Falcon-512 and Dilithium2 commitments.
 | - | - | - |
 | falcon_keygen | None | Generates a Falcon-512 keypair (public key: 897 bytes, secret key: 1281 bytes) |
 | tx_sighash32 | -x, -s, -i, -h | Derives transaction input sighash32 used by signing flows |
-| addwitness | -x, -i, -s | Appends witness item bytes to a transaction input (for example PQ public key carriage) |
-| printwitness | -x | Prints per-input witness stack items from a raw transaction |
+| addscriptsigpqc | -x, -i, -k, -s | Appends PQ public key and PQ signature bytes as first two pushes in input scriptSig |
+| printscriptsigpqc | -x | Prints extracted PQ public key/signature from per-input scriptSig pushes |
+| addwitness | -x, -i, -s | Appends witness item bytes to a transaction input (legacy helper) |
+| printwitness | -x | Prints per-input witness stack items from a raw transaction (legacy helper) |
 | falcon_sign | -p, -x | Signs message bytes (typically tx_sighash32 hex) with Falcon-512 secret key. Returns signature (~660 bytes) |
 | falcon_verify | -k, -x, -s | Verifies a Falcon-512 signature against message bytes and public key |
 | falcon_commit | -k, -s | Generates a 32-byte SHA256 commitment from public key and signature for OP_RETURN |
@@ -562,19 +564,20 @@ Generating Falcon-512 commitment...
 Commitment (32 bytes): a1b2c3d4e5f6789...
 ```
 
-#### Attach PQ public key in witness and inspect it:
+#### Attach PQ public key/signature in scriptSig and inspect:
 ```bash
-# Append Falcon public key as witness item 0 on input 0
-TX_WITH_WITNESS=$(./such -c addwitness -x <tx_with_commit_hex> -i 0 -s <falcon_public_key_hex> | awk '/tx with witness:/ {print $4}')
+# Append Falcon public key/signature as scriptSig pushes on input 0
+TX_WITH_SCRIPTSIG_PQC=$(./such -c addscriptsigpqc -x <tx_with_commit_hex> -i 0 -k <falcon_public_key_hex> -s <falcon_signature_hex> | awk '/tx with scriptsig pqc:/ {print $5}')
 
-# Verify witness contents
-./such -c printwitness -x $TX_WITH_WITNESS
+# Verify scriptSig PQC payload
+./such -c printscriptsigpqc -x $TX_WITH_SCRIPTSIG_PQC
 ```
 
 Output:
 ```
-input[0] witness items: 1
-  witness[0]: <falcon_public_key_hex>
+input[0]
+  scriptsig_pqc_pubkey: <falcon_public_key_hex>
+  scriptsig_pqc_signature: <falcon_signature_hex>
 ```
 
 ### Testnet Workflow Helpers
@@ -589,11 +592,7 @@ For end-to-end mainnet command flow, use:
 - `contrib/mainnet_dilithium2_test.sh`
 - `contrib/mainnet_raccoong_test.sh`
 
-These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, optional witness public-key/signature attachment, and SPV monitoring commands.
-All PQC E2E scripts support both paths:
-
-- `INCLUDE_WITNESS_ITEMS=1` (default): attach PQ public key and PQ signature into witness items `[0]` and `[1]`.
-- `INCLUDE_WITNESS_ITEMS=0`: non-witness mode; sign/broadcast commitment transaction without witness PQ payload.
+These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, scriptSig public-key/signature attachment, and SPV monitoring commands.
 
 For non-interactive execution (recommended for reproducible reruns/log capture), set:
 
@@ -620,7 +619,7 @@ These scripts automate:
 - Falcon keypair generation
 - tx_sighash signing
 - Commitment generation
-- Witness carriage of PQC public key
+- scriptSig carriage of PQC public key/signature
 - SPV monitoring instructions
 
 For protocol rationale/specification details, see:
