@@ -47,9 +47,10 @@ FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-52fdbbef70164cdd95ea78e7e95857ccd029550e60bfeb2ad0c80e734a7a472d}"
 FUNDED_UTXO_VOUT="${FUNDED_UTXO_VOUT:-0}"
-UTXO_API_URL="${UTXO_API_URL:-https://api.blockcypher.com/v1/doge/main/addrs/${FUNDED_ADDR}?unspentOnly=true&includeScript=true}"
 AUTO_PREPARE_TX_FROM_UTXO="${AUTO_PREPARE_TX_FROM_UTXO:-1}"
 TX_FEE_KOINU="${TX_FEE_KOINU:-100000}"
+FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-4194000000}"
+FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}"
 RAW_UNSIGNED_TX="${RAW_UNSIGNED_TX:-}"
 SCRIPT_PUBKEY="${SCRIPT_PUBKEY:-}"
 RUN_LOG="$TMPDIR/mainnet_falcon_run.log"
@@ -138,8 +139,9 @@ log_run_context() {
         echo "ADDRESS=$TESTNET_ADDR"
         echo "FUNDED_UTXO_TXID=$FUNDED_UTXO_TXID"
         echo "FUNDED_UTXO_VOUT=$FUNDED_UTXO_VOUT"
-        echo "UTXO_API_URL=$UTXO_API_URL"
         echo "TX_FEE_KOINU=$TX_FEE_KOINU"
+        echo "FUNDED_UTXO_VALUE_KOINU=$FUNDED_UTXO_VALUE_KOINU"
+        echo "FUNDED_UTXO_SCRIPT_PUBKEY=$FUNDED_UTXO_SCRIPT_PUBKEY"
         echo "SCRIPT_PUBKEY=$SCRIPT_PUBKEY"
         echo "SPV_HEADERS_FILE=$SPV_HEADERS_FILE"
         echo "SPV_WALLET_FILE=$SPV_WALLET_FILE"
@@ -148,57 +150,18 @@ log_run_context() {
 }
 
 prepare_tx_from_funded_utxo() {
-    info "Step 4a: Fetching funded UTXO and constructing unsigned transaction..."
-    local utxo_json="$TMPDIR/utxos.json"
-    local selected
+    info "Step 4a: Constructing unsigned transaction from known funded UTXO..."
     local selected_txid
     local selected_vout
     local selected_value
     local selected_script
     local send_value
 
-    run_and_log "fetch funded UTXOs" curl -fsS "$UTXO_API_URL" > "$utxo_json"
-    cat "$utxo_json" >> "$RUN_LOG"
-    echo "" >> "$RUN_LOG"
+    selected_txid="$FUNDED_UTXO_TXID"
+    selected_vout="$FUNDED_UTXO_VOUT"
+    selected_value="$FUNDED_UTXO_VALUE_KOINU"
+    selected_script="$FUNDED_UTXO_SCRIPT_PUBKEY"
 
-    selected=$(python3 - "$utxo_json" "$FUNDED_UTXO_TXID" "$FUNDED_UTXO_VOUT" <<'PY'
-import json
-import sys
-
-path = sys.argv[1]
-want_txid = sys.argv[2].lower()
-want_vout = int(sys.argv[3])
-with open(path, "r", encoding="utf-8") as f:
-    data = json.load(f)
-
-rows = []
-for key in ("txrefs", "unconfirmed_txrefs"):
-    rows.extend(data.get(key, []) or [])
-
-for r in rows:
-    txid = (r.get("tx_hash") or "").lower()
-    vout = r.get("tx_output_n")
-    spent = bool(r.get("spent", False))
-    if txid == want_txid and vout == want_vout and not spent:
-        value = int(r.get("value", 0))
-        script = r.get("script") or ""
-        conf = int(r.get("confirmations", 0))
-        print(f"txid={txid}")
-        print(f"vout={vout}")
-        print(f"value={value}")
-        print(f"script={script}")
-        print(f"confirmations={conf}")
-        sys.exit(0)
-
-print("ERROR: requested funded UTXO not found or already spent", file=sys.stderr)
-sys.exit(1)
-PY
-)
-
-    selected_txid=$(echo "$selected" | awk -F= '/^txid=/{print $2; exit}')
-    selected_vout=$(echo "$selected" | awk -F= '/^vout=/{print $2; exit}')
-    selected_value=$(echo "$selected" | awk -F= '/^value=/{print $2; exit}')
-    selected_script=$(echo "$selected" | awk -F= '/^script=/{print $2; exit}')
     if [ -z "$selected_txid" ] || [ -z "$selected_vout" ] || [ -z "$selected_value" ] || [ -z "$selected_script" ]; then
         error "Failed to parse selected UTXO details"
     fi
@@ -269,6 +232,7 @@ PY
         echo "selected_txid=$selected_txid"
         echo "selected_vout=$selected_vout"
         echo "selected_value_koinu=$selected_value"
+        echo "selected_source=known_utxo_constants"
         echo "tx_fee_koinu=$TX_FEE_KOINU"
         echo "send_value_koinu=$send_value"
         echo "selected_script_pubkey=$SCRIPT_PUBKEY"
