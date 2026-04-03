@@ -48,8 +48,8 @@ FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 RAW_UNSIGNED_TX="${RAW_UNSIGNED_TX:-}"
 SCRIPT_PUBKEY="${SCRIPT_PUBKEY:-}"
 RUN_LOG="$TMPDIR/mainnet_falcon_run.log"
-# sendtx can report success either as immediate relay or as "already known".
-RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
+# sendtx can report success either as immediate relay, non-relayed acceptance, or as "already known".
+RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
 
 # Function to print colored messages
 info() {

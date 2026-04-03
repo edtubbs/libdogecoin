@@ -38,7 +38,8 @@ NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
-RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
+RELAY_SUCCESS_PATTERN='tx successfully sent to node|not relayed back|already (broadcasted|known|have transaction)|txn-already-known'
+INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-1}"
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -167,11 +168,25 @@ build_transaction() {
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Raccoon-G commitment"
 
-    info "Embedding Raccoon-G public key/signature in scriptSig for input 0..."
-    ADD_SCRIPTSIG_PQC_OUTPUT=$(run_and_log "such addscriptsigpqc" ./such -c addscriptsigpqc -x "$TX_WITH_COMMIT" -i 0 -k "$RACCOONG_PK" -s "$RACCOONG_SIG")
-    echo "$ADD_SCRIPTSIG_PQC_OUTPUT"
-    TX_FOR_SIGNING=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | grep "^tx with scriptsig pqc:" | cut -d: -f2- | tr -d ' ')
-    [ -n "$TX_FOR_SIGNING" ] || error "Failed to append Raccoon-G public key/signature to scriptSig"
+    TX_FOR_SIGNING="$TX_WITH_COMMIT"
+    TX_WITH_WITNESS="$TX_WITH_COMMIT"
+    TX_WITH_WITNESS_SIG="$TX_WITH_COMMIT"
+    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
+        info "Embedding Raccoon-G public key in witness[0] for input 0..."
+        ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$RACCOONG_PK")
+        echo "$ADD_WITNESS_OUTPUT"
+        TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
+        [ -n "$TX_WITH_WITNESS" ] || error "Failed to append Raccoon-G public key witness item"
+
+        info "Embedding Raccoon-G signature in witness[1] for input 0..."
+        ADD_SIG_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$RACCOONG_SIG")
+        echo "$ADD_SIG_WITNESS_OUTPUT"
+        TX_WITH_WITNESS_SIG=$(echo "$ADD_SIG_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
+        [ -n "$TX_WITH_WITNESS_SIG" ] || error "Failed to append Raccoon-G signature witness item"
+        TX_FOR_SIGNING="$TX_WITH_WITNESS_SIG"
+    else
+        info "Non-witness flow enabled (INCLUDE_WITNESS_ITEMS=0); signing tx with commitment only"
+    fi
 
     SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
@@ -181,14 +196,15 @@ build_transaction() {
     cat > "$TMPDIR/tx_info.txt" <<EOF
 RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
 TX_WITH_COMMIT=$TX_WITH_COMMIT
-TX_WITH_SCRIPTSIG_PQC=$TX_FOR_SIGNING
+TX_WITH_WITNESS=$TX_WITH_WITNESS
+TX_WITH_WITNESS_SIG=$TX_WITH_WITNESS_SIG
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
 TX_SIGHASH_HEX=$TX_SIGHASH_HEX
 RACCOONG_SIG=$RACCOONG_SIG
 RACCOONG_COMMIT=$RACCOONG_COMMIT
-SCRIPTSIG_PQC_PUBKEY=$RACCOONG_PK
+WITNESS_PQC_PUBKEY=$RACCOONG_PK
+WITNESS_PQC_SIG=$RACCOONG_SIG
 SIGNED_TX=$SIGNED_TX
-TXID=$BROADCAST_TXID
 OPRETURN_SCRIPT=6a2452434734${RACCOONG_COMMIT}
 EOF
 
@@ -293,25 +309,29 @@ verify_commitment() {
     info "Step 8: Off-chain verification"
     local VERIFY_PK="$RACCOONG_PK"
     local VERIFY_SIG="$RACCOONG_SIG"
-    SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$SIGNED_TX")
-    echo "$SCRIPTSIG_OUTPUT" > "$TMPDIR/raccoong_scriptsig_pqc.txt"
-    SCRIPTSIG_RACCOONG_PK=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
-    SCRIPTSIG_RACCOONG_SIG=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
-    if [ -z "$SCRIPTSIG_RACCOONG_PK" ]; then
-        error "Failed to extract Raccoon-G public key from scriptSig"
+    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
+        WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
+        echo "$WITNESS_OUTPUT" > "$TMPDIR/raccoong_witness.txt"
+        WITNESS_RACCOONG_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
+        WITNESS_RACCOONG_SIG=$(echo "$WITNESS_OUTPUT" | awk '/witness\[1\]:/ {print $2; exit}')
+        if [ -z "$WITNESS_RACCOONG_PK" ]; then
+            error "Failed to extract Raccoon-G public key from witness"
+        fi
+        if [ -z "$WITNESS_RACCOONG_SIG" ]; then
+            error "Failed to extract Raccoon-G signature from witness"
+        fi
+        if [ "$WITNESS_RACCOONG_PK" != "$RACCOONG_PK" ]; then
+            error "Witness Raccoon-G public key does not match expected public key"
+        fi
+        if [ "$WITNESS_RACCOONG_SIG" != "$RACCOONG_SIG" ]; then
+            error "Witness Raccoon-G signature does not match expected signature"
+        fi
+        VERIFY_PK="$WITNESS_RACCOONG_PK"
+        VERIFY_SIG="$WITNESS_RACCOONG_SIG"
+        success "Witness carries expected Raccoon-G public key"
+    else
+        info "Witness validation skipped (INCLUDE_WITNESS_ITEMS=0); using generated key/signature for off-chain verify"
     fi
-    if [ -z "$SCRIPTSIG_RACCOONG_SIG" ]; then
-        error "Failed to extract Raccoon-G signature from scriptSig"
-    fi
-    if [ "$SCRIPTSIG_RACCOONG_PK" != "$RACCOONG_PK" ]; then
-        error "scriptSig Raccoon-G public key does not match expected public key"
-    fi
-    if [ "$SCRIPTSIG_RACCOONG_SIG" != "$RACCOONG_SIG" ]; then
-        error "scriptSig Raccoon-G signature does not match expected signature"
-    fi
-    VERIFY_PK="$SCRIPTSIG_RACCOONG_PK"
-    VERIFY_SIG="$SCRIPTSIG_RACCOONG_SIG"
-    success "scriptSig carries expected Raccoon-G public key/signature"
 
     VERIFY_OUTPUT=$(./such -c raccoong_verify -k "$VERIFY_PK" -x "$TX_SIGHASH_HEX" -s "$VERIFY_SIG")
     echo "$VERIFY_OUTPUT"
