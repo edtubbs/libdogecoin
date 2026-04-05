@@ -43,6 +43,7 @@ REST_PORT="${REST_PORT:-$((18080 + ($$ % 1000)))}"
 REST_SERVER="${REST_SERVER:-${REST_HOST}:${REST_PORT}}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
+INCLUDE_SCRIPTSIG_PQC="${INCLUDE_SCRIPTSIG_PQC:-0}"
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-52fdbbef70164cdd95ea78e7e95857ccd029550e60bfeb2ad0c80e734a7a472d}"
@@ -364,42 +365,47 @@ build_transaction() {
         error "Failed to append Falcon commitment to transaction"
     fi
 
-    info "Step 6b: Embedding Falcon public key and signature in scriptSig (input 0)..."
-    ADD_SCRIPTSIG_PQC_OUTPUT=$(run_and_log "such addscriptsigpqc" ./such -c addscriptsigpqc -x "$TX_WITH_COMMIT" -i 0 -k "$FALCON_PK" -s "$FALCON_SIG")
-    echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | tee -a "$RUN_LOG"
-    TX_FOR_SIGNING=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | grep "^tx with scriptsig pqc:" | cut -d: -f2- | tr -d ' ')
-    if [ -z "$TX_FOR_SIGNING" ]; then
-        error "Failed to append Falcon public key/signature to scriptSig"
-    fi
-    info "Step 6c: Verifying scriptSig carries Falcon public key/signature before signing..."
-    PRE_SIGN_SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$TX_FOR_SIGNING")
-    echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | tee "$TMPDIR/falcon_scriptsig_pqc_presign.txt" | tee -a "$RUN_LOG" >/dev/null
-    PRE_SIGN_FALCON_ITEM_A=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
-    PRE_SIGN_FALCON_ITEM_B=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
-    if [ -z "$PRE_SIGN_FALCON_ITEM_A" ] || [ -z "$PRE_SIGN_FALCON_ITEM_B" ]; then
-        error "scriptSig pre-sign check missing Falcon PQC payload"
-    fi
-    PRE_SIGN_FALCON_PK=""
-    PRE_SIGN_FALCON_SIG=""
-    for candidate_pk in "$PRE_SIGN_FALCON_ITEM_A" "$PRE_SIGN_FALCON_ITEM_B"; do
-        for candidate_sig in "$PRE_SIGN_FALCON_ITEM_A" "$PRE_SIGN_FALCON_ITEM_B"; do
-            if [ "$candidate_pk" = "$candidate_sig" ]; then
-                continue
-            fi
-            if ./such -c falcon_verify -k "$candidate_pk" -x "$TX_SIGHASH_HEX" -s "$candidate_sig" 2>/dev/null | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid"; then
-                PRE_SIGN_FALCON_PK="$candidate_pk"
-                PRE_SIGN_FALCON_SIG="$candidate_sig"
-                break 2
-            fi
+    if [ "$INCLUDE_SCRIPTSIG_PQC" -eq 1 ]; then
+        info "Step 6b: Embedding Falcon public key and signature in scriptSig (input 0)..."
+        ADD_SCRIPTSIG_PQC_OUTPUT=$(run_and_log "such addscriptsigpqc" ./such -c addscriptsigpqc -x "$TX_WITH_COMMIT" -i 0 -k "$FALCON_PK" -s "$FALCON_SIG")
+        echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | tee -a "$RUN_LOG"
+        TX_FOR_SIGNING=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | grep "^tx with scriptsig pqc:" | cut -d: -f2- | tr -d ' ')
+        if [ -z "$TX_FOR_SIGNING" ]; then
+            error "Failed to append Falcon public key/signature to scriptSig"
+        fi
+        info "Step 6c: Verifying scriptSig carries Falcon public key/signature before signing..."
+        PRE_SIGN_SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$TX_FOR_SIGNING")
+        echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | tee "$TMPDIR/falcon_scriptsig_pqc_presign.txt" | tee -a "$RUN_LOG" >/dev/null
+        PRE_SIGN_FALCON_ITEM_A=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
+        PRE_SIGN_FALCON_ITEM_B=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
+        if [ -z "$PRE_SIGN_FALCON_ITEM_A" ] || [ -z "$PRE_SIGN_FALCON_ITEM_B" ]; then
+            error "scriptSig pre-sign check missing Falcon PQC payload"
+        fi
+        PRE_SIGN_FALCON_PK=""
+        PRE_SIGN_FALCON_SIG=""
+        for candidate_pk in "$PRE_SIGN_FALCON_ITEM_A" "$PRE_SIGN_FALCON_ITEM_B"; do
+            for candidate_sig in "$PRE_SIGN_FALCON_ITEM_A" "$PRE_SIGN_FALCON_ITEM_B"; do
+                if [ "$candidate_pk" = "$candidate_sig" ]; then
+                    continue
+                fi
+                if ./such -c falcon_verify -k "$candidate_pk" -x "$TX_SIGHASH_HEX" -s "$candidate_sig" 2>/dev/null | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid"; then
+                    PRE_SIGN_FALCON_PK="$candidate_pk"
+                    PRE_SIGN_FALCON_SIG="$candidate_sig"
+                    break 2
+                fi
+            done
         done
-    done
-    if [ -z "$PRE_SIGN_FALCON_PK" ] || [ -z "$PRE_SIGN_FALCON_SIG" ]; then
-        error "scriptSig pre-sign payload could not be validated as Falcon pk/signature pair"
+        if [ -z "$PRE_SIGN_FALCON_PK" ] || [ -z "$PRE_SIGN_FALCON_SIG" ]; then
+            error "scriptSig pre-sign payload could not be validated as Falcon pk/signature pair"
+        fi
+        if [ "$PRE_SIGN_FALCON_PK" != "$FALCON_PK" ] || [ "$PRE_SIGN_FALCON_SIG" != "$FALCON_SIG" ]; then
+            error "scriptSig pre-sign payload does not match expected Falcon key/signature pair"
+        fi
+        success "scriptSig pre-sign payload check passed"
+    else
+        TX_FOR_SIGNING="$TX_WITH_COMMIT"
+        info "Step 6b: Skipping scriptSig PQC embedding (OP_RETURN-only commitment mode)"
     fi
-    if [ "$PRE_SIGN_FALCON_PK" != "$FALCON_PK" ] || [ "$PRE_SIGN_FALCON_SIG" != "$FALCON_SIG" ]; then
-        error "scriptSig pre-sign payload does not match expected Falcon key/signature pair"
-    fi
-    success "scriptSig pre-sign payload check passed"
 
     info "Signing transaction with commitment output..."
     SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
@@ -485,8 +491,12 @@ monitor_spvnode() {
         local spv_pipe_pid
         local spv_exit_code
         local commit_match_line=""
-        local expected_commit_source="source=scriptsig"
-        local expected_commit_mode="scriptsig"
+        local expected_commit_source="source=op_return_only"
+        local expected_commit_mode="op_return_only"
+        if [ "$INCLUDE_SCRIPTSIG_PQC" -eq 1 ]; then
+            expected_commit_source="source=scriptsig"
+            expected_commit_mode="scriptsig"
+        fi
         local rest_timeout_remaining
         rm -f "$SPV_WALLET_FILE"
         info "Running spvnode scan with REST monitoring until txid and ${expected_commit_mode} commitment validation are both confirmed..."
@@ -525,10 +535,12 @@ monitor_spvnode() {
                 echo "$commit_match_line" | tee -a "$RUN_LOG"
                 break
             fi
-            op_return_only_line=$(grep -F "[falcon-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$FALCON_COMMIT" | grep -F "source=op_return_only" | tail -n1 || true)
-            if [ -n "$op_return_only_line" ]; then
-                echo "$op_return_only_line" | tee -a "$RUN_LOG"
-                error "spvnode validated commitment as source=op_return_only; expected source=scriptsig"
+            if [ "$INCLUDE_SCRIPTSIG_PQC" -eq 1 ]; then
+                op_return_only_line=$(grep -F "[falcon-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$FALCON_COMMIT" | grep -F "source=op_return_only" | tail -n1 || true)
+                if [ -n "$op_return_only_line" ]; then
+                    echo "$op_return_only_line" | tee -a "$RUN_LOG"
+                    error "spvnode validated commitment as source=op_return_only; expected source=scriptsig"
+                fi
             fi
             if ! kill -0 "$spv_pipe_pid" 2>/dev/null; then
                 set +e
@@ -565,30 +577,34 @@ monitor_spvnode() {
 # Step 8: Verify commitment off-chain
 verify_commitment() {
     info "Step 8: Verifying commitment off-chain..."
-    SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$SIGNED_TX")
-    echo "$SCRIPTSIG_OUTPUT" | tee "$TMPDIR/falcon_scriptsig_pqc.txt" | tee -a "$RUN_LOG" >/dev/null
-    SCRIPTSIG_FALCON_PK=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
-    SCRIPTSIG_FALCON_SIG=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
-    if [ -z "$SCRIPTSIG_FALCON_PK" ]; then
-        error "Failed to extract Falcon public key from scriptSig"
+    if [ "$INCLUDE_SCRIPTSIG_PQC" -eq 1 ]; then
+        SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$SIGNED_TX")
+        echo "$SCRIPTSIG_OUTPUT" | tee "$TMPDIR/falcon_scriptsig_pqc.txt" | tee -a "$RUN_LOG" >/dev/null
+        SCRIPTSIG_FALCON_PK=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
+        SCRIPTSIG_FALCON_SIG=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
+        if [ -z "$SCRIPTSIG_FALCON_PK" ]; then
+            error "Failed to extract Falcon public key from scriptSig"
+        fi
+        if [ -z "$SCRIPTSIG_FALCON_SIG" ]; then
+            error "Failed to extract Falcon signature from scriptSig"
+        fi
+        if [ "$SCRIPTSIG_FALCON_PK" != "$FALCON_PK" ]; then
+            error "scriptSig Falcon public key does not match expected public key"
+        fi
+        if [ "$SCRIPTSIG_FALCON_SIG" != "$FALCON_SIG" ]; then
+            error "scriptSig Falcon signature does not match expected signature"
+        fi
+        success "scriptSig carries expected Falcon public key/signature"
+        {
+            echo "SCRIPTSIG_VALIDATION"
+            echo "scriptsig_pqc_pubkey=$SCRIPTSIG_FALCON_PK"
+            echo "scriptsig_pqc_signature=$SCRIPTSIG_FALCON_SIG"
+            echo "tx_sighash32=$TX_SIGHASH_HEX"
+            echo "expected_commit=$FALCON_COMMIT"
+        } | tee -a "$RUN_LOG"
+    else
+        info "Skipping scriptSig extraction in OP_RETURN-only commitment mode"
     fi
-    if [ -z "$SCRIPTSIG_FALCON_SIG" ]; then
-        error "Failed to extract Falcon signature from scriptSig"
-    fi
-    if [ "$SCRIPTSIG_FALCON_PK" != "$FALCON_PK" ]; then
-        error "scriptSig Falcon public key does not match expected public key"
-    fi
-    if [ "$SCRIPTSIG_FALCON_SIG" != "$FALCON_SIG" ]; then
-        error "scriptSig Falcon signature does not match expected signature"
-    fi
-    success "scriptSig carries expected Falcon public key/signature"
-    {
-        echo "SCRIPTSIG_VALIDATION"
-        echo "scriptsig_pqc_pubkey=$SCRIPTSIG_FALCON_PK"
-        echo "scriptsig_pqc_signature=$SCRIPTSIG_FALCON_SIG"
-        echo "tx_sighash32=$TX_SIGHASH_HEX"
-        echo "expected_commit=$FALCON_COMMIT"
-    } | tee -a "$RUN_LOG"
 
     VERIFY_OUTPUT=$(./such -c falcon_verify -k "$FALCON_PK" -x "$TX_SIGHASH_HEX" -s "$FALCON_SIG")
     echo "$VERIFY_OUTPUT" | tee -a "$RUN_LOG"
