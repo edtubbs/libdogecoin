@@ -427,7 +427,9 @@ build_transaction() {
         if [ -z "$BROADCAST_TXID" ]; then
             error "Failed to parse broadcast txid from sendtx output"
         fi
-        if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
+        if echo "$SENDTX_OUTPUT" | grep -Eqi "not relayed back"; then
+            error "sendtx reported non-relay; transaction was not relayed back"
+        elif echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
             success "Broadcast accepted or already known by peers"
             BROADCASTED=1
         else
@@ -476,7 +478,7 @@ monitor_spvnode() {
     
     info "SPV sync may take time. Be patient!"
     if [ "$BROADCASTED" -eq 1 ]; then
-        local spv_cmd=("./spvnode" $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$TESTNET_ADDR" scan)
+        local spv_cmd=("./spvnode" $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$TESTNET_ADDR")
         local scan_start_ts
         local found_ts
         local elapsed_seconds
@@ -493,7 +495,7 @@ monitor_spvnode() {
         if [ -f "$SPV_HEADERS_FILE" ]; then
             info "Reusing headers file: $SPV_HEADERS_FILE"
         fi
-        spv_cmd+=(-w "$SPV_WALLET_FILE" -u "$REST_SERVER")
+        spv_cmd+=(-w "$SPV_WALLET_FILE" -u "$REST_SERVER" scan)
         set +e
         stdbuf -oL -eL "${spv_cmd[@]}" | tee "$TMPDIR/spvnode.log" | tee -a "$RUN_LOG" &
         spv_pipe_pid=$!

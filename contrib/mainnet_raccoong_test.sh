@@ -233,7 +233,9 @@ EOF
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
         BROADCAST_TXID=$(echo "$SENDTX_OUTPUT" | sed -n 's/^Start broadcasting transaction:[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1)
         [ -n "$BROADCAST_TXID" ] || error "Failed to parse broadcast txid from sendtx output"
-        if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
+        if echo "$SENDTX_OUTPUT" | grep -Eqi "not relayed back"; then
+            error "sendtx reported non-relay; transaction was not relayed back"
+        elif echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
             success "Broadcast accepted or already known by peers"
             BROADCASTED=1
         else
