@@ -614,6 +614,7 @@ static struct option long_options[] =
         {"privkey", required_argument, NULL, 'p'},
         {"pubkey", required_argument, NULL, 'k'},
         {"derived_path", required_argument, NULL, 'm'},
+        {"chunks", required_argument, NULL, 'm'},
         {"sighash", required_argument, NULL, 'h'},
         {"script", required_argument, NULL, 's'},
         {"input_index", required_argument, NULL, 'i'},
@@ -662,10 +663,14 @@ static void print_usage()
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
-    printf("addscriptsigpqc (-x <raw hex tx> -i <input index> -k <pqc_pubkey_hex> -s <pqc_signature_hex>),\n");
-    printf("printscriptsigpqc (-x <raw hex tx>),\n");
-    printf("addwitness (-x <raw hex tx> -i <input index> -s <witness item hex>),\n");
-    printf("printwitness (-x <raw hex tx>),\n");
+        printf("addscriptsigpqc (-x <raw hex tx> -i <input index> -k <pqc_pubkey_hex> -s <pqc_signature_hex>),\n");
+        printf("printscriptsigpqc (-x <raw hex tx>),\n");
+        printf("addwitness (-x <raw hex tx> -i <input index> -s <witness item hex>),\n");
+        printf("printwitness (-x <raw hex tx>),\n");
+        printf("p2sh_p2wsh_datacarrier_scriptpubkey (-s <witness_script_hex>),\n");
+        printf("p2sh_p2wsh_datacarrier_witness_script (-i <chunk_count>),\n");
+        printf("pqc_chunk_hex (-x <hex_payload> [-h <max_chunk_bytes, default 520>]),\n");
+        printf("apply_p2sh_p2wsh_redeemscript_and_witness (-x <raw hex tx> -i <input index> -s <redeemscript_hex> -k <witness_script_hex> -m <chunk_hex_csv>),\n");
 #ifdef USE_LIBOQS
     printf("tx_sighash32 (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type>),\n");
 #endif
@@ -799,6 +804,22 @@ static dogecoin_bool such_hex_payload_chunks(const char* payload_hex, size_t max
         }
     }
     return true;
+}
+
+static dogecoin_bool such_witness_script_is_dropn_true(const uint8_t* script, size_t script_len, size_t expected_drops)
+{
+    if (!script || script_len == 0) {
+        return false;
+    }
+    if (script_len != expected_drops + 1) {
+        return false;
+    }
+    for (size_t i = 0; i < expected_drops; i++) {
+        if (script[i] != OP_DROP) {
+            return false;
+        }
+    }
+    return script[script_len - 1] == OP_1;
 }
 
 static void print_tx_witness_stack(const dogecoin_tx* tx)
@@ -1494,6 +1515,185 @@ int main(int argc, char* argv[])
         dogecoin_free(data_bin);
 
         print_tx_witness_stack(tx);
+        dogecoin_tx_free(tx);
+    }
+    else if (strcmp(cmd, "p2sh_p2wsh_datacarrier_scriptpubkey") == 0) {
+        if (!scripthex) {
+            return showError("Missing witness_script_hex (use -s)\n");
+        }
+        if ((strlen(scripthex) % 2) != 0) {
+            return showError("Invalid witness_script_hex\n");
+        }
+
+        size_t witness_script_len = strlen(scripthex) / 2;
+        uint8_t* witness_script_bytes = dogecoin_malloc(witness_script_len + 1);
+        if (!witness_script_bytes) {
+            return showError("Failed to allocate witness script buffer");
+        }
+        size_t witness_script_outlen = 0;
+        utils_hex_to_bin(scripthex, witness_script_bytes, strlen(scripthex), &witness_script_outlen);
+        if (witness_script_outlen == 0) {
+            dogecoin_free(witness_script_bytes);
+            return showError("Failed to decode witness_script_hex");
+        }
+
+        uint8_t witness_script_sha[32];
+        dogecoin_hash_sngl_sha256(witness_script_bytes, witness_script_outlen, witness_script_sha);
+        dogecoin_free(witness_script_bytes);
+
+        cstring* redeem_script = cstr_new_sz(64);
+        dogecoin_script_append_op(redeem_script, OP_0);
+        dogecoin_script_append_pushdata(redeem_script, witness_script_sha, sizeof(witness_script_sha));
+
+        uint160_t redeem_hash160;
+        dogecoin_script_get_scripthash(redeem_script, redeem_hash160);
+
+        cstring* script_pubkey = cstr_new_sz(64);
+        dogecoin_script_build_p2sh(script_pubkey, redeem_hash160);
+
+        char* redeem_hex = utils_uint8_to_hex((const uint8_t*)redeem_script->str, redeem_script->len);
+        char* script_pubkey_hex = utils_uint8_to_hex((const uint8_t*)script_pubkey->str, script_pubkey->len);
+        printf("redeemscript: %s\n", redeem_hex ? redeem_hex : "");
+        printf("scriptpubkey: %s\n", script_pubkey_hex ? script_pubkey_hex : "");
+
+        if (redeem_hex) dogecoin_free(redeem_hex);
+        if (script_pubkey_hex) dogecoin_free(script_pubkey_hex);
+        cstr_free(script_pubkey, true);
+        cstr_free(redeem_script, true);
+    }
+    else if (strcmp(cmd, "p2sh_p2wsh_datacarrier_witness_script") == 0) {
+        size_t chunk_count = (size_t)inputindex;
+        cstring* witness_script = cstr_new_sz(chunk_count + 8);
+        such_append_witness_drop_script(witness_script, chunk_count);
+        char* witness_script_hex = utils_uint8_to_hex((const uint8_t*)witness_script->str, witness_script->len);
+        printf("witness_script: %s\n", witness_script_hex ? witness_script_hex : "");
+        if (witness_script_hex) dogecoin_free(witness_script_hex);
+        cstr_free(witness_script, true);
+    }
+    else if (strcmp(cmd, "pqc_chunk_hex") == 0) {
+        if (!txhex) {
+            return showError("Missing payload hex (use -x)\n");
+        }
+        size_t max_chunk_bytes = sighashtype > 0 ? (size_t)sighashtype : 520;
+        if (max_chunk_bytes == 0 || max_chunk_bytes > 520) {
+            return showError("max_chunk_bytes must be in range 1..520 (use -h)");
+        }
+
+        vector_t* chunks = vector_new(8, such_witness_item_free_cb);
+        if (!such_hex_payload_chunks(txhex, max_chunk_bytes, chunks)) {
+            vector_free(chunks, true);
+            return showError("Failed to chunk payload hex");
+        }
+        printf("chunks: %zu\n", chunks->len);
+        for (size_t i = 0; i < chunks->len; i++) {
+            cstring* chunk = vector_idx(chunks, i);
+            printf("chunk[%zu]: %s\n", i, chunk ? chunk->str : "");
+        }
+        vector_free(chunks, true);
+    }
+    else if (strcmp(cmd, "apply_p2sh_p2wsh_redeemscript_and_witness") == 0) {
+        if (!txhex || !scripthex || !pubkey || !derived_path) {
+            return showError("Missing tx/redeemscript/witness_script/chunks (use -x -s -k -m)\n");
+        }
+        if ((strlen(scripthex) % 2) != 0 || (strlen(pubkey) % 2) != 0) {
+            return showError("Invalid redeemscript_hex or witness_script_hex\n");
+        }
+
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex");
+        }
+        dogecoin_free(data_bin);
+
+        if ((size_t)inputindex >= tx->vin->len) {
+            dogecoin_tx_free(tx);
+            return showError("Inputindex out of range");
+        }
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, inputindex);
+        if (!tx_in->script_sig) {
+            tx_in->script_sig = cstr_new_sz(32);
+            if (!tx_in->script_sig) {
+                dogecoin_tx_free(tx);
+                return showError("Failed to allocate scriptSig buffer");
+            }
+        }
+
+        size_t redeem_outlen = 0;
+        uint8_t* redeem_bytes = dogecoin_malloc(strlen(scripthex) / 2 + 1);
+        if (!redeem_bytes) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to allocate redeem script");
+        }
+        utils_hex_to_bin(scripthex, redeem_bytes, strlen(scripthex), &redeem_outlen);
+        cstr_resize(tx_in->script_sig, 0);
+        dogecoin_script_append_pushdata(tx_in->script_sig, redeem_bytes, redeem_outlen);
+        dogecoin_free(redeem_bytes);
+
+        such_reset_witness_stack(tx_in);
+        if (!tx_in->witness_stack) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to allocate witness stack");
+        }
+
+        char* chunks_csv = strdup(derived_path);
+        if (!chunks_csv) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to allocate chunks csv");
+        }
+        char* tok = strtok(chunks_csv, ",");
+        while (tok) {
+            while (*tok == ' ' || *tok == '\t') tok++;
+            if (*tok != '\0') {
+                if ((strlen(tok) / 2) > 520) {
+                    free(chunks_csv);
+                    dogecoin_tx_free(tx);
+                    return showError("Witness chunk exceeds 520-byte policy limit");
+                }
+                if (!such_witness_push_hex(tx_in->witness_stack, tok, "chunk")) {
+                    free(chunks_csv);
+                    dogecoin_tx_free(tx);
+                    return showError("Failed to append witness chunk");
+                }
+            }
+            tok = strtok(NULL, ",");
+        }
+        free(chunks_csv);
+
+        size_t witness_script_len = strlen(pubkey) / 2;
+        uint8_t* witness_script_bytes = dogecoin_malloc(witness_script_len + 1);
+        if (!witness_script_bytes) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to allocate witness script decode buffer");
+        }
+        size_t witness_script_outlen = 0;
+        utils_hex_to_bin(pubkey, witness_script_bytes, strlen(pubkey), &witness_script_outlen);
+        size_t chunk_items = tx_in->witness_stack->len;
+        if (!such_witness_script_is_dropn_true(witness_script_bytes, witness_script_outlen, chunk_items)) {
+            dogecoin_free(witness_script_bytes);
+            dogecoin_tx_free(tx);
+            return showError("witness_script must be OP_DROP xN then OP_1, where N == chunk count");
+        }
+        dogecoin_free(witness_script_bytes);
+
+        if (!such_witness_push_hex(tx_in->witness_stack, pubkey, "witness_script")) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to append witness script");
+        }
+
+        cstring* with_witness_tx = cstr_new_sz(1024);
+        dogecoin_tx_serialize(with_witness_tx, tx);
+        char* with_witness_tx_hex = dogecoin_char_vla(with_witness_tx->len * 2 + 1);
+        utils_bin_to_hex((unsigned char*)with_witness_tx->str, with_witness_tx->len, with_witness_tx_hex);
+        printf("tx with witness: %s\n", with_witness_tx_hex);
+        print_tx_witness_stack(tx);
+
+        cstr_free(with_witness_tx, true);
+        free(with_witness_tx_hex);
         dogecoin_tx_free(tx);
     }
 #ifdef USE_LIBOQS
