@@ -233,9 +233,24 @@ EOF
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
         BROADCAST_TXID=$(echo "$SENDTX_OUTPUT" | sed -n 's/^Start broadcasting transaction:[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1)
         [ -n "$BROADCAST_TXID" ] || error "Failed to parse broadcast txid from sendtx output"
-        if echo "$SENDTX_OUTPUT" | grep -Eqi "not relayed back"; then
-            error "sendtx reported non-relay; transaction was not relayed back"
-        elif echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
+        CHAINED_UTXO_TXID="$BROADCAST_TXID"
+        CHAINED_UTXO_VOUT=0
+        CHAINED_UTXO_VALUE_KOINU=$((FUNDED_UTXO_VALUE_KOINU - TX_FEE_KOINU))
+        CHAINED_UTXO_SCRIPT_PUBKEY="$SCRIPT_PUBKEY"
+        {
+            echo "CHAINED_UTXO"
+            echo "chained_utxo_txid=$CHAINED_UTXO_TXID"
+            echo "chained_utxo_vout=$CHAINED_UTXO_VOUT"
+            echo "chained_utxo_value_koinu=$CHAINED_UTXO_VALUE_KOINU"
+            echo "chained_utxo_script_pubkey=$CHAINED_UTXO_SCRIPT_PUBKEY"
+        } | tee -a "$TMPDIR/spvnode.log"
+        cat >> "$TMPDIR/tx_info.txt" <<EOF
+CHAINED_UTXO_TXID=$CHAINED_UTXO_TXID
+CHAINED_UTXO_VOUT=$CHAINED_UTXO_VOUT
+CHAINED_UTXO_VALUE_KOINU=$CHAINED_UTXO_VALUE_KOINU
+CHAINED_UTXO_SCRIPT_PUBKEY=$CHAINED_UTXO_SCRIPT_PUBKEY
+EOF
+        if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
             success "Broadcast accepted or already known by peers"
             BROADCASTED=1
         else

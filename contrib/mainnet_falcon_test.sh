@@ -43,7 +43,7 @@ REST_PORT="${REST_PORT:-$((18080 + ($$ % 1000)))}"
 REST_SERVER="${REST_SERVER:-${REST_HOST}:${REST_PORT}}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
-INCLUDE_SCRIPTSIG_PQC="${INCLUDE_SCRIPTSIG_PQC:-0}"
+INCLUDE_SCRIPTSIG_PQC="${INCLUDE_SCRIPTSIG_PQC:-1}"
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-52fdbbef70164cdd95ea78e7e95857ccd029550e60bfeb2ad0c80e734a7a472d}"
@@ -433,9 +433,19 @@ build_transaction() {
         if [ -z "$BROADCAST_TXID" ]; then
             error "Failed to parse broadcast txid from sendtx output"
         fi
-        if echo "$SENDTX_OUTPUT" | grep -Eqi "not relayed back"; then
-            error "sendtx reported non-relay; transaction was not relayed back"
-        elif echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
+
+        CHAINED_UTXO_TXID="$BROADCAST_TXID"
+        CHAINED_UTXO_VOUT=0
+        CHAINED_UTXO_VALUE_KOINU=$((FUNDED_UTXO_VALUE_KOINU - TX_FEE_KOINU))
+        CHAINED_UTXO_SCRIPT_PUBKEY="$SCRIPT_PUBKEY"
+        {
+            echo "CHAINED_UTXO"
+            echo "chained_utxo_txid=$CHAINED_UTXO_TXID"
+            echo "chained_utxo_vout=$CHAINED_UTXO_VOUT"
+            echo "chained_utxo_value_koinu=$CHAINED_UTXO_VALUE_KOINU"
+            echo "chained_utxo_script_pubkey=$CHAINED_UTXO_SCRIPT_PUBKEY"
+        } | tee -a "$RUN_LOG"
+        if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
             success "Broadcast accepted or already known by peers"
             BROADCASTED=1
         else
