@@ -494,8 +494,12 @@ The `such` tool includes PQC commands for Falcon-512 and Dilithium2 commitments.
 | tx_sighash32 | -x, -s, -i, -h | Derives transaction input sighash32 used by signing flows |
 | addscriptsigpqc | -x, -i, -k, -s | Appends PQ public key and PQ signature bytes as first two pushes in input scriptSig |
 | printscriptsigpqc | -x | Prints extracted PQ public key/signature from per-input scriptSig pushes |
-| addwitness | -x, -i, -s | Appends witness item bytes to a transaction input (legacy helper) |
+| addwitness | -x, -i, -s | Appends witness item bytes to a transaction input (policy-sanity: P2SH-P2WSH spends only) |
 | printwitness | -x | Prints per-input witness stack items from a raw transaction (legacy helper) |
+| p2sh_p2wsh_datacarrier_witness_script | -i | Builds witnessScript as OP_DROP x N + OP_1, where N is chunk count |
+| p2sh_p2wsh_datacarrier_scriptpubkey | -s | Returns redeemScript and P2SH scriptPubKey for witness_script_hex |
+| pqc_chunk_hex | -x, (-h optional) | Splits payload hex into <= max_chunk_bytes chunks (default 520) |
+| apply_p2sh_p2wsh_redeemscript_and_witness | -x, -i, -s, -k, -m | Applies redeemScript in scriptSig and sets witness stack chunks + witnessScript |
 | falcon_sign | -p, -x | Signs message bytes (typically tx_sighash32 hex) with Falcon-512 secret key. Returns signature (~660 bytes) |
 | falcon_verify | -k, -x, -s | Verifies a Falcon-512 signature against message bytes and public key |
 | falcon_commit | -k, -s | Generates a 32-byte SHA256 commitment from public key and signature for OP_RETURN |
@@ -529,6 +533,31 @@ Secret Key (1281 bytes): 5014...
 #### Derive transaction sighash32:
 ```bash
 ./such -c tx_sighash32 -x <unsigned_raw_tx_hex> -s <script_pubkey_hex> -i 0 -h 1
+```
+
+#### Build a data-carrier witness script (N chunks => DROP xN + OP_1):
+```bash
+./such -c p2sh_p2wsh_datacarrier_witness_script -i 4
+```
+
+#### Build P2SH-P2WSH funding scriptPubKey from witness script:
+```bash
+./such -c p2sh_p2wsh_datacarrier_scriptpubkey -s <witness_script_hex>
+```
+
+#### Chunk PQ payload to policy-safe witness pieces (<=520 bytes each):
+```bash
+./such -c pqc_chunk_hex -x <hex_payload> -h 520
+```
+
+#### Apply redeemScript + witness stack to a spending input:
+```bash
+./such -c apply_p2sh_p2wsh_redeemscript_and_witness \
+  -x <raw_tx_hex> \
+  -i 0 \
+  -s <redeemscript_hex> \
+  -k <witness_script_hex> \
+  -m <chunk0_hex,chunk1_hex,...>
 ```
 
 #### Sign tx_sighash32 with Falcon-512:

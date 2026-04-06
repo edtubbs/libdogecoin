@@ -822,6 +822,15 @@ static dogecoin_bool such_witness_script_is_dropn_true(const uint8_t* script, si
     return script[script_len - 1] == OP_1;
 }
 
+static dogecoin_bool such_scriptsig_is_push_only_p2sh_p2wsh_redeemscript(const cstring* script_sig)
+{
+    if (!script_sig || !script_sig->str || script_sig->len != 35) {
+        return false;
+    }
+    const uint8_t* s = (const uint8_t*)script_sig->str;
+    return (s[0] == 0x22 && s[1] == OP_0 && s[2] == 0x20);
+}
+
 static void print_tx_witness_stack(const dogecoin_tx* tx)
 {
     if (!tx) {
@@ -1464,6 +1473,10 @@ int main(int argc, char* argv[])
         }
 
         dogecoin_tx_in* tx_in = vector_idx(tx->vin, inputindex);
+        if (!such_scriptsig_is_push_only_p2sh_p2wsh_redeemscript(tx_in->script_sig)) {
+            dogecoin_tx_free(tx);
+            return showError("addwitness policy: only P2SH-P2WSH spends are accepted; use apply_p2sh_p2wsh_redeemscript_and_witness\n");
+        }
         if (!tx_in->witness_stack) {
             tx_in->witness_stack = vector_new(1, such_witness_item_free_cb);
             if (!tx_in->witness_stack) {
@@ -1551,13 +1564,15 @@ int main(int argc, char* argv[])
         cstring* script_pubkey = cstr_new_sz(64);
         dogecoin_script_build_p2sh(script_pubkey, redeem_hash160);
 
-        char* redeem_hex = utils_uint8_to_hex((const uint8_t*)redeem_script->str, redeem_script->len);
-        char* script_pubkey_hex = utils_uint8_to_hex((const uint8_t*)script_pubkey->str, script_pubkey->len);
+        char* redeem_hex_tmp = utils_uint8_to_hex((const uint8_t*)redeem_script->str, redeem_script->len);
+        char* script_pubkey_hex_tmp = utils_uint8_to_hex((const uint8_t*)script_pubkey->str, script_pubkey->len);
+        char* redeem_hex = redeem_hex_tmp ? strdup(redeem_hex_tmp) : NULL;
+        char* script_pubkey_hex = script_pubkey_hex_tmp ? strdup(script_pubkey_hex_tmp) : NULL;
         printf("redeemscript: %s\n", redeem_hex ? redeem_hex : "");
         printf("scriptpubkey: %s\n", script_pubkey_hex ? script_pubkey_hex : "");
-
         if (redeem_hex) dogecoin_free(redeem_hex);
         if (script_pubkey_hex) dogecoin_free(script_pubkey_hex);
+
         cstr_free(script_pubkey, true);
         cstr_free(redeem_script, true);
     }
@@ -1567,7 +1582,6 @@ int main(int argc, char* argv[])
         such_append_witness_drop_script(witness_script, chunk_count);
         char* witness_script_hex = utils_uint8_to_hex((const uint8_t*)witness_script->str, witness_script->len);
         printf("witness_script: %s\n", witness_script_hex ? witness_script_hex : "");
-        if (witness_script_hex) dogecoin_free(witness_script_hex);
         cstr_free(witness_script, true);
     }
     else if (strcmp(cmd, "pqc_chunk_hex") == 0) {

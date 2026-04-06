@@ -31,7 +31,7 @@ SPV_FROM_HEIGHT="${SPV_FROM_HEIGHT:-0}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
-INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-1}"
+INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-0}"
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -167,20 +167,9 @@ build_transaction() {
     TX_WITH_WITNESS="$TX_WITH_COMMIT"
     TX_WITH_WITNESS_SIG="$TX_WITH_COMMIT"
     if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
-        info "Embedding Raccoon-G public key in witness[0] for input 0..."
-        ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$RACCOONG_PK")
-        echo "$ADD_WITNESS_OUTPUT"
-        TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-        [ -n "$TX_WITH_WITNESS" ] || error "Failed to append Raccoon-G public key witness item"
-
-        info "Embedding Raccoon-G signature in witness[1] for input 0..."
-        ADD_SIG_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$RACCOONG_SIG")
-        echo "$ADD_SIG_WITNESS_OUTPUT"
-        TX_WITH_WITNESS_SIG=$(echo "$ADD_SIG_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-        [ -n "$TX_WITH_WITNESS_SIG" ] || error "Failed to append Raccoon-G signature witness item"
-        TX_FOR_SIGNING="$TX_WITH_WITNESS_SIG"
+        error "Legacy-spend witness flow is disabled; fund and spend a P2SH-P2WSH data-carrier UTXO instead"
     else
-        info "Non-witness flow enabled (INCLUDE_WITNESS_ITEMS=0); signing tx with commitment only"
+        info "Non-witness legacy spend path enforced; signing tx with commitment only"
     fi
 
     SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)

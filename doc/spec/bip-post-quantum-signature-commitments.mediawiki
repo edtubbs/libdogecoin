@@ -107,9 +107,21 @@ commitment32 = SHA256(public_key_bytes || signature_bytes)
 
 This keeps Phase 1 commitment publication consensus-neutral while still binding the off-chain PQ proof to a concrete transaction authorization digest.
 
-===Phase 1: scriptSig/P2SH-Carried PQ Public Key and Signature===
+===Phase 1: On-chain PQ Verification Material via P2SH-P2WSH Data Carrier===
 
-For implementations following the relay-compatible transaction path used here, both the PQ public key and PQ signature bytes are attached in the spending input scriptSig (first two pushes) of the same transaction that carries the OP_RETURN commitment.
+For relay-policy compatibility, Phase 1 carries PQ verification material in witness when spending a segwit output (P2SH-P2WSH), while OP_RETURN keeps acting as the index/telemetry anchor.
+
+Flow:
+# construct witnessScript as <code>OP_DROP</code> repeated N times, then <code>OP_1</code>;
+# compute redeemScript as segwit v0 witness program <code>0 &lt;SHA256(witnessScript)&gt;</code>;
+# fund a P2SH output paying to <code>HASH160(redeemScript)</code>;
+# spend that UTXO with:
+## scriptSig = push(redeemScript),
+## witness stack = <code>&lt;chunk0&gt; ... &lt;chunkN-1&gt; &lt;witnessScript&gt;</code>.
+
+All payload chunks MUST be <=520 bytes.
+
+Witness MUST NOT be attached to legacy (non-segwit) spends.
 
 In libdogecoin tooling, a practical flow is:
 
@@ -128,6 +140,7 @@ Off-chain verification SHOULD use scriptSig push 0 (PQ public key) and scriptSig
 
 * <code>PQ_VERIFY(scriptsig_push0_pubkey, message32, scriptsig_push1_signature)</code>, and
 * commitment reconstruction check against OP_RETURN-tagged commitment payload.
+* optional witness stack length logging for matching commitment transactions.
 
 ===Phase 1: Base Transaction Binding===
 

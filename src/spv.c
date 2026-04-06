@@ -206,10 +206,10 @@ static dogecoin_bool spv_validate_dilithium_scriptsig_commit(const uint8_t* item
 }
 
 static dogecoin_bool spv_validate_raccoong_scriptsig_commit(const uint8_t* item0, size_t item0_len,
-                                                            const uint8_t* item1, size_t item1_len,
-                                                            const uint8_t expected_commit[32],
-                                                            const uint8_t** out_pk, size_t* out_pk_len,
-                                                            const uint8_t** out_sig, size_t* out_sig_len)
+                                                             const uint8_t* item1, size_t item1_len,
+                                                             const uint8_t expected_commit[32],
+                                                             const uint8_t** out_pk, size_t* out_pk_len,
+                                                             const uint8_t** out_sig, size_t* out_sig_len)
 {
     uint8_t commit_data[32];
     if (dogecoin_raccoong44_commit_bytes(item0, item0_len, item1, item1_len, commit_data) &&
@@ -225,6 +225,24 @@ static dogecoin_bool spv_validate_raccoong_scriptsig_commit(const uint8_t* item0
         return true;
     }
     return false;
+}
+
+static void spv_log_witness_stack_summary(dogecoin_spv_client* client, dogecoin_tx* tx, const char* label, int32_t height, uint32_t txpos)
+{
+    if (!client || !client->nodegroup || !client->nodegroup->log_write_cb || !tx || !label) {
+        return;
+    }
+    for (size_t vin = 0; vin < tx->vin->len; vin++) {
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, vin);
+        size_t items = (tx_in && tx_in->witness_stack) ? tx_in->witness_stack->len : 0;
+        client->nodegroup->log_write_cb("[%s] witness_summary height=%d txpos=%u vin=%zu items=%zu\n",
+                                        label, height, txpos, vin, items);
+        for (size_t i = 0; i < items; i++) {
+            cstring* wit = vector_idx(tx_in->witness_stack, i);
+            client->nodegroup->log_write_cb("[%s] witness_item_len vin=%zu idx=%zu len=%zu\n",
+                                            label, vin, i, wit ? wit->len : 0);
+        }
+    }
 }
 #endif
 
@@ -853,6 +871,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                                  &scriptsig_sig, &scriptsig_sig_len)) {
                             client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig\n",
                                                              pindex->height, i, falcon_commit_hex, scriptsig_vin_index);
+                            spv_log_witness_stack_summary(client, tx, "falcon-commit", pindex->height, i);
                         } else {
                             client->nodegroup->log_write_cb("[falcon-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch\n",
                                                              pindex->height, i, falcon_commit_hex, scriptsig_vin_index);
@@ -860,6 +879,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     } else {
                         client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s source=op_return_only\n",
                                                          pindex->height, i, falcon_commit_hex);
+                        spv_log_witness_stack_summary(client, tx, "falcon-commit", pindex->height, i);
                     }
                 }
                 uint8_t dilithium_commit_data[32];
@@ -877,6 +897,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                                     &scriptsig_sig, &scriptsig_sig_len)) {
                             client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig\n",
                                                              pindex->height, i, dilithium_commit_hex, scriptsig_vin_index);
+                            spv_log_witness_stack_summary(client, tx, "dilithium-commit", pindex->height, i);
                         } else {
                             client->nodegroup->log_write_cb("[dilithium-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch\n",
                                                              pindex->height, i, dilithium_commit_hex, scriptsig_vin_index);
@@ -884,6 +905,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     } else {
                         client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s source=op_return_only\n",
                                                          pindex->height, i, dilithium_commit_hex);
+                        spv_log_witness_stack_summary(client, tx, "dilithium-commit", pindex->height, i);
                     }
                 }
                 uint8_t raccoong_commit_data[32];
@@ -901,6 +923,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                                    &scriptsig_sig, &scriptsig_sig_len)) {
                             client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig\n",
                                                              pindex->height, i, raccoong_commit_hex, scriptsig_vin_index);
+                            spv_log_witness_stack_summary(client, tx, "raccoong-commit", pindex->height, i);
                         } else {
                             client->nodegroup->log_write_cb("[raccoong-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch\n",
                                                              pindex->height, i, raccoong_commit_hex, scriptsig_vin_index);
@@ -908,6 +931,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     } else {
                         client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s source=op_return_only\n",
                                                          pindex->height, i, raccoong_commit_hex);
+                        spv_log_witness_stack_summary(client, tx, "raccoong-commit", pindex->height, i);
                     }
                 }
 #endif
@@ -1070,8 +1094,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         client->nodegroup->log_write_cb("[smpv] tx witness vin=%zu items=%zu\n", vin_index, witness_items);
                         for (size_t wit_index = 0; wit_index < witness_items; wit_index++) {
                             cstring* witness_item = vector_idx(tx_in->witness_stack, wit_index);
-                            char* witness_hex = utils_uint8_to_hex((const uint8_t*)witness_item->str, witness_item->len);
-                            client->nodegroup->log_write_cb("[smpv] tx witness vin=%zu idx=%zu hex=%s\n", vin_index, wit_index, witness_hex ? witness_hex : "");
+                            client->nodegroup->log_write_cb("[smpv] tx witness vin=%zu idx=%zu len=%zu\n",
+                                                            vin_index, wit_index, witness_item ? witness_item->len : 0);
                         }
                     }
                 }

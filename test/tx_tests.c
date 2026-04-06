@@ -956,6 +956,73 @@ void test_tx_witness_roundtrip()
     dogecoin_tx_free(tx);
 }
 
+static dogecoin_bool is_p2sh_p2wsh_redeemscript_scriptsig(const cstring* script_sig)
+{
+    if (!script_sig || !script_sig->str || script_sig->len != 35) {
+        return false;
+    }
+    const uint8_t* s = (const uint8_t*)script_sig->str;
+    return (s[0] == 0x22 && s[1] == OP_0 && s[2] == 0x20);
+}
+
+void test_tx_datacarrier_witness_roundtrip()
+{
+    static const char tx_hex[] =
+        "020000000001010000000000000000000000000000000000000000000000000000000000000000ffffffff24232200201111111111111111111111111111111111111111111111111111111111111111ffffffff010100000000000000000401aa01bb01cc047575755100000000";
+    uint8_t tx_data[(sizeof(tx_hex) - 1) / 2];
+    size_t tx_data_len = 0;
+    utils_hex_to_bin(tx_hex, tx_data, strlen(tx_hex), &tx_data_len);
+
+    dogecoin_tx* tx = dogecoin_tx_new();
+    size_t consumed = 0;
+    u_assert_int_eq(dogecoin_tx_deserialize(tx_data, tx_data_len, tx, &consumed), true);
+    u_assert_int_eq(consumed, tx_data_len);
+    dogecoin_tx_in* in = vector_idx(tx->vin, 0);
+    u_assert_int_eq(is_p2sh_p2wsh_redeemscript_scriptsig(in->script_sig), true);
+    u_assert_int_eq(in->witness_stack->len, 4);
+    for (size_t i = 0; i < 3; i++) {
+        cstring* chunk = vector_idx(in->witness_stack, i);
+        u_assert_true(chunk->len <= 520);
+    }
+    cstring* witness_script = vector_idx(in->witness_stack, 3);
+    u_assert_int_eq(((uint8_t*)witness_script->str)[witness_script->len - 1], OP_1);
+
+    cstring* ser = cstr_new_sz(1024);
+    dogecoin_tx_serialize(ser, tx);
+    dogecoin_tx* tx2 = dogecoin_tx_new();
+    size_t consumed2 = 0;
+    u_assert_int_eq(dogecoin_tx_deserialize((const uint8_t*)ser->str, ser->len, tx2, &consumed2), true);
+    u_assert_int_eq(consumed2, ser->len);
+    dogecoin_tx_in* in2 = vector_idx(tx2->vin, 0);
+    u_assert_int_eq(in2->witness_stack->len, 4);
+    for (size_t i = 0; i < 3; i++) {
+        cstring* chunk = vector_idx(in2->witness_stack, i);
+        u_assert_true(chunk->len <= 520);
+    }
+    cstring* ws2 = vector_idx(in2->witness_stack, 3);
+    u_assert_int_eq(((uint8_t*)ws2->str)[ws2->len - 1], OP_1);
+
+    cstr_free(ser, true);
+    dogecoin_tx_free(tx2);
+    dogecoin_tx_free(tx);
+}
+
+void test_tx_witness_policy_sanity()
+{
+    cstring* legacy_script_sig = cstr_new_sz(1);
+    cstr_append_buf(legacy_script_sig, "\x00", 1);
+    u_assert_int_eq(is_p2sh_p2wsh_redeemscript_scriptsig(legacy_script_sig), false);
+    cstr_free(legacy_script_sig, true);
+
+    cstring* p2sh_p2wsh_script_sig = cstr_new_sz(35);
+    cstr_append_buf(p2sh_p2wsh_script_sig, "\x22\x00\x20", 3);
+    uint8_t h[32];
+    memset(h, 0x42, sizeof(h));
+    cstr_append_buf(p2sh_p2wsh_script_sig, (const void*)h, sizeof(h));
+    u_assert_int_eq(is_p2sh_p2wsh_redeemscript_scriptsig(p2sh_p2wsh_script_sig), true);
+    cstr_free(p2sh_p2wsh_script_sig, true);
+}
+
 
 struct script_test {
     char script[32];

@@ -74,6 +74,8 @@ extern void test_tx_sighash();
 extern void test_tx_sighash_ext();
 extern void test_tx_negative_version();
 extern void test_tx_witness_roundtrip();
+extern void test_tx_datacarrier_witness_roundtrip();
+extern void test_tx_witness_policy_sanity();
 extern void test_script_parse();
 extern void test_script_op_codeseperator();
 extern void test_invalid_tx_deser();
@@ -162,6 +164,8 @@ int main()
     u_run_test(test_tx_sighash_ext);
     u_run_test(test_tx_negative_version);
     u_run_test(test_tx_witness_roundtrip);
+    u_run_test(test_tx_datacarrier_witness_roundtrip);
+    u_run_test(test_tx_witness_policy_sanity);
     u_run_test(test_scripts);
     u_run_test(test_script_parse);
     u_run_test(test_script_op_codeseperator);

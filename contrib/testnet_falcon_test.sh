@@ -38,7 +38,7 @@ SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
-INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-1}"
+INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-0}"
 # sendtx success must be explicit relay or explicit already-known acceptance.
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
 
@@ -255,24 +255,9 @@ build_transaction() {
     TX_WITH_WITNESS="$TX_WITH_COMMIT"
     TX_WITH_WITNESS_SIG="$TX_WITH_COMMIT"
     if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
-        info "Step 6b: Embedding Falcon public key in witness[0] for input 0..."
-        ADD_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_COMMIT" -i 0 -s "$FALCON_PK")
-        echo "$ADD_WITNESS_OUTPUT"
-        TX_WITH_WITNESS=$(echo "$ADD_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-        if [ -z "$TX_WITH_WITNESS" ]; then
-            error "Failed to append Falcon public key witness item"
-        fi
-
-        info "Step 6c: Embedding Falcon signature in witness[1] for input 0..."
-        ADD_SIG_WITNESS_OUTPUT=$(run_and_log "such addwitness" ./such -c addwitness -x "$TX_WITH_WITNESS" -i 0 -s "$FALCON_SIG")
-        echo "$ADD_SIG_WITNESS_OUTPUT"
-        TX_WITH_WITNESS_SIG=$(echo "$ADD_SIG_WITNESS_OUTPUT" | grep "^tx with witness:" | cut -d: -f2- | tr -d ' ')
-        if [ -z "$TX_WITH_WITNESS_SIG" ]; then
-            error "Failed to append Falcon signature witness item"
-        fi
-        TX_FOR_SIGNING="$TX_WITH_WITNESS_SIG"
+        error "Legacy-spend witness flow is disabled; fund and spend a P2SH-P2WSH data-carrier UTXO instead"
     else
-        info "Step 6b/6c: Non-witness flow enabled (INCLUDE_WITNESS_ITEMS=0); signing tx with commitment only"
+        info "Step 6b/6c: Non-witness legacy spend path enforced; signing tx with commitment only"
     fi
 
     info "Signing transaction with commitment output..."
