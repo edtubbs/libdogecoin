@@ -5640,3 +5640,162 @@ DEBUG: received command from node 23: tx
 DEBUG: [smpv] tx=c496791ec0301859152f269b6ab25297b6450a7fe5b822534305de51e9463b28 size=226B vin=1 vout=2 coinbase=0 outval=3612066448329 koinu types{p2pk=0,p2pkh=2,p2sh=0,multi=0,opret=0,nonstd=0}
 DEBUG: [smpv] tx witness vin=0 items=0
 DEBUG: [smpv] mempool tx seen len=226 dispatched=true
+DEBUG: received command from node 5: inv
+DEBUG: received command from node 3: inv
+DEBUG: received command from node 4: inv
+DEBUG: received command from node 8: inv
+DEBUG: received command from node 11: inv
+DEBUG: received command from node 23: inv
+DEBUG: Get inv request with 4 items
+DEBUG: Requesting 4 tx (mempool INV)
+DEBUG: sending message to node 23: getdata
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=37fa85c31bbbe989faf52d403f38345fea6005cbac87a72577a0e9cbb3868459 size=328B vin=1 vout=5 coinbase=0 outval=31776635606912 koinu types{p2pk=0,p2pkh=5,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=328 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=6dd0002afe3bd2d06213f74cd21c388ac4d74ebbb3acb8e3542027afeb630052 size=191B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=191 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=23d42fef81e0e1ee3c5041ae2ce081c29e0491ee36512a6a4d6bee68eb97eab6 size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=c5e8caec2437b7f716af0566a55eb628764ca69acf5237ba619a5becab4adc8f size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: Statecheck: amount of connected nodes: 20
+chaintip hash: 754fbe9e52c36b791f59674711621e44498539e61e4afef98afab18f2c57908e
+chaintip height: 6155086
+DEBUG: received command from node 13: inv
+DEBUG: received command from node 12: inv
+DEBUG: received command from node 25: inv
+DEBUG: received command from node 2: inv
+DEBUG: received command from node 22: inv
+DEBUG: received command from node 17: inv
+DEBUG: received command from node 14: addr
+DEBUG: received command from node 4: inv
+DEBUG: received command from node 7: inv
+----- spvnode log tail -----
+DEBUG: [smpv] tx=2e3887d49c5bc9a3f7d61eae1e9fcedcd07628d23684fc88dcc681e94eefc038 size=191B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=191 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=05698fde938bfc6756d2484c7be84797a2e1ee9f43a83d5801b1e393bc897f29 size=191B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=191 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=ae295a0f5b05d4bf49d21717cd0e889e3b0c5b960357260d67f4b34897e9e913 size=191B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=191 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=f3332438530c654625e046f1c621c9deeed80dc1c7d51c57994896b9341d850a size=191B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=191 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=2740aab4a5ce6b8040f2b23abb57337b77761d47fede97f4d858bd920e4e4b03 size=191B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=191 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=7d0ff63e3056bdf06d82ba2a16ea810f370dd79fbb0cab7b4ffabe9db694734c size=225B vin=1 vout=2 coinbase=0 outval=2000000 koinu types{p2pk=0,p2pkh=2,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=225 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=f1e42d6a3c31ae3d18f37fa36eabb8074b925d6cb731bba47a79e41e6e9540ef size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=e61d1cbb9a9e3f06f3591bbc4ab2831cfa59f079d03abe4f0c539e10617c75d2 size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=4f5b930f4ed15eb902a172fd457afd0bca15479909052d893ebdd8b434a969c9 size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=88ed2a447249b84f6477e2f3b296884b85d0cedbece8f84e54109fe8209d67be size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=bc2fc480f400ccea4654bc64989ad44991de1a672026481a9380a2196ad0c78e size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=3b472a02d84b2b55c36bafe77a55f3b59fcbb9763fdf3478fa874ca747248185 size=226B vin=1 vout=2 coinbase=0 outval=2000000 koinu types{p2pk=0,p2pkh=2,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=226 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=8054c29e41e9a974ea3b3c6d8c2fefaf7d99a82f9382f09fd8ee514449a3de81 size=260B vin=1 vout=3 coinbase=0 outval=3000000 koinu types{p2pk=0,p2pkh=3,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=260 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=1f801aed8634fde05664225ff81e1e0fc8a27c449c8acfa5efd43cbababdad7d size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=dfcdd22377080ca7a33c29c7312ea7cec9d142be352bc1a8b3c9c7bbc36bf555 size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=f4342a3c5ec06499dbb60d300de77d7aee993a8170976e7a1d1e372083212c45 size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=6e64727c36df2b1ebf4c472b19b188871b5bf1bd22b1bf6036a1a6279589053e size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=c90e223d9ab5db81deb149012a8b230c5535277ed5a8466e453878c981dcab3a size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=1345719e91c343b80a89147b4db5fda99bc2ee5a3869c4ea8cb224e7779e1334 size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=aa72b7ef9c88048c7a90087808a65efc4b393d7c83798ce4725e76866aad8e20 size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=c496791ec0301859152f269b6ab25297b6450a7fe5b822534305de51e9463b28 size=226B vin=1 vout=2 coinbase=0 outval=3612066448329 koinu types{p2pk=0,p2pkh=2,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=226 dispatched=true
+DEBUG: received command from node 5: inv
+DEBUG: received command from node 3: inv
+DEBUG: received command from node 4: inv
+DEBUG: received command from node 8: inv
+DEBUG: received command from node 11: inv
+DEBUG: received command from node 23: inv
+DEBUG: Get inv request with 4 items
+DEBUG: Requesting 4 tx (mempool INV)
+DEBUG: sending message to node 23: getdata
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=37fa85c31bbbe989faf52d403f38345fea6005cbac87a72577a0e9cbb3868459 size=328B vin=1 vout=5 coinbase=0 outval=31776635606912 koinu types{p2pk=0,p2pkh=5,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=328 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=6dd0002afe3bd2d06213f74cd21c388ac4d74ebbb3acb8e3542027afeb630052 size=191B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=191 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=23d42fef81e0e1ee3c5041ae2ce081c29e0491ee36512a6a4d6bee68eb97eab6 size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: received command from node 23: tx
+DEBUG: [smpv] tx=c5e8caec2437b7f716af0566a55eb628764ca69acf5237ba619a5becab4adc8f size=192B vin=1 vout=1 coinbase=0 outval=1000000 koinu types{p2pk=0,p2pkh=1,p2sh=0,multi=0,opret=0,nonstd=0}
+DEBUG: [smpv] tx witness vin=0 items=0
+DEBUG: [smpv] mempool tx seen len=192 dispatched=true
+DEBUG: Statecheck: amount of connected nodes: 20
+chaintip hash: 754fbe9e52c36b791f59674711621e44498539e61e4afef98afab18f2c57908e
+chaintip height: 6155086
+DEBUG: received command from node 13: inv
+DEBUG: received command from node 12: inv
+DEBUG: received command from node 25: inv
+DEBUG: received command from node 2: inv
+DEBUG: received command from node 22: inv
+DEBUG: received command from node 17: inv
+DEBUG: received command from node 14: addr
+DEBUG: received command from node 4: inv
+DEBUG: received command from node 7: inv
+[0;31m[ERROR][0m Timed out waiting for txid 82c7d61a699053510b2344180190eb74607b9fd41ccae1c5805e547faab496ae in /getUTXOs
