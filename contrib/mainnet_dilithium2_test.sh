@@ -40,6 +40,7 @@ NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
+RUN_LOG="$TMPDIR/mainnet_dilithium2_run.log"
 # sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
 
@@ -49,10 +50,10 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 run_and_log() {
     local label="$1"
     shift
-    echo "----- ${label}: $* -----"
-    "$@" 2>&1
-    local rc=$?
-    echo "----- ${label} exit=${rc} -----"
+    echo "----- ${label}: $* -----" | tee -a "$RUN_LOG"
+    "$@" 2>&1 | tee -a "$RUN_LOG"
+    local rc=${PIPESTATUS[0]}
+    echo "----- ${label} exit=${rc} -----" | tee -a "$RUN_LOG"
     return $rc
 }
 
@@ -61,10 +62,13 @@ wait_for_rest_tx() {
     local timeout="$2"
     local start_ts now_ts
     local txid_le
+    local rest_utxos rest_txs
     start_ts=$(date +%s)
     txid_le=$(echo "$txid" | sed 's/../& /g' | awk '{for(i=NF;i>=1;i--) printf $i}' | tr -d '\n')
     while true; do
-        if curl -fsS "http://${REST_SERVER}/getUTXOs" 2>/dev/null | grep -Fqi "txid:[[:space:]]*${txid_le}"; then
+        rest_utxos=$(curl -fsS "http://${REST_SERVER}/getUTXOs" 2>/dev/null || true)
+        rest_txs=$(curl -fsS "http://${REST_SERVER}/getTransactions" 2>/dev/null || true)
+        if echo "$rest_utxos$rest_txs" | grep -Eqi "${txid}|${txid_le}"; then
             date +%s
             return 0
         fi
@@ -293,7 +297,7 @@ monitor_spvnode() {
         info "Running spvnode scan with REST monitoring until txid and ${expected_commit_mode} commitment validation are both confirmed..."
         scan_start_ts=$(date +%s)
         : > "$TMPDIR/spvnode.log"
-        stdbuf -oL -eL ./spvnode $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -w "$SPV_WALLET_FILE" -u "$REST_SERVER" -c -d -x -p -b -a "$TESTNET_ADDR" scan | tee "$TMPDIR/spvnode.log" &
+        stdbuf -oL -eL ./spvnode $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -w "$SPV_WALLET_FILE" -u "$REST_SERVER" -c -d -x -p -b -a "$TESTNET_ADDR" scan | tee "$TMPDIR/spvnode.log" | tee -a "$RUN_LOG" &
         spv_pipe_pid=$!
         if ! found_ts=$(wait_for_rest_tx "$BROADCAST_TXID" "$SPV_TIMEOUT_SECONDS"); then
             echo "----- spvnode log tail -----"

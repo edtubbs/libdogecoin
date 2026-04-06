@@ -70,10 +70,10 @@ success() {
 run_and_log() {
     local label="$1"
     shift
-    echo "----- ${label}: $* -----"
-    "$@" 2>&1
-    local rc=$?
-    echo "----- ${label} exit=${rc} -----"
+    echo "----- ${label}: $* -----" | tee -a "$RUN_LOG"
+    "$@" 2>&1 | tee -a "$RUN_LOG"
+    local rc=${PIPESTATUS[0]}
+    echo "----- ${label} exit=${rc} -----" | tee -a "$RUN_LOG"
     return $rc
 }
 
@@ -252,10 +252,13 @@ wait_for_rest_tx() {
     local timeout="$2"
     local start_ts now_ts
     local txid_le
+    local rest_utxos rest_txs
     start_ts=$(date +%s)
     txid_le=$(echo "$txid" | sed 's/../& /g' | awk '{for(i=NF;i>=1;i--) printf $i}' | tr -d '\n')
     while true; do
-        if curl -fsS "http://${REST_SERVER}/getUTXOs" 2>/dev/null | grep -Fqi "txid:[[:space:]]*${txid_le}"; then
+        rest_utxos=$(curl -fsS "http://${REST_SERVER}/getUTXOs" 2>/dev/null || true)
+        rest_txs=$(curl -fsS "http://${REST_SERVER}/getTransactions" 2>/dev/null || true)
+        if echo "$rest_utxos$rest_txs" | grep -Eqi "${txid}|${txid_le}"; then
             date +%s
             return 0
         fi
