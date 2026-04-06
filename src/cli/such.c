@@ -711,6 +711,96 @@ static void such_witness_item_free_cb(void* data)
     cstr_free((cstring*)data, true);
 }
 
+static void such_reset_witness_stack(dogecoin_tx_in* tx_in)
+{
+    if (!tx_in) {
+        return;
+    }
+    if (tx_in->witness_stack) {
+        vector_free(tx_in->witness_stack, true);
+    }
+    tx_in->witness_stack = vector_new(1, such_witness_item_free_cb);
+}
+
+static dogecoin_bool such_witness_push_hex(vector_t* witness_stack, const char* hex, const char* what)
+{
+    if (!witness_stack || !hex) {
+        return false;
+    }
+    size_t hex_len = strlen(hex);
+    if ((hex_len % 2) != 0) {
+        printf("Error: Invalid %s hex length\n", what);
+        return false;
+    }
+
+    size_t outlen = 0;
+    uint8_t* data = dogecoin_malloc(hex_len / 2 + 1);
+    if (!data) {
+        printf("Error: Failed to allocate %s buffer\n", what);
+        return false;
+    }
+    utils_hex_to_bin(hex, data, hex_len, &outlen);
+
+    cstring* item = cstr_new_buf(data, outlen);
+    dogecoin_free(data);
+    if (!item) {
+        printf("Error: Failed to allocate %s witness item\n", what);
+        return false;
+    }
+    if (!vector_add(witness_stack, item)) {
+        cstr_free(item, true);
+        printf("Error: Failed to append %s witness item\n", what);
+        return false;
+    }
+    return true;
+}
+
+static void such_append_witness_drop_script(cstring* witness_script, size_t drops)
+{
+    for (size_t i = 0; i < drops; i++) {
+        dogecoin_script_append_op(witness_script, OP_DROP);
+    }
+    dogecoin_script_append_op(witness_script, OP_1);
+}
+
+static dogecoin_bool such_hex_payload_chunks(const char* payload_hex, size_t max_chunk_bytes, vector_t* chunks_out)
+{
+    if (!payload_hex || !chunks_out) {
+        return false;
+    }
+    size_t payload_hex_len = strlen(payload_hex);
+    if ((payload_hex_len % 2) != 0) {
+        return false;
+    }
+    if (max_chunk_bytes == 0) {
+        return false;
+    }
+    size_t chunk_hex_len = max_chunk_bytes * 2;
+    if (chunk_hex_len == 0) {
+        return false;
+    }
+    if (payload_hex_len == 0) {
+        return true;
+    }
+
+    for (size_t off = 0; off < payload_hex_len; off += chunk_hex_len) {
+        size_t take = payload_hex_len - off;
+        if (take > chunk_hex_len) {
+            take = chunk_hex_len;
+        }
+        cstring* chunk = cstr_new_sz(take + 1);
+        if (!chunk) {
+            return false;
+        }
+        cstr_append_buf(chunk, payload_hex + off, take);
+        if (!vector_add(chunks_out, chunk)) {
+            cstr_free(chunk, true);
+            return false;
+        }
+    }
+    return true;
+}
+
 static void print_tx_witness_stack(const dogecoin_tx* tx)
 {
     if (!tx) {
