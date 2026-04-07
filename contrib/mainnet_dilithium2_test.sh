@@ -253,36 +253,26 @@ build_transaction() {
     sign_message_dilithium2
     generate_commitment
 
-    ADD_COMMIT_OUTPUT=$(run_and_log "such dilithium2_add_commit_tx" ./such -c dilithium2_add_commit_tx -x "$RAW_UNSIGNED_TX" -s "$DILITHIUM2_COMMIT")
-    echo "$ADD_COMMIT_OUTPUT"
-    TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
-    [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Dilithium2 commitment"
-
-    info "Attaching Dilithium2 full material via canonical Doginals-style P2SH carrier..."
-    ADD_SCRIPTSIG_PQC_OUTPUT=$(run_and_log "such addpqcdatawitness" ./such -c addpqcdatawitness -x "$TX_WITH_COMMIT" -i 0 -k "$DILITHIUM2_PK" -s "$DILITHIUM2_SIG")
-    echo "$ADD_SCRIPTSIG_PQC_OUTPUT"
-    TX_FOR_SIGNING=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | awk -F': ' '/^tx with pqc p2sh carrier:/ {print $2; exit}' | tr -d ' ')
-    [ -n "$TX_FOR_SIGNING" ] || error "Failed to attach Dilithium2 P2SH data carrier"
-    CARRIER_TAG=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | awk -F': ' '/^carrier_tag:/ {print $2; exit}' | tr -d ' ')
-    [ "$CARRIER_TAG" = "DIL2FULL" ] || error "Unexpected Dilithium2 carrier tag: $CARRIER_TAG"
-    success "P2SH carrier pre-sign check passed"
-
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
+    ADD_COMMIT_AND_CARRIER_OUTPUT=$(run_and_log "such dilithium2_add_commit_and_carrier_tx" ./such -c dilithium2_add_commit_and_carrier_tx -x "$RAW_UNSIGNED_TX" -m "$DILITHIUM2_COMMIT" -k "$DILITHIUM2_PK" -s "$DILITHIUM2_SIG" -h 1000)
+    echo "$ADD_COMMIT_AND_CARRIER_OUTPUT"
+    TX_C_UNSIGNED=$(echo "$ADD_COMMIT_AND_CARRIER_OUTPUT" | awk -F': ' '/^tx with commitment and carrier outputs:/ {print $2; exit}' | tr -d ' ')
+    [ -n "$TX_C_UNSIGNED" ] || error "Failed to append Dilithium2 commitment + carrier outputs"
+    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_C_UNSIGNED" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
     [ -n "$SIGNED_TX" ] || error "Failed to sign transaction"
 
     cat > "$TMPDIR/tx_info.txt" <<EOF
 RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
-TX_C=$TX_WITH_COMMIT
-TX_R=$TX_FOR_SIGNING
-TX_WITH_COMMIT=$TX_WITH_COMMIT
-TX_WITH_SCRIPTSIG_PQC=$TX_FOR_SIGNING
+TX_C=$TX_C_UNSIGNED
+TX_R=
+TX_WITH_COMMIT=$TX_C_UNSIGNED
+TX_WITH_SCRIPTSIG_PQC=
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
 TX_SIGHASH_HEX=$TX_SIGHASH_HEX
 DILITHIUM2_SIG=$DILITHIUM2_SIG
 DILITHIUM2_COMMIT=$DILITHIUM2_COMMIT
-SCRIPTSIG_PQC_PUBKEY=$DILITHIUM2_PK
+SCRIPTSIG_PQC_PUBKEY=
 SIGNED_TX=$SIGNED_TX
 OPRETURN_SCRIPT=6a2444494c32${DILITHIUM2_COMMIT}
 EOF
@@ -340,8 +330,8 @@ monitor_spvnode() {
         local spv_pipe_pid
         local spv_exit_code
         local commit_match_line=""
-        local expected_commit_source="source=scriptsig"
-        local expected_commit_mode="scriptsig"
+        local expected_commit_source="source=op_return_only"
+        local expected_commit_mode="op_return_only"
         rm -f "$SPV_WALLET_FILE"
         info "Running spvnode scan with REST monitoring until txid and ${expected_commit_mode} commitment validation are both confirmed..."
         scan_start_ts=$(date +%s)

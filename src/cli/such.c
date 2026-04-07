@@ -664,10 +664,11 @@ static void print_usage()
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
-        printf("addpqcdatawitness (-x <raw hex tx> -i <input index> -k <pqc_pubkey_hex> -s <pqc_signature_hex> [-h <max_chunk_bytes, default 400>]),\n");
+        printf("addpqcdatawitness (-x <raw hex tx> -i <input index> -k <pqc_pubkey_hex> -s <pqc_signature_hex> [-h <max_chunk_bytes, default 400>]) [deprecated, regtest-only],\n");
         printf("addscriptsigpqc (-x <raw hex tx> -i <input index> -k <pqc_pubkey_hex> -s <pqc_signature_hex>) [deprecated, regtest-only test helper],\n");
         printf("printscriptsigpqc (-x <raw hex tx>) [deprecated scriptSig inspector],\n");
         printf("addwitness (-x <raw hex tx> -i <input index> -s <witness item hex>),\n");
+        printf("set_scriptsig (-x <raw hex tx> -i <input index> -s <scriptSig hex>),\n");
         printf("printwitness (-x <raw hex tx>),\n");
         printf("p2sh_p2wsh_datacarrier_scriptpubkey (-s <witness_script_hex>),\n");
         printf("p2sh_p2wsh_datacarrier_witness_script (-i <chunk_count>),\n");
@@ -703,6 +704,9 @@ static void print_usage()
     printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <falcon_commitment_hex>),\n");
     printf("dilithium2_add_commit_tx (requires -x <raw_tx_hex> -s <dilithium2_commitment_hex>),\n");
     printf("raccoong_add_commit_tx (requires -x <raw_tx_hex> -s <raccoong_commitment_hex>),\n");
+    printf("falcon_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <falcon_commitment_hex> -k <falcon_pubkey_hex> -s <falcon_signature_hex> [-h <carrier_value_koinu, default 1000>]),\n");
+    printf("dilithium2_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <dilithium2_commitment_hex> -k <dilithium2_pubkey_hex> -s <dilithium2_signature_hex> [-h <carrier_value_koinu, default 1000>]),\n");
+    printf("raccoong_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <raccoong_commitment_hex> -k <raccoong_pubkey_hex> -s <raccoong_signature_hex> [-h <carrier_value_koinu, default 1000>]),\n");
 #endif
     printf("\nExamples: \n");
     printf("Generate a testnet private ec keypair wif/hex:\n");
@@ -984,6 +988,123 @@ static dogecoin_bool such_tag4_hex_to_tag8(const char* tag4_hex, char out_tag8[8
     }
     memcpy(out_tag8, tag4, 4);
     memcpy(out_tag8 + 4, "FULL", 4);
+    return true;
+}
+
+static dogecoin_bool such_commit_hex_to_bytes32(const char* commit_hex, uint8_t out_commit32[32])
+{
+    if (!commit_hex || !out_commit32) {
+        return false;
+    }
+    if (strlen(commit_hex) != 64) {
+        return false;
+    }
+    for (size_t i = 0; i < 64; i++) {
+        if (!isxdigit((unsigned char)commit_hex[i])) {
+            return false;
+        }
+    }
+    size_t commit_len = 0;
+    utils_hex_to_bin(commit_hex, out_commit32, 64, &commit_len);
+    return commit_len == 32;
+}
+
+static dogecoin_bool such_tx_add_commit_and_carrier_outputs(
+    dogecoin_tx* tx,
+    const uint8_t commit32[32],
+    dogecoin_bool (*add_commit_fn)(dogecoin_tx* tx, const uint8_t commitment32[32]),
+    const char tag4[4],
+    const char* pqc_pubkey_hex,
+    const char* pqc_signature_hex,
+    uint64_t carrier_value_koinu,
+    cstring** out_carrier_spk,
+    uint8_t* out_part_total,
+    uint32_t* out_carrier_first_vout)
+{
+    if (!tx || !add_commit_fn || !tag4 || !pqc_pubkey_hex || !pqc_signature_hex ||
+        !out_carrier_spk || !out_part_total || !out_carrier_first_vout) {
+        return false;
+    }
+    if ((strlen(pqc_pubkey_hex) % 2) != 0 || (strlen(pqc_signature_hex) % 2) != 0) {
+        return false;
+    }
+    size_t pk_len = strlen(pqc_pubkey_hex) / 2;
+    size_t sig_len = strlen(pqc_signature_hex) / 2;
+    if (pk_len == 0 || sig_len == 0) {
+        return false;
+    }
+    uint8_t* pk = dogecoin_malloc(pk_len + 1);
+    uint8_t* sig = dogecoin_malloc(sig_len + 1);
+    if (!pk || !sig) {
+        if (pk) dogecoin_free(pk);
+        if (sig) dogecoin_free(sig);
+        return false;
+    }
+    size_t outlen = 0;
+    utils_hex_to_bin(pqc_pubkey_hex, pk, strlen(pqc_pubkey_hex), &outlen);
+    if (outlen != pk_len) {
+        dogecoin_free(pk);
+        dogecoin_free(sig);
+        return false;
+    }
+    utils_hex_to_bin(pqc_signature_hex, sig, strlen(pqc_signature_hex), &outlen);
+    if (outlen != sig_len) {
+        dogecoin_free(pk);
+        dogecoin_free(sig);
+        return false;
+    }
+
+    size_t full_len = pk_len + sig_len;
+    uint8_t* full = dogecoin_malloc(full_len + 1);
+    if (!full) {
+        dogecoin_free(pk);
+        dogecoin_free(sig);
+        return false;
+    }
+    memcpy(full, pk, pk_len);
+    memcpy(full + pk_len, sig, sig_len);
+    dogecoin_free(pk);
+    dogecoin_free(sig);
+
+    if (!add_commit_fn(tx, commit32)) {
+        dogecoin_free(full);
+        return false;
+    }
+
+    cstring* redeem = NULL;
+    cstring* carrier_spk = NULL;
+    if (!dogecoin_pqc_carrier_build_redeemscript(&redeem)) {
+        dogecoin_free(full);
+        return false;
+    }
+    if (!dogecoin_pqc_carrier_build_p2sh_scriptpubkey(redeem, &carrier_spk)) {
+        cstr_free(redeem, true);
+        dogecoin_free(full);
+        return false;
+    }
+
+    size_t part_payload_max = DOGECOIN_PQC_CARRIER_MAX_CHUNKS * DOGECOIN_PQC_CARRIER_CHUNK_MAX;
+    uint8_t part_total = (uint8_t)((full_len + part_payload_max - 1) / part_payload_max);
+    if (part_total == 0) {
+        cstr_free(carrier_spk, true);
+        cstr_free(redeem, true);
+        dogecoin_free(full);
+        return false;
+    }
+
+    uint32_t first_vout = (uint32_t)(tx->vout->len);
+    if (!dogecoin_tx_add_pqc_carrier_outputs(tx, carrier_spk, carrier_value_koinu, part_total)) {
+        cstr_free(carrier_spk, true);
+        cstr_free(redeem, true);
+        dogecoin_free(full);
+        return false;
+    }
+
+    *out_carrier_spk = carrier_spk;
+    *out_part_total = part_total;
+    *out_carrier_first_vout = first_vout;
+    cstr_free(redeem, true);
+    dogecoin_free(full);
     return true;
 }
 #endif
@@ -1729,6 +1850,10 @@ int main(int argc, char* argv[])
     }
 #endif
     else if (strcmp(cmd, "addpqcdatawitness") == 0) {
+        printf("warning: addpqcdatawitness is deprecated and non-standard for relay; use TX_C/TX_R P2SH carrier flow via pqc_carrier_* commands\n");
+        if (chain != &dogecoin_chainparams_regtest) {
+            return showError("addpqcdatawitness is deprecated for relay flows and is regtest-only");
+        }
         if (!txhex || !pubkey || !scripthex) {
             return showError("Missing tx-hex, pqc-pubkey-hex, or pqc-signature-hex (use -x, -k, -s)\n");
         }
@@ -1874,6 +1999,62 @@ int main(int argc, char* argv[])
             if (pk_hex) dogecoin_free(pk_hex);
             if (sig_hex) dogecoin_free(sig_hex);
         }
+        dogecoin_tx_free(tx);
+    }
+    else if (strcmp(cmd, "set_scriptsig") == 0) {
+        if (!txhex || !scripthex) {
+            return showError("Missing tx-hex or scriptSig-hex (use -x, -s)\n");
+        }
+        if ((strlen(txhex) % 2) != 0 || (strlen(scripthex) % 2) != 0) {
+            return showError("Invalid tx/scriptSig hex\n");
+        }
+        if (strlen(txhex) > 1024 * 100) {
+            return showError("tx too large (max 100kb)\n");
+        }
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex");
+        }
+        dogecoin_free(data_bin);
+        if ((size_t)inputindex >= tx->vin->len) {
+            dogecoin_tx_free(tx);
+            return showError("Inputindex out of range");
+        }
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, inputindex);
+        if (!tx_in->script_sig) {
+            tx_in->script_sig = cstr_new_sz(32);
+            if (!tx_in->script_sig) {
+                dogecoin_tx_free(tx);
+                return showError("Failed to allocate scriptSig");
+            }
+        }
+        size_t ss_len = strlen(scripthex) / 2;
+        uint8_t* ss_bin = dogecoin_malloc(ss_len + 1);
+        if (!ss_bin) {
+            dogecoin_tx_free(tx);
+            return showError("OOM");
+        }
+        utils_hex_to_bin(scripthex, ss_bin, strlen(scripthex), &outlen);
+        if (outlen != ss_len) {
+            dogecoin_free(ss_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid scriptSig hex");
+        }
+        cstr_resize(tx_in->script_sig, 0);
+        cstr_append_buf(tx_in->script_sig, ss_bin, ss_len);
+        dogecoin_free(ss_bin);
+        cstring* out_tx = cstr_new_sz(1024);
+        dogecoin_tx_serialize(out_tx, tx);
+        char* out_tx_hex = dogecoin_char_vla(out_tx->len * 2 + 1);
+        utils_bin_to_hex((unsigned char*)out_tx->str, out_tx->len, out_tx_hex);
+        printf("tx with scriptsig set: %s\n", out_tx_hex);
+        cstr_free(out_tx, true);
+        free(out_tx_hex);
         dogecoin_tx_free(tx);
     }
     else if (strcmp(cmd, "addwitness") == 0) {
@@ -3326,6 +3507,159 @@ int main(int argc, char* argv[])
         printf("tx with commitment: %s\n", tx_with_commit_hex);
         cstr_free(tx_with_commit, true);
         dogecoin_free(tx_with_commit_hex);
+        dogecoin_tx_free(tx);
+    }
+    else if (strcmp(cmd, "falcon_add_commit_and_carrier_tx") == 0 ||
+             strcmp(cmd, "dilithium2_add_commit_and_carrier_tx") == 0 ||
+             strcmp(cmd, "raccoong_add_commit_and_carrier_tx") == 0) {
+        if (!txhex || !derived_path || !pubkey || !scripthex) {
+            return showError("Missing tx hex (-x), commitment hex (-m), pqc pubkey (-k), or pqc signature (-s)\n");
+        }
+        if ((strlen(txhex) % 2) != 0) {
+            return showError("Raw transaction hex length must be even\n");
+        }
+        uint64_t carrier_value_koinu = (sighashtype > 0) ? (uint64_t)sighashtype : 1000;
+
+        dogecoin_tx* tx = dogecoin_tx_new();
+        uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
+        if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
+            dogecoin_free(data_bin);
+            dogecoin_tx_free(tx);
+            return showError("Invalid tx hex\n");
+        }
+        dogecoin_free(data_bin);
+
+        uint8_t commit32[32];
+        if (!such_commit_hex_to_bytes32(derived_path, commit32)) {
+            dogecoin_tx_free(tx);
+            return showError("Commitment must be exactly 32 bytes (64 hex characters)\n");
+        }
+
+        dogecoin_bool (*add_commit_fn)(dogecoin_tx*, const uint8_t*) = NULL;
+        const char* tag4_ascii = NULL;
+        if (strcmp(cmd, "falcon_add_commit_and_carrier_tx") == 0) {
+            add_commit_fn = dogecoin_tx_add_falcon512_commit;
+            tag4_ascii = "FLC1";
+        } else if (strcmp(cmd, "dilithium2_add_commit_and_carrier_tx") == 0) {
+            add_commit_fn = dogecoin_tx_add_dilithium2_commit;
+            tag4_ascii = "DIL2";
+        } else {
+            add_commit_fn = dogecoin_tx_add_raccoong44_commit;
+            tag4_ascii = "RCG4";
+        }
+
+        cstring* carrier_spk = NULL;
+        uint8_t part_total = 0;
+        uint32_t carrier_first_vout = 0;
+        if (!such_tx_add_commit_and_carrier_outputs(tx, commit32, add_commit_fn, tag4_ascii, pubkey, scripthex,
+                                                    carrier_value_koinu, &carrier_spk, &part_total, &carrier_first_vout)) {
+            dogecoin_tx_free(tx);
+            return showError("Failed to append commitment + carrier outputs\n");
+        }
+
+        size_t pk_len = strlen(pubkey) / 2;
+        size_t sig_len = strlen(scripthex) / 2;
+        uint8_t* pk = dogecoin_malloc(pk_len + 1);
+        uint8_t* sig = dogecoin_malloc(sig_len + 1);
+        if (!pk || !sig) {
+            if (pk) dogecoin_free(pk);
+            if (sig) dogecoin_free(sig);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("OOM");
+        }
+        outlen = 0;
+        utils_hex_to_bin(pubkey, pk, strlen(pubkey), &outlen);
+        if (outlen != pk_len) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("Invalid pqc pubkey hex");
+        }
+        utils_hex_to_bin(scripthex, sig, strlen(scripthex), &outlen);
+        if (outlen != sig_len) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("Invalid pqc signature hex");
+        }
+        size_t full_len = pk_len + sig_len;
+        uint8_t* full = dogecoin_malloc(full_len + 1);
+        if (!full) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("OOM");
+        }
+        memcpy(full, pk, pk_len);
+        memcpy(full + pk_len, sig, sig_len);
+        dogecoin_free(pk);
+        dogecoin_free(sig);
+
+        char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN];
+        memcpy(tag8, tag4_ascii, 4);
+        memcpy(tag8 + 4, "FULL", 4);
+        cstring* redeem = NULL;
+        if (!dogecoin_pqc_carrier_build_redeemscript(&redeem)) {
+            dogecoin_free(full);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("Failed to build carrier redeemScript");
+        }
+
+        cstring* tx_out = cstr_new_sz(1024);
+        dogecoin_tx_serialize(tx_out, tx);
+        char* tx_out_hex = dogecoin_malloc(tx_out->len * 2 + 1);
+        if (!tx_out_hex) {
+            cstr_free(tx_out, true);
+            cstr_free(redeem, true);
+            dogecoin_free(full);
+            cstr_free(carrier_spk, true);
+            dogecoin_tx_free(tx);
+            return showError("OOM");
+        }
+        utils_bin_to_hex((unsigned char*)tx_out->str, tx_out->len, tx_out_hex);
+        char* carrier_spk_hex = utils_uint8_to_hex((const uint8_t*)carrier_spk->str, carrier_spk->len);
+        printf("tx with commitment and carrier outputs: %s\n", tx_out_hex);
+        printf("carrier_part_total: %u\n", (unsigned)part_total);
+        printf("carrier_output_value_koinu: %llu\n", (unsigned long long)carrier_value_koinu);
+        printf("carrier_first_vout: %u\n", carrier_first_vout);
+        printf("carrier_p2sh_scriptpubkey: %s\n", carrier_spk_hex ? carrier_spk_hex : "");
+
+        size_t part_payload_max = DOGECOIN_PQC_CARRIER_MAX_CHUNKS * DOGECOIN_PQC_CARRIER_CHUNK_MAX;
+        for (uint8_t part_index = 0; part_index < part_total; part_index++) {
+            size_t part_off = (size_t)part_index * part_payload_max;
+            size_t part_len = full_len - part_off;
+            if (part_len > part_payload_max) part_len = part_payload_max;
+            cstring* part_scriptsig = NULL;
+            if (!dogecoin_pqc_carrier_build_part_scriptsig(tag8, part_index, part_total, (uint16_t)pk_len, (uint16_t)full_len,
+                                                           full + part_off, part_len, redeem, &part_scriptsig)) {
+                if (carrier_spk_hex) dogecoin_free(carrier_spk_hex);
+                dogecoin_free(tx_out_hex);
+                cstr_free(tx_out, true);
+                cstr_free(redeem, true);
+                dogecoin_free(full);
+                cstr_free(carrier_spk, true);
+                dogecoin_tx_free(tx);
+                return showError("Failed to build carrier part scriptsig");
+            }
+            char* ss_hex = utils_uint8_to_hex((const uint8_t*)part_scriptsig->str, part_scriptsig->len);
+            printf("carrier_part_scriptsig[%u]: %s\n", (unsigned)part_index, ss_hex ? ss_hex : "");
+            if (ss_hex) dogecoin_free(ss_hex);
+            cstr_free(part_scriptsig, true);
+        }
+
+        if (carrier_spk_hex) dogecoin_free(carrier_spk_hex);
+        dogecoin_free(tx_out_hex);
+        cstr_free(tx_out, true);
+        cstr_free(redeem, true);
+        dogecoin_free(full);
+        cstr_free(carrier_spk, true);
         dogecoin_tx_free(tx);
     }
 #endif
