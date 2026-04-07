@@ -52,7 +52,9 @@ FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-${CHAINED_UTXO_VALUE_KOINU:-
 FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}}"
 RUN_LOG="$TMPDIR/mainnet_raccoong_run.log"
 SENDTX_MAX_RETRIES="${SENDTX_MAX_RETRIES:-3}"
-RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
+# Relay success: "Seen on other nodes: N" where N > 0, or already-known responses.
+# NOTE: "tx successfully sent to node" only means pushed to peer, NOT that it was accepted.
+RELAY_SUCCESS_PATTERN='Seen on other nodes:[[:space:]]*[1-9]|already (broadcasted|known|have transaction)|txn-already-known|txn-already-in-mempool'
 SENDTX_FATAL_PATTERN='not relayed back|Seen on other nodes:[[:space:]]*0|very likely invalid'
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -92,7 +94,7 @@ nout=rvar(); print(f"  outputs: {nout}")
 for i in range(nout):
     val=ru64(); sl=rvar(); spk=tx[off:off+sl].hex(); off+=sl; vd=val/1e8
     kind="P2PKH" if spk.startswith('76a914') else "P2SH" if spk.startswith('a914') else "OP_RETURN" if spk.startswith('6a') else "unknown"
-    dust_ok = "OK" if (val==0 and kind=="OP_RETURN") or val>=100000000 else f"DUST(need>=1DOGE)"
+    dust_ok = "OK" if (val==0 and kind=="OP_RETURN") or val>=100000 else f"DUST(need>=0.001DOGE)"
     print(f"    out[{i}]: {val} koinu ({vd:.8f} DOGE) type={kind} dust={dust_ok}")
 print(f"=== end {label} ===")
 PYDEBUG

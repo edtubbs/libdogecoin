@@ -53,7 +53,7 @@ FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-${CHAINED_UTXO_TXID:-63d79b47b6d55b5143afb
 FUNDED_UTXO_VOUT="${FUNDED_UTXO_VOUT:-${CHAINED_UTXO_VOUT:-0}}"
 AUTO_PREPARE_TX_FROM_UTXO="${AUTO_PREPARE_TX_FROM_UTXO:-1}"
 TX_FEE_KOINU="${TX_FEE_KOINU:-100000}"
-TX_R_FEE_KOINU="${TX_R_FEE_KOINU:-1}"
+TX_R_FEE_KOINU="${TX_R_FEE_KOINU:-200000}"
 CARRIER_VALUE_KOINU="${CARRIER_VALUE_KOINU:-100000000}"
 # Enforce minimum carrier value of 1 DOGE to avoid dust rejection
 if [ "$CARRIER_VALUE_KOINU" -lt 100000000 ]; then
@@ -65,8 +65,9 @@ RAW_UNSIGNED_TX="${RAW_UNSIGNED_TX:-}"
 SCRIPT_PUBKEY="${SCRIPT_PUBKEY:-}"
 RUN_LOG="$TMPDIR/mainnet_falcon_run.log"
 SENDTX_MAX_RETRIES="${SENDTX_MAX_RETRIES:-3}"
-# sendtx success must be explicit relay or explicit already-known acceptance.
-RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
+# Relay success: "Seen on other nodes: N" where N > 0, or already-known responses.
+# NOTE: "tx successfully sent to node" only means pushed to peer, NOT that it was accepted.
+RELAY_SUCCESS_PATTERN='Seen on other nodes:[[:space:]]*[1-9]|already (broadcasted|known|have transaction)|txn-already-known|txn-already-in-mempool'
 SENDTX_FATAL_PATTERN='not relayed back|Seen on other nodes:[[:space:]]*0|very likely invalid'
 
 # Function to print colored messages
@@ -143,7 +144,7 @@ for i in range(nout):
     if spk.startswith('76a914') and spk.endswith('88ac'): kind="P2PKH"
     elif spk.startswith('a914') and spk.endswith('87'): kind="P2SH"
     elif spk.startswith('6a'): kind="OP_RETURN"
-    dust_ok = "OK" if (val==0 and kind=="OP_RETURN") or val>=100000000 else f"DUST(need>=1DOGE)"
+    dust_ok = "OK" if (val==0 and kind=="OP_RETURN") or val>=100000 else f"DUST(need>=0.001DOGE)"
     print(f"    out[{i}]: {val} koinu ({vd:.8f} DOGE) type={kind} spk_len={sl} dust={dust_ok}")
 lt=ru32(); print(f"  locktime: {lt}")
 print(f"=== end {label} ===")
