@@ -687,8 +687,8 @@ monitor_spvnode() {
         local expected_commit_source="source=op_return_only"
         local expected_commit_mode="op_return_only"
         if [ "$CARRIER_ENABLED" -eq 1 ] && [ -n "$TX_R_TXID" ]; then
-            expected_commit_source="source=scriptsig"
-            expected_commit_mode="scriptsig"
+            expected_commit_source="source=carrier_scriptsig"
+            expected_commit_mode="carrier_scriptsig"
         fi
         local rest_timeout_remaining
         rm -f "$SPV_WALLET_FILE"
