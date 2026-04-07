@@ -57,6 +57,7 @@ SCRIPT_PUBKEY="${SCRIPT_PUBKEY:-}"
 RUN_LOG="$TMPDIR/mainnet_falcon_run.log"
 # sendtx success must be explicit relay or explicit already-known acceptance.
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
+SENDTX_FATAL_PATTERN='not relayed back|Seen on other nodes:[[:space:]]*0|very likely invalid'
 
 # Function to print colored messages
 info() {
@@ -406,6 +407,9 @@ build_transaction() {
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
         SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $NETWORK_FLAG "$SIGNED_TX" || true)
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g' | tee "$TMPDIR/sendtx.log" | tee -a "$RUN_LOG"
+        if echo "$SENDTX_OUTPUT" | grep -Eqi "$SENDTX_FATAL_PATTERN"; then
+            error "sendtx reported explicit relay failure (not relayed/seen on other nodes 0)"
+        fi
         BROADCAST_TXID=$(echo "$SENDTX_OUTPUT" | sed -n 's/^Start broadcasting transaction:[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1)
         if [ -z "$BROADCAST_TXID" ]; then
             error "Failed to parse broadcast txid from sendtx output"

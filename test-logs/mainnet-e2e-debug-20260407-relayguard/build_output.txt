@@ -1,0 +1,2066 @@
+make: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends'
+Fetching ccache-3.3.3.tar.bz2 from https://samba.org/ftp/ccache
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   301  100   301    0     0    750      0 --:--:-- --:--:-- --:--:--   748
+ 50  337k   50  170k    0     0   139k      0  0:00:02  0:00:01  0:00:01  139k100  337k  100  337k    0     0   246k      0  0:00:01  0:00:01 --:--:-- 1112k
+/home/runner/work/libdogecoin/libdogecoin/depends/work/download/native_ccache-3.3.3/ccache-3.3.3.tar.bz2.temp: OK
+Extracting native_ccache...
+/home/runner/work/libdogecoin/libdogecoin/depends/sources/ccache-3.3.3.tar.bz2: OK
+Preprocessing native_ccache...
+Configuring native_ccache...
+configure: Configuring ccache
+checking build system type... x86_64-unknown-linux-gnu
+checking host system type... x86_64-pc-linux-gnu
+checking for x86_64-pc-linux-gnu-gcc... gcc
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether we are using the GNU C compiler... yes
+checking whether gcc accepts -g... yes
+checking for gcc option to accept ISO C89... none needed
+checking for gcc option to accept ISO C99... none needed
+checking how to run the C preprocessor... gcc -E
+checking for a BSD-compatible install... /usr/bin/install -c
+checking for x86_64-pc-linux-gnu-ranlib... ranlib
+checking for x86_64-pc-linux-gnu-ar... ar
+checking for dirent.h that defines DIR... yes
+checking for library containing opendir... none required
+checking whether time.h and sys/time.h may both be included... yes
+checking for sys/wait.h that is POSIX.1 compatible... yes
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for ANSI C header files... yes
+checking for sys/types.h... yes
+checking for sys/stat.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for memory.h... yes
+checking for strings.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for unistd.h... yes
+checking for long long... yes
+checking ctype.h usability... yes
+checking ctype.h presence... yes
+checking for ctype.h... yes
+checking pwd.h usability... yes
+checking pwd.h presence... yes
+checking for pwd.h... yes
+checking for stdlib.h... (cached) yes
+checking for string.h... (cached) yes
+checking for strings.h... (cached) yes
+checking sys/time.h usability... yes
+checking sys/time.h presence... yes
+checking for sys/time.h... yes
+checking sys/mman.h usability... yes
+checking sys/mman.h presence... yes
+checking for sys/mman.h... yes
+checking termios.h usability... yes
+checking termios.h presence... yes
+checking for termios.h... yes
+checking for gethostname... yes
+checking for getopt_long... yes
+checking for getpwuid... yes
+checking for gettimeofday... yes
+checking for mkstemp... yes
+checking for realpath... yes
+checking for strndup... yes
+checking for strtok_r... yes
+checking for unsetenv... yes
+checking for utimes... yes
+checking for compar_fn_t in stdlib.h... yes
+checking for stdarg.h... yes
+checking for varargs.h... no
+checking for unsigned long long int... yes
+checking for vsnprintf... yes
+checking whether vsnprintf is C99 compliant... yes
+checking for snprintf... yes
+checking whether snprintf is C99 compliant... yes
+checking for vasprintf... yes
+checking for asprintf... yes
+checking for library containing cos... -lm
+checking for zlib >= 1.2.3... yes
+checking for gzdopen in -lz... yes
+checking whether byte ordering is bigendian... no
+checking for inline... inline
+checking for extern inline... no
+configure: Developer mode disabled
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating config.h
+configure: now build ccache by running make
+Building native_ccache...
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/native_ccache/3.3.3-f25c6349956'
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o main.o main.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o args.o args.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o ccache.o ccache.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o cleanup.o cleanup.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o compopt.o compopt.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o conf.o conf.c
+ccache.c: In function ‘cc_process_args’:
+ccache.c:2546:78: warning: ‘%s’ directive argument is null [-Wformat-overflow=]
+ 2546 |                                         cc_log("Setting profile directory to %s", profile_dir);
+      |                                                                              ^~
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o counters.o counters.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o execute.o execute.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o exitfn.o exitfn.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o hash.o hash.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o hashutil.o hashutil.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o language.o language.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o lockfile.o lockfile.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o manifest.o manifest.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o mdfour.o mdfour.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o stats.o stats.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o unify.o unify.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o util.o util.c
+util.c: In function ‘parse_size_with_suffix’:
+util.c:971:27: warning: this statement may fall through [-Wimplicit-fallthrough=]
+  971 |                         x *= multiplier;
+      |                         ~~^~~~~~~~~~~~~
+util.c:972:17: note: here
+  972 |                 case 'G':
+      |                 ^~~~
+util.c:973:27: warning: this statement may fall through [-Wimplicit-fallthrough=]
+  973 |                         x *= multiplier;
+      |                         ~~^~~~~~~~~~~~~
+util.c:974:17: note: here
+  974 |                 case 'M':
+      |                 ^~~~
+util.c:975:27: warning: this statement may fall through [-Wimplicit-fallthrough=]
+  975 |                         x *= multiplier;
+      |                         ~~^~~~~~~~~~~~~
+util.c:976:17: note: here
+  976 |                 case 'K':
+      |                 ^~~~
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o version.o version.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o getopt_long.o getopt_long.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o hashtable.o hashtable.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o hashtable_itr.o hashtable_itr.c
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o murmurhashneutral2.o murmurhashneutral2.c
+murmurhashneutral2.c: In function ‘murmurhashneutral2’:
+murmurhashneutral2.c:33:19: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   33 |         case 3: h ^= data[2] << 16;
+      |                 ~~^~~~~~~~~~~~~~~~
+murmurhashneutral2.c:34:9: note: here
+   34 |         case 2: h ^= data[1] << 8;
+      |         ^~~~
+murmurhashneutral2.c:34:19: warning: this statement may fall through [-Wimplicit-fallthrough=]
+   34 |         case 2: h ^= data[1] << 8;
+      |                 ~~^~~~~~~~~~~~~~~
+murmurhashneutral2.c:35:9: note: here
+   35 |         case 1: h ^= data[0];
+      |         ^~~~
+gcc -DHAVE_CONFIG_H -DSYSCONFDIR=/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/etc -I. -I. -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/include -g -O2 -Wall -W -c -o snprintf.o snprintf.c
+gcc -g -O2 -Wall -W -o ccache main.o args.o ccache.o cleanup.o compopt.o conf.o counters.o execute.o exitfn.o hash.o hashutil.o language.o lockfile.o manifest.o mdfour.o stats.o unify.o util.o version.o getopt_long.o hashtable.o hashtable_itr.o murmurhashneutral2.o snprintf.o -L/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/lib  -lm  -lz
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/native_ccache/3.3.3-f25c6349956'
+Staging native_ccache...
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/native_ccache/3.3.3-f25c6349956'
+make[1]: warning: jobserver unavailable: using -j1.  Add '+' to parent make rule.
+/usr/bin/install -c -d /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/native_ccache/3.3.3-f25c6349956/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/bin
+/usr/bin/install -c -m 755 ccache /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/native_ccache/3.3.3-f25c6349956/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/bin
+/usr/bin/install -c -d /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/native_ccache/3.3.3-f25c6349956/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/share/man/man1
+/usr/bin/install -c -m 644 ./ccache.1 /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/native_ccache/3.3.3-f25c6349956/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/native/share/man/man1/
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/native_ccache/3.3.3-f25c6349956'
+Postprocessing native_ccache...
+Caching native_ccache...
+Fetching libevent-2.1.12-stable.tar.gz from https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100 1075k  100 1075k    0     0  6733k      0 --:--:-- --:--:-- --:--:-- 6733k
+/home/runner/work/libdogecoin/libdogecoin/depends/work/download/libevent-2.1.12-stable/libevent-2.1.12-stable.tar.gz.temp: OK
+Extracting libevent...
+/home/runner/work/libdogecoin/libdogecoin/depends/sources/libevent-2.1.12-stable.tar.gz: OK
+Preprocessing libevent...
+Configuring libevent...
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether build environment is sane... yes
+checking for x86_64-pc-linux-gnu-strip... no
+checking for strip... strip
+checking for a thread-safe mkdir -p... /usr/bin/mkdir -p
+checking for gawk... gawk
+checking whether make sets $(MAKE)... yes
+checking whether make supports nested variables... yes
+checking whether make supports nested variables... (cached) yes
+checking whether make supports the include directive... yes (GNU style)
+checking for x86_64-pc-linux-gnu-gcc... gcc -m64
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether we are using the GNU C compiler... yes
+checking whether gcc -m64 accepts -g... yes
+checking for gcc -m64 option to accept ISO C89... none needed
+checking whether gcc -m64 understands -c and -o together... yes
+checking dependency style of gcc -m64... none
+checking how to run the C preprocessor... gcc -m64 -E
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for ANSI C header files... yes
+checking for sys/types.h... yes
+checking for sys/stat.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for memory.h... yes
+checking for strings.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for unistd.h... yes
+checking minix/config.h usability... no
+checking minix/config.h presence... no
+checking for minix/config.h... no
+checking whether it is safe to define __EXTENSIONS__... yes
+checking build system type... x86_64-pc-linux-gnu
+checking host system type... x86_64-pc-linux-gnu
+checking whether ln -s works... yes
+checking for a sed that does not truncate output... /usr/bin/sed
+checking whether gcc -m64 needs -traditional... no
+checking how to print strings... printf
+checking for a sed that does not truncate output... (cached) /usr/bin/sed
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by gcc -m64... /usr/bin/ld
+checking if the linker (/usr/bin/ld) is GNU ld... yes
+checking for BSD- or MS-compatible name lister (nm)... nm
+checking the name lister (nm) interface... BSD nm
+checking the maximum length of command line arguments... 3145728
+checking how to convert x86_64-pc-linux-gnu file names to x86_64-pc-linux-gnu format... func_convert_file_noop
+checking how to convert x86_64-pc-linux-gnu file names to toolchain format... func_convert_file_noop
+checking for /usr/bin/ld option to reload object files... -r
+checking for x86_64-pc-linux-gnu-objdump... no
+checking for objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for x86_64-pc-linux-gnu-dlltool... no
+checking for dlltool... no
+checking how to associate runtime and link libraries... printf %s\n
+checking for x86_64-pc-linux-gnu-ar... ar
+checking for archiver @FILE support... @
+checking for x86_64-pc-linux-gnu-strip... strip
+checking for x86_64-pc-linux-gnu-ranlib... ranlib
+checking command to parse nm output from gcc -m64 object... ok
+checking for sysroot... no
+checking for a working dd... /usr/bin/dd
+checking how to truncate binary pipes... /usr/bin/dd bs=4096 count=1
+checking for x86_64-pc-linux-gnu-mt... no
+checking for mt... mt
+checking if mt is a manifest tool... no
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if gcc -m64 supports -fno-rtti -fno-exceptions... no
+checking for gcc -m64 option to produce PIC... -fPIC -DPIC
+checking if gcc -m64 PIC flag -fPIC -DPIC works... yes
+checking if gcc -m64 static flag -static works... yes
+checking if gcc -m64 supports -c -o file.o... yes
+checking if gcc -m64 supports -c -o file.o... (cached) yes
+checking whether the gcc -m64 linker (/usr/bin/ld -m elf_x86_64) supports shared libraries... yes
+checking dynamic linker characteristics... GNU/Linux ld.so
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... no
+checking whether to build static libraries... yes
+checking for library containing inet_ntoa... none required
+checking for library containing socket... none required
+checking for library containing inet_aton... none required
+checking for library containing clock_gettime... none required
+checking for clock_gettime... yes
+checking for library containing sendfile... none required
+checking for WIN32... no
+checking for MIDIPIX... no
+checking for CYGWIN... no
+checking zlib.h usability... yes
+checking zlib.h presence... yes
+checking for zlib.h... yes
+checking for library containing inflateEnd... -lz
+checking for special C compiler options needed for large files... no
+checking for _FILE_OFFSET_BITS value needed for large files... no
+checking for x86_64-pc-linux-gnu-pkg-config... no
+checking for pkg-config... /usr/bin/pkg-config
+checking if pkg-config is at least version 0.15.0... yes
+checking arpa/inet.h usability... yes
+checking arpa/inet.h presence... yes
+checking for arpa/inet.h... yes
+checking fcntl.h usability... yes
+checking fcntl.h presence... yes
+checking for fcntl.h... yes
+checking ifaddrs.h usability... yes
+checking ifaddrs.h presence... yes
+checking for ifaddrs.h... yes
+checking mach/mach_time.h usability... no
+checking mach/mach_time.h presence... no
+checking for mach/mach_time.h... no
+checking mach/mach.h usability... no
+checking mach/mach.h presence... no
+checking for mach/mach.h... no
+checking netdb.h usability... yes
+checking netdb.h presence... yes
+checking for netdb.h... yes
+checking netinet/in.h usability... yes
+checking netinet/in.h presence... yes
+checking for netinet/in.h... yes
+checking netinet/in6.h usability... no
+checking netinet/in6.h presence... no
+checking for netinet/in6.h... no
+checking netinet/tcp.h usability... yes
+checking netinet/tcp.h presence... yes
+checking for netinet/tcp.h... yes
+checking sys/un.h usability... yes
+checking sys/un.h presence... yes
+checking for sys/un.h... yes
+checking poll.h usability... yes
+checking poll.h presence... yes
+checking for poll.h... yes
+checking port.h usability... no
+checking port.h presence... no
+checking for port.h... no
+checking stdarg.h usability... yes
+checking stdarg.h presence... yes
+checking for stdarg.h... yes
+checking stddef.h usability... yes
+checking stddef.h presence... yes
+checking for stddef.h... yes
+checking sys/devpoll.h usability... no
+checking sys/devpoll.h presence... no
+checking for sys/devpoll.h... no
+checking sys/epoll.h usability... yes
+checking sys/epoll.h presence... yes
+checking for sys/epoll.h... yes
+checking sys/event.h usability... no
+checking sys/event.h presence... no
+checking for sys/event.h... no
+checking sys/eventfd.h usability... yes
+checking sys/eventfd.h presence... yes
+checking for sys/eventfd.h... yes
+checking sys/ioctl.h usability... yes
+checking sys/ioctl.h presence... yes
+checking for sys/ioctl.h... yes
+checking sys/mman.h usability... yes
+checking sys/mman.h presence... yes
+checking for sys/mman.h... yes
+checking sys/param.h usability... yes
+checking sys/param.h presence... yes
+checking for sys/param.h... yes
+checking sys/queue.h usability... yes
+checking sys/queue.h presence... yes
+checking for sys/queue.h... yes
+checking sys/resource.h usability... yes
+checking sys/resource.h presence... yes
+checking for sys/resource.h... yes
+checking sys/select.h usability... yes
+checking sys/select.h presence... yes
+checking for sys/select.h... yes
+checking sys/sendfile.h usability... yes
+checking sys/sendfile.h presence... yes
+checking for sys/sendfile.h... yes
+checking sys/socket.h usability... yes
+checking sys/socket.h presence... yes
+checking for sys/socket.h... yes
+checking for sys/stat.h... (cached) yes
+checking sys/time.h usability... yes
+checking sys/time.h presence... yes
+checking for sys/time.h... yes
+checking sys/timerfd.h usability... yes
+checking sys/timerfd.h presence... yes
+checking for sys/timerfd.h... yes
+checking sys/uio.h usability... yes
+checking sys/uio.h presence... yes
+checking for sys/uio.h... yes
+checking sys/wait.h usability... yes
+checking sys/wait.h presence... yes
+checking for sys/wait.h... yes
+checking sys/random.h usability... yes
+checking sys/random.h presence... yes
+checking for sys/random.h... yes
+checking errno.h usability... yes
+checking errno.h presence... yes
+checking for errno.h... yes
+checking afunix.h usability... no
+checking afunix.h presence... no
+checking for afunix.h... no
+checking for TAILQ_FOREACH in sys/queue.h... yes
+checking for timeradd in sys/time.h... yes
+checking for timercmp in sys/time.h... yes
+checking for timerclear in sys/time.h... yes
+checking for timerisset in sys/time.h... yes
+checking for an ANSI C-conforming const... yes
+checking for inline... inline
+checking whether time.h and sys/time.h may both be included... yes
+checking for accept4... yes
+checking for arc4random... yes
+checking for arc4random_buf... yes
+checking for arc4random_addrandom... no
+checking for eventfd... yes
+checking for epoll_create1... yes
+checking for fcntl... yes
+checking for getegid... yes
+checking for geteuid... yes
+checking for getifaddrs... yes
+checking for gettimeofday... yes
+checking for issetugid... no
+checking for mach_absolute_time... no
+checking for mmap... yes
+checking for nanosleep... yes
+checking for pipe... yes
+checking for pipe2... yes
+checking for putenv... yes
+checking for sendfile... yes
+checking for setenv... yes
+checking for setrlimit... yes
+checking for sigaction... yes
+checking for signal... yes
+checking for splice... yes
+checking for strlcpy... yes
+checking for strsep... yes
+checking for strtok_r... yes
+checking for strtoll... yes
+checking for sysctl... no
+checking for timerfd_create... yes
+checking for umask... yes
+checking for unsetenv... yes
+checking for usleep... yes
+checking for vasprintf... yes
+checking for getrandom... yes
+checking for getnameinfo... yes
+checking for getprotobynumber... yes
+checking for getservbyname... yes
+checking for inet_ntop... yes
+checking for inet_pton... yes
+checking for getaddrinfo... yes
+checking for F_SETFD in fcntl.h... yes
+checking for select... yes
+checking for poll... yes
+checking for epoll_ctl... yes
+checking for port_create... no
+checking for pid_t... yes
+checking for size_t... yes
+checking for ssize_t... yes
+checking for uint64_t... yes
+checking for uint32_t... yes
+checking for uint16_t... yes
+checking for uint8_t... yes
+checking for uintptr_t... yes
+checking for fd_mask... yes
+checking size of long long... 8
+checking size of long... 8
+checking size of int... 4
+checking size of short... 2
+checking size of size_t... 8
+checking size of void *... 8
+checking size of off_t... 8
+checking size of time_t... 8
+checking for struct in6_addr... yes
+checking for struct sockaddr_in6... yes
+checking for struct sockaddr_un... yes
+checking for sa_family_t... yes
+checking for struct addrinfo... yes
+checking for struct sockaddr_storage... yes
+checking for struct in6_addr.s6_addr32... yes
+checking for struct in6_addr.s6_addr16... yes
+checking for struct sockaddr_in.sin_len... no
+checking for struct sockaddr_in6.sin6_len... no
+checking for struct sockaddr_storage.ss_family... yes
+checking for struct sockaddr_storage.__ss_family... no
+checking for struct linger... yes
+checking for socklen_t... yes
+checking whether our compiler supports __func__... yes
+checking whether our compiler supports __FUNCTION__... yes
+checking for the pthreads library -lpthreads... no
+checking whether pthreads work without any flags... yes
+checking for joinable pthread attribute... PTHREAD_CREATE_JOINABLE
+checking if more special flags are required for pthreads... no
+checking size of pthread_t... 8
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating libevent.pc
+config.status: creating libevent_openssl.pc
+config.status: creating libevent_pthreads.pc
+config.status: creating libevent_core.pc
+config.status: creating libevent_extra.pc
+config.status: creating Makefile
+config.status: creating config.h
+config.status: creating evconfig-private.h
+config.status: executing depfiles commands
+config.status: executing libtool commands
+Building libevent...
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791'
+  GEN      include/event2/event-config.h
+make  all-am
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791'
+  CC       buffer.lo
+  CC       bufferevent.lo
+  CC       bufferevent_filter.lo
+  CC       bufferevent_pair.lo
+  CC       bufferevent_ratelim.lo
+  CC       bufferevent_sock.lo
+  CC       event.lo
+  CC       evmap.lo
+event.c: In function ‘event_signal_closure’:
+event.c:1362:32: warning: storing the address of local variable ‘ncalls’ in ‘*ev.ev_.ev_signal.ev_pncalls’ [-Wdangling-pointer=]
+ 1362 |                 ev->ev_pncalls = &ncalls;
+      |                 ~~~~~~~~~~~~~~~^~~~~~~~~
+event.c:1356:15: note: ‘ncalls’ declared here
+ 1356 |         short ncalls;
+      |               ^~~~~~
+event.c:1354:61: note: ‘ev’ declared here
+ 1354 | event_signal_closure(struct event_base *base, struct event *ev)
+      |                                               ~~~~~~~~~~~~~~^~
+  CC       evthread.lo
+  CC       evutil.lo
+evutil.c:213:21: warning: argument 4 of type ‘int[2]’ with mismatched bound [-Warray-parameter=]
+  213 |     evutil_socket_t fd[2])
+In file included from evutil.c:85:
+./include/event2/util.h:310:25: note: previously declared as ‘int[]’
+  310 | #define evutil_socket_t int
+util-internal.h:306:47: note: in expansion of macro ‘evutil_socket_t’
+  306 | int evutil_ersatz_socketpair_(int, int , int, evutil_socket_t[]);
+      |                                               ^~~~~~~~~~~~~~~
+  CC       evutil_rand.lo
+evutil_rand.c: In function ‘evutil_secure_rng_init’:
+evutil_rand.c:56:16: warning: ignoring return value of ‘arc4random’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+   56 |         (void) arc4random();
+      |                ^~~~~~~~~~~~
+  CC       evutil_time.lo
+  CC       listener.lo
+  CC       log.lo
+  CC       select.lo
+  CC       poll.lo
+  CC       epoll.lo
+  CC       signal.lo
+  CC       evdns.lo
+  CC       event_tagging.lo
+  CC       evrpc.lo
+  CC       http.lo
+  CCLD     libevent_core.la
+  CC       evthread_pthread.lo
+  CCLD     libevent_pthreads.la
+  CCLD     libevent.la
+  CCLD     libevent_extra.la
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791'
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791'
+Staging libevent...
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791'
+make[1]: warning: jobserver unavailable: using -j1.  Add '+' to parent make rule.
+make  install-am
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin'
+ /usr/bin/install -c event_rpcgen.py '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+ /bin/bash ./libtool   --mode=install /usr/bin/install -c   libevent.la libevent_core.la libevent_extra.la libevent_pthreads.la '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+libtool: install: /usr/bin/install -c .libs/libevent.lai /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent.la
+libtool: install: /usr/bin/install -c .libs/libevent_core.lai /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_core.la
+libtool: install: /usr/bin/install -c .libs/libevent_extra.lai /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_extra.la
+libtool: install: /usr/bin/install -c .libs/libevent_pthreads.lai /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_pthreads.la
+libtool: install: /usr/bin/install -c .libs/libevent.a /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent.a
+libtool: install: chmod 644 /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent.a
+libtool: install: ranlib /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent.a
+libtool: install: /usr/bin/install -c .libs/libevent_core.a /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_core.a
+libtool: install: chmod 644 /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_core.a
+libtool: install: ranlib /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_core.a
+libtool: install: /usr/bin/install -c .libs/libevent_extra.a /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_extra.a
+libtool: install: chmod 644 /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_extra.a
+libtool: install: ranlib /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_extra.a
+libtool: install: /usr/bin/install -c .libs/libevent_pthreads.a /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_pthreads.a
+libtool: install: chmod 644 /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_pthreads.a
+libtool: install: ranlib /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libevent_pthreads.a
+libtool: warning: remember to run 'libtool --finish /home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include'
+ /usr/bin/install -c -m 644 include/evdns.h include/event.h include/evhttp.h include/evrpc.h include/evutil.h '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/event2'
+ /usr/bin/install -c -m 644 include/event2/buffer.h include/event2/buffer_compat.h include/event2/bufferevent.h include/event2/bufferevent_compat.h include/event2/bufferevent_struct.h include/event2/dns.h include/event2/dns_compat.h include/event2/dns_struct.h include/event2/event.h include/event2/event_compat.h include/event2/event_struct.h include/event2/http.h include/event2/http_compat.h include/event2/http_struct.h include/event2/keyvalq_struct.h include/event2/listener.h include/event2/rpc.h include/event2/rpc_compat.h include/event2/rpc_struct.h include/event2/tag.h include/event2/tag_compat.h include/event2/thread.h include/event2/util.h include/event2/visibility.h '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/event2'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/event2'
+ /usr/bin/install -c -m 644 include/event2/event-config.h '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/event2'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/pkgconfig'
+ /usr/bin/install -c -m 644 libevent.pc libevent_core.pc libevent_extra.pc libevent_pthreads.pc '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/pkgconfig'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791'
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791'
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libevent/2.1.12-stable-2b437e2b791'
+Postprocessing libevent...
+Caching libevent...
+Fetching libyubikey-1.13.tar.gz from https://developers.yubico.com/yubico-c/Releases
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  339k  100  339k    0     0  1092k      0 --:--:-- --:--:-- --:--:-- 1090k
+/home/runner/work/libdogecoin/libdogecoin/depends/work/download/libyubikey-1.13/libyubikey-1.13.tar.gz.temp: OK
+Extracting libyubikey...
+/home/runner/work/libdogecoin/libdogecoin/depends/sources/libyubikey-1.13.tar.gz: OK
+Preprocessing libyubikey...
+Configuring libyubikey...
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether build environment is sane... yes
+checking for x86_64-pc-linux-gnu-strip... no
+checking for strip... strip
+checking for a thread-safe mkdir -p... /usr/bin/mkdir -p
+checking for gawk... gawk
+checking whether make sets $(MAKE)... yes
+checking whether make supports nested variables... yes
+checking whether make supports nested variables... (cached) yes
+checking for x86_64-pc-linux-gnu-gcc... gcc -m64
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether we are using the GNU C compiler... yes
+checking whether gcc -m64 accepts -g... yes
+checking for gcc -m64 option to accept ISO C89... none needed
+checking whether gcc -m64 understands -c and -o together... yes
+checking for style of include used by make... GNU
+checking dependency style of gcc -m64... gcc3
+checking for x86_64-pc-linux-gnu-ar... ar
+checking the archiver (ar) interface... ar
+checking build system type... x86_64-unknown-linux-gnu
+checking host system type... x86_64-pc-linux-gnu
+checking how to print strings... printf
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by gcc -m64... /usr/bin/ld
+checking if the linker (/usr/bin/ld) is GNU ld... yes
+checking for BSD- or MS-compatible name lister (nm)... nm
+checking the name lister (nm) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... 3145728
+checking whether the shell understands some XSI constructs... yes
+checking whether the shell understands "+="... yes
+checking how to convert x86_64-unknown-linux-gnu file names to x86_64-pc-linux-gnu format... func_convert_file_noop
+checking how to convert x86_64-unknown-linux-gnu file names to toolchain format... func_convert_file_noop
+checking for /usr/bin/ld option to reload object files... -r
+checking for x86_64-pc-linux-gnu-objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for x86_64-pc-linux-gnu-dlltool... dlltool
+checking how to associate runtime and link libraries... printf %s\n
+checking for x86_64-pc-linux-gnu-ar... (cached) ar
+checking for archiver @FILE support... @
+checking for x86_64-pc-linux-gnu-strip... strip
+checking for x86_64-pc-linux-gnu-ranlib... ranlib
+checking command to parse nm output from gcc -m64 object... ok
+checking for sysroot... no
+checking for x86_64-pc-linux-gnu-mt... no
+checking for mt... mt
+checking if mt is a manifest tool... no
+checking how to run the C preprocessor... gcc -m64 -E
+checking for ANSI C header files... yes
+checking for sys/types.h... yes
+checking for sys/stat.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for memory.h... yes
+checking for strings.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for unistd.h... yes
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if gcc -m64 supports -fno-rtti -fno-exceptions... no
+checking for gcc -m64 option to produce PIC... -fPIC -DPIC
+checking if gcc -m64 PIC flag -fPIC -DPIC works... yes
+checking if gcc -m64 static flag -static works... yes
+checking if gcc -m64 supports -c -o file.o... yes
+checking if gcc -m64 supports -c -o file.o... (cached) yes
+checking whether the gcc -m64 linker (/usr/bin/ld -m elf_x86_64) supports shared libraries... yes
+checking dynamic linker characteristics... GNU/Linux ld.so
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... no
+checking whether to build static libraries... yes
+checking if LD -Wl,--version-script works... yes
+checking for valgrind... no
+checking whether self tests are run under valgrind... no
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating tests/Makefile
+config.status: executing depfiles commands
+config.status: executing libtool commands
+configure: summary of build options:
+
+  version:          1.13 shared 1:7:1 major  minor  patch  number 
+  Host type:        x86_64-pc-linux-gnu
+  Install prefix:   /home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu
+  Compiler:         gcc -m64
+  Compiler CFLAGS:  -fPIC
+  Warning flags:    
+  Library types:    Shared=no, Static=yes
+  Valgrind:         
+  Version script:   yes
+
+Building libyubikey...
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e'
+Making all in .
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e'
+  CC       yktoken.lo
+  CC       ykhex.lo
+  CC       ykcrc.lo
+  CC       ykaes.lo
+  CC       modhex.o
+  CC       ykparse.o
+  CC       ykgenerate.o
+  CCLD     libyubikey.la
+ar: `u' modifier ignored since `D' is the default (see `U')
+  CCLD     modhex
+  CCLD     ykparse
+  CCLD     ykgenerate
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e'
+Making all in tests
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/tests'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/tests'
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e'
+Staging libyubikey...
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e'
+make[1]: warning: jobserver unavailable: using -j1.  Add '+' to parent make rule.
+Making install in .
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+ /bin/bash ./libtool   --mode=install /usr/bin/install -c   libyubikey.la '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+libtool: install: /usr/bin/install -c .libs/libyubikey.lai /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libyubikey.la
+libtool: install: /usr/bin/install -c .libs/libyubikey.a /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libyubikey.a
+libtool: install: chmod 644 /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libyubikey.a
+libtool: install: ranlib /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libyubikey.a
+libtool: install: warning: remember to run `libtool --finish /home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin'
+  /bin/bash ./libtool   --mode=install /usr/bin/install -c modhex ykparse ykgenerate '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin'
+libtool: install: /usr/bin/install -c modhex /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin/modhex
+libtool: install: /usr/bin/install -c ykparse /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin/ykparse
+libtool: install: /usr/bin/install -c ykgenerate /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin/ykgenerate
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include'
+ /usr/bin/install -c -m 644 yubikey.h '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/share/man/man1'
+ /usr/bin/install -c -m 644 modhex.1 ykparse.1 ykgenerate.1 '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/share/man/man1'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e'
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e'
+Making install in tests
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/tests'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/tests'
+make[3]: Nothing to be done for 'install-exec-am'.
+make[3]: Nothing to be done for 'install-data-am'.
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/tests'
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e/tests'
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libyubikey/1.13-df149f8628e'
+Postprocessing libyubikey...
+Caching libyubikey...
+Fetching libusb-1.0.27.tar.bz2 from https://github.com/libusb/libusb/releases/download/v1.0.27
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100  628k  100  628k    0     0  3675k      0 --:--:-- --:--:-- --:--:-- 3675k
+/home/runner/work/libdogecoin/libdogecoin/depends/work/download/libusb-1.0.27/libusb-1.0.27.tar.bz2.temp: OK
+Extracting libusb...
+/home/runner/work/libdogecoin/libdogecoin/depends/sources/libusb-1.0.27.tar.bz2: OK
+Preprocessing libusb...
+Configuring libusb...
+checking for x86_64-pc-linux-gnu-gcc... gcc -m64
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether the compiler supports GNU C... yes
+checking whether gcc -m64 accepts -g... yes
+checking for gcc -m64 option to enable C11 features... none needed
+checking whether gcc -m64 understands -c and -o together... yes
+checking whether the compiler supports GNU C++... yes
+checking whether g++ -m64 accepts -g... yes
+checking for g++ -m64 option to enable C++11 features... none needed
+checking for inline... inline
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether build environment is sane... yes
+checking for a race-free mkdir -p... /usr/bin/mkdir -p
+checking for gawk... gawk
+checking whether make sets $(MAKE)... yes
+checking whether make supports the include directive... yes (GNU style)
+checking whether make supports nested variables... yes
+checking dependency style of gcc -m64... gcc3
+checking dependency style of g++ -m64... gcc3
+checking build system type... x86_64-pc-linux-gnu
+checking host system type... x86_64-pc-linux-gnu
+checking how to print strings... printf
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by gcc -m64... /usr/bin/ld
+checking if the linker (/usr/bin/ld) is GNU ld... yes
+checking for BSD- or MS-compatible name lister (nm)... nm
+checking the name lister (nm) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... 3145728
+checking how to convert x86_64-pc-linux-gnu file names to x86_64-pc-linux-gnu format... func_convert_file_noop
+checking how to convert x86_64-pc-linux-gnu file names to toolchain format... func_convert_file_noop
+checking for /usr/bin/ld option to reload object files... -r
+checking for x86_64-pc-linux-gnu-file... no
+checking for file... file
+checking for x86_64-pc-linux-gnu-objdump... no
+checking for objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for x86_64-pc-linux-gnu-dlltool... no
+checking for dlltool... no
+checking how to associate runtime and link libraries... printf %s\n
+checking for x86_64-pc-linux-gnu-ar... ar
+checking for archiver @FILE support... @
+checking for x86_64-pc-linux-gnu-strip... no
+checking for strip... strip
+checking for x86_64-pc-linux-gnu-ranlib... ranlib
+checking command to parse nm output from gcc -m64 object... ok
+checking for sysroot... no
+checking for a working dd... /usr/bin/dd
+checking how to truncate binary pipes... /usr/bin/dd bs=4096 count=1
+checking for x86_64-pc-linux-gnu-mt... no
+checking for mt... mt
+checking if mt is a manifest tool... no
+checking for stdio.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for strings.h... yes
+checking for sys/stat.h... yes
+checking for sys/types.h... yes
+checking for unistd.h... yes
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if gcc -m64 supports -fno-rtti -fno-exceptions... no
+checking for gcc -m64 option to produce PIC... -fPIC -DPIC
+checking if gcc -m64 PIC flag -fPIC -DPIC works... yes
+checking if gcc -m64 static flag -static works... yes
+checking if gcc -m64 supports -c -o file.o... yes
+checking if gcc -m64 supports -c -o file.o... (cached) yes
+checking whether the gcc -m64 linker (/usr/bin/ld -m elf_x86_64) supports shared libraries... yes
+checking dynamic linker characteristics... GNU/Linux ld.so
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... no
+checking whether to build static libraries... yes
+checking how to run the C++ preprocessor... g++ -m64 -E
+checking for ld used by g++ -m64... /usr/bin/ld -m elf_x86_64
+checking if the linker (/usr/bin/ld -m elf_x86_64) is GNU ld... yes
+checking whether the g++ -m64 linker (/usr/bin/ld -m elf_x86_64) supports shared libraries... yes
+checking for g++ -m64 option to produce PIC... -fPIC -DPIC
+checking if g++ -m64 PIC flag -fPIC -DPIC works... yes
+checking if g++ -m64 static flag -static works... yes
+checking if g++ -m64 supports -c -o file.o... yes
+checking if g++ -m64 supports -c -o file.o... (cached) yes
+checking whether the g++ -m64 linker (/usr/bin/ld -m elf_x86_64) supports shared libraries... yes
+checking dynamic linker characteristics... (cached) GNU/Linux ld.so
+checking how to hardcode library paths into programs... immediate
+checking for x86_64-pc-linux-gnu-windres... no
+checking for windres... no
+checking whether make supports nested variables... (cached) yes
+checking if gcc -m64 supports -std=gnu11... yes
+checking operating system... Linux
+checking for nfds_t... yes
+checking for pipe2... yes
+checking if gcc -m64 recognizes -pthread... yes
+checking for library containing pthread_create... none required
+checking whether __atomic_load_n is supported... yes
+checking for library containing clock_gettime... none required
+checking for pthread_setname_np... yes
+checking for asm/types.h... yes
+checking for linux/netlink.h... yes
+checking for sys/socket.h... yes
+checking for sys/time.h... yes
+checking for clock_gettime... yes
+checking for gcc -m64 options needed to detect all undeclared functions... none needed
+checking whether CLOCK_MONOTONIC is declared... yes
+checking for pthread_condattr_setclock... yes
+checking for sys/eventfd.h... yes
+checking whether EFD_NONBLOCK is declared... yes
+checking whether EFD_CLOEXEC is declared... yes
+checking for eventfd... yes
+checking whether to use eventfd for signalling... yes
+checking for sys/timerfd.h... yes
+checking whether TFD_NONBLOCK is declared... yes
+checking whether TFD_CLOEXEC is declared... yes
+checking for timerfd_create... yes
+checking whether to use timerfd for timing... yes
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating libusb-1.0.pc
+config.status: creating Makefile
+config.status: creating libusb/Makefile
+config.status: creating examples/Makefile
+config.status: creating tests/Makefile
+config.status: creating doc/Makefile
+config.status: creating doc/doxygen.cfg
+config.status: creating config.h
+config.status: executing depfiles commands
+config.status: executing libtool commands
+Building libusb...
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+make  all-recursive
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+Making all in libusb
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/libusb'
+  CC       core.lo
+  CC       descriptor.lo
+  CC       hotplug.lo
+  CC       io.lo
+  CC       strerror.lo
+  CC       sync.lo
+  CC       os/events_posix.lo
+  CC       os/threads_posix.lo
+  CC       os/linux_usbfs.lo
+  CC       os/linux_netlink.lo
+  CCLD     libusb-1.0.la
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/libusb'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+Staging libusb...
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+make[1]: warning: jobserver unavailable: using -j1.  Add '+' to parent make rule.
+Making install in libusb
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/libusb'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/libusb'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+ /bin/bash ../libtool   --mode=install /usr/bin/install -c   libusb-1.0.la '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+libtool: install: /usr/bin/install -c .libs/libusb-1.0.lai /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libusb-1.0.la
+libtool: install: /usr/bin/install -c .libs/libusb-1.0.a /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libusb-1.0.a
+libtool: install: chmod 644 /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libusb-1.0.a
+libtool: install: ranlib /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libusb-1.0.a
+libtool: warning: remember to run 'libtool --finish /home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/libusb-1.0'
+ /usr/bin/install -c -m 644 libusb.h '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/libusb-1.0'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/libusb'
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/libusb'
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+make[3]: Nothing to be done for 'install-exec-am'.
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/pkgconfig'
+ /usr/bin/install -c -m 644 libusb-1.0.pc '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/pkgconfig'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/libusb/1.0.27-6579e120418'
+Postprocessing libusb...
+Caching libusb...
+Fetching ykpers-1.20.0.tar.gz from https://developers.yubico.com/yubikey-personalization/Releases
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  510k  100  510k    0     0  2484k      0 --:--:-- --:--:-- --:--:-- 2492k
+/home/runner/work/libdogecoin/libdogecoin/depends/work/download/ykpers-1.20.0/ykpers-1.20.0.tar.gz.temp: OK
+Extracting ykpers...
+/home/runner/work/libdogecoin/libdogecoin/depends/sources/ykpers-1.20.0.tar.gz: OK
+Preprocessing ykpers...
+patching file ykpers-args.h
+Configuring ykpers...
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether build environment is sane... yes
+checking for x86_64-pc-linux-gnu-strip... no
+checking for strip... strip
+checking for a thread-safe mkdir -p... /usr/bin/mkdir -p
+checking for gawk... gawk
+checking whether make sets $(MAKE)... yes
+checking whether make supports nested variables... yes
+checking whether make supports nested variables... (cached) yes
+checking for x86_64-pc-linux-gnu-gcc... gcc -m64
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether we are using the GNU C compiler... yes
+checking whether gcc -m64 accepts -g... yes
+checking for gcc -m64 option to accept ISO C89... none needed
+checking whether gcc -m64 understands -c and -o together... yes
+checking for style of include used by make... GNU
+checking dependency style of gcc -m64... gcc3
+checking build system type... x86_64-unknown-linux-gnu
+checking host system type... x86_64-pc-linux-gnu
+checking for the pthreads library -lpthreads... no
+checking whether pthreads work without any flags... yes
+checking for joinable pthread attribute... PTHREAD_CREATE_JOINABLE
+checking if more special flags are required for pthreads... no
+checking for x86_64-pc-linux-gnu-ar... ar
+checking the archiver (ar) interface... ar
+checking how to print strings... printf
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by gcc -m64... /usr/bin/ld
+checking if the linker (/usr/bin/ld) is GNU ld... yes
+checking for BSD- or MS-compatible name lister (nm)... nm
+checking the name lister (nm) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... 3145728
+checking whether the shell understands some XSI constructs... yes
+checking whether the shell understands "+="... yes
+checking how to convert x86_64-unknown-linux-gnu file names to x86_64-pc-linux-gnu format... func_convert_file_noop
+checking how to convert x86_64-unknown-linux-gnu file names to toolchain format... func_convert_file_noop
+checking for /usr/bin/ld option to reload object files... -r
+checking for x86_64-pc-linux-gnu-objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for x86_64-pc-linux-gnu-dlltool... dlltool
+checking how to associate runtime and link libraries... printf %s\n
+checking for x86_64-pc-linux-gnu-ar... (cached) ar
+checking for archiver @FILE support... @
+checking for x86_64-pc-linux-gnu-strip... strip
+checking for x86_64-pc-linux-gnu-ranlib... ranlib
+checking command to parse nm output from gcc -m64 object... ok
+checking for sysroot... no
+checking for x86_64-pc-linux-gnu-mt... no
+checking for mt... mt
+checking if mt is a manifest tool... no
+checking how to run the C preprocessor... gcc -m64 -E
+checking for ANSI C header files... yes
+checking for sys/types.h... yes
+checking for sys/stat.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for memory.h... yes
+checking for strings.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for unistd.h... yes
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if gcc -m64 supports -fno-rtti -fno-exceptions... no
+checking for gcc -m64 option to produce PIC... -fPIC -DPIC
+checking if gcc -m64 PIC flag -fPIC -DPIC works... yes
+checking if gcc -m64 static flag -static works... yes
+checking if gcc -m64 supports -c -o file.o... yes
+checking if gcc -m64 supports -c -o file.o... (cached) yes
+checking whether the gcc -m64 linker (/usr/bin/ld -m elf_x86_64) supports shared libraries... yes
+checking dynamic linker characteristics... GNU/Linux ld.so
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... no
+checking whether to build static libraries... yes
+checking for x86_64-pc-linux-gnu-pkg-config... no
+checking for pkg-config... /usr/bin/pkg-config
+checking pkg-config is at least version 0.9.0... yes
+checking for ld used by GCC... /usr/bin/ld -m elf_x86_64
+checking if the linker (/usr/bin/ld -m elf_x86_64) is GNU ld... yes
+checking for shared library run path origin... done
+checking for libyubikey... yes
+checking how to link with libyubikey... /home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libyubikey.a
+checking for LIBUSB... yes
+checking for libjson... no
+checking for libjson... no
+checking whether to use json library... no
+checking for json_object_to_json_string_ext... no
+checking for json_object_object_get_ex... no
+checking for memset_s... no
+checking for explicit_bzero... yes
+checking for explicit_memset... no
+checking whether we can use inline asm code... yes
+no
+checking if LD -Wl,--version-script works... yes
+checking for valgrind... no
+checking whether self tests are run under valgrind... no
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating ykpers-1.pc
+config.status: creating ykpers-version.h
+config.status: creating ykcore/Makefile
+config.status: creating tests/Makefile
+config.status: executing depfiles commands
+config.status: executing libtool commands
+configure: summary of build options:
+
+  version:           1.20.0 shared 21:0:20 major 1 minor 20 patch 0 number 0x011400
+  Host type:         x86_64-pc-linux-gnu
+  Install prefix:    /home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu
+  Compiler:          gcc -m64
+  Library types:     Shared=no, Static=yes
+  USB backend:       libusb-1.0
+  JSON library:      no
+    CFLAGS:          
+    LIBS:            
+    pretty printing: no
+  udev rules dir:    N/A
+  udev rules file:   N/A
+
+Building ykpers...
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f'
+Making all in ykcore
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/ykcore'
+  CC       ykcore.lo
+  CC       ykstatus.lo
+  CC       ykcore_libusb-1.0.lo
+  CCLD     libykcore.la
+ar: `u' modifier ignored since `D' is the default (see `U')
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/ykcore'
+Making all in .
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f'
+  CC       ykpers.lo
+  CC       ykpers-version.lo
+  CC       ykpbkdf2.lo
+  CC       ykpers-nojson.lo
+  CC       ykpers_lcl.lo
+  CC       libhmac_la-hmac.lo
+  CC       libhmac_la-usha.lo
+  CC       libhmac_la-sha1.lo
+  CC       libhmac_la-sha224-256.lo
+  CC       libhmac_la-sha384-512.lo
+  CC       ykpers-args.lo
+  CC       ykpersonalize.o
+  CC       ykchalresp.o
+  CC       ykinfo.o
+  CCLD     libhmac.la
+ar: `u' modifier ignored since `D' is the default (see `U')
+  CCLD     libykpers-1.la
+ar: `u' modifier ignored since `D' is the default (see `U')
+  CCLD     libykpers_args.la
+  CCLD     ykchalresp
+ar: `u' modifier ignored since `D' is the default (see `U')
+  CCLD     ykinfo
+  CCLD     ykpersonalize
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f'
+Making all in tests
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/tests'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/tests'
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f'
+Staging ykpers...
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f'
+make[1]: warning: jobserver unavailable: using -j1.  Add '+' to parent make rule.
+Making install in ykcore
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/ykcore'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/ykcore'
+make[3]: Nothing to be done for 'install-exec-am'.
+make[3]: Nothing to be done for 'install-data-am'.
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/ykcore'
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/ykcore'
+Making install in .
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+ /bin/bash ./libtool   --mode=install /usr/bin/install -c   libykpers-1.la '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+libtool: install: /usr/bin/install -c .libs/libykpers-1.lai /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libykpers-1.la
+libtool: install: /usr/bin/install -c .libs/libykpers-1.a /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libykpers-1.a
+libtool: install: chmod 644 /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libykpers-1.a
+libtool: install: ranlib /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/libykpers-1.a
+libtool: install: warning: remember to run `libtool --finish /home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin'
+  /bin/bash ./libtool   --mode=install /usr/bin/install -c ykpersonalize ykchalresp ykinfo '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin'
+libtool: install: /usr/bin/install -c ykpersonalize /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin/ykpersonalize
+libtool: install: /usr/bin/install -c ykchalresp /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin/ykchalresp
+libtool: install: /usr/bin/install -c ykinfo /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/bin/ykinfo
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/share/man/man1'
+ /usr/bin/install -c -m 644 ykpersonalize.1 ykchalresp.1 ykinfo.1 '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/share/man/man1'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/pkgconfig'
+ /usr/bin/install -c -m 644 ykpers-1.pc '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/pkgconfig'
+ /usr/bin/mkdir -p '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/ykpers-1'
+ /usr/bin/install -c -m 644 ykpers.h ykpers-version.h ykcore/ykstatus.h ykcore/ykcore.h ykcore/ykdef.h ykpbkdf2.h '/home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/ykpers-1'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f'
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f'
+Making install in tests
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/tests'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/tests'
+make[3]: Nothing to be done for 'install-exec-am'.
+make[3]: Nothing to be done for 'install-data-am'.
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/tests'
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f/tests'
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/ykpers/1.20.0-6a73c77510f'
+Postprocessing ykpers...
+Caching ykpers...
+Fetching v0.0.1.tar.gz from https://github.com/edtubbs/liboqs/archive/refs/tags
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100 13170    0 13170    0     0  37746      0 --:--:-- --:--:-- --:--:-- 37746100 6705k    0 6705k    0     0  5182k      0 --:--:--  0:00:01 --:--:-- 7081k100 8899k    0 8899k    0     0  5742k      0 --:--:--  0:00:01 --:--:-- 7405k
+/home/runner/work/libdogecoin/libdogecoin/depends/work/download/liboqs-v0.0.1/v0.0.1.tar.gz.temp: OK
+Extracting liboqs...
+/home/runner/work/libdogecoin/libdogecoin/depends/sources/v0.0.1.tar.gz: OK
+Preprocessing liboqs...
+Configuring liboqs...
+Building liboqs...
+-- The C compiler identification is GNU 13.3.0
+-- The ASM compiler identification is GNU
+-- Found assembler: /usr/bin/cc
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Performing Test CC_SUPPORTS_WA_NOEXECSTACK
+-- Performing Test CC_SUPPORTS_WA_NOEXECSTACK - Success
+-- Performing Test LD_SUPPORTS_WL_Z_NOEXECSTACK
+-- Performing Test LD_SUPPORTS_WL_Z_NOEXECSTACK - Success
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Algorithms filtered for SIG_falcon_512;SIG_falcon_1024;SIG_ml_dsa_44;SIG_ml_dsa_65;SIG_ml_dsa_87;SIG_sphincs_shake_128s_simple;SIG_sphincs_shake_128f_simple;SIG_raccoon_g_44
+-- Looking for getentropy
+-- Looking for getentropy - found
+-- Looking for getentropy
+-- Looking for getentropy - found
+-- Looking for aligned_alloc
+-- Looking for aligned_alloc - found
+-- Looking for posix_memalign
+-- Looking for posix_memalign - found
+-- Looking for memalign
+-- Looking for memalign - found
+-- Looking for explicit_bzero
+-- Looking for explicit_bzero - found
+-- Looking for explicit_memset
+-- Looking for explicit_memset - not found
+-- Looking for memset_s
+-- Looking for memset_s - not found
+-- Configuring done (1.3s)
+-- Generating done (0.1s)
+-- Build files have been written to: /home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[  1%] Building C object src/sig/raccoong/CMakeFiles/raccoong_44_ref.dir/sig_raccoong_44.c.o
+[  1%] Building C object src/common/CMakeFiles/common.dir/aes/aes_impl.c.o
+[  1%] Building C object src/sig/raccoong/CMakeFiles/raccoong_44_ref.dir/raccoong.c.o
+[  2%] Building C object src/common/CMakeFiles/common.dir/aes/aes_c.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[  2%] Built target raccoong_44_ref
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[  2%] Building C object src/common/sha3/xkcp_low/CMakeFiles/xkcp_low_keccakp_1600_plain64.dir/KeccakP-1600/plain-64bits/KeccakP-1600-opt64.c.o
+[  2%] Building C object src/common/CMakeFiles/common.dir/aes/aes128_ni.c.o
+[  3%] Building C object src/common/CMakeFiles/common.dir/aes/aes256_ni.c.o
+[  3%] Building C object src/common/CMakeFiles/common.dir/aes/aes.c.o
+[  4%] Building C object src/common/CMakeFiles/common.dir/sha2/sha2_impl.c.o
+[  4%] Building C object src/common/CMakeFiles/common.dir/sha2/sha2_c.c.o
+[  5%] Building C object src/common/CMakeFiles/common.dir/sha2/sha2.c.o
+[  5%] Building C object src/common/CMakeFiles/common.dir/sha3/xkcp_sha3.c.o
+[  6%] Building C object src/common/CMakeFiles/common.dir/sha3/xkcp_sha3x4.c.o
+[  6%] Building C object src/common/CMakeFiles/common.dir/sha3/avx512vl_sha3.c.o
+[  7%] Building C object src/common/CMakeFiles/common.dir/sha3/avx512vl_sha3x4.c.o
+[  7%] Building C object src/common/CMakeFiles/common.dir/sha3/sha3.c.o
+[  8%] Building C object src/common/CMakeFiles/common.dir/sha3/sha3x4.c.o
+[  8%] Building C object src/common/CMakeFiles/common.dir/common.c.o
+[  9%] Building C object src/common/CMakeFiles/common.dir/pqclean_shims/fips202.c.o
+[  9%] Building C object src/common/CMakeFiles/common.dir/pqclean_shims/fips202x4.c.o
+[ 10%] Building C object src/common/CMakeFiles/common.dir/rand/rand.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 10%] Built target common
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 11%] Building C object src/common/sha3/xkcp_low/CMakeFiles/xkcp_low_keccakp_1600times4_serial.dir/KeccakP-1600times4/serial/KeccakP-1600-times4-on1.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 11%] Built target xkcp_low_keccakp_1600times4_serial
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 12%] Building ASM object src/common/sha3/xkcp_low/CMakeFiles/xkcp_low_keccakp_1600_avx2.dir/KeccakP-1600/avx2/KeccakP-1600-AVX2.S.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 12%] Built target xkcp_low_keccakp_1600_plain64
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 13%] Building C object src/common/sha3/xkcp_low/CMakeFiles/xkcp_low_keccakp_1600times4_avx2.dir/KeccakP-1600times4/avx2/KeccakP-1600-times4-SIMD256.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 13%] Built target xkcp_low_keccakp_1600_avx2
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 14%] Building ASM object src/common/sha3/avx512vl_low/CMakeFiles/sha3_avx512vl_low.dir/KeccakP-1600-AVX512VL.S.o
+[ 14%] Building ASM object src/common/sha3/avx512vl_low/CMakeFiles/sha3_avx512vl_low.dir/SHA3-AVX512VL.S.o
+[ 15%] Building ASM object src/common/sha3/avx512vl_low/CMakeFiles/sha3_avx512vl_low.dir/KeccakP-1600-times4-AVX512VL.S.o
+[ 15%] Building ASM object src/common/sha3/avx512vl_low/CMakeFiles/sha3_avx512vl_low.dir/SHA3-times4-AVX512VL.S.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 15%] Built target sha3_avx512vl_low
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 16%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_ref.dir/sig_ml_dsa_44.c.o
+[ 16%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_ref.dir/mldsa-native_ml-dsa-44_ref/mldsa/src/ct.c.o
+[ 17%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_ref.dir/mldsa-native_ml-dsa-44_ref/mldsa/src/debug.c.o
+[ 17%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_ref.dir/mldsa-native_ml-dsa-44_ref/mldsa/src/packing.c.o
+[ 18%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_ref.dir/mldsa-native_ml-dsa-44_ref/mldsa/src/poly.c.o
+[ 18%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_ref.dir/mldsa-native_ml-dsa-44_ref/mldsa/src/poly_kl.c.o
+[ 19%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_ref.dir/mldsa-native_ml-dsa-44_ref/mldsa/src/polyvec.c.o
+[ 19%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_ref.dir/mldsa-native_ml-dsa-44_ref/mldsa/src/sign.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 19%] Built target ml_dsa_44_ref
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 20%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/ct.c.o
+[ 20%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/debug.c.o
+[ 21%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/consts.c.o
+[ 21%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/intt.S.o
+[ 22%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/ntt.S.o
+[ 22%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/nttunpack.S.o
+[ 23%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/pointwise.S.o
+[ 23%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/pointwise_acc_l4.S.o
+[ 24%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/pointwise_acc_l5.S.o
+[ 24%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/pointwise_acc_l7.S.o
+[ 25%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/poly_caddq_avx2.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 25%] Built target xkcp_low_keccakp_1600times4_avx2
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 26%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_ref.dir/sig_ml_dsa_65.c.o
+[ 26%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/poly_chknorm_avx2.c.o
+[ 26%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_ref.dir/mldsa-native_ml-dsa-65_ref/mldsa/src/ct.c.o
+[ 27%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_ref.dir/mldsa-native_ml-dsa-65_ref/mldsa/src/debug.c.o
+[ 27%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_ref.dir/mldsa-native_ml-dsa-65_ref/mldsa/src/packing.c.o
+[ 28%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_ref.dir/mldsa-native_ml-dsa-65_ref/mldsa/src/poly.c.o
+[ 29%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/poly_decompose_32_avx2.c.o
+[ 29%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/poly_decompose_88_avx2.c.o
+[ 29%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_ref.dir/mldsa-native_ml-dsa-65_ref/mldsa/src/poly_kl.c.o
+[ 30%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/poly_use_hint_32_avx2.c.o
+[ 31%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_ref.dir/mldsa-native_ml-dsa-65_ref/mldsa/src/polyvec.c.o
+[ 32%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/poly_use_hint_88_avx2.c.o
+[ 32%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_ref.dir/mldsa-native_ml-dsa-65_ref/mldsa/src/sign.c.o
+[ 32%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/polyz_unpack_17_avx2.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 32%] Built target ml_dsa_65_ref
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 33%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/ct.c.o
+[ 33%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/debug.c.o
+[ 34%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/consts.c.o
+[ 34%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/intt.S.o
+[ 35%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/polyz_unpack_19_avx2.c.o
+[ 36%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/ntt.S.o
+[ 37%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/nttunpack.S.o
+[ 37%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/pointwise.S.o
+[ 38%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/pointwise_acc_l4.S.o
+[ 38%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/pointwise_acc_l5.S.o
+[ 39%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/pointwise_acc_l7.S.o
+[ 39%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/poly_caddq_avx2.c.o
+[ 39%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/rej_uniform_avx2.c.o
+[ 40%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/poly_chknorm_avx2.c.o
+[ 41%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/rej_uniform_eta2_avx2.c.o
+[ 41%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/poly_decompose_32_avx2.c.o
+[ 41%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/rej_uniform_eta4_avx2.c.o
+[ 42%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/poly_decompose_88_avx2.c.o
+[ 43%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/native/x86_64/src/rej_uniform_table.c.o
+[ 43%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/packing.c.o
+[ 43%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/poly_use_hint_32_avx2.c.o
+[ 44%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/poly.c.o
+[ 45%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/poly_use_hint_88_avx2.c.o
+[ 45%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/poly_kl.c.o
+[ 45%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/polyz_unpack_17_avx2.c.o
+[ 46%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/polyz_unpack_19_avx2.c.o
+[ 46%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/rej_uniform_avx2.c.o
+[ 47%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/polyvec.c.o
+[ 47%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_44_x86_64.dir/mldsa-native_ml-dsa-44_x86_64/mldsa/src/sign.c.o
+[ 48%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/rej_uniform_eta2_avx2.c.o
+[ 48%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/rej_uniform_eta4_avx2.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 48%] Built target ml_dsa_44_x86_64
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 49%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_ref.dir/sig_ml_dsa_87.c.o
+[ 50%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_ref.dir/mldsa-native_ml-dsa-87_ref/mldsa/src/ct.c.o
+[ 50%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_ref.dir/mldsa-native_ml-dsa-87_ref/mldsa/src/debug.c.o
+[ 51%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_ref.dir/mldsa-native_ml-dsa-87_ref/mldsa/src/packing.c.o
+[ 51%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_ref.dir/mldsa-native_ml-dsa-87_ref/mldsa/src/poly.c.o
+[ 52%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/native/x86_64/src/rej_uniform_table.c.o
+[ 52%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/packing.c.o
+[ 53%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/poly.c.o
+[ 54%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_ref.dir/mldsa-native_ml-dsa-87_ref/mldsa/src/poly_kl.c.o
+[ 54%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/poly_kl.c.o
+[ 54%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_ref.dir/mldsa-native_ml-dsa-87_ref/mldsa/src/polyvec.c.o
+[ 55%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_ref.dir/mldsa-native_ml-dsa-87_ref/mldsa/src/sign.c.o
+[ 56%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/polyvec.c.o
+[ 56%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_65_x86_64.dir/mldsa-native_ml-dsa-65_x86_64/mldsa/src/sign.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 56%] Built target ml_dsa_87_ref
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 56%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/ct.c.o
+[ 57%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/debug.c.o
+[ 57%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/consts.c.o
+[ 58%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/intt.S.o
+[ 58%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/ntt.S.o
+[ 59%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/nttunpack.S.o
+[ 59%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/pointwise.S.o
+[ 60%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/pointwise_acc_l4.S.o
+[ 60%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/pointwise_acc_l5.S.o
+[ 61%] Building ASM object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/pointwise_acc_l7.S.o
+[ 61%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/poly_caddq_avx2.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 61%] Built target ml_dsa_65_x86_64
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 62%] Building C object src/sig/falcon/CMakeFiles/falcon_512_clean.dir/sig_falcon_512.c.o
+[ 63%] Building C object src/sig/falcon/CMakeFiles/falcon_512_clean.dir/pqclean_falcon-512_clean/codec.c.o
+[ 63%] Building C object src/sig/falcon/CMakeFiles/falcon_512_clean.dir/pqclean_falcon-512_clean/common.c.o
+[ 64%] Building C object src/sig/falcon/CMakeFiles/falcon_512_clean.dir/pqclean_falcon-512_clean/fft.c.o
+[ 65%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/poly_chknorm_avx2.c.o
+[ 65%] Building C object src/sig/falcon/CMakeFiles/falcon_512_clean.dir/pqclean_falcon-512_clean/fpr.c.o
+[ 66%] Building C object src/sig/falcon/CMakeFiles/falcon_512_clean.dir/pqclean_falcon-512_clean/keygen.c.o
+[ 66%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/poly_decompose_32_avx2.c.o
+[ 67%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/poly_decompose_88_avx2.c.o
+[ 67%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/poly_use_hint_32_avx2.c.o
+[ 68%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/poly_use_hint_88_avx2.c.o
+[ 68%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/polyz_unpack_17_avx2.c.o
+[ 68%] Building C object src/sig/falcon/CMakeFiles/falcon_512_clean.dir/pqclean_falcon-512_clean/pqclean.c.o
+[ 69%] Building C object src/sig/falcon/CMakeFiles/falcon_512_clean.dir/pqclean_falcon-512_clean/rng.c.o
+[ 69%] Building C object src/sig/falcon/CMakeFiles/falcon_512_clean.dir/pqclean_falcon-512_clean/sign.c.o
+[ 70%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/polyz_unpack_19_avx2.c.o
+[ 71%] Building C object src/sig/falcon/CMakeFiles/falcon_512_clean.dir/pqclean_falcon-512_clean/vrfy.c.o
+[ 72%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/rej_uniform_avx2.c.o
+[ 72%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/rej_uniform_eta2_avx2.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 72%] Built target falcon_512_clean
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 72%] Building C object src/sig/falcon/CMakeFiles/falcon_512_avx2.dir/pqclean_falcon-512_avx2/codec.c.o
+[ 73%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/rej_uniform_eta4_avx2.c.o
+[ 74%] Building C object src/sig/falcon/CMakeFiles/falcon_512_avx2.dir/pqclean_falcon-512_avx2/common.c.o
+[ 74%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/native/x86_64/src/rej_uniform_table.c.o
+[ 75%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/packing.c.o
+[ 75%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/poly.c.o
+[ 75%] Building C object src/sig/falcon/CMakeFiles/falcon_512_avx2.dir/pqclean_falcon-512_avx2/fft.c.o
+[ 76%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/poly_kl.c.o
+[ 77%] Building C object src/sig/falcon/CMakeFiles/falcon_512_avx2.dir/pqclean_falcon-512_avx2/fpr.c.o
+[ 77%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/polyvec.c.o
+[ 77%] Building C object src/sig/falcon/CMakeFiles/falcon_512_avx2.dir/pqclean_falcon-512_avx2/keygen.c.o
+[ 78%] Building C object src/sig/ml_dsa/CMakeFiles/ml_dsa_87_x86_64.dir/mldsa-native_ml-dsa-87_x86_64/mldsa/src/sign.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 78%] Built target ml_dsa_87_x86_64
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 78%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_clean.dir/sig_falcon_1024.c.o
+[ 79%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_clean.dir/pqclean_falcon-1024_clean/codec.c.o
+[ 79%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_clean.dir/pqclean_falcon-1024_clean/common.c.o
+[ 80%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_clean.dir/pqclean_falcon-1024_clean/fft.c.o
+[ 80%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_clean.dir/pqclean_falcon-1024_clean/fpr.c.o
+[ 81%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_clean.dir/pqclean_falcon-1024_clean/keygen.c.o
+[ 81%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_clean.dir/pqclean_falcon-1024_clean/pqclean.c.o
+[ 82%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_clean.dir/pqclean_falcon-1024_clean/rng.c.o
+[ 83%] Building C object src/sig/falcon/CMakeFiles/falcon_512_avx2.dir/pqclean_falcon-512_avx2/pqclean.c.o
+[ 83%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_clean.dir/pqclean_falcon-1024_clean/sign.c.o
+[ 84%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_clean.dir/pqclean_falcon-1024_clean/vrfy.c.o
+[ 84%] Building C object src/sig/falcon/CMakeFiles/falcon_512_avx2.dir/pqclean_falcon-512_avx2/rng.c.o
+[ 85%] Building C object src/sig/falcon/CMakeFiles/falcon_512_avx2.dir/pqclean_falcon-512_avx2/sign.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 85%] Built target falcon_1024_clean
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 85%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_avx2.dir/pqclean_falcon-1024_avx2/codec.c.o
+[ 86%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_avx2.dir/pqclean_falcon-1024_avx2/common.c.o
+[ 86%] Building C object src/sig/falcon/CMakeFiles/falcon_512_avx2.dir/pqclean_falcon-512_avx2/vrfy.c.o
+[ 86%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_avx2.dir/pqclean_falcon-1024_avx2/fft.c.o
+[ 87%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_avx2.dir/pqclean_falcon-1024_avx2/fpr.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 87%] Built target falcon_512_avx2
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 87%] Building C object src/common/CMakeFiles/internal.dir/aes/aes_impl.c.o
+[ 88%] Building C object src/common/CMakeFiles/internal.dir/aes/aes_c.c.o
+[ 88%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_avx2.dir/pqclean_falcon-1024_avx2/keygen.c.o
+[ 88%] Building C object src/common/CMakeFiles/internal.dir/aes/aes128_ni.c.o
+[ 89%] Building C object src/common/CMakeFiles/internal.dir/aes/aes256_ni.c.o
+[ 89%] Building C object src/common/CMakeFiles/internal.dir/aes/aes.c.o
+[ 90%] Building C object src/common/CMakeFiles/internal.dir/sha2/sha2_impl.c.o
+[ 90%] Building C object src/common/CMakeFiles/internal.dir/sha2/sha2_c.c.o
+[ 91%] Building C object src/common/CMakeFiles/internal.dir/sha2/sha2.c.o
+[ 91%] Building C object src/common/CMakeFiles/internal.dir/sha3/xkcp_sha3.c.o
+[ 92%] Building C object src/common/CMakeFiles/internal.dir/sha3/xkcp_sha3x4.c.o
+[ 92%] Building C object src/common/CMakeFiles/internal.dir/sha3/avx512vl_sha3.c.o
+[ 93%] Building C object src/common/CMakeFiles/internal.dir/sha3/avx512vl_sha3x4.c.o
+[ 93%] Building C object src/common/CMakeFiles/internal.dir/sha3/sha3.c.o
+[ 94%] Building C object src/common/CMakeFiles/internal.dir/sha3/sha3x4.c.o
+[ 94%] Building C object src/common/CMakeFiles/internal.dir/common.c.o
+[ 95%] Building C object src/common/CMakeFiles/internal.dir/rand/rand_nist.c.o
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 95%] Built target internal
+[ 96%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_avx2.dir/pqclean_falcon-1024_avx2/pqclean.c.o
+[ 97%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_avx2.dir/pqclean_falcon-1024_avx2/rng.c.o
+[ 97%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_avx2.dir/pqclean_falcon-1024_avx2/sign.c.o
+[ 98%] Building C object src/sig/falcon/CMakeFiles/falcon_1024_avx2.dir/pqclean_falcon-1024_avx2/vrfy.c.o
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 98%] Linking C static library ../lib/liboqs-internal.a
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 98%] Built target oqs-internal
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 98%] Built target falcon_1024_avx2
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 98%] Building C object src/CMakeFiles/oqs.dir/kem/kem.c.o
+[ 99%] Building C object src/CMakeFiles/oqs.dir/sig/sig.c.o
+[ 99%] Building C object src/CMakeFiles/oqs.dir/sig_stfl/sig_stfl.c.o
+[100%] Linking C static library ../lib/liboqs.a
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[100%] Built target oqs
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+Staging liboqs...
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[1]: warning: jobserver unavailable: using -j1.  Add '+' to parent make rule.
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[  1%] Built target raccoong_44_ref
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 10%] Built target common
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 10%] Built target xkcp_low_keccakp_1600_plain64
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 11%] Built target xkcp_low_keccakp_1600times4_serial
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 12%] Built target xkcp_low_keccakp_1600_avx2
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 13%] Built target xkcp_low_keccakp_1600times4_avx2
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 15%] Built target sha3_avx512vl_low
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 19%] Built target ml_dsa_44_ref
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 33%] Built target ml_dsa_44_x86_64
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 37%] Built target ml_dsa_65_ref
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 51%] Built target ml_dsa_65_x86_64
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 56%] Built target ml_dsa_87_ref
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 70%] Built target ml_dsa_87_x86_64
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 76%] Built target falcon_512_clean
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 80%] Built target falcon_512_avx2
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 85%] Built target falcon_1024_clean
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 90%] Built target falcon_1024_avx2
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[ 92%] Built target oqs
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[100%] Built target internal
+make[3]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+make[3]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+[100%] Built target oqs-internal
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+Install the project...
+-- Install configuration: ""
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/cmake/liboqs/liboqsConfig.cmake
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/cmake/liboqs/liboqsConfigVersion.cmake
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/pkgconfig/liboqs.pc
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/liboqs.a
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/cmake/liboqs/liboqsTargets.cmake
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib/cmake/liboqs/liboqsTargets-noconfig.cmake
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/oqs.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/aes_ops.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/common.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/rand.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/sha2_ops.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/sha3_ops.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/sha3x4_ops.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/kem.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/sig.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/sig_stfl.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/sig_ml_dsa.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/sig_falcon.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/sig_raccoong.h
+-- Installing: /home/runner/work/libdogecoin/libdogecoin/depends/work/staging/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include/oqs/oqsconfig.h
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends/work/build/x86_64-pc-linux-gnu/liboqs/v0.0.1-093f6acf6fd/build'
+Postprocessing liboqs...
+Caching liboqs...
+copying packages: native_ccache libevent libyubikey libusb ykpers liboqs
+to: /home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu
+make: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/depends'
+libtoolize: putting auxiliary files in AC_CONFIG_AUX_DIR, 'build-aux'.
+libtoolize: copying file 'build-aux/ltmain.sh'
+libtoolize: putting macros in AC_CONFIG_MACRO_DIRS, 'build-aux/m4'.
+libtoolize: copying file 'build-aux/m4/libtool.m4'
+libtoolize: copying file 'build-aux/m4/ltoptions.m4'
+libtoolize: copying file 'build-aux/m4/ltsugar.m4'
+libtoolize: copying file 'build-aux/m4/ltversion.m4'
+libtoolize: copying file 'build-aux/m4/lt~obsolete.m4'
+configure.ac:30: installing 'build-aux/compile'
+configure.ac:24: installing 'build-aux/config.guess'
+configure.ac:24: installing 'build-aux/config.sub'
+configure.ac:28: installing 'build-aux/install-sh'
+configure.ac:28: installing 'build-aux/missing'
+Makefile.am: installing 'build-aux/depcomp'
+parallel-tests: installing 'build-aux/test-driver'
+libtoolize: putting auxiliary files in AC_CONFIG_AUX_DIR, 'build-aux'.
+libtoolize: copying file 'build-aux/ltmain.sh'
+libtoolize: putting macros in AC_CONFIG_MACRO_DIRS, 'build-aux/m4'.
+libtoolize: copying file 'build-aux/m4/libtool.m4'
+libtoolize: copying file 'build-aux/m4/ltoptions.m4'
+libtoolize: copying file 'build-aux/m4/ltsugar.m4'
+libtoolize: copying file 'build-aux/m4/ltversion.m4'
+libtoolize: copying file 'build-aux/m4/lt~obsolete.m4'
+configure.ac:43: installing 'build-aux/ar-lib'
+configure.ac:37: installing 'build-aux/compile'
+configure.ac:24: installing 'build-aux/config.guess'
+configure.ac:24: installing 'build-aux/config.sub'
+configure.ac:33: installing 'build-aux/install-sh'
+configure.ac:33: installing 'build-aux/missing'
+Makefile.am: installing 'build-aux/depcomp'
+checking build system type... x86_64-pc-linux-gnu
+checking host system type... x86_64-pc-linux-gnu
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether build environment is sane... yes
+checking for a race-free mkdir -p... /usr/bin/mkdir -p
+checking for gawk... gawk
+checking whether make sets $(MAKE)... yes
+checking whether make supports nested variables... yes
+checking whether to enable maintainer-specific portions of Makefiles... yes
+checking whether make supports the include directive... yes (GNU style)
+checking for gcc... gcc
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether the compiler supports GNU C... yes
+checking whether gcc accepts -g... yes
+checking for gcc option to enable C11 features... none needed
+checking whether gcc understands -c and -o together... yes
+checking dependency style of gcc... gcc3
+checking for stdio.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for strings.h... yes
+checking for sys/stat.h... yes
+checking for sys/types.h... yes
+checking for unistd.h... yes
+checking for _Bool... yes
+checking for stdbool.h that conforms to C99... yes
+checking whether make supports nested variables... (cached) yes
+checking for gcc... (cached) gcc
+checking whether the compiler supports GNU C... (cached) yes
+checking whether gcc accepts -g... (cached) yes
+checking for gcc option to enable C11 features... (cached) none needed
+checking whether gcc understands -c and -o together... (cached) yes
+checking dependency style of gcc... (cached) gcc3
+checking dependency style of gcc... gcc3
+checking for ar... ar
+checking the archiver (ar) interface... ar
+checking how to print strings... printf
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by gcc... /usr/bin/ld
+checking if the linker (/usr/bin/ld) is GNU ld... yes
+checking for BSD- or MS-compatible name lister (nm)... /usr/bin/nm -B
+checking the name lister (/usr/bin/nm -B) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... 3145728
+checking how to convert x86_64-pc-linux-gnu file names to x86_64-pc-linux-gnu format... func_convert_file_noop
+checking how to convert x86_64-pc-linux-gnu file names to toolchain format... func_convert_file_noop
+checking for /usr/bin/ld option to reload object files... -r
+checking for file... file
+checking for objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for dlltool... no
+checking how to associate runtime and link libraries... printf %s\n
+checking for archiver @FILE support... @
+checking for strip... strip
+checking for ranlib... ranlib
+checking command to parse /usr/bin/nm -B output from gcc object... ok
+checking for sysroot... no
+checking for a working dd... /usr/bin/dd
+checking how to truncate binary pipes... /usr/bin/dd bs=4096 count=1
+checking for mt... mt
+checking if mt is a manifest tool... no
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if gcc supports -fno-rtti -fno-exceptions... no
+checking for gcc option to produce PIC... -fPIC -DPIC
+checking if gcc PIC flag -fPIC -DPIC works... yes
+checking if gcc static flag -static works... yes
+checking if gcc supports -c -o file.o... yes
+checking if gcc supports -c -o file.o... (cached) yes
+checking whether the gcc linker (/usr/bin/ld -m elf_x86_64) supports shared libraries... yes
+checking whether -lc should be explicitly linked in... no
+checking dynamic linker characteristics... GNU/Linux ld.so
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... yes
+checking whether to build static libraries... yes
+checking if gcc supports -std=gnu99 -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings... yes
+checking for __builtin_expect... yes
+checking for gcc options needed to detect all undeclared functions... none needed
+checking whether daemon is declared... yes
+checking for event2/event.h... yes
+checking for main in -levent... yes
+checking for main in -levent_core... yes
+checking for main in -levent_extra... yes
+checking for main in -loqs... yes
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating libdogecoin.pc
+config.status: creating config/libdogecoin-config.h
+config.status: executing depfiles commands
+config.status: executing libtool commands
+=== configuring in src/secp256k1 (/home/runner/work/libdogecoin/libdogecoin/src/secp256k1)
+configure: running /bin/bash ./configure --disable-option-checking '--prefix=/usr/local'  '--enable-liboqs' '--enable-test-passwd' 'CFLAGS=-I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include ' 'LDFLAGS=-L/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib ' '--disable-shared' '--with-pic' '--with-bignum=no' '--enable-module-recovery' --cache-file=/dev/null --srcdir=.
+checking build system type... x86_64-pc-linux-gnu
+checking host system type... x86_64-pc-linux-gnu
+checking for a BSD-compatible install... /usr/bin/install -c
+checking whether build environment is sane... yes
+checking for a race-free mkdir -p... /usr/bin/mkdir -p
+checking for gawk... gawk
+checking whether make sets $(MAKE)... yes
+checking whether make supports nested variables... yes
+checking how to print strings... printf
+checking whether make supports the include directive... yes (GNU style)
+checking for gcc... gcc
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether the compiler supports GNU C... yes
+checking whether gcc accepts -g... yes
+checking for gcc option to enable C11 features... none needed
+checking whether gcc understands -c and -o together... yes
+checking dependency style of gcc... gcc3
+checking for a sed that does not truncate output... /usr/bin/sed
+checking for grep that handles long lines and -e... /usr/bin/grep
+checking for egrep... /usr/bin/grep -E
+checking for fgrep... /usr/bin/grep -F
+checking for ld used by gcc... /usr/bin/ld
+checking if the linker (/usr/bin/ld) is GNU ld... yes
+checking for BSD- or MS-compatible name lister (nm)... /usr/bin/nm -B
+checking the name lister (/usr/bin/nm -B) interface... BSD nm
+checking whether ln -s works... yes
+checking the maximum length of command line arguments... 3145728
+checking how to convert x86_64-pc-linux-gnu file names to x86_64-pc-linux-gnu format... func_convert_file_noop
+checking how to convert x86_64-pc-linux-gnu file names to toolchain format... func_convert_file_noop
+checking for /usr/bin/ld option to reload object files... -r
+checking for file... file
+checking for objdump... objdump
+checking how to recognize dependent libraries... pass_all
+checking for dlltool... no
+checking how to associate runtime and link libraries... printf %s\n
+checking for ar... ar
+checking for archiver @FILE support... @
+checking for strip... strip
+checking for ranlib... ranlib
+checking command to parse /usr/bin/nm -B output from gcc object... ok
+checking for sysroot... no
+checking for a working dd... /usr/bin/dd
+checking how to truncate binary pipes... /usr/bin/dd bs=4096 count=1
+checking for mt... mt
+checking if mt is a manifest tool... no
+checking for stdio.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for strings.h... yes
+checking for sys/stat.h... yes
+checking for sys/types.h... yes
+checking for unistd.h... yes
+checking for dlfcn.h... yes
+checking for objdir... .libs
+checking if gcc supports -fno-rtti -fno-exceptions... no
+checking for gcc option to produce PIC... -fPIC -DPIC
+checking if gcc PIC flag -fPIC -DPIC works... yes
+checking if gcc static flag -static works... yes
+checking if gcc supports -c -o file.o... yes
+checking if gcc supports -c -o file.o... (cached) yes
+checking whether the gcc linker (/usr/bin/ld -m elf_x86_64) supports shared libraries... yes
+checking dynamic linker characteristics... GNU/Linux ld.so
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... no
+checking whether to build static libraries... yes
+checking whether make supports nested variables... (cached) yes
+checking for pkg-config... /usr/bin/pkg-config
+checking pkg-config is at least version 0.9.0... yes
+checking for ar... /usr/bin/ar
+checking for ranlib... /usr/bin/ranlib
+checking for strip... /usr/bin/strip
+checking for gcc... (cached) gcc
+checking whether the compiler supports GNU C... (cached) yes
+checking whether gcc accepts -g... (cached) yes
+checking for gcc option to enable C11 features... (cached) none needed
+checking whether gcc understands -c and -o together... (cached) yes
+checking dependency style of gcc... (cached) gcc3
+checking dependency style of gcc... gcc3
+checking if gcc supports -Werror=unknown-warning-option... no
+checking if gcc supports -std=c89 -pedantic -Wno-long-long -Wnested-externs -Wshadow -Wstrict-prototypes -Wundef... yes
+checking if gcc supports -Wno-overlength-strings... yes
+checking if gcc supports -Wall... yes
+checking if gcc supports -Wno-unused-function... yes
+checking if gcc supports -Wextra... yes
+checking if gcc supports -Wcast-align... yes
+checking if gcc supports -Wcast-align=strict... yes
+checking if gcc supports -Wconditional-uninitialized... no
+checking if gcc supports -fvisibility=hidden... yes
+checking for x86_64 assembly availability... yes
+checking that generated files are newer than configure... done
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating libsecp256k1.pc
+config.status: creating src/libsecp256k1-config.h
+config.status: executing depfiles commands
+config.status: executing libtool commands
+
+Build Options:
+  with external callbacks = no
+  with benchmarks         = yes
+  with tests              = yes
+  with coverage           = no
+  module ecdh             = no
+  module recovery         = yes
+  module extrakeys        = no
+  module schnorrsig       = no
+
+  asm                     = x86_64
+  ecmult window size      = 15
+  ecmult gen prec. bits   = 4
+
+  valgrind                = no
+  CC                      = gcc
+  CPPFLAGS                =  
+  SECP_CFLAGS             = -O2  -std=c89 -pedantic -Wno-long-long -Wnested-externs -Wshadow -Wstrict-prototypes -Wundef -Wno-overlength-strings -Wall -Wno-unused-function -Wextra -Wcast-align -Wcast-align=strict -fvisibility=hidden 
+  CFLAGS                  = -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include 
+  LDFLAGS                 = -L/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib 
+
+Options used to compile and link:
+  with tests      = yes
+  with bench      = yes
+  with tools      = yes
+  with net        = yes
+  with logdb      = yes
+  with wallet     = yes
+
+  Intel AVX2      = no
+  Intel SSE       = no
+  SSE2 Scrypt     = no
+  ARMv8 crypto    = no
+  ARMv8.2 crypto  = no
+
+  test password   = yes
+                    ecBFDMG8CDeu
+
+  openenclave     = no
+  optee           = no
+  Yubikey         = no
+  liboqs          = yes
+
+  host            = x86_64-pc-linux-gnu
+  target os       = linux
+  nasm flags      = -Werror -felf64 -Xgnu -gdwarf -DLINUX -D__linux__
+
+  CC              = gcc
+  CFLAGS          = -I/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/include  -W -std=gnu99 -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings
+  CXX             = 
+  CXXFLAGS        = 
+  LDFLAGS         = -L/home/runner/work/libdogecoin/libdogecoin/depends/x86_64-pc-linux-gnu/lib 
+  LIBS            =  -levent -levent_core -levent_extra  -loqs
+
+Making all in src/secp256k1
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/src/secp256k1'
+make  all-am
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/src/secp256k1'
+  CC       src/bench.o
+  CC       src/libsecp256k1_la-secp256k1.lo
+  CC       src/libsecp256k1_precomputed_la-precomputed_ecmult.lo
+  CC       src/libsecp256k1_precomputed_la-precomputed_ecmult_gen.lo
+  CC       src/bench_internal-bench_internal.o
+  CC       src/bench_ecmult-bench_ecmult.o
+  CC       src/tests-tests.o
+  CC       src/exhaustive_tests-tests_exhaustive.o
+  CCLD     libsecp256k1_precomputed.la
+  CCLD     exhaustive_tests
+  CCLD     libsecp256k1.la
+libtool: warning: '-version-info/-version-number' is ignored for convenience libraries
+  CCLD     bench_internal
+  CCLD     bench_ecmult
+  CCLD     bench
+  CCLD     tests
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/src/secp256k1'
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/src/secp256k1'
+make[1]: Entering directory '/home/runner/work/libdogecoin/libdogecoin'
+  CC       src/cli/libdogecoin_la-tool.lo
+  CC       src/libdogecoin_la-wallet.lo
+  CC       src/libdogecoin_la-headersdb_file.lo
+  CC       src/libdogecoin_la-net.lo
+  CC       src/libdogecoin_la-protocol.lo
+  CC       src/libdogecoin_la-rest.lo
+  CC       src/libdogecoin_la-spv.lo
+make[2]: Entering directory '/home/runner/work/libdogecoin/libdogecoin/src/secp256k1'
+make[2]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin/src/secp256k1'
+  CC       src/cli/sendtx-sendtx.o
+  CC       src/cli/spvnode-spvnode.o
+  CC       test/tests-wallet_tests.o
+  CC       test/tests-net_tests.o
+  CC       test/tests-protocol_tests.o
+  CC       test/tests-spv_tests.o
+  CC       test/tests-tool_tests.o
+  CC       src/bench-bench.o
+  CC       src/cli/such-such.o
+  CC       src/libdogecoin_la-address.lo
+  CC       src/libdogecoin_la-aes.lo
+  CC       src/libdogecoin_la-arith_uint256.lo
+  CC       src/libdogecoin_la-auxpow.lo
+  CC       src/libdogecoin_la-base58.lo
+  CC       src/libdogecoin_la-bip32.lo
+  CC       src/libdogecoin_la-bip39.lo
+  CC       src/libdogecoin_la-bip44.lo
+  CC       src/libdogecoin_la-block.lo
+  CC       src/libdogecoin_la-buffer.lo
+  CC       src/libdogecoin_la-chacha20.lo
+  CC       src/libdogecoin_la-chainparams.lo
+  CC       src/libdogecoin_la-cstr.lo
+  CC       src/libdogecoin_la-ctaes.lo
+  CC       src/libdogecoin_la-ecc.lo
+  CC       src/libdogecoin_la-eckey.lo
+  CC       src/libdogecoin_la-key.lo
+  CC       src/libdogecoin_la-koinu.lo
+  CC       src/libdogecoin_la-map.lo
+  CC       src/libdogecoin_la-mem.lo
+src/map.c: In function 'remove_hash':
+src/map.c:139:9: warning: the comparison will always evaluate as 'true' for the address of 'u8' will never be NULL [-Waddress]
+  139 |     if (hash->data.u8) dogecoin_free(hash->data.u8);
+      |         ^~~~
+In file included from src/map.c:27:
+./include/dogecoin/map.h:65:13: note: 'u8' declared here
+   65 |     uint8_t u8[32];
+      |             ^~
+  CC       src/libdogecoin_la-moon.lo
+  CC       src/libdogecoin_la-pow.lo
+  CC       src/libdogecoin_la-png.lo
+  CC       src/libdogecoin_la-jpeg.lo
+  CC       src/libdogecoin_la-qrengine.lo
+  CC       src/libdogecoin_la-qr.lo
+  CC       src/libdogecoin_la-random.lo
+  CC       src/libdogecoin_la-rmd160.lo
+  CC       src/libdogecoin_la-script.lo
+  CC       src/libdogecoin_la-scrypt.lo
+  CC       src/libdogecoin_la-seal.lo
+  CC       src/libdogecoin_la-sign.lo
+  CC       src/libdogecoin_la-serialize.lo
+  CC       src/libdogecoin_la-sha2.lo
+  CC       src/libdogecoin_la-smpv.lo
+  CC       src/libdogecoin_la-transaction.lo
+  CC       src/libdogecoin_la-tx.lo
+  CC       src/libdogecoin_la-utf8proc.lo
+  CC       src/libdogecoin_la-utils.lo
+  CC       src/libdogecoin_la-validation.lo
+  CC       src/libdogecoin_la-vector.lo
+  CC       src/libdogecoin_la-pqc_carrier.lo
+  CC       src/libdogecoin_la-pqc_dilithium.lo
+  CC       src/libdogecoin_la-pqc_falcon.lo
+src/pqc_dilithium.c:95:81: warning: argument 2 of type 'const uint8_t *' {aka 'const unsigned char *'} declared as a pointer [-Warray-parameter=]
+   95 | dogecoin_bool dogecoin_tx_add_dilithium2_commit(dogecoin_tx* tx, const uint8_t* commit32) {
+      |                                                                  ~~~~~~~~~~~~~~~^~~~~~~~
+In file included from src/pqc_dilithium.c:34:
+./include/dogecoin/pqc_dilithium.h:59:80: note: previously declared as an array 'const uint8_t[32]' {aka 'const unsigned char[32]'}
+   59 |                                                                  const uint8_t commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
+      |                                                                  ~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/pqc_dilithium.c:124:85: warning: argument 2 of type 'uint8_t *' {aka 'unsigned char *'} declared as a pointer [-Warray-parameter=]
+  124 | dogecoin_bool dogecoin_tx_extract_dilithium2_commit(const dogecoin_tx* tx, uint8_t* out32) {
+      |                                                                            ~~~~~~~~~^~~~~
+./include/dogecoin/pqc_dilithium.h:61:78: note: previously declared as an array 'uint8_t[32]' {aka 'unsigned char[32]'}
+   61 |                                                                      uint8_t out_commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
+      |                                                                      ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/pqc_falcon.c:83:80: warning: argument 2 of type 'const uint8_t *' {aka 'const unsigned char *'} declared as a pointer [-Warray-parameter=]
+   83 | dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t* commit32) {
+      |                                                                 ~~~~~~~~~~~~~~~^~~~~~~~
+In file included from src/pqc_falcon.c:34:
+./include/dogecoin/pqc_falcon.h:76:78: note: previously declared as an array 'const uint8_t[32]' {aka 'const unsigned char[32]'}
+   76 |                                                                const uint8_t commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]);
+      |                                                                ~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/pqc_falcon.c:116:84: warning: argument 2 of type 'uint8_t *' {aka 'unsigned char *'} declared as a pointer [-Warray-parameter=]
+  116 | dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_t* out32) {
+      |                                                                           ~~~~~~~~~^~~~~
+./include/dogecoin/pqc_falcon.h:82:77: note: previously declared as an array 'uint8_t[32]' {aka 'unsigned char[32]'}
+   82 |                                                                     uint8_t out_commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]);
+      |                                                                     ~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  CC       src/libdogecoin_la-pqc_raccoon.lo
+  CC       src/logdb/libdogecoin_la-logdb_core.lo
+  CC       src/logdb/libdogecoin_la-logdb_memdb_llist.lo
+  CC       src/logdb/libdogecoin_la-logdb_memdb_rbtree.lo
+  CC       src/logdb/libdogecoin_la-logdb_rec.lo
+  CC       src/logdb/libdogecoin_la-misc.lo
+  CC       src/logdb/libdogecoin_la-red_black_tree.lo
+  CC       src/logdb/libdogecoin_la-stack.lo
+  CC       test/tests-arith_uint256_tests.o
+  CC       test/tests-address_tests.o
+  CC       test/tests-aes_tests.o
+  CC       test/tests-base58_tests.o
+  CC       test/tests-bip32_tests.o
+  CC       test/tests-bip39_tests.o
+  CC       test/tests-bip44_tests.o
+  CC       test/tests-block_tests.o
+  CC       test/tests-buffer_tests.o
+  CC       test/tests-chacha20_tests.o
+  CC       test/tests-cstr_tests.o
+  CC       test/tests-ecc_tests.o
+  CC       test/tests-hash_tests.o
+  CC       test/tests-key_tests.o
+  CC       test/tests-koinu_tests.o
+  CC       test/tests-mem_tests.o
+  CC       test/tests-moon_tests.o
+  CC       test/tests-opreturn_tests.o
+  CC       test/tests-qr_tests.o
+  CC       test/tests-random_tests.o
+  CC       test/tests-rmd160_tests.o
+  CC       test/tests-scrypt_tests.o
+  CC       test/tests-serialize_tests.o
+  CC       test/tests-sha1_tests.o
+  CC       test/tests-sha2_tests.o
+  CC       test/tests-signmsg_tests.o
+  CC       test/tests-smpv_tests.o
+  CC       test/tests-tpm_tests.o
+  CC       test/tests-transaction_tests.o
+  CC       test/tests-tx_tests.o
+  CC       test/tests-unittester.o
+  CC       test/tests-utils_tests.o
+  CC       test/tests-vector_tests.o
+  CC       src/logdb/test/tests-logdb_tests.o
+  CC       src/logdb/test/tests-tests_red_black_tree.o
+  CCLD     libdogecoin.la
+  CCLD     such
+  CCLD     sendtx
+  CCLD     spvnode
+  CCLD     tests
+  CCLD     bench
+make[1]: Leaving directory '/home/runner/work/libdogecoin/libdogecoin'
+___BEGIN___COMMAND_DONE_MARKER___0

@@ -1,0 +1,4 @@
+----- such generate_public_key: ./such -c generate_public_key -p QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w -----
+public key hex: 03c15308abaf34326d0274d022c70cd15db84809822154dc894001066ce6b97482
+p2pkh address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+----- such generate_public_key exit=0 -----

@@ -49,6 +49,7 @@ FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PU
 RUN_LOG="$TMPDIR/mainnet_dilithium2_run.log"
 # sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
+SENDTX_FATAL_PATTERN='not relayed back|Seen on other nodes:[[:space:]]*0|very likely invalid'
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -295,6 +296,9 @@ EOF
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
         SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $NETWORK_FLAG "$SIGNED_TX" || true)
         echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
+        if echo "$SENDTX_OUTPUT" | grep -Eqi "$SENDTX_FATAL_PATTERN"; then
+            error "sendtx reported explicit relay failure (not relayed/seen on other nodes 0)"
+        fi
         BROADCAST_TXID=$(echo "$SENDTX_OUTPUT" | sed -n 's/^Start broadcasting transaction:[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1)
         [ -n "$BROADCAST_TXID" ] || error "Failed to parse broadcast txid from sendtx output"
         CHAINED_UTXO_TXID="$BROADCAST_TXID"
