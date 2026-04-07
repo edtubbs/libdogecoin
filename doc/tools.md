@@ -606,29 +606,10 @@ Commitment (32 bytes): a1b2c3d4e5f6789...
 ./such -c pqc_carrier_parsepart -x <carrier_part_scriptsig_hex>
 ```
 
-#### Legacy compatibility helper (single-step scripted attachment):
-```bash
-# Applies:
-# - scriptSig = push(redeemScript carrying TAGFULL + lengths + payload chunks + cleanup + OP_TRUE)
-# - witness remains empty
-TX_WITH_PQC_P2SH=$(./such -c addpqcdatawitness -x <tx_with_commit_hex> -i 0 -k <falcon_public_key_hex> -s <falcon_signature_hex> | awk -F': ' '/tx with pqc p2sh carrier:/ {print $2}')
-```
-
 Output:
 ```
-tx with pqc p2sh carrier: <raw_tx_hex_with_redeemscript_payload>
-carrier_tag: FLC1FULL|DIL2FULL|RCG4FULL
-pubkey_chunks: <n>
-signature_chunks: <m>
-redeemscript: <doginals_style_tagged_redeemscript_hex>
-scriptpubkey: a914...87
-```
-
-#### Deprecated (non-standard relay) scriptSig payload helper:
-```bash
-# regtest-only / non-relayed test helper
-./such -r -c addscriptsigpqc -x <tx_hex> -i 0 -k <pqc_public_key_hex> -s <pqc_signature_hex>
-./such -c printscriptsigpqc -x <tx_hex_with_legacy_scriptsig_payload>
+carrier_part_scriptsig[0]: <tagged_carrier_part_scriptsig_hex>
+carrier_p2sh_scriptpubkey: a914...87
 ```
 
 ### Testnet Workflow Helpers
