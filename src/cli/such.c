@@ -66,6 +66,7 @@
 #include <dogecoin/wow.h>
 #include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
+#include <dogecoin/pqc_carrier.h>
 #include <dogecoin/pqc_raccoon.h>
 
 // ******************************** SUCH -C TRANSACTION MENU ********************************
@@ -674,6 +675,10 @@ static void print_usage()
         printf("apply_p2sh_p2wsh_redeemscript_and_witness (-x <raw hex tx> -i <input index> -s <redeemscript_hex> -k <witness_script_hex> -m <chunk_hex_csv>),\n");
 #ifdef USE_LIBOQS
     printf("tx_sighash32 (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type>),\n");
+    printf("pqc_carrier_redeemscript,\n");
+    printf("pqc_carrier_scriptpubkey,\n");
+    printf("pqc_carrier_mkpart (-k <tag4_hex> -p <pqc_pubkey_hex> -s <pqc_signature_hex> -i <part_index>),\n");
+    printf("pqc_carrier_parsepart (-x <scriptsig_hex>),\n");
 #endif
     printf("comp2der (-s <compact signature>),\n");
     printf("bip32maintotest (-p <extended hd master key>),\n");
@@ -965,6 +970,24 @@ static void such_select_pqc_full_tag(size_t pubkey_len, char out_tag[9])
     out_tag[8] = '\0';
 }
 
+#ifdef USE_LIBOQS
+static dogecoin_bool such_tag4_hex_to_tag8(const char* tag4_hex, char out_tag8[8])
+{
+    if (!tag4_hex || !out_tag8 || strlen(tag4_hex) != 8) {
+        return false;
+    }
+    uint8_t tag4[4];
+    size_t outlen = 0;
+    utils_hex_to_bin(tag4_hex, tag4, 8, &outlen);
+    if (outlen != 4) {
+        return false;
+    }
+    memcpy(out_tag8, tag4, 4);
+    memcpy(out_tag8 + 4, "FULL", 4);
+    return true;
+}
+#endif
+
 static dogecoin_bool such_script_append_hex_chunks(cstring* script, const char* hex_payload, size_t max_chunk_bytes, size_t* chunk_count_out)
 {
     if (!script || !hex_payload || !chunk_count_out) {
@@ -1135,8 +1158,6 @@ int main(int argc, char* argv[])
         switch (opt) {
                 case 'p':
                     pkey = optarg;
-                    if (strlen(pkey) < 50)
-                        return showError("Private key must be WIF encoded");
                     break;
                 case 'c':
                     cmd = optarg;
@@ -1532,6 +1553,181 @@ int main(int argc, char* argv[])
             }
         dogecoin_tx_free(tx);
         }
+#ifdef USE_LIBOQS
+    else if (strcmp(cmd, "pqc_carrier_redeemscript") == 0) {
+        cstring* redeem = NULL;
+        if (!dogecoin_pqc_carrier_build_redeemscript(&redeem)) {
+            return showError("Failed to build carrier redeemScript");
+        }
+        char* hex = utils_uint8_to_hex((const uint8_t*)redeem->str, redeem->len);
+        printf("redeemScript: %s\n", hex ? hex : "");
+        cstr_free(redeem, true);
+    }
+    else if (strcmp(cmd, "pqc_carrier_scriptpubkey") == 0) {
+        cstring* redeem = NULL;
+        cstring* spk = NULL;
+        if (!dogecoin_pqc_carrier_build_redeemscript(&redeem)) {
+            return showError("Failed to build carrier redeemScript");
+        }
+        if (!dogecoin_pqc_carrier_build_p2sh_scriptpubkey(redeem, &spk)) {
+            cstr_free(redeem, true);
+            return showError("Failed to build carrier scriptPubKey");
+        }
+        char* hex = utils_uint8_to_hex((const uint8_t*)spk->str, spk->len);
+        printf("carrier_p2sh_scriptpubkey: %s\n", hex ? hex : "");
+        cstr_free(spk, true);
+        cstr_free(redeem, true);
+    }
+    else if (strcmp(cmd, "pqc_carrier_mkpart") == 0) {
+        /* CLI uses:
+         * -k tag4 hex ("FLC1"/"DIL2"/"RCG4" as 8 hex chars),
+         * -p PQ public key hex, -s PQ signature hex, -i part_index.
+         * Note: -p/-s/-i reuse existing parser slots (pkey/scripthex/inputindex).
+         */
+        if (!pubkey || !pkey || !scripthex) {
+            return showError("Missing tag4 (-k), pqc pubkey (-p), or pqc signature (-s)");
+        }
+        char tag8[8];
+        if (!such_tag4_hex_to_tag8(pubkey, tag8)) {
+            return showError("Invalid tag4 hex; expected 8 hex chars");
+        }
+
+        size_t pk_len = strlen(pkey) / 2;
+        size_t sig_len = strlen(scripthex) / 2;
+        if ((strlen(pkey) % 2) != 0 || (strlen(scripthex) % 2) != 0) {
+            return showError("Invalid pubkey/signature hex");
+        }
+        uint8_t* pk = dogecoin_malloc(pk_len + 1);
+        uint8_t* sig = dogecoin_malloc(sig_len + 1);
+        if (!pk || !sig) {
+            if (pk) dogecoin_free(pk);
+            if (sig) dogecoin_free(sig);
+            return showError("OOM");
+        }
+        size_t outlen = 0;
+        utils_hex_to_bin(pkey, pk, strlen(pkey), &outlen);
+        if (outlen != pk_len) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            return showError("Invalid pubkey hex");
+        }
+        utils_hex_to_bin(scripthex, sig, strlen(scripthex), &outlen);
+        if (outlen != sig_len) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            return showError("Invalid signature hex");
+        }
+
+        size_t full_len = pk_len + sig_len;
+        uint8_t* full = dogecoin_malloc(full_len + 1);
+        if (!full) {
+            dogecoin_free(pk);
+            dogecoin_free(sig);
+            return showError("OOM");
+        }
+        memcpy(full, pk, pk_len);
+        memcpy(full + pk_len, sig, sig_len);
+        dogecoin_free(pk);
+        dogecoin_free(sig);
+
+        size_t part_payload_max = DOGECOIN_PQC_CARRIER_MAX_CHUNKS * DOGECOIN_PQC_CARRIER_CHUNK_MAX;
+        uint8_t part_total = (uint8_t)((full_len + part_payload_max - 1) / part_payload_max);
+        uint8_t part_index = (uint8_t)inputindex; /* explicit part index from -i */
+        if (part_total == 0 || part_index >= part_total) {
+            dogecoin_free(full);
+            return showError("part_index out of range");
+        }
+        size_t part_off = (size_t)part_index * part_payload_max;
+        size_t part_len = full_len - part_off;
+        if (part_len > part_payload_max) part_len = part_payload_max;
+
+        cstring* redeem = NULL;
+        cstring* scriptsig = NULL;
+        cstring* carrier_spk = NULL;
+        if (!dogecoin_pqc_carrier_build_redeemscript(&redeem)) {
+            dogecoin_free(full);
+            return showError("Failed to build carrier redeemScript");
+        }
+        if (!dogecoin_pqc_carrier_build_part_scriptsig(tag8, part_index, part_total, (uint16_t)pk_len, (uint16_t)full_len,
+                                                       full + part_off, part_len, redeem, &scriptsig)) {
+            cstr_free(redeem, true);
+            dogecoin_free(full);
+            return showError("Failed to build carrier part scriptsig");
+        }
+        if (!dogecoin_pqc_carrier_build_p2sh_scriptpubkey(redeem, &carrier_spk)) {
+            cstr_free(scriptsig, true);
+            cstr_free(redeem, true);
+            dogecoin_free(full);
+            return showError("Failed to build carrier scriptPubKey");
+        }
+        dogecoin_free(full);
+
+        char* scriptsig_hex_tmp = utils_uint8_to_hex((const uint8_t*)scriptsig->str, scriptsig->len);
+        char* scriptsig_hex = scriptsig_hex_tmp ? strdup(scriptsig_hex_tmp) : NULL;
+        char* spk_hex_tmp = utils_uint8_to_hex((const uint8_t*)carrier_spk->str, carrier_spk->len);
+        char* spk_hex = spk_hex_tmp ? strdup(spk_hex_tmp) : NULL;
+        printf("carrier_part_total: %u\n", (unsigned)part_total);
+        printf("carrier_part_index: %u\n", (unsigned)part_index);
+        printf("carrier_p2sh_scriptpubkey: %s\n", spk_hex ? spk_hex : "");
+        printf("carrier_part_scriptsig: %s\n", scriptsig_hex ? scriptsig_hex : "");
+        if (scriptsig_hex) dogecoin_free(scriptsig_hex);
+        if (spk_hex) dogecoin_free(spk_hex);
+
+        cstr_free(carrier_spk, true);
+        cstr_free(scriptsig, true);
+        cstr_free(redeem, true);
+    }
+    else if (strcmp(cmd, "pqc_carrier_parsepart") == 0) {
+        if (!txhex || (strlen(txhex) % 2) != 0) {
+            return showError("Missing/invalid scriptsig hex (-x)");
+        }
+        size_t blen = strlen(txhex) / 2;
+        uint8_t* b = dogecoin_malloc(blen + 1);
+        if (!b) {
+            return showError("OOM");
+        }
+        size_t outlen = 0;
+        utils_hex_to_bin(txhex, b, strlen(txhex), &outlen);
+        if (outlen != blen) {
+            dogecoin_free(b);
+            return showError("Invalid scriptsig hex");
+        }
+        cstring* scriptsig = cstr_new_buf(b, blen);
+        dogecoin_free(b);
+        if (!scriptsig) {
+            return showError("OOM");
+        }
+
+        char tag8[9];
+        uint8_t part_index = 0, part_total = 0;
+        uint16_t pk_len = 0, full_len = 0;
+        uint8_t* part_data = NULL;
+        size_t part_data_len = 0;
+        cstring* redeem = NULL;
+        if (!dogecoin_pqc_carrier_parse_part_scriptsig(scriptsig, tag8, &part_index, &part_total, &pk_len, &full_len,
+                                                       &part_data, &part_data_len, &redeem)) {
+            cstr_free(scriptsig, true);
+            return showError("Carrier part parse failed");
+        }
+        char* part_hex_tmp = utils_uint8_to_hex(part_data, part_data_len);
+        char* part_hex = part_hex_tmp ? strdup(part_hex_tmp) : NULL;
+        char* redeem_hex_tmp = utils_uint8_to_hex((const uint8_t*)redeem->str, redeem->len);
+        char* redeem_hex = redeem_hex_tmp ? strdup(redeem_hex_tmp) : NULL;
+        printf("tag8: %s\n", tag8);
+        printf("part_index: %u\n", (unsigned)part_index);
+        printf("part_total: %u\n", (unsigned)part_total);
+        printf("pk_len: %u\n", (unsigned)pk_len);
+        printf("full_len: %u\n", (unsigned)full_len);
+        printf("part_data: %s\n", part_hex ? part_hex : "");
+        printf("redeemScript: %s\n", redeem_hex ? redeem_hex : "");
+        if (part_hex) dogecoin_free(part_hex);
+        if (redeem_hex) dogecoin_free(redeem_hex);
+
+        if (part_data) dogecoin_free(part_data);
+        cstr_free(redeem, true);
+        cstr_free(scriptsig, true);
+    }
+#endif
     else if (strcmp(cmd, "addpqcdatawitness") == 0) {
         if (!txhex || !pubkey || !scripthex) {
             return showError("Missing tx-hex, pqc-pubkey-hex, or pqc-signature-hex (use -x, -k, -s)\n");

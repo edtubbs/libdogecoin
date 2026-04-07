@@ -492,7 +492,11 @@ The `such` tool includes PQC commands for Falcon-512 and Dilithium2 commitments.
 | - | - | - |
 | falcon_keygen | None | Generates a Falcon-512 keypair (public key: 897 bytes, secret key: 1281 bytes) |
 | tx_sighash32 | -x, -s, -i, -h | Derives transaction input sighash32 used by signing flows |
-| addpqcdatawitness | -x, -i, -k, -s, (-h optional) | Canonical Phase-1 carrier: builds Doginals-style P2SH redeemScript envelope (`TAGFULL`, length pushes, payload chunks, cleanup + OP_TRUE) and applies as scriptSig redeemScript |
+| addpqcdatawitness | -x, -i, -k, -s, (-h optional) | Legacy single-tx helper for embedding TAGFULL payload into redeemScript push; retained for compatibility |
+| pqc_carrier_redeemscript | None | Prints canonical fixed 6-byte carrier redeemScript (`OP_DROP x5 OP_TRUE`) |
+| pqc_carrier_scriptpubkey | None | Prints canonical carrier P2SH scriptPubKey (`OP_HASH160 <20-byte> OP_EQUAL`) |
+| pqc_carrier_mkpart | -k, -p, -s, -i | Builds one reveal part scriptSig (`TAG8 HDR8 CHUNK0 CHUNK1 CHUNK2 redeemScript`) with 3x520-byte chunking |
+| pqc_carrier_parsepart | -x | Parses one reveal part scriptSig and prints decoded fields/payload |
 | addscriptsigpqc | -x, -i, -k, -s | **Deprecated** non-standard scriptSig helper (regtest/internal only; not mainnet relay-safe) |
 | printscriptsigpqc | -x | Prints deprecated scriptSig PQ payload (inspection helper for non-relayed/test flows) |
 | addwitness | -x, -i, -s | Appends witness item bytes to a transaction input (policy-sanity: P2SH-P2WSH spends only) |
@@ -594,7 +598,15 @@ Generating Falcon-512 commitment...
 Commitment (32 bytes): a1b2c3d4e5f6789...
 ```
 
-#### Canonical: attach PQ public key/signature using Doginals-style P2SH redeemScript carrier:
+#### Canonical carrier primitives (two-transaction TX_C/TX_R flow):
+```bash
+./such -c pqc_carrier_redeemscript
+./such -c pqc_carrier_scriptpubkey
+./such -c pqc_carrier_mkpart -k 464c4331 -p <falcon_public_key_hex> -s <falcon_signature_hex> -i 0
+./such -c pqc_carrier_parsepart -x <carrier_part_scriptsig_hex>
+```
+
+#### Legacy compatibility helper (single-step scripted attachment):
 ```bash
 # Applies:
 # - scriptSig = push(redeemScript carrying TAGFULL + lengths + payload chunks + cleanup + OP_TRUE)
@@ -631,7 +643,7 @@ For end-to-end mainnet command flow, use:
 - `contrib/mainnet_dilithium2_test.sh`
 - `contrib/mainnet_raccoong_test.sh`
 
-These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, canonical P2SH-P2WSH witness-carrier attachment, and SPV monitoring commands.
+These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, canonical P2SH data-carrier attachment, and SPV monitoring commands.
 
 For non-interactive execution (recommended for reproducible reruns/log capture), set:
 
@@ -658,7 +670,7 @@ These scripts automate:
 - Falcon keypair generation
 - tx_sighash signing
 - Commitment generation
-- scriptSig carriage of PQC public key/signature
+- canonical P2SH carrier reveal carriage of PQC public key/signature
 - SPV monitoring instructions
 
 For protocol rationale/specification details, see:

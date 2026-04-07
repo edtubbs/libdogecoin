@@ -21,6 +21,7 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
+#include <dogecoin/pqc_carrier.h>
 #include <dogecoin/pqc_raccoon.h>
 
 /*
@@ -696,5 +697,43 @@ void test_transaction()
     dogecoin_free(child_sk);
     dogecoin_free(child_pk);
     dogecoin_free(child_pubonly);
+
+    cstring* carrier_redeem = NULL;
+    cstring* carrier_spk = NULL;
+    u_assert_true(dogecoin_pqc_carrier_build_redeemscript(&carrier_redeem));
+    u_assert_true(dogecoin_pqc_carrier_build_p2sh_scriptpubkey(carrier_redeem, &carrier_spk));
+
+    const uint16_t test_pk_len = 48;
+    const uint16_t test_sig_len = 96;
+    size_t full_len = (size_t)test_pk_len + (size_t)test_sig_len;
+    uint8_t* full = dogecoin_malloc(full_len);
+    for (size_t i = 0; i < full_len; i++) full[i] = (uint8_t)(i & 0xff);
+    cstring* carrier_ss = NULL;
+    char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN] = { 'F','L','C','1','F','U','L','L' };
+    u_assert_true(dogecoin_pqc_carrier_build_part_scriptsig(
+        tag8, 0, 1, test_pk_len, (uint16_t)full_len, full, full_len, carrier_redeem, &carrier_ss));
+
+    char out_tag8[9];
+    uint8_t part_index = 0, part_total = 0;
+    uint16_t out_pk_len = 0, out_full_len = 0;
+    uint8_t* out_part = NULL;
+    size_t out_part_len = 0;
+    cstring* out_redeem = NULL;
+    u_assert_true(dogecoin_pqc_carrier_parse_part_scriptsig(
+        carrier_ss, out_tag8, &part_index, &part_total, &out_pk_len, &out_full_len, &out_part, &out_part_len, &out_redeem));
+    u_assert_true(part_index == 0 && part_total == 1);
+    u_assert_true(out_pk_len == test_pk_len);
+    u_assert_true(out_full_len == full_len);
+    u_assert_true(out_part_len == full_len);
+    u_assert_true(memcmp(out_part, full, full_len) == 0);
+    u_assert_true(out_redeem->len == carrier_redeem->len);
+    u_assert_true(memcmp(out_redeem->str, carrier_redeem->str, carrier_redeem->len) == 0);
+
+    dogecoin_free(out_part);
+    cstr_free(out_redeem, true);
+    cstr_free(carrier_ss, true);
+    dogecoin_free(full);
+    cstr_free(carrier_spk, true);
+    cstr_free(carrier_redeem, true);
 #endif
 }
