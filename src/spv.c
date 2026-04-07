@@ -949,12 +949,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         if (spv_validate_falcon_scriptsig_commit(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len,
                                                                  falcon_commit_data, &scriptsig_pk, &scriptsig_pk_len,
                                                                  &scriptsig_sig, &scriptsig_sig_len)) {
-                            client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig\n",
-                                                             pindex->height, i, falcon_commit_hex, scriptsig_vin_index);
+                            client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig pk_len=%zu sig_len=%zu\n",
+                                                             pindex->height, i, falcon_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
                             spv_log_witness_stack_summary(client, tx, "falcon-commit", pindex->height, i);
                         } else {
-                            client->nodegroup->log_write_cb("[falcon-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch\n",
-                                                             pindex->height, i, falcon_commit_hex, scriptsig_vin_index);
+                            client->nodegroup->log_write_cb("[falcon-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch pk_len=%zu sig_len=%zu\n",
+                                                             pindex->height, i, falcon_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
                         }
                     } else {
                         /* No same-TX scriptSig match — will be matched by carrier TX_R in same/later block */
@@ -976,12 +976,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         if (spv_validate_dilithium_scriptsig_commit(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len,
                                                                     dilithium_commit_data, &scriptsig_pk, &scriptsig_pk_len,
                                                                     &scriptsig_sig, &scriptsig_sig_len)) {
-                            client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig\n",
-                                                             pindex->height, i, dilithium_commit_hex, scriptsig_vin_index);
+                            client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig pk_len=%zu sig_len=%zu\n",
+                                                             pindex->height, i, dilithium_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
                             spv_log_witness_stack_summary(client, tx, "dilithium-commit", pindex->height, i);
                         } else {
-                            client->nodegroup->log_write_cb("[dilithium-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch\n",
-                                                             pindex->height, i, dilithium_commit_hex, scriptsig_vin_index);
+                            client->nodegroup->log_write_cb("[dilithium-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch pk_len=%zu sig_len=%zu\n",
+                                                             pindex->height, i, dilithium_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
                         }
                     } else {
                         client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s source=op_return_only\n",
@@ -1002,12 +1002,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         if (spv_validate_raccoong_scriptsig_commit(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len,
                                                                    raccoong_commit_data, &scriptsig_pk, &scriptsig_pk_len,
                                                                    &scriptsig_sig, &scriptsig_sig_len)) {
-                            client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig\n",
-                                                             pindex->height, i, raccoong_commit_hex, scriptsig_vin_index);
+                            client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig pk_len=%zu sig_len=%zu\n",
+                                                             pindex->height, i, raccoong_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
                             spv_log_witness_stack_summary(client, tx, "raccoong-commit", pindex->height, i);
                         } else {
-                            client->nodegroup->log_write_cb("[raccoong-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch\n",
-                                                             pindex->height, i, raccoong_commit_hex, scriptsig_vin_index);
+                            client->nodegroup->log_write_cb("[raccoong-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch pk_len=%zu sig_len=%zu\n",
+                                                             pindex->height, i, raccoong_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
                         }
                     } else {
                         client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s source=op_return_only\n",
@@ -1041,8 +1041,16 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         if (commit_ok) {
                             char commit_hex[65];
                             utils_bin_to_hex(computed_commit, 32, commit_hex);
-                            client->nodegroup->log_write_cb("[%s] Valid at height=%d txpos=%u commit=%s carrier_vin=%zu source=carrier_scriptsig\n",
-                                                             algo_label, pindex->height, i, commit_hex, carrier_vin);
+                            /* Log pk prefix (first 16 bytes hex = 32 chars) */
+                            char pk_prefix_hex[33] = {0};
+                            size_t pk_prefix_len = carrier_pk_len < 16 ? carrier_pk_len : 16;
+                            utils_bin_to_hex((unsigned char*)carrier_pk, pk_prefix_len, pk_prefix_hex);
+                            /* Log sig prefix (first 16 bytes hex = 32 chars) */
+                            char sig_prefix_hex[33] = {0};
+                            size_t sig_prefix_len = carrier_sig_len < 16 ? carrier_sig_len : 16;
+                            utils_bin_to_hex((unsigned char*)carrier_sig, sig_prefix_len, sig_prefix_hex);
+                            client->nodegroup->log_write_cb("[%s] Valid at height=%d txpos=%u commit=%s carrier_vin=%zu source=carrier_scriptsig pk_len=%zu sig_len=%zu pk_prefix=%s sig_prefix=%s\n",
+                                                             algo_label, pindex->height, i, commit_hex, carrier_vin, carrier_pk_len, carrier_sig_len, pk_prefix_hex, sig_prefix_hex);
                             spv_log_witness_stack_summary(client, tx, algo_label, pindex->height, i);
                         }
                         if (carrier_buf) dogecoin_free(carrier_buf);
