@@ -267,7 +267,7 @@ In Phase 1, PQC commitments should be treated as an interoperability and migrati
 # Build transaction and derive per-input <code>sighash32</code>.
 # Sign <code>sighash32</code> with Falcon-512 or Dilithium2.
 # Publish <code>SHA256(pubkey || signature)</code> in canonical tagged OP_RETURN.
-# Keep full PQ verification material off-chain for validators/auditors.
+# Publish full PQ verification material on-chain via the Doginals-style P2SH carrier (TX_C + TX_R).
 
 This mirrors current implementation behavior:
 
@@ -308,9 +308,8 @@ Current reference behavior exists in libdogecoin components that:
 Current CLI wiring reflects this implementation model:
 
 * <code>such -c tx_sighash32</code> derives transaction-bound digest bytes for a selected input;
-* <code>such -c addpqcdatawitness</code> is the canonical command to attach PQ payload via Doginals-style P2SH redeemScript carrier;
-* <code>such -c addscriptsigpqc</code> is deprecated and test-only (regtest/non-relayed helper);
-* <code>such -c printscriptsigpqc</code> inspects deprecated scriptSig payloads for test workflows;
+* <code>such -c pqc_carrier_redeemscript</code>, <code>pqc_carrier_scriptpubkey</code>, <code>pqc_carrier_mkpart</code>, and <code>pqc_carrier_parsepart</code> are the canonical commands to build and inspect Doginals-style P2SH carriers;
+* <code>such -c addscriptsigpqc</code> and <code>printscriptsigpqc</code> are deprecated and test-only (regtest/non-relayed helper);
 * <code>such -c falcon_sign</code> / <code>dilithium2_sign</code> accept message bytes via <code>-x</code> (including tx_sighash32 hex);
 * <code>such -c falcon_commit</code> / <code>dilithium2_commit</code> derive commitment32 from public key + signature; and
 * <code>such -c raccoong_commit</code> derives Raccoon-G-44 commitment32 from public key + signature;
