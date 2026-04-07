@@ -3639,7 +3639,6 @@ int main(int argc, char* argv[])
             cstring* part_scriptsig = NULL;
             if (!dogecoin_pqc_carrier_build_part_scriptsig(tag8, part_index, part_total, (uint16_t)pk_len, (uint16_t)full_len,
                                                            full + part_off, part_len, redeem, &part_scriptsig)) {
-                if (carrier_spk_hex) dogecoin_free(carrier_spk_hex);
                 dogecoin_free(tx_out_hex);
                 cstr_free(tx_out, true);
                 cstr_free(redeem, true);
@@ -3650,11 +3649,9 @@ int main(int argc, char* argv[])
             }
             char* ss_hex = utils_uint8_to_hex((const uint8_t*)part_scriptsig->str, part_scriptsig->len);
             printf("carrier_part_scriptsig[%u]: %s\n", (unsigned)part_index, ss_hex ? ss_hex : "");
-            if (ss_hex) dogecoin_free(ss_hex);
             cstr_free(part_scriptsig, true);
         }
 
-        if (carrier_spk_hex) dogecoin_free(carrier_spk_hex);
         dogecoin_free(tx_out_hex);
         cstr_free(tx_out, true);
         cstr_free(redeem, true);
