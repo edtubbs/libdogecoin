@@ -40,6 +40,12 @@ NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
+FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621}"
+FUNDED_UTXO_VOUT="${FUNDED_UTXO_VOUT:-0}"
+AUTO_PREPARE_TX_FROM_UTXO="${AUTO_PREPARE_TX_FROM_UTXO:-1}"
+TX_FEE_KOINU="${TX_FEE_KOINU:-100000}"
+FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-4194000000}"
+FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}"
 RUN_LOG="$TMPDIR/mainnet_dilithium2_run.log"
 # sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
@@ -113,6 +119,63 @@ load_mainnet_wallet() {
     success "Mainnet funded wallet loaded: $TESTNET_ADDR"
 }
 
+prepare_tx_from_funded_utxo() {
+    info "Constructing unsigned tx from configured funded UTXO..."
+    local selected_txid selected_vout selected_value selected_script send_value
+    selected_txid="$FUNDED_UTXO_TXID"
+    selected_vout="$FUNDED_UTXO_VOUT"
+    selected_value="$FUNDED_UTXO_VALUE_KOINU"
+    selected_script="$FUNDED_UTXO_SCRIPT_PUBKEY"
+
+    [ -n "$selected_txid" ] || error "FUNDED_UTXO_TXID is required"
+    [ -n "$selected_vout" ] || error "FUNDED_UTXO_VOUT is required"
+    [ -n "$selected_value" ] || error "FUNDED_UTXO_VALUE_KOINU is required"
+    [ -n "$selected_script" ] || error "FUNDED_UTXO_SCRIPT_PUBKEY is required"
+    if [ "$selected_value" -le "$TX_FEE_KOINU" ]; then
+        error "FUNDED_UTXO_VALUE_KOINU must be greater than TX_FEE_KOINU"
+    fi
+    send_value=$((selected_value - TX_FEE_KOINU))
+
+    RAW_UNSIGNED_TX=$(python3 - "$selected_txid" "$selected_vout" "$send_value" "$selected_script" <<'PY'
+import sys
+txid_hex = sys.argv[1].strip().lower()
+vout = int(sys.argv[2])
+value = int(sys.argv[3])
+script_hex = sys.argv[4].strip().lower()
+
+if len(txid_hex) != 64:
+    raise SystemExit("invalid txid length")
+if len(script_hex) % 2 != 0:
+    raise SystemExit("invalid script hex length")
+
+def le_u32(n): return n.to_bytes(4, "little", signed=False).hex()
+def le_u64(n): return n.to_bytes(8, "little", signed=False).hex()
+def varint(n):
+    if n < 0xfd: return f"{n:02x}"
+    if n <= 0xffff: return "fd" + n.to_bytes(2, "little").hex()
+    if n <= 0xffffffff: return "fe" + n.to_bytes(4, "little").hex()
+    return "ff" + n.to_bytes(8, "little").hex()
+
+raw = (
+    "01000000"
+    + "01"
+    + bytes.fromhex(txid_hex)[::-1].hex()
+    + le_u32(vout)
+    + "00"
+    + "ffffffff"
+    + "01"
+    + le_u64(value)
+    + varint(len(script_hex) // 2)
+    + script_hex
+    + "00000000"
+)
+print(raw)
+PY
+)
+    SCRIPT_PUBKEY="$selected_script"
+    success "Prepared RAW_UNSIGNED_TX from ${selected_txid}:${selected_vout} (same-address cascade output)"
+}
+
 generate_dilithium2_keypair() {
     info "Generating Dilithium2 keypair..."
     run_and_log "such dilithium2_keygen" ./such -c dilithium2_keygen | tee "$TMPDIR/dilithium2_keys.txt"
@@ -151,6 +214,9 @@ generate_commitment() {
 
 build_transaction() {
     info "Build unsigned mainnet tx with such, then paste hex below:"
+    if { [ -z "$RAW_UNSIGNED_TX" ] || [ -z "$SCRIPT_PUBKEY" ]; } && [ "$AUTO_PREPARE_TX_FROM_UTXO" -eq 1 ]; then
+        prepare_tx_from_funded_utxo
+    fi
     if [ -z "$RAW_UNSIGNED_TX" ] && [ "$NON_INTERACTIVE" -eq 1 ]; then
         error "RAW_UNSIGNED_TX must be set in NON_INTERACTIVE mode"
     fi
