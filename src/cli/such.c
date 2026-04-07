@@ -701,9 +701,9 @@ static void print_usage()
     printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <falcon_commitment_hex>),\n");
     printf("dilithium2_add_commit_tx (requires -x <raw_tx_hex> -s <dilithium2_commitment_hex>),\n");
     printf("raccoong_add_commit_tx (requires -x <raw_tx_hex> -s <raccoong_commitment_hex>),\n");
-    printf("falcon_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <falcon_commitment_hex> -k <falcon_pubkey_hex> -s <falcon_signature_hex> [-h <carrier_value_koinu, default 1000>]),\n");
-    printf("dilithium2_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <dilithium2_commitment_hex> -k <dilithium2_pubkey_hex> -s <dilithium2_signature_hex> [-h <carrier_value_koinu, default 1000>]),\n");
-    printf("raccoong_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <raccoong_commitment_hex> -k <raccoong_pubkey_hex> -s <raccoong_signature_hex> [-h <carrier_value_koinu, default 1000>]),\n");
+    printf("falcon_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <falcon_commitment_hex> -k <falcon_pubkey_hex> -s <falcon_signature_hex> [-h <carrier_value_koinu, default 100000000>]),\n");
+    printf("dilithium2_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <dilithium2_commitment_hex> -k <dilithium2_pubkey_hex> -s <dilithium2_signature_hex> [-h <carrier_value_koinu, default 100000000>]),\n");
+    printf("raccoong_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <raccoong_commitment_hex> -k <raccoong_pubkey_hex> -s <raccoong_signature_hex> [-h <carrier_value_koinu, default 100000000>]),\n");
 #endif
     printf("\nExamples: \n");
     printf("Generate a testnet private ec keypair wif/hex:\n");
@@ -980,6 +980,22 @@ static dogecoin_bool such_tx_add_commit_and_carrier_outputs(
         cstr_free(redeem, true);
         dogecoin_free(full);
         return false;
+    }
+
+    /* Deduct the total carrier cost from the first output (change/send-back)
+       so that the miner fee stays intact instead of being consumed by carriers. */
+    uint64_t carrier_total = (uint64_t)part_total * carrier_value_koinu;
+    if (tx->vout->len > 0) {
+        dogecoin_tx_out* change_out = vector_idx(tx->vout, 0);
+        if (change_out->value < carrier_total) {
+            printf("Error: change output (%llu) too small for carrier total (%llu)\n",
+                   (unsigned long long)change_out->value, (unsigned long long)carrier_total);
+            cstr_free(carrier_spk, true);
+            cstr_free(redeem, true);
+            dogecoin_free(full);
+            return false;
+        }
+        change_out->value -= carrier_total;
     }
 
     *out_carrier_spk = carrier_spk;
@@ -3112,7 +3128,7 @@ int main(int argc, char* argv[])
         if ((strlen(txhex) % 2) != 0) {
             return showError("Raw transaction hex length must be even\n");
         }
-        uint64_t carrier_value_koinu = (sighashtype > 0) ? (uint64_t)sighashtype : 1000;
+        uint64_t carrier_value_koinu = (sighashtype > 0) ? (uint64_t)sighashtype : 100000000;
 
         dogecoin_tx* tx = dogecoin_tx_new();
         uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);

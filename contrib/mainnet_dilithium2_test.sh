@@ -44,6 +44,7 @@ FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-${CHAINED_UTXO_TXID:-63d79b47b6d55b5143afb
 FUNDED_UTXO_VOUT="${FUNDED_UTXO_VOUT:-${CHAINED_UTXO_VOUT:-0}}"
 AUTO_PREPARE_TX_FROM_UTXO="${AUTO_PREPARE_TX_FROM_UTXO:-1}"
 TX_FEE_KOINU="${TX_FEE_KOINU:-100000}"
+CARRIER_VALUE_KOINU="${CARRIER_VALUE_KOINU:-100000000}"
 FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-${CHAINED_UTXO_VALUE_KOINU:-4193900000}}"
 FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}}"
 RUN_LOG="$TMPDIR/mainnet_dilithium2_run.log"
@@ -253,7 +254,7 @@ build_transaction() {
     sign_message_dilithium2
     generate_commitment
 
-    ADD_COMMIT_AND_CARRIER_OUTPUT=$(run_and_log "such dilithium2_add_commit_and_carrier_tx" ./such -c dilithium2_add_commit_and_carrier_tx -x "$RAW_UNSIGNED_TX" -m "$DILITHIUM2_COMMIT" -k "$DILITHIUM2_PK" -s "$DILITHIUM2_SIG" -h 1000)
+    ADD_COMMIT_AND_CARRIER_OUTPUT=$(run_and_log "such dilithium2_add_commit_and_carrier_tx" ./such -c dilithium2_add_commit_and_carrier_tx -x "$RAW_UNSIGNED_TX" -m "$DILITHIUM2_COMMIT" -k "$DILITHIUM2_PK" -s "$DILITHIUM2_SIG" -h "$CARRIER_VALUE_KOINU")
     echo "$ADD_COMMIT_AND_CARRIER_OUTPUT"
     TX_C_UNSIGNED=$(echo "$ADD_COMMIT_AND_CARRIER_OUTPUT" | awk -F': ' '/^tx with commitment and carrier outputs:/ {print $2; exit}' | tr -d ' ')
     [ -n "$TX_C_UNSIGNED" ] || error "Failed to append Dilithium2 commitment + carrier outputs"
