@@ -731,8 +731,7 @@ monitor_spvnode() {
             if [ "$CARRIER_ENABLED" -eq 1 ] && [ -n "$TX_R_TXID" ]; then
                 op_return_only_line=$(grep -F "[falcon-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$FALCON_COMMIT" | grep -F "source=op_return_only" | tail -n1 || true)
                 if [ -n "$op_return_only_line" ]; then
-                    echo "$op_return_only_line" | tee -a "$RUN_LOG"
-                    error "spvnode validated commitment as source=op_return_only; expected source=scriptsig"
+                    info "TX_C OP_RETURN commitment found; waiting for TX_R carrier_scriptsig match in a later block..."
                 fi
             fi
             if ! kill -0 "$spv_pipe_pid" 2>/dev/null; then
