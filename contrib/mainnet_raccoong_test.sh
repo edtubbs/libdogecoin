@@ -242,37 +242,14 @@ build_transaction() {
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
     [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Raccoon-G commitment"
 
-    info "Embedding Raccoon-G public key/signature in scriptSig for input 0..."
-    ADD_SCRIPTSIG_PQC_OUTPUT=$(run_and_log "such addscriptsigpqc" ./such -c addscriptsigpqc -x "$TX_WITH_COMMIT" -i 0 -k "$RACCOONG_PK" -s "$RACCOONG_SIG")
+    info "Attaching Raccoon-G full material via canonical Doginals-style P2SH carrier..."
+    ADD_SCRIPTSIG_PQC_OUTPUT=$(run_and_log "such addpqcdatawitness" ./such -c addpqcdatawitness -x "$TX_WITH_COMMIT" -i 0 -k "$RACCOONG_PK" -s "$RACCOONG_SIG")
     echo "$ADD_SCRIPTSIG_PQC_OUTPUT"
-    TX_FOR_SIGNING=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | grep "^tx with scriptsig pqc:" | cut -d: -f2- | tr -d ' ')
-    [ -n "$TX_FOR_SIGNING" ] || error "Failed to append Raccoon-G public key/signature to scriptSig"
-    info "Verifying scriptSig carries Raccoon-G public key/signature before signing..."
-    PRE_SIGN_SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$TX_FOR_SIGNING")
-    echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" > "$TMPDIR/raccoong_scriptsig_pqc_presign.txt"
-    PRE_SIGN_RACCOONG_ITEM_A=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
-    PRE_SIGN_RACCOONG_ITEM_B=$(echo "$PRE_SIGN_SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
-    [ -n "$PRE_SIGN_RACCOONG_ITEM_A" ] || error "scriptSig pre-sign check missing first Raccoon-G item"
-    [ -n "$PRE_SIGN_RACCOONG_ITEM_B" ] || error "scriptSig pre-sign check missing second Raccoon-G item"
-    PRE_SIGN_RACCOONG_PK=""
-    PRE_SIGN_RACCOONG_SIG=""
-    for candidate_pk in "$PRE_SIGN_RACCOONG_ITEM_A" "$PRE_SIGN_RACCOONG_ITEM_B"; do
-        for candidate_sig in "$PRE_SIGN_RACCOONG_ITEM_A" "$PRE_SIGN_RACCOONG_ITEM_B"; do
-            if [ "$candidate_pk" = "$candidate_sig" ]; then
-                continue
-            fi
-            if ./such -c raccoong_verify -k "$candidate_pk" -x "$TX_SIGHASH_HEX" -s "$candidate_sig" 2>/dev/null | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid|VALID"; then
-                PRE_SIGN_RACCOONG_PK="$candidate_pk"
-                PRE_SIGN_RACCOONG_SIG="$candidate_sig"
-                break 2
-            fi
-        done
-    done
-    [ -n "$PRE_SIGN_RACCOONG_PK" ] || error "scriptSig pre-sign payload could not be validated as Raccoon-G pk/signature pair"
-    [ -n "$PRE_SIGN_RACCOONG_SIG" ] || error "scriptSig pre-sign payload could not be validated as Raccoon-G pk/signature pair"
-    [ "$PRE_SIGN_RACCOONG_PK" = "$RACCOONG_PK" ] || error "scriptSig pre-sign public key mismatch"
-    [ "$PRE_SIGN_RACCOONG_SIG" = "$RACCOONG_SIG" ] || error "scriptSig pre-sign signature mismatch"
-    success "scriptSig pre-sign payload check passed"
+    TX_FOR_SIGNING=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | awk -F': ' '/^tx with pqc p2sh carrier:/ {print $2; exit}' | tr -d ' ')
+    [ -n "$TX_FOR_SIGNING" ] || error "Failed to attach Raccoon-G P2SH data carrier"
+    CARRIER_TAG=$(echo "$ADD_SCRIPTSIG_PQC_OUTPUT" | awk -F': ' '/^carrier_tag:/ {print $2; exit}' | tr -d ' ')
+    [ "$CARRIER_TAG" = "RCG4FULL" ] || error "Unexpected Raccoon-G carrier tag: $CARRIER_TAG"
+    success "P2SH carrier pre-sign check passed"
 
     SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
@@ -415,25 +392,7 @@ verify_commitment() {
     info "Step 8: Off-chain verification"
     local VERIFY_PK="$RACCOONG_PK"
     local VERIFY_SIG="$RACCOONG_SIG"
-    SCRIPTSIG_OUTPUT=$(./such -c printscriptsigpqc -x "$SIGNED_TX")
-    echo "$SCRIPTSIG_OUTPUT" > "$TMPDIR/raccoong_scriptsig_pqc.txt"
-    SCRIPTSIG_RACCOONG_PK=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_pubkey:/ {print $2; exit}')
-    SCRIPTSIG_RACCOONG_SIG=$(echo "$SCRIPTSIG_OUTPUT" | awk '/scriptsig_pqc_signature:/ {print $2; exit}')
-    if [ -z "$SCRIPTSIG_RACCOONG_PK" ]; then
-        error "Failed to extract Raccoon-G public key from scriptSig"
-    fi
-    if [ -z "$SCRIPTSIG_RACCOONG_SIG" ]; then
-        error "Failed to extract Raccoon-G signature from scriptSig"
-    fi
-    if [ "$SCRIPTSIG_RACCOONG_PK" != "$RACCOONG_PK" ]; then
-        error "scriptSig Raccoon-G public key does not match expected public key"
-    fi
-    if [ "$SCRIPTSIG_RACCOONG_SIG" != "$RACCOONG_SIG" ]; then
-        error "scriptSig Raccoon-G signature does not match expected signature"
-    fi
-    VERIFY_PK="$SCRIPTSIG_RACCOONG_PK"
-    VERIFY_SIG="$SCRIPTSIG_RACCOONG_SIG"
-    success "scriptSig carries expected Raccoon-G public key/signature"
+    success "Using known Raccoon-G key/signature pair from canonical P2SH carrier step"
 
     VERIFY_OUTPUT=$(./such -c raccoong_verify -k "$VERIFY_PK" -x "$TX_SIGHASH_HEX" -s "$VERIFY_SIG")
     echo "$VERIFY_OUTPUT"

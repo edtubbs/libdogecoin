@@ -107,58 +107,47 @@ commitment32 = SHA256(public_key_bytes || signature_bytes)
 
 This keeps Phase 1 commitment publication consensus-neutral while still binding the off-chain PQ proof to a concrete transaction authorization digest.
 
-===Phase 1: On-chain PQ Verification Material via P2SH-P2WSH Data Carrier===
+===Phase 1: On-chain PQ Verification Material via Doginals-Style P2SH Data Carrier===
 
-For relay-policy compatibility, Phase 1 carries PQ verification material in witness when spending a segwit output (P2SH-P2WSH), while OP_RETURN keeps acting as the index/telemetry anchor.
+For relay-policy compatibility in current Dogecoin policy, Phase 1 canonical full-material publication uses a Doginals-style P2SH redeemScript envelope (not segwit witness), while OP_RETURN remains the index/telemetry anchor.
 
 Flow:
-# construct witnessScript as <code>OP_DROP</code> repeated N times, then <code>OP_1</code>;
-# compute redeemScript as segwit v0 witness program <code>0 &lt;SHA256(witnessScript)&gt;</code>;
-# fund a P2SH output paying to <code>HASH160(redeemScript)</code>;
-# spend that UTXO with:
-## scriptSig = push(redeemScript),
-## witness stack = <code>&lt;chunk0&gt; ... &lt;chunkN-1&gt; &lt;witnessScript&gt;</code>.
-
-All payload chunks MUST be <=520 bytes.
+# derive <code>message32</code> from the base transaction template (before commitment output);
+# produce PQ signature over <code>message32</code>;
+# append canonical tagged OP_RETURN commitment output to the transaction;
+# construct P2SH redeemScript envelope carrying full payload:
+## push <code>FLC1FULL</code> / <code>DIL2FULL</code> / <code>RCG4FULL</code>;
+## push 2-byte pubkey length;
+## push pubkey bytes (chunked pushes when large);
+## push 2-byte signature length;
+## push signature bytes (chunked pushes when large);
+## cleanup sequence (<code>OP_DROP</code>...) ending with <code>OP_1</code>.
+# fund/spend the matching P2SH output:
+## <code>scriptPubKey = OP_HASH160 HASH160(redeemScript) OP_EQUAL</code>;
+## <code>scriptSig = push(redeemScript)</code>.
 
 Example transaction skeleton:
 
 <source>
-vin[0]: spends P2SH-P2WSH prevout (scriptPubKey = OP_HASH160 <20-byte> OP_EQUAL)
-  scriptSig: push(redeemScript = 0 <32-byte SHA256(witnessScript)>)
-  witness: [chunk0, chunk1, ..., chunkN-1, witnessScript]   # total items = N + 1
-vout[0]: normal payment/change output (e.g. P2PKH)
+vin[0]: spends P2SH prevout (scriptPubKey = OP_HASH160 <20-byte> OP_EQUAL)
+  scriptSig: push(redeemScript carrying TAGFULL + len fields + payload chunks + cleanup + OP_TRUE)
+  witness: empty
+vout[0]: normal payment/change output (same-address cascade output is supported)
 vout[1]: OP_RETURN <TAG(4 bytes) || commitment32(32 bytes)>
 </source>
 
-Witness MUST NOT be attached to legacy (non-segwit) spends.
-
-In libdogecoin tooling, canonical Phase 1 flow is:
-
-# derive <code>message32</code> from the base transaction template (before commitment output);
-# produce PQ signature over <code>message32</code>;
-# append canonical tagged OP_RETURN commitment output to the transaction;
-# construct witness carrier payload as <code>pqc_pubkey || pqc_signature</code>;
-# chunk payload into <=520-byte pieces;
-# build witnessScript as <code>OP_DROP x N + OP_1</code>;
-# compute redeemScript as <code>OP_0 + SHA256(witnessScript)</code>;
-# spend a matching P2SH-P2WSH prevout with:
-## <code>scriptSig = push(redeemScript)</code>;
-## <code>witness = [chunk0, ..., chunkN-1, witnessScript]</code>.
-
-This keeps the on-chain commitment format unchanged while making verification material retrievable from witness bytes for verifier-side reconstruction:
+This keeps the on-chain commitment format unchanged while making full verification material retrievable from redeemScript payload bytes:
 
 <source>
-commitment32 == SHA256(witness_payload_pubkey_bytes || witness_payload_signature_bytes)
+commitment32 == SHA256(redeem_payload_pubkey_bytes || redeem_payload_signature_bytes)
 </source>
 
-Off-chain verification SHOULD use witness payload bytes (reassembled from chunks) as the canonical on-chain PQ data source for:
+Off-chain verification SHOULD use reconstructed redeemScript payload bytes for:
 
 * <code>PQ_VERIFY(payload_pubkey, message32, payload_signature)</code>, and
 * commitment reconstruction check against OP_RETURN-tagged commitment payload.
-* optional witness stack length logging for matching commitment transactions.
 
-Direct scriptSig pubkey/signature pushes are '''non-standard for relay on mainnet policy''' and are deprecated for Phase 1 publication. They MAY be used only in internal/regtest/non-relayed tests.
+Direct scriptSig pubkey/signature pushes are deprecated and SHOULD be treated as internal/regtest/non-relayed test helpers only. Legacy P2SH-P2WSH witness-carrier text is non-canonical for current relay policy.
 
 ===Phase 1: Base Transaction Binding===
 
@@ -264,7 +253,7 @@ Current reference behavior exists in libdogecoin components that:
 Current CLI wiring reflects this implementation model:
 
 * <code>such -c tx_sighash32</code> derives transaction-bound digest bytes for a selected input;
-* <code>such -c addpqcdatawitness</code> is the canonical command to attach PQ payload via P2SH-P2WSH witness carrier;
+* <code>such -c addpqcdatawitness</code> is the canonical command to attach PQ payload via Doginals-style P2SH redeemScript carrier;
 * <code>such -c addscriptsigpqc</code> is deprecated and test-only (regtest/non-relayed helper);
 * <code>such -c printscriptsigpqc</code> inspects deprecated scriptSig payloads for test workflows;
 * <code>such -c falcon_sign</code> / <code>dilithium2_sign</code> accept message bytes via <code>-x</code> (including tx_sighash32 hex);
@@ -275,7 +264,7 @@ Current CLI wiring reflects this implementation model:
 
 Current end-to-end script behavior is aligned across mainnet and testnet flows:
 
-* canonical mode: publishes full PQ pubkey/signature via P2SH-P2WSH witness carrier; and
+* canonical mode: publishes full PQ pubkey/signature via Doginals-style P2SH redeemScript carrier; and
 * SPV scanning runs until relevant transaction detection and records elapsed timing telemetry.
 
 ==Deployment==

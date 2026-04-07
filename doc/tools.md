@@ -492,15 +492,15 @@ The `such` tool includes PQC commands for Falcon-512 and Dilithium2 commitments.
 | - | - | - |
 | falcon_keygen | None | Generates a Falcon-512 keypair (public key: 897 bytes, secret key: 1281 bytes) |
 | tx_sighash32 | -x, -s, -i, -h | Derives transaction input sighash32 used by signing flows |
-| addpqcdatawitness | -x, -i, -k, -s, (-h optional) | Canonical Phase-1 carrier: chunks `pubkey||signature` into <=520-byte witness items and applies P2SH-P2WSH redeemScript + witness stack |
+| addpqcdatawitness | -x, -i, -k, -s, (-h optional) | Canonical Phase-1 carrier: builds Doginals-style P2SH redeemScript envelope (`TAGFULL`, length pushes, payload chunks, cleanup + OP_TRUE) and applies as scriptSig redeemScript |
 | addscriptsigpqc | -x, -i, -k, -s | **Deprecated** non-standard scriptSig helper (regtest/internal only; not mainnet relay-safe) |
 | printscriptsigpqc | -x | Prints deprecated scriptSig PQ payload (inspection helper for non-relayed/test flows) |
 | addwitness | -x, -i, -s | Appends witness item bytes to a transaction input (policy-sanity: P2SH-P2WSH spends only) |
 | printwitness | -x | Prints per-input witness stack items from a raw transaction (legacy helper) |
-| p2sh_p2wsh_datacarrier_witness_script | -i | Builds witnessScript as OP_DROP x N + OP_1, where N is chunk count |
-| p2sh_p2wsh_datacarrier_scriptpubkey | -s | Returns redeemScript and P2SH scriptPubKey for witness_script_hex |
+| p2sh_p2wsh_datacarrier_witness_script | -i | Legacy helper for witness-carrier experiments |
+| p2sh_p2wsh_datacarrier_scriptpubkey | -s | Legacy helper for witness-carrier experiments |
 | pqc_chunk_hex | -x, (-h optional) | Splits payload hex into <= max_chunk_bytes chunks (default 520) |
-| apply_p2sh_p2wsh_redeemscript_and_witness | -x, -i, -s, -k, -m | Applies redeemScript in scriptSig and sets witness stack chunks + witnessScript |
+| apply_p2sh_p2wsh_redeemscript_and_witness | -x, -i, -s, -k, -m | Legacy helper for witness-carrier experiments |
 | falcon_sign | -p, -x | Signs message bytes (typically tx_sighash32 hex) with Falcon-512 secret key. Returns signature (~660 bytes) |
 | falcon_verify | -k, -x, -s | Verifies a Falcon-512 signature against message bytes and public key |
 | falcon_commit | -k, -s | Generates a 32-byte SHA256 commitment from public key and signature for OP_RETURN |
@@ -594,22 +594,22 @@ Generating Falcon-512 commitment...
 Commitment (32 bytes): a1b2c3d4e5f6789...
 ```
 
-#### Canonical: attach PQ public key/signature using P2SH-P2WSH witness carrier:
+#### Canonical: attach PQ public key/signature using Doginals-style P2SH redeemScript carrier:
 ```bash
 # Applies:
-# - scriptSig = push(redeemScript)
-# - witness = [chunk0, ..., chunkN-1, witnessScript]
-# where witnessScript = OP_DROP x N + OP_1
-TX_WITH_PQC_WITNESS=$(./such -c addpqcdatawitness -x <tx_with_commit_hex> -i 0 -k <falcon_public_key_hex> -s <falcon_signature_hex> | awk -F': ' '/tx with pqc witness carrier:/ {print $2}')
+# - scriptSig = push(redeemScript carrying TAGFULL + lengths + payload chunks + cleanup + OP_TRUE)
+# - witness remains empty
+TX_WITH_PQC_P2SH=$(./such -c addpqcdatawitness -x <tx_with_commit_hex> -i 0 -k <falcon_public_key_hex> -s <falcon_signature_hex> | awk -F': ' '/tx with pqc p2sh carrier:/ {print $2}')
 ```
 
 Output:
 ```
-tx with pqc witness carrier: <raw_tx_hex_with_witness>
-redeemscript: 0020<32-byte-sha256(witness_script)>
-witness_script: 7575...51
+tx with pqc p2sh carrier: <raw_tx_hex_with_redeemscript_payload>
+carrier_tag: FLC1FULL|DIL2FULL|RCG4FULL
+pubkey_chunks: <n>
+signature_chunks: <m>
+redeemscript: <doginals_style_tagged_redeemscript_hex>
 scriptpubkey: a914...87
-input[0] witness items: N+1
 ```
 
 #### Deprecated (non-standard relay) scriptSig payload helper:
