@@ -121,26 +121,44 @@ Flow:
 
 All payload chunks MUST be <=520 bytes.
 
-Witness MUST NOT be attached to legacy (non-segwit) spends.
-
-In libdogecoin tooling, a practical flow is:
-
-# build tx with tagged OP_RETURN commitment output;
-# append scriptSig push 0 for the spending input with the PQ public key hex;
-# append scriptSig push 1 for the same input with the PQ signature hex; and
-# sign/broadcast transaction normally.
-
-This keeps the on-chain commitment format unchanged while making verification material retrievable from scriptSig bytes for verifier-side reconstruction:
+Example transaction skeleton:
 
 <source>
-commitment32 == SHA256(scriptsig_push0_pubkey_bytes || scriptsig_push1_signature_bytes)
+vin[0]: spends P2SH-P2WSH prevout (scriptPubKey = OP_HASH160 <20-byte> OP_EQUAL)
+  scriptSig: push(redeemScript = 0 <32-byte SHA256(witnessScript)>)
+  witness: [chunk0, chunk1, ..., chunkN-1, witnessScript]   # total items = N + 1
+vout[0]: normal payment/change output (e.g. P2PKH)
+vout[1]: OP_RETURN <TAG(4 bytes) || commitment32(32 bytes)>
 </source>
 
-Off-chain verification SHOULD use scriptSig push 0 (PQ public key) and scriptSig push 1 (PQ signature) as the canonical on-chain PQ data source for:
+Witness MUST NOT be attached to legacy (non-segwit) spends.
 
-* <code>PQ_VERIFY(scriptsig_push0_pubkey, message32, scriptsig_push1_signature)</code>, and
+In libdogecoin tooling, canonical Phase 1 flow is:
+
+# derive <code>message32</code> from the base transaction template (before commitment output);
+# produce PQ signature over <code>message32</code>;
+# append canonical tagged OP_RETURN commitment output to the transaction;
+# construct witness carrier payload as <code>pqc_pubkey || pqc_signature</code>;
+# chunk payload into <=520-byte pieces;
+# build witnessScript as <code>OP_DROP x N + OP_1</code>;
+# compute redeemScript as <code>OP_0 + SHA256(witnessScript)</code>;
+# spend a matching P2SH-P2WSH prevout with:
+## <code>scriptSig = push(redeemScript)</code>;
+## <code>witness = [chunk0, ..., chunkN-1, witnessScript]</code>.
+
+This keeps the on-chain commitment format unchanged while making verification material retrievable from witness bytes for verifier-side reconstruction:
+
+<source>
+commitment32 == SHA256(witness_payload_pubkey_bytes || witness_payload_signature_bytes)
+</source>
+
+Off-chain verification SHOULD use witness payload bytes (reassembled from chunks) as the canonical on-chain PQ data source for:
+
+* <code>PQ_VERIFY(payload_pubkey, message32, payload_signature)</code>, and
 * commitment reconstruction check against OP_RETURN-tagged commitment payload.
 * optional witness stack length logging for matching commitment transactions.
+
+Direct scriptSig pubkey/signature pushes are '''non-standard for relay on mainnet policy''' and are deprecated for Phase 1 publication. They MAY be used only in internal/regtest/non-relayed tests.
 
 ===Phase 1: Base Transaction Binding===
 
@@ -246,8 +264,9 @@ Current reference behavior exists in libdogecoin components that:
 Current CLI wiring reflects this implementation model:
 
 * <code>such -c tx_sighash32</code> derives transaction-bound digest bytes for a selected input;
-* <code>such -c addscriptsigpqc</code> appends PQ public key/signature pushes to a chosen input scriptSig;
-* <code>such -c printscriptsigpqc</code> inspects scriptSig PQ payload for verifier extraction workflows;
+* <code>such -c addpqcdatawitness</code> is the canonical command to attach PQ payload via P2SH-P2WSH witness carrier;
+* <code>such -c addscriptsigpqc</code> is deprecated and test-only (regtest/non-relayed helper);
+* <code>such -c printscriptsigpqc</code> inspects deprecated scriptSig payloads for test workflows;
 * <code>such -c falcon_sign</code> / <code>dilithium2_sign</code> accept message bytes via <code>-x</code> (including tx_sighash32 hex);
 * <code>such -c falcon_commit</code> / <code>dilithium2_commit</code> derive commitment32 from public key + signature; and
 * <code>such -c raccoong_commit</code> derives Raccoon-G-44 commitment32 from public key + signature;
@@ -256,7 +275,7 @@ Current CLI wiring reflects this implementation model:
 
 Current end-to-end script behavior is aligned across mainnet and testnet flows:
 
-* scriptSig mode: appends PQ pubkey/signature to scriptSig push slots [0]/[1]; and
+* canonical mode: publishes full PQ pubkey/signature via P2SH-P2WSH witness carrier; and
 * SPV scanning runs until relevant transaction detection and records elapsed timing telemetry.
 
 ==Deployment==

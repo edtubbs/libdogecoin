@@ -492,8 +492,9 @@ The `such` tool includes PQC commands for Falcon-512 and Dilithium2 commitments.
 | - | - | - |
 | falcon_keygen | None | Generates a Falcon-512 keypair (public key: 897 bytes, secret key: 1281 bytes) |
 | tx_sighash32 | -x, -s, -i, -h | Derives transaction input sighash32 used by signing flows |
-| addscriptsigpqc | -x, -i, -k, -s | Appends PQ public key and PQ signature bytes as first two pushes in input scriptSig |
-| printscriptsigpqc | -x | Prints extracted PQ public key/signature from per-input scriptSig pushes |
+| addpqcdatawitness | -x, -i, -k, -s, (-h optional) | Canonical Phase-1 carrier: chunks `pubkey||signature` into <=520-byte witness items and applies P2SH-P2WSH redeemScript + witness stack |
+| addscriptsigpqc | -x, -i, -k, -s | **Deprecated** non-standard scriptSig helper (regtest/internal only; not mainnet relay-safe) |
+| printscriptsigpqc | -x | Prints deprecated scriptSig PQ payload (inspection helper for non-relayed/test flows) |
 | addwitness | -x, -i, -s | Appends witness item bytes to a transaction input (policy-sanity: P2SH-P2WSH spends only) |
 | printwitness | -x | Prints per-input witness stack items from a raw transaction (legacy helper) |
 | p2sh_p2wsh_datacarrier_witness_script | -i | Builds witnessScript as OP_DROP x N + OP_1, where N is chunk count |
@@ -593,20 +594,29 @@ Generating Falcon-512 commitment...
 Commitment (32 bytes): a1b2c3d4e5f6789...
 ```
 
-#### Attach PQ public key/signature in scriptSig and inspect:
+#### Canonical: attach PQ public key/signature using P2SH-P2WSH witness carrier:
 ```bash
-# Append Falcon public key/signature as scriptSig pushes on input 0
-TX_WITH_SCRIPTSIG_PQC=$(./such -c addscriptsigpqc -x <tx_with_commit_hex> -i 0 -k <falcon_public_key_hex> -s <falcon_signature_hex> | awk '/tx with scriptsig pqc:/ {print $5}')
-
-# Verify scriptSig PQC payload
-./such -c printscriptsigpqc -x $TX_WITH_SCRIPTSIG_PQC
+# Applies:
+# - scriptSig = push(redeemScript)
+# - witness = [chunk0, ..., chunkN-1, witnessScript]
+# where witnessScript = OP_DROP x N + OP_1
+TX_WITH_PQC_WITNESS=$(./such -c addpqcdatawitness -x <tx_with_commit_hex> -i 0 -k <falcon_public_key_hex> -s <falcon_signature_hex> | awk -F': ' '/tx with pqc witness carrier:/ {print $2}')
 ```
 
 Output:
 ```
-input[0]
-  scriptsig_pqc_pubkey: <falcon_public_key_hex>
-  scriptsig_pqc_signature: <falcon_signature_hex>
+tx with pqc witness carrier: <raw_tx_hex_with_witness>
+redeemscript: 0020<32-byte-sha256(witness_script)>
+witness_script: 7575...51
+scriptpubkey: a914...87
+input[0] witness items: N+1
+```
+
+#### Deprecated (non-standard relay) scriptSig payload helper:
+```bash
+# regtest-only / non-relayed test helper
+./such -r -c addscriptsigpqc -x <tx_hex> -i 0 -k <pqc_public_key_hex> -s <pqc_signature_hex>
+./such -c printscriptsigpqc -x <tx_hex_with_legacy_scriptsig_payload>
 ```
 
 ### Testnet Workflow Helpers
@@ -621,7 +631,7 @@ For end-to-end mainnet command flow, use:
 - `contrib/mainnet_dilithium2_test.sh`
 - `contrib/mainnet_raccoong_test.sh`
 
-These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, scriptSig public-key/signature attachment, and SPV monitoring commands.
+These scripts walk through wallet/faucet setup, key generation, signing, commitment generation, transaction construction, canonical P2SH-P2WSH witness-carrier attachment, and SPV monitoring commands.
 
 For non-interactive execution (recommended for reproducible reruns/log capture), set:
 
