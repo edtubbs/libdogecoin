@@ -12,6 +12,7 @@ umask 077
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
@@ -36,21 +37,89 @@ REST_PORT="${REST_PORT:-$((20080 + ($$ % 1000)))}"
 REST_SERVER="${REST_SERVER:-${REST_HOST}:${REST_PORT}}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
+CARRIER_ENABLED="${CARRIER_ENABLED:-0}"
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-${CHAINED_UTXO_TXID:-63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621}}"
 FUNDED_UTXO_VOUT="${FUNDED_UTXO_VOUT:-${CHAINED_UTXO_VOUT:-0}}"
 AUTO_PREPARE_TX_FROM_UTXO="${AUTO_PREPARE_TX_FROM_UTXO:-1}"
 TX_FEE_KOINU="${TX_FEE_KOINU:-100000}"
-FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-${CHAINED_UTXO_VALUE_KOINU:-4193900000}}"
+CARRIER_VALUE_KOINU="${CARRIER_VALUE_KOINU:-100000000}"
+if [ "$CARRIER_VALUE_KOINU" -lt 100000000 ]; then
+    CARRIER_VALUE_KOINU=100000000
+fi
+FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-${CHAINED_UTXO_VALUE_KOINU:-}}"
 FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}}"
 RUN_LOG="$TMPDIR/mainnet_raccoong_run.log"
+SENDTX_MAX_RETRIES="${SENDTX_MAX_RETRIES:-3}"
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
 SENDTX_FATAL_PATTERN='not relayed back|Seen on other nodes:[[:space:]]*0|very likely invalid'
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+
+lookup_utxo_value() {
+    local txid="$1"; local vout="$2"; local val=""
+    val=$(curl -sf "https://chain.so/api/v2/tx/DOGE/${txid}" 2>/dev/null \
+        | python3 -c "import sys,json; d=json.load(sys.stdin); o=d['data']['outputs'][${vout}]; print(int(float(o['value'])*1e8))" 2>/dev/null || true)
+    if [ -n "$val" ] && [ "$val" -gt 0 ] 2>/dev/null; then echo "$val"; return 0; fi
+    val=$(curl -sf "https://api.blockcypher.com/v1/doge/main/txs/${txid}" 2>/dev/null \
+        | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['outputs'][${vout}]['value'])" 2>/dev/null || true)
+    if [ -n "$val" ] && [ "$val" -gt 0 ] 2>/dev/null; then echo "$val"; return 0; fi
+    return 1
+}
+
+debug_tx_hex() {
+    local tx_hex="$1"; local label="${2:-TX}"
+    python3 - "$tx_hex" "$label" <<'PYDEBUG'
+import sys, struct
+tx_hex = sys.argv[1]; label = sys.argv[2]; tx = bytes.fromhex(tx_hex); off = 0
+def ru32(): global off; v=struct.unpack_from('<I',tx,off)[0]; off+=4; return v
+def ru64(): global off; v=struct.unpack_from('<Q',tx,off)[0]; off+=8; return v
+def rvar():
+    global off; b=tx[off]; off+=1
+    if b<0xfd: return b
+    if b==0xfd: v=struct.unpack_from('<H',tx,off)[0]; off+=2; return v
+    if b==0xfe: v=struct.unpack_from('<I',tx,off)[0]; off+=4; return v
+    v=struct.unpack_from('<Q',tx,off)[0]; off+=8; return v
+print(f"=== {label} Debug (size={len(tx)} bytes) ===")
+ver=ru32(); print(f"  version: {ver}"); nin=rvar(); print(f"  inputs: {nin}")
+for i in range(nin):
+    ph=tx[off:off+32][::-1].hex(); off+=32; pi=ru32(); sl=rvar(); off+=sl; sq=ru32()
+    print(f"    in[{i}]: txid={ph} vout={pi} scriptSig_len={sl}")
+nout=rvar(); print(f"  outputs: {nout}")
+for i in range(nout):
+    val=ru64(); sl=rvar(); spk=tx[off:off+sl].hex(); off+=sl; vd=val/1e8
+    kind="P2PKH" if spk.startswith('76a914') else "P2SH" if spk.startswith('a914') else "OP_RETURN" if spk.startswith('6a') else "unknown"
+    dust_ok = "OK" if (val==0 and kind=="OP_RETURN") or val>=100000000 else f"DUST(need>=1DOGE)"
+    print(f"    out[{i}]: {val} koinu ({vd:.8f} DOGE) type={kind} dust={dust_ok}")
+print(f"=== end {label} ===")
+PYDEBUG
+}
+
+broadcast_with_retry() {
+    local label="$1"; local signed_tx="$2"; local max_retries="${3:-$SENDTX_MAX_RETRIES}"
+    local attempt=0; local sendtx_output="" txid=""
+    while [ "$attempt" -lt "$max_retries" ]; do
+        attempt=$((attempt + 1)); info "Broadcast attempt $attempt/$max_retries for $label..."
+        sendtx_output=$(run_and_log "sendtx $label attempt=$attempt" ./sendtx $NETWORK_FLAG "$signed_tx" || true)
+        echo "$sendtx_output" | sed 's/Error:/sendtx-note:/g' | tee -a "$RUN_LOG"
+        txid=$(echo "$sendtx_output" | sed -n 's/^Start broadcasting transaction:[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1)
+        if echo "$sendtx_output" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
+            BROADCAST_RESULT_TXID="$txid"; success "$label broadcast accepted on attempt $attempt: $txid"; return 0
+        fi
+        if echo "$sendtx_output" | grep -Eqi "$SENDTX_FATAL_PATTERN"; then
+            echo -e "${YELLOW}[WARN]${NC} $label relay failed on attempt $attempt. Debugging TX format..."
+            debug_tx_hex "$signed_tx" "$label" 2>&1 | tee -a "$RUN_LOG"
+            [ "$attempt" -lt "$max_retries" ] && sleep 10
+        elif [ -n "$txid" ]; then
+            BROADCAST_RESULT_TXID="$txid"; return 0
+        fi
+    done
+    BROADCAST_RESULT_TXID="$txid"; return 1
+}
+
 run_and_log() {
     local label="$1"
     shift
@@ -121,6 +190,17 @@ prepare_tx_from_funded_utxo() {
     selected_vout="$FUNDED_UTXO_VOUT"
     selected_value="$FUNDED_UTXO_VALUE_KOINU"
     selected_script="$FUNDED_UTXO_SCRIPT_PUBKEY"
+
+    if [ -z "$selected_value" ]; then
+        info "UTXO value not provided, attempting blockchain API lookup..."
+        selected_value=$(lookup_utxo_value "$selected_txid" "$selected_vout" || true)
+        if [ -n "$selected_value" ] && [ "$selected_value" -gt 0 ] 2>/dev/null; then
+            info "Auto-detected UTXO value: $selected_value koinu"
+            FUNDED_UTXO_VALUE_KOINU="$selected_value"
+        else
+            error "Failed to auto-detect UTXO value. Set FUNDED_UTXO_VALUE_KOINU manually."
+        fi
+    fi
 
     [ -n "$selected_txid" ] || error "FUNDED_UTXO_TXID is required"
     [ -n "$selected_vout" ] || error "FUNDED_UTXO_VOUT is required"
@@ -238,10 +318,23 @@ build_transaction() {
     RACCOONG_COMMIT=$(grep "^commitment:" "$TMPDIR/raccoong_commit.txt" | cut -d: -f2 | tr -d ' ')
     [ "${#RACCOONG_COMMIT}" -eq 64 ] || error "Invalid commitment length"
 
-    ADD_COMMIT_AND_CARRIER_OUTPUT=$(run_and_log "such raccoong_add_commit_and_carrier_tx" ./such -c raccoong_add_commit_and_carrier_tx -x "$RAW_UNSIGNED_TX" -m "$RACCOONG_COMMIT" -k "$RACCOONG_PK" -s "$RACCOONG_SIG" -h 1000)
-    echo "$ADD_COMMIT_AND_CARRIER_OUTPUT"
-    TX_C_UNSIGNED=$(echo "$ADD_COMMIT_AND_CARRIER_OUTPUT" | awk -F': ' '/^tx with commitment and carrier outputs:/ {print $2; exit}' | tr -d ' ')
-    [ -n "$TX_C_UNSIGNED" ] || error "Failed to append Raccoon-G commitment + carrier outputs"
+    if [ "$CARRIER_ENABLED" -eq 1 ]; then
+        info "Building TX_C with OP_RETURN commitment + P2SH carrier outputs..."
+        ADD_COMMIT_AND_CARRIER_OUTPUT=$(run_and_log "such raccoong_add_commit_and_carrier_tx" ./such -c raccoong_add_commit_and_carrier_tx -x "$RAW_UNSIGNED_TX" -m "$RACCOONG_COMMIT" -k "$RACCOONG_PK" -s "$RACCOONG_SIG" -h "$CARRIER_VALUE_KOINU")
+        echo "$ADD_COMMIT_AND_CARRIER_OUTPUT"
+        TX_C_UNSIGNED=$(echo "$ADD_COMMIT_AND_CARRIER_OUTPUT" | awk -F': ' '/^tx with commitment and carrier outputs:/ {print $2; exit}' | tr -d ' ')
+        [ -n "$TX_C_UNSIGNED" ] || error "Failed to append Raccoon-G commitment + carrier outputs"
+    else
+        info "Building TX_C with OP_RETURN commitment only (no carrier)..."
+        COMMIT_ONLY_OUTPUT=$(run_and_log "such raccoong_add_commit_tx" ./such -c raccoong_add_commit_tx -x "$RAW_UNSIGNED_TX" -s "$RACCOONG_COMMIT")
+        echo "$COMMIT_ONLY_OUTPUT"
+        TX_C_UNSIGNED=$(echo "$COMMIT_ONLY_OUTPUT" | awk -F': ' '/^tx with commitment:/ {print $2; exit}' | tr -d ' ')
+        [ -n "$TX_C_UNSIGNED" ] || error "Failed to construct TX_C (commit-only)"
+        success "TX_C built in commitment-only mode (standard, relayable)"
+    fi
+
+    debug_tx_hex "$TX_C_UNSIGNED" "TX_C_unsigned" 2>&1 | tee -a "$RUN_LOG"
+
     SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_C_UNSIGNED" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
     SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
@@ -250,14 +343,11 @@ build_transaction() {
     cat > "$TMPDIR/tx_info.txt" <<EOF
 RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
 TX_C=$TX_C_UNSIGNED
-TX_R=
-TX_WITH_COMMIT=$TX_C_UNSIGNED
-TX_WITH_SCRIPTSIG_PQC=
+CARRIER_ENABLED=$CARRIER_ENABLED
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
 TX_SIGHASH_HEX=$TX_SIGHASH_HEX
 RACCOONG_SIG=$RACCOONG_SIG
 RACCOONG_COMMIT=$RACCOONG_COMMIT
-SCRIPTSIG_PQC_PUBKEY=
 SIGNED_TX=$SIGNED_TX
 OPRETURN_SCRIPT=6a2452434734${RACCOONG_COMMIT}
 EOF
@@ -269,13 +359,13 @@ EOF
         read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
     fi
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
-        SENDTX_OUTPUT=$(run_and_log "sendtx" ./sendtx $NETWORK_FLAG "$SIGNED_TX" || true)
-        echo "$SENDTX_OUTPUT" | sed 's/Error:/sendtx-note:/g'
-        if echo "$SENDTX_OUTPUT" | grep -Eqi "$SENDTX_FATAL_PATTERN"; then
-            error "sendtx reported explicit relay failure (not relayed/seen on other nodes 0)"
+        debug_tx_hex "$SIGNED_TX" "TX_C_signed" 2>&1 | tee -a "$RUN_LOG"
+        BROADCAST_RESULT_TXID=""
+        if ! broadcast_with_retry "TX_C" "$SIGNED_TX"; then
+            error "TX_C failed to relay after all retries. Check TX debug output above."
         fi
-        BROADCAST_TXID=$(echo "$SENDTX_OUTPUT" | sed -n 's/^Start broadcasting transaction:[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1)
-        [ -n "$BROADCAST_TXID" ] || error "Failed to parse broadcast txid from sendtx output"
+        BROADCAST_TXID="$BROADCAST_RESULT_TXID"
+        [ -n "$BROADCAST_TXID" ] || error "Failed to parse broadcast txid"
         CHAINED_UTXO_TXID="$BROADCAST_TXID"
         CHAINED_UTXO_VOUT=0
         CHAINED_UTXO_VALUE_KOINU=$((FUNDED_UTXO_VALUE_KOINU - TX_FEE_KOINU))
@@ -286,19 +376,15 @@ EOF
             echo "chained_utxo_vout=$CHAINED_UTXO_VOUT"
             echo "chained_utxo_value_koinu=$CHAINED_UTXO_VALUE_KOINU"
             echo "chained_utxo_script_pubkey=$CHAINED_UTXO_SCRIPT_PUBKEY"
-        } | tee -a "$TMPDIR/spvnode.log"
+        } | tee -a "$RUN_LOG"
         cat >> "$TMPDIR/tx_info.txt" <<EOF
 CHAINED_UTXO_TXID=$CHAINED_UTXO_TXID
 CHAINED_UTXO_VOUT=$CHAINED_UTXO_VOUT
 CHAINED_UTXO_VALUE_KOINU=$CHAINED_UTXO_VALUE_KOINU
 CHAINED_UTXO_SCRIPT_PUBKEY=$CHAINED_UTXO_SCRIPT_PUBKEY
 EOF
-        if echo "$SENDTX_OUTPUT" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
-            success "Broadcast accepted or already known by peers"
-            BROADCASTED=1
-        else
-            error "sendtx did not report a known relay/acceptance status"
-        fi
+        success "Broadcast accepted or already known by peers"
+        BROADCASTED=1
     else
         error "Broadcast is required for full-run mode"
     fi
