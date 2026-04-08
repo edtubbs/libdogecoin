@@ -354,6 +354,82 @@ Current end-to-end script behavior is aligned across mainnet and testnet flows:
 * SPV scanning validates on-chain PQC commitments using carrier scriptSig data, logs pk_len/sig_len/prefix details; and
 * all transaction change outputs are sent back to the same funded address to enable chained testing.
 
+==Mainnet Examples==
+
+The following examples are from confirmed mainnet transactions demonstrating Phase 1 PQC commitment publication and SPV validation.
+
+===Falcon-512 Carrier Mode (TX_C + TX_R)===
+
+Commitment transaction (TX_C) with OP_RETURN commitment and P2SH carrier output:
+
+<source>
+TX_C txid:   b47b271ff454ce93e93f723b52959f9d14f44313c61706453c1a85aaced93031
+Block:       6156590 (mainnet, confirmed 2026-04-08T00:33:20Z)
+Funded addr: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+Carrier P2SH: A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q
+
+Outputs:
+  vout 0: 35.933 DOGE → DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (change)
+  vout 1: OP_RETURN 6a24 464c4331 94308315af52359db5af07391ab12fc14909dc6fe64182477ea61c96e8ab8b9f
+  vout 2: 1.0 DOGE → A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q (P2SH carrier)
+</source>
+
+SPV validation log for the OP_RETURN commitment:
+
+<source>
+[falcon-commit] Valid at height=6156590 txpos=6 commit=94308315af52359db5af07391ab12fc14909dc6fe64182477ea61c96e8ab8b9f source=op_return_only
+</source>
+
+SPV validation log for carrier_scriptsig (from earlier TX_R spending a carrier output):
+
+<source>
+[falcon-commit] Valid at height=6156389 txpos=2 commit=492c7dcba00e3e48cb22ce55ee4954312017ace60f2a40b523db9c17bfef85ef carrier_vin=0 source=carrier_scriptsig pk_len=897 sig_len=652 pk_prefix=09b26e7841a14148109e36c32561227c sig_prefix=3913b5adffe778500ac0e252705a81b0
+[falcon-commit] Valid at height=6156425 txpos=5 commit=d87439a60ba163f5e27fd9e259557b7fca77a5196494be649637310cd67206e5 carrier_vin=0 source=carrier_scriptsig pk_len=897 sig_len=660 pk_prefix=0952300ef52dc8d199b86c62fd98f199 sig_prefix=3956a8334554881d551118e122a98d23
+[falcon-commit] Valid at height=6156450 txpos=2 commit=5a6bc01cfa36880a634bc370596c762ed1f36c9f10c4b0894fdbf1085d6edb1b carrier_vin=0 source=carrier_scriptsig pk_len=897 sig_len=656 pk_prefix=096d02fd877d228e433eaf692c253887 sig_prefix=39a7c04c051fa2969b04ccfc0763bac0
+</source>
+
+The carrier_scriptsig validation extracts the full PQC public key (pk_len=897 bytes for Falcon-512) and signature from the TX_R scriptSig, recomputes <code>SHA256(pk || sig)</code>, and matches it against the OP_RETURN commitment from TX_C.
+
+===Dilithium2 Commitment-Only Mode===
+
+Commitment transaction (TX_C) with OP_RETURN commitment only:
+
+<source>
+TX_C txid:   5e0d3e7d8ef7d301a0688c477312824240d57f847338d8aaf66cfea3f3202b83
+Block:       6156605 (mainnet, confirmed 2026-04-08)
+Funded addr: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+
+Outputs:
+  vout 0: 0.997 DOGE → DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (change)
+  vout 1: OP_RETURN 6a24 44494c32 752b2c664c68d89d029c81ac30b6036d42dcdf1990937d669d878026ffcaf72f
+</source>
+
+SPV validation log:
+
+<source>
+[dilithium-commit] Valid at height=6156605 txpos=4 commit=752b2c664c68d89d029c81ac30b6036d42dcdf1990937d669d878026ffcaf72f source=op_return_only
+</source>
+
+===SPV Commitment Validation Summary===
+
+The SPV scanner detected and validated the following PQC commitments during mainnet block scan:
+
+<source>
+Height   TxPos  Algorithm   Source              Commitment (first 16 hex)
+6156358  8      Falcon-512  op_return_only      0657e61928b8eb2b...
+6156374  21     Falcon-512  op_return_only      492c7dcba00e3e48...
+6156388  27     Falcon-512  op_return_only      d87439a60ba163f5...
+6156389  2      Falcon-512  carrier_scriptsig   492c7dcba00e3e48...  (pk_len=897, sig_len=652)
+6156399  21     Falcon-512  op_return_only      5a6bc01cfa36880a...
+6156425  5      Falcon-512  carrier_scriptsig   d87439a60ba163f5...  (pk_len=897, sig_len=660)
+6156450  2      Falcon-512  carrier_scriptsig   5a6bc01cfa36880a...  (pk_len=897, sig_len=656)
+6156513  26     Falcon-512  op_return_only      818da8f9c669bc93...
+6156590  6      Falcon-512  op_return_only      94308315af52359d...
+6156605  4      Dilithium2  op_return_only      752b2c664c68d89d...
+</source>
+
+Note: Commitments at heights 6156389, 6156425, and 6156450 appear as both op_return_only (TX_C) and carrier_scriptsig (TX_R), demonstrating the two-transaction carrier pattern where TX_R reveals the full PQC verification material and the SPV scanner cross-validates the commitment.
+
 ==Deployment==
 
 Phase 1 can be deployed immediately in wallets, tooling, and SPV infrastructure without consensus change.
