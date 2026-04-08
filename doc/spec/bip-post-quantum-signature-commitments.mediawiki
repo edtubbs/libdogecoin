@@ -272,7 +272,7 @@ Given a TX_R with carrier-tagged scriptSig:
 For carrier mode transactions:
 
 * '''TX_C''' (commitment + carrier outputs): minimum relay fee is 100000 koinu (0.001 DOGE), matching Dogecoin's default <code>minrelaytxfee</code>.
-* '''TX_R''' (reveal, spending carrier outputs): minimum relay fee is 100000 koinu (0.001 DOGE). Despite larger scriptSig sizes, the minimum relay fee is sufficient for standard relay.
+* '''TX_R''' (reveal, spending carrier outputs): minimum relay fee is 500000 koinu (0.005 DOGE). Since TX_R scriptSigs carry full PQ material (~1675 bytes for Falcon-512), the fee must satisfy the per-KB minimum relay rate (100000 koinu/KB). A fee of 500000 koinu (~300 koinu/byte) ensures reliable relay and timely mining.
 * '''Carrier output value:''' each P2SH carrier output must be at least 100000000 koinu (1 DOGE) to avoid dust rejection. Values below the dust threshold (100000 koinu / 0.001 DOGE) will be rejected by relay policy.
 
 ===Phase 2: Reserved Opcode Upgrade Path===
