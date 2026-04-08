@@ -61,6 +61,8 @@ if [ "$CARRIER_VALUE_KOINU" -lt 100000000 ]; then
 fi
 FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-${CHAINED_UTXO_VALUE_KOINU:-}}"
 FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}}"
+# Carrier P2SH address to watch in SPV (for TX_R carrier output visibility)
+CARRIER_P2SH_WATCH_ADDR="${CARRIER_P2SH_WATCH_ADDR:-A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q}"
 RAW_UNSIGNED_TX="${RAW_UNSIGNED_TX:-}"
 SCRIPT_PUBKEY="${SCRIPT_PUBKEY:-}"
 RUN_LOG="$TMPDIR/mainnet_falcon_run.log"
@@ -677,7 +679,13 @@ monitor_spvnode() {
     
     info "SPV sync may take time. Be patient!"
     if [ "$BROADCASTED" -eq 1 ]; then
-        local spv_cmd=("./spvnode" $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$TESTNET_ADDR")
+        # Watch both the funded address and the carrier P2SH address
+        local spv_watch_addrs="$TESTNET_ADDR"
+        if [ -n "${CARRIER_P2SH_WATCH_ADDR:-}" ]; then
+            spv_watch_addrs="$TESTNET_ADDR $CARRIER_P2SH_WATCH_ADDR"
+        fi
+        info "SPV watching addresses: $spv_watch_addrs"
+        local spv_cmd=("./spvnode" $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -c -d -x -p -b -a "$spv_watch_addrs")
         local scan_start_ts
         local found_ts
         local elapsed_seconds

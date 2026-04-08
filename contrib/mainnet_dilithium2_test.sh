@@ -51,6 +51,8 @@ if [ "$CARRIER_VALUE_KOINU" -lt 100000000 ]; then
 fi
 FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-${CHAINED_UTXO_VALUE_KOINU:-}}"
 FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}}"
+# Carrier P2SH address to watch in SPV (for TX_R carrier output visibility)
+CARRIER_P2SH_WATCH_ADDR="${CARRIER_P2SH_WATCH_ADDR:-A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q}"
 RUN_LOG="$TMPDIR/mainnet_dilithium2_run.log"
 SENDTX_MAX_RETRIES="${SENDTX_MAX_RETRIES:-3}"
 # sendtx can report success either as immediate relay or as "already known".
@@ -426,7 +428,7 @@ monitor_spvnode() {
         info "Running spvnode scan with REST monitoring until txid and ${expected_commit_mode} commitment validation are both confirmed..."
         scan_start_ts=$(date +%s)
         : > "$TMPDIR/spvnode.log"
-        stdbuf -oL -eL ./spvnode $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -w "$SPV_WALLET_FILE" -u "$REST_SERVER" -c -d -x -p -b -a "$TESTNET_ADDR" scan | tee "$TMPDIR/spvnode.log" | tee -a "$RUN_LOG" &
+        stdbuf -oL -eL ./spvnode $NETWORK_FLAG -l -h "$SPV_HEADERS_FILE" -w "$SPV_WALLET_FILE" -u "$REST_SERVER" -c -d -x -p -b -a "$TESTNET_ADDR ${CARRIER_P2SH_WATCH_ADDR:-}" scan | tee "$TMPDIR/spvnode.log" | tee -a "$RUN_LOG" &
         spv_pipe_pid=$!
         if ! found_ts=$(wait_for_rest_tx "$BROADCAST_TXID" "$SPV_TIMEOUT_SECONDS"); then
             echo "----- spvnode log tail -----"
