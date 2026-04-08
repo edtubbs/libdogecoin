@@ -33,7 +33,6 @@ SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
 SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
-INCLUDE_WITNESS_ITEMS="${INCLUDE_WITNESS_ITEMS:-0}"
 # sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
 
@@ -171,13 +170,6 @@ build_transaction() {
     [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Dilithium2 commitment"
 
     TX_FOR_SIGNING="$TX_WITH_COMMIT"
-    TX_WITH_WITNESS="$TX_WITH_COMMIT"
-    TX_WITH_WITNESS_SIG="$TX_WITH_COMMIT"
-    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
-        error "Legacy-spend witness flow is disabled; fund and spend a P2SH-P2WSH data-carrier UTXO instead"
-    else
-        info "Non-witness legacy spend path enforced; signing tx with commitment only"
-    fi
 
     SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_FOR_SIGNING" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
     echo "$SIGN_OUTPUT"
@@ -187,14 +179,10 @@ build_transaction() {
     cat > "$TMPDIR/tx_info.txt" <<EOF
 RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
 TX_WITH_COMMIT=$TX_WITH_COMMIT
-TX_WITH_WITNESS=$TX_WITH_WITNESS
-TX_WITH_WITNESS_SIG=$TX_WITH_WITNESS_SIG
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
 TX_SIGHASH_HEX=$TX_SIGHASH_HEX
 DILITHIUM2_SIG=$DILITHIUM2_SIG
 DILITHIUM2_COMMIT=$DILITHIUM2_COMMIT
-WITNESS_PQC_PUBKEY=$DILITHIUM2_PK
-WITNESS_PQC_SIG=$DILITHIUM2_SIG
 SIGNED_TX=$SIGNED_TX
 OPRETURN_SCRIPT=6a2444494c32${DILITHIUM2_COMMIT}
 EOF
@@ -252,29 +240,6 @@ verify_commitment() {
     info "Step 8: Off-chain verification"
     local VERIFY_PK="$DILITHIUM2_PK"
     local VERIFY_SIG="$DILITHIUM2_SIG"
-    if [ "$INCLUDE_WITNESS_ITEMS" -eq 1 ]; then
-        WITNESS_OUTPUT=$(./such -c printwitness -x "$SIGNED_TX")
-        echo "$WITNESS_OUTPUT" > "$TMPDIR/dilithium2_witness.txt"
-        WITNESS_DILITHIUM2_PK=$(echo "$WITNESS_OUTPUT" | awk '/witness\[0\]:/ {print $2; exit}')
-        WITNESS_DILITHIUM2_SIG=$(echo "$WITNESS_OUTPUT" | awk '/witness\[1\]:/ {print $2; exit}')
-        if [ -z "$WITNESS_DILITHIUM2_PK" ]; then
-            error "Failed to extract Dilithium2 public key from witness"
-        fi
-        if [ -z "$WITNESS_DILITHIUM2_SIG" ]; then
-            error "Failed to extract Dilithium2 signature from witness"
-        fi
-        if [ "$WITNESS_DILITHIUM2_PK" != "$DILITHIUM2_PK" ]; then
-            error "Witness Dilithium2 public key does not match expected public key"
-        fi
-        if [ "$WITNESS_DILITHIUM2_SIG" != "$DILITHIUM2_SIG" ]; then
-            error "Witness Dilithium2 signature does not match expected signature"
-        fi
-        VERIFY_PK="$WITNESS_DILITHIUM2_PK"
-        VERIFY_SIG="$WITNESS_DILITHIUM2_SIG"
-        success "Witness carries expected Dilithium2 public key"
-    else
-        info "Witness validation skipped (INCLUDE_WITNESS_ITEMS=0); using generated key/signature for off-chain verify"
-    fi
 
     VERIFY_OUTPUT=$(./such -c dilithium2_verify -k "$VERIFY_PK" -x "$TX_SIGHASH_HEX" -s "$VERIFY_SIG")
     echo "$VERIFY_OUTPUT"

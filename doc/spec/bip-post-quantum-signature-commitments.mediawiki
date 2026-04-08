@@ -120,6 +120,12 @@ Note: TX_C and TX_R must be separate transactions because a transaction cannot s
 
 This keeps the Phase 1 OP_RETURN commitment unchanged, while ensuring the full PQ verification material is eventually available on-chain using standard P2SH spending rules.
 
+'''Algorithm-specific carrier mode support:'''
+
+* '''Falcon-512''' supports both commitment-only and carrier mode. The public key (897 bytes) and signature (~660 bytes) fit within 3 P2SH carrier outputs at 1 DOGE each.
+* '''Dilithium2 (ML-DSA-44)''' is '''commitment-only'''. The public key (1312 bytes) and signature (2420 bytes) are too large for practical carrier mode, requiring many P2SH outputs and excessive cost. Only the OP_RETURN commitment is published on-chain.
+* '''Raccoon-G-44''' is '''commitment-only'''. The public key (~16 KB) and signature (~65 KB) far exceed practical carrier limits (would require 32+ P2SH outputs at 1 DOGE each). Only the OP_RETURN commitment is published on-chain.
+
 ====Phase 1: Commitment Output (unchanged)====
 
 The commitment output remains canonical tagged OP_RETURN:
@@ -248,11 +254,10 @@ SPV implementations should:
 
 ====SPV Commitment Validation Sources====
 
-SPV commitment detection operates in three modes depending on how PQ material is published:
+SPV commitment detection operates in two modes depending on how PQ material is published:
 
-# '''OP_RETURN only (commitment-only):''' The commitment is detected in the OP_RETURN output. No PQ verification material is available on-chain. Log entry includes <code>source=op_return_only</code>.
-# '''Same-TX scriptSig:''' The commitment OP_RETURN and PQ pubkey/signature appear in the same transaction (legacy non-carrier mode). The SPV scanner extracts pk and sig from a non-standard scriptSig push, recomputes <code>SHA256(pk || sig)</code>, and validates against the OP_RETURN commitment. Log entry includes <code>source=scriptsig pk_len=... sig_len=...</code>.
-# '''Cross-TX P2SH carrier (TX_C + TX_R):''' The commitment OP_RETURN is in TX_C, and the full PQ public key + signature are revealed in TX_R's carrier scriptSig spending the P2SH outputs. The SPV scanner extracts pk and sig from the carrier-tagged scriptSig (<code>FLC1FULL</code>, <code>DL21FULL</code>, or <code>RCG4FULL</code>), recomputes <code>SHA256(pk || sig)</code>, and matches against buffered OP_RETURN commitments from the same or earlier block. Log entry includes <code>source=carrier_scriptsig pk_len=... sig_len=... pk_prefix=... sig_prefix=...</code>.
+# '''Commitment-only:''' The commitment is detected in the OP_RETURN output. No PQ verification material is available on-chain. This is the only mode for Dilithium2 and Raccoon-G-44 due to their large key sizes. Log entry includes <code>source=commitment_only</code>.
+# '''Cross-TX P2SH carrier (TX_C + TX_R):''' The commitment OP_RETURN is in TX_C, and the full PQ public key + signature are revealed in TX_R's carrier scriptSig spending the P2SH outputs. Currently supported for Falcon-512. The SPV scanner extracts pk and sig from the carrier-tagged scriptSig (<code>FLC1FULL</code>), recomputes <code>SHA256(pk || sig)</code>, and matches against buffered OP_RETURN commitments from the same block. Log entry includes <code>source=carrier_scriptsig matched_txc_txpos=... pk_len=... sig_len=... pk_prefix=... sig_prefix=...</code>.
 
 In all validated cases, the log emits the algorithm label (e.g. <code>[falcon-commit]</code>), block height, transaction position, the 32-byte commitment hex, and the validation source.
 
@@ -261,10 +266,10 @@ In all validated cases, the log emits the algorithm label (e.g. <code>[falcon-co
 Given a TX_R with carrier-tagged scriptSig:
 
 # Parse scriptSig using <code>dogecoin_pqc_carrier_parse_part_scriptsig()</code> to extract tag, part metadata, and raw payload.
-# Identify the PQC algorithm from the 8-byte tag: <code>FLC1FULL</code> (Falcon-512), <code>DL21FULL</code> (Dilithium2), <code>RCG4FULL</code> (Raccoon-G-44).
+# Identify the PQC algorithm from the 8-byte tag: <code>FLC1FULL</code> (Falcon-512).
 # Split the payload into public key (pk_len bytes) and signature (remaining bytes).
 # Recompute <code>commitment32 = SHA256(pk || sig)</code> using the algorithm-specific commit function.
-# Match the recomputed commitment against any buffered OP_RETURN commitments from the same block.
+# Cross-validate: match the recomputed commitment against buffered OP_RETURN commitments from TX_C transactions in the same block. If matched, report <code>matched_txc_txpos</code> identifying the originating commitment transaction.
 # Log the validation result including pk_len, sig_len, and hex prefixes of pk and sig for diagnostic purposes.
 
 ====Transaction Fee Guidance====
