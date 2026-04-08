@@ -58,8 +58,8 @@ SENDTX_MAX_RETRIES="${SENDTX_MAX_RETRIES:-3}"
 # sendtx can report success either as immediate relay or as "already known".
 # Relay success: "Seen on other nodes: N" where N > 0, or already-known responses.
 # NOTE: "tx successfully sent to node" only means pushed to peer, NOT that it was accepted.
-RELAY_SUCCESS_PATTERN='Seen on other nodes:[[:space:]]*[1-9]|already (broadcasted|known|have transaction)|txn-already-known|txn-already-in-mempool'
-SENDTX_FATAL_PATTERN='not relayed back|Seen on other nodes:[[:space:]]*0|very likely invalid'
+RELAY_SUCCESS_PATTERN='Requested from nodes:[[:space:]]*[1-9]|Seen on other nodes:[[:space:]]*[1-9]|already (broadcasted|known|have transaction)|txn-already-known|txn-already-in-mempool'
+SENDTX_FATAL_PATTERN='Requested from nodes:[[:space:]]*0.*Seen on other nodes:[[:space:]]*0|not relayed back|very likely invalid'
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -109,7 +109,7 @@ broadcast_with_retry() {
     local attempt=0; local sendtx_output="" txid=""
     while [ "$attempt" -lt "$max_retries" ]; do
         attempt=$((attempt + 1)); info "Broadcast attempt $attempt/$max_retries for $label..."
-        sendtx_output=$(run_and_log "sendtx $label attempt=$attempt" ./sendtx $NETWORK_FLAG "$signed_tx" || true)
+        sendtx_output=$(run_and_log "sendtx $label attempt=$attempt" ./sendtx -d -m 16 -s 30 $NETWORK_FLAG "$signed_tx" || true)
         echo "$sendtx_output" | sed 's/Error:/sendtx-note:/g' | tee -a "$RUN_LOG"
         txid=$(echo "$sendtx_output" | sed -n 's/^Start broadcasting transaction:[[:space:]]*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1)
         if echo "$sendtx_output" | grep -Eqi "$RELAY_SUCCESS_PATTERN"; then
