@@ -1,3 +1,41 @@
+/*
+
+ The MIT License (MIT)
+
+ Copyright (c) 2026 edtubbs
+ Copyright (c) 2026 The Dogecoin Foundation
+
+ Permission is hereby granted, free of charge, to any person obtaining
+ a copy of this software and associated documentation files (the "Software"),
+ to deal in the Software without restriction, including without limitation
+ the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ and/or sell copies of the Software, and to permit persons to whom the
+ Software is furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included
+ in all copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+ OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES
+ OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ OTHER DEALINGS IN THE SOFTWARE.
+
+*/
+
+/**
+ * @file pqc_carrier.c
+ * @brief PQC P2SH carrier transaction construction and parsing.
+ *
+ * Implements the P2SH carrier mode for post-quantum signature commitment
+ * transactions.  TX_C creates P2SH outputs whose redeem script is simply
+ * OP_DROP*5 OP_1.  TX_R spends those outputs, embedding the full PQ
+ * public key and signature in the scriptSig as tagged, chunked data
+ * pushes that miners accept (non-standard but consensus-valid).
+ */
+
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -8,11 +46,16 @@
 #include <dogecoin/script.h>
 #include <dogecoin/sha2.h>
 
+/* Push a single opcode byte onto a script buffer. */
 static void script_push_op(cstring* s, uint8_t op)
 {
     cstr_append_buf(s, &op, 1);
 }
 
+/**
+ * Push arbitrary data onto a script buffer using the smallest
+ * canonical push encoding (direct / OP_PUSHDATA1 / OP_PUSHDATA2).
+ */
 static void script_push_data(cstring* s, const uint8_t* data, size_t len)
 {
     if (len == 0) {
@@ -41,6 +84,11 @@ static void script_push_data(cstring* s, const uint8_t* data, size_t len)
     cstr_append_buf(s, data, len);
 }
 
+/**
+ * Read one push-data element from raw script bytes starting at *off.
+ * On success, *out points into the original buffer and *outlen is set.
+ * Returns false on truncation or unexpected opcodes.
+ */
 static dogecoin_bool read_push(const uint8_t* s, size_t slen, size_t* off, const uint8_t** out, size_t* outlen)
 {
     if (!s || !off || !out || !outlen || *off >= slen) return false;
@@ -60,7 +108,7 @@ static dogecoin_bool read_push(const uint8_t* s, size_t slen, size_t* off, const
         *off += n;
         return true;
     }
-    if (op == 0x4c) {
+    if (op == 0x4c) { /* OP_PUSHDATA1 */
         if (*off + 1 > slen) return false;
         size_t n = s[*off];
         *off += 1;
@@ -70,7 +118,7 @@ static dogecoin_bool read_push(const uint8_t* s, size_t slen, size_t* off, const
         *off += n;
         return true;
     }
-    if (op == 0x4d) {
+    if (op == 0x4d) { /* OP_PUSHDATA2 */
         if (*off + 2 > slen) return false;
         size_t n = (size_t)s[*off] | ((size_t)s[*off + 1] << 8);
         *off += 2;
@@ -83,6 +131,7 @@ static dogecoin_bool read_push(const uint8_t* s, size_t slen, size_t* off, const
     return false;
 }
 
+/* Compute HASH160 (SHA-256 then RIPEMD-160) of data. */
 static void hash160(const uint8_t* data, size_t len, uint8_t out20[20])
 {
     uint8_t h32[32];
@@ -90,6 +139,11 @@ static void hash160(const uint8_t* data, size_t len, uint8_t out20[20])
     rmd160(h32, sizeof(h32), out20);
 }
 
+/**
+ * Build the carrier redeem script: OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_1.
+ * This script always succeeds after consuming the five data pushes in the
+ * scriptSig, allowing miners to accept the TX_R spend.
+ */
 dogecoin_bool dogecoin_pqc_carrier_build_redeemscript(cstring** out_redeem)
 {
     if (!out_redeem) return false;
@@ -105,6 +159,10 @@ dogecoin_bool dogecoin_pqc_carrier_build_redeemscript(cstring** out_redeem)
     return true;
 }
 
+/**
+ * Build the P2SH scriptPubKey (OP_HASH160 <hash160(redeem)> OP_EQUAL) from
+ * the carrier redeem script.  Used to create the carrier outputs in TX_C.
+ */
 dogecoin_bool dogecoin_pqc_carrier_build_p2sh_scriptpubkey(const cstring* redeem, cstring** out_spk)
 {
     if (!redeem || !out_spk) return false;
@@ -124,6 +182,14 @@ dogecoin_bool dogecoin_pqc_carrier_build_p2sh_scriptpubkey(const cstring* redeem
     return true;
 }
 
+/**
+ * Build a single carrier-part scriptSig for TX_R.
+ *
+ * Layout: <tag8> <8-byte-hdr> <chunk0..chunk4> <redeemscript>
+ *
+ * The header encodes version, part index/total, and the public-key and
+ * full-payload lengths so the SPV parser can reassemble across parts.
+ */
 dogecoin_bool dogecoin_pqc_carrier_build_part_scriptsig(
     const char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN],
     uint8_t part_index,
@@ -173,6 +239,14 @@ dogecoin_bool dogecoin_pqc_carrier_build_part_scriptsig(
     return true;
 }
 
+/**
+ * Parse a carrier-part scriptSig produced by
+ * dogecoin_pqc_carrier_build_part_scriptsig().
+ *
+ * Extracts the 8-byte tag, part index/total, pk/full lengths, the
+ * concatenated data payload, and the redeem script.  Caller must free
+ * *out_part_data with dogecoin_free() and *out_redeem with cstr_free().
+ */
 dogecoin_bool dogecoin_pqc_carrier_parse_part_scriptsig(
     const cstring* scriptsig,
     char out_tag8[DOGECOIN_PQC_CARRIER_TAG_LEN + 1],
@@ -240,6 +314,12 @@ dogecoin_bool dogecoin_pqc_carrier_parse_part_scriptsig(
     return true;
 }
 
+/**
+ * Append P2SH carrier outputs to a transaction (TX_C).
+ *
+ * Creates part_total outputs, each paying value koinu to carrier_spk.
+ * TX_R will later spend each output with its carrier scriptSig.
+ */
 dogecoin_bool dogecoin_tx_add_pqc_carrier_outputs(
     dogecoin_tx* tx,
     const cstring* carrier_spk,

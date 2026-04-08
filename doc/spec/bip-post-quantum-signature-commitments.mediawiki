@@ -123,10 +123,10 @@ This keeps the Phase 1 OP_RETURN commitment unchanged, while ensuring the full P
 '''Algorithm-specific carrier mode support:'''
 
 * '''Falcon-512''' supports both commitment-only and carrier mode. The public key (897 bytes) and signature (~660 bytes) fit within 3 P2SH carrier outputs at 1 DOGE each.
-* '''Dilithium2 (ML-DSA-44)''' is '''commitment-only'''. The public key (1312 bytes) and signature (2420 bytes) are too large for practical carrier mode, requiring many P2SH outputs and excessive cost. Only the OP_RETURN commitment is published on-chain.
-* '''Raccoon-G-44''' is '''commitment-only'''. The public key (~16 KB) and signature (~65 KB) far exceed practical carrier limits (would require 32+ P2SH outputs at 1 DOGE each). Only the OP_RETURN commitment is published on-chain.
+* '''Dilithium2 (ML-DSA-44)''' supports both commitment-only and carrier mode. The public key (1312 bytes) and signature (2420 bytes) require more P2SH carrier outputs than Falcon-512, resulting in higher on-chain cost.
+* '''Raccoon-G-44''' supports both commitment-only and carrier mode. The public key (~16 KB) and signature (~65 KB) require 32+ P2SH carrier outputs at 1 DOGE each, making carrier mode significantly more expensive.
 
-====Phase 1: Commitment Output (unchanged)====
+====Phase 1: Commitment Output====
 
 The commitment output remains canonical tagged OP_RETURN:
 
@@ -136,13 +136,13 @@ Dilithium2:  0x6a 0x24 0x44494c32 <32-byte-commitment>   ; "DIL2"
 Raccoon-G:   0x6a 0x24 0x52434734 <32-byte-commitment>   ; "RCG4"
 </source>
 
-Commitment derivation is unchanged:
+Commitment derivation:
 
 <source>
 commitment32 = SHA256(public_key_bytes || signature_bytes)
 </source>
 
-====Phase 1: Transaction Binding (unchanged)====
+====Phase 1: Transaction Binding====
 
 The PQ signature payload SHOULD be the per-input transaction signature hash:
 
@@ -256,8 +256,8 @@ SPV implementations should:
 
 SPV commitment detection operates in two modes depending on how PQ material is published:
 
-# '''Commitment-only:''' The commitment is detected in the OP_RETURN output. No PQ verification material is available on-chain. This is the only mode for Dilithium2 and Raccoon-G-44 due to their large key sizes. Log entry includes <code>source=commitment_only</code>.
-# '''Cross-TX P2SH carrier (TX_C + TX_R):''' The commitment OP_RETURN is in TX_C, and the full PQ public key + signature are revealed in TX_R's carrier scriptSig spending the P2SH outputs. Currently supported for Falcon-512. The SPV scanner extracts pk and sig from the carrier-tagged scriptSig (<code>FLC1FULL</code>), recomputes <code>SHA256(pk || sig)</code>, and matches against buffered OP_RETURN commitments from the same block. Log entry includes <code>source=carrier_scriptsig matched_txc_txpos=... pk_len=... sig_len=... pk_prefix=... sig_prefix=...</code>.
+# '''Commitment-only:''' The commitment is detected in the OP_RETURN output. No PQ verification material is available on-chain. Log entry includes <code>source=commitment_only</code>.
+# '''Cross-TX P2SH carrier (TX_C + TX_R):''' The commitment OP_RETURN is in TX_C, and the full PQ public key + signature are revealed in TX_R's carrier scriptSig spending the P2SH outputs. Supported for all three algorithms (Falcon-512 via <code>FLC1FULL</code>, Dilithium2 via <code>DL21FULL</code>, Raccoon-G via <code>RCG4FULL</code>). The SPV scanner extracts pk and sig from the carrier-tagged scriptSig, recomputes <code>SHA256(pk || sig)</code>, and matches against buffered OP_RETURN commitments from the same block. Log entry includes <code>source=carrier_scriptsig matched_txc_txpos=... pk_len=... sig_len=... pk_prefix=... sig_prefix=...</code>.
 
 In all validated cases, the log emits the algorithm label (e.g. <code>[falcon-commit]</code>), block height, transaction position, the 32-byte commitment hex, and the validation source.
 
