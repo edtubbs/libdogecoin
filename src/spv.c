@@ -87,147 +87,6 @@ static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 
 #ifdef USE_LIBOQS
-static dogecoin_bool spv_extract_scriptsig_pubkey_sig(const dogecoin_tx* tx,
-                                                      const uint8_t** out_pk, size_t* out_pk_len,
-                                                      const uint8_t** out_sig, size_t* out_sig_len,
-                                                      size_t* out_vin_index)
-{
-    if (!tx || !out_pk || !out_pk_len || !out_sig || !out_sig_len || !out_vin_index) {
-        return false;
-    }
-    for (size_t vin_index = 0; vin_index < tx->vin->len; vin_index++) {
-        dogecoin_tx_in* tx_in = vector_idx(tx->vin, vin_index);
-        if (!tx_in || !tx_in->script_sig || tx_in->script_sig->len == 0) {
-            continue;
-        }
-        const uint8_t* s = (const uint8_t*)tx_in->script_sig->str;
-        size_t slen = tx_in->script_sig->len;
-        size_t off = 0;
-        const uint8_t* item0 = NULL;
-        const uint8_t* item1 = NULL;
-        size_t item0_len = 0;
-        size_t item1_len = 0;
-        for (int item = 0; item < 2; item++) {
-            if (off >= slen) {
-                break;
-            }
-            uint8_t op = s[off++];
-            size_t push_len = 0;
-            if (op > 0 && op < OP_PUSHDATA1) {
-                push_len = op;
-            } else if (op == OP_PUSHDATA1) {
-                if (off + 1 > slen) {
-                    break;
-                }
-                push_len = s[off++];
-            } else if (op == OP_PUSHDATA2) {
-                if (off + 2 > slen) {
-                    break;
-                }
-                push_len = (size_t)s[off] | ((size_t)s[off + 1] << 8);
-                off += 2;
-            } else if (op == OP_PUSHDATA4) {
-                if (off + 4 > slen) {
-                    break;
-                }
-                push_len = (size_t)s[off] |
-                           ((size_t)s[off + 1] << 8) |
-                           ((size_t)s[off + 2] << 16) |
-                           ((size_t)s[off + 3] << 24);
-                off += 4;
-            } else {
-                break;
-            }
-            if (push_len == 0 || off + push_len > slen) {
-                break;
-            }
-            if (item == 0) {
-                item0 = s + off;
-                item0_len = push_len;
-            } else {
-                item1 = s + off;
-                item1_len = push_len;
-            }
-            off += push_len;
-        }
-        if (item0 && item1 && item0_len >= 96 && item1_len >= 96) {
-            *out_pk = item0;
-            *out_pk_len = item0_len;
-            *out_sig = item1;
-            *out_sig_len = item1_len;
-            *out_vin_index = vin_index;
-            return true;
-        }
-    }
-    return false;
-}
-
-static dogecoin_bool spv_validate_falcon_scriptsig_commit(const uint8_t* item0, size_t item0_len,
-                                                          const uint8_t* item1, size_t item1_len,
-                                                          const uint8_t expected_commit[32],
-                                                          const uint8_t** out_pk, size_t* out_pk_len,
-                                                          const uint8_t** out_sig, size_t* out_sig_len)
-{
-    uint8_t commit_data[32];
-    if (dogecoin_falcon512_commit_bytes(item0, item0_len, item1, item1_len, commit_data) &&
-        memcmp(commit_data, expected_commit, 32) == 0) {
-        *out_pk = item0; *out_pk_len = item0_len;
-        *out_sig = item1; *out_sig_len = item1_len;
-        return true;
-    }
-    if (dogecoin_falcon512_commit_bytes(item1, item1_len, item0, item0_len, commit_data) &&
-        memcmp(commit_data, expected_commit, 32) == 0) {
-        *out_pk = item1; *out_pk_len = item1_len;
-        *out_sig = item0; *out_sig_len = item0_len;
-        return true;
-    }
-    return false;
-}
-
-static dogecoin_bool spv_validate_dilithium_scriptsig_commit(const uint8_t* item0, size_t item0_len,
-                                                             const uint8_t* item1, size_t item1_len,
-                                                             const uint8_t expected_commit[32],
-                                                             const uint8_t** out_pk, size_t* out_pk_len,
-                                                             const uint8_t** out_sig, size_t* out_sig_len)
-{
-    uint8_t commit_data[32];
-    if (dogecoin_dilithium2_commit_bytes(item0, item0_len, item1, item1_len, commit_data) &&
-        memcmp(commit_data, expected_commit, 32) == 0) {
-        *out_pk = item0; *out_pk_len = item0_len;
-        *out_sig = item1; *out_sig_len = item1_len;
-        return true;
-    }
-    if (dogecoin_dilithium2_commit_bytes(item1, item1_len, item0, item0_len, commit_data) &&
-        memcmp(commit_data, expected_commit, 32) == 0) {
-        *out_pk = item1; *out_pk_len = item1_len;
-        *out_sig = item0; *out_sig_len = item0_len;
-        return true;
-    }
-    return false;
-}
-
-static dogecoin_bool spv_validate_raccoong_scriptsig_commit(const uint8_t* item0, size_t item0_len,
-                                                             const uint8_t* item1, size_t item1_len,
-                                                             const uint8_t expected_commit[32],
-                                                             const uint8_t** out_pk, size_t* out_pk_len,
-                                                             const uint8_t** out_sig, size_t* out_sig_len)
-{
-    uint8_t commit_data[32];
-    if (dogecoin_raccoong44_commit_bytes(item0, item0_len, item1, item1_len, commit_data) &&
-        memcmp(commit_data, expected_commit, 32) == 0) {
-        *out_pk = item0; *out_pk_len = item0_len;
-        *out_sig = item1; *out_sig_len = item1_len;
-        return true;
-    }
-    if (dogecoin_raccoong44_commit_bytes(item1, item1_len, item0, item0_len, commit_data) &&
-        memcmp(commit_data, expected_commit, 32) == 0) {
-        *out_pk = item1; *out_pk_len = item1_len;
-        *out_sig = item0; *out_sig_len = item0_len;
-        return true;
-    }
-    return false;
-}
-
 /* Maximum number of pending PQC OP_RETURN commitments buffered per block
    for cross-TX carrier validation (TX_C has OP_RETURN, TX_R has scriptSig). */
 #define SPV_PQC_PENDING_MAX 16
@@ -899,6 +758,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             uint64_t coinbase_value = 0;
 
             size_t consumedlength = 0;
+#ifdef USE_LIBOQS
+            /* Per-block buffer for pending OP_RETURN commitments awaiting carrier TX_R match */
+            spv_pqc_pending_commit_t pending_commits[SPV_PQC_PENDING_MAX];
+            size_t pending_count = 0;
+#endif
             unsigned int i;
             for (i = 0; i < amount_of_txs; i++)
             {
@@ -917,87 +781,36 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
                 
 #ifdef USE_LIBOQS
-                /* --- Phase 1: Detect OP_RETURN commitments (Falcon / Dilithium / Raccoon-G) --- */
+                /* --- Phase 1: Detect OP_RETURN commitments --- */
+                /* Falcon-512: buffer for cross-TX carrier match (TX_C → pending, TX_R validates) */
                 uint8_t falcon_commit_data[32];
                 if (dogecoin_tx_extract_falcon512_commit(tx, falcon_commit_data)) {
                     char falcon_commit_hex[65];
                     utils_bin_to_hex(falcon_commit_data, 32, falcon_commit_hex);
-                    const uint8_t* scriptsig_pk = NULL;
-                    const uint8_t* scriptsig_sig = NULL;
-                    size_t scriptsig_pk_len = 0;
-                    size_t scriptsig_sig_len = 0;
-                    size_t scriptsig_vin_index = 0;
-                    if (spv_extract_scriptsig_pubkey_sig(tx, &scriptsig_pk, &scriptsig_pk_len, &scriptsig_sig, &scriptsig_sig_len, &scriptsig_vin_index)) {
-                        if (spv_validate_falcon_scriptsig_commit(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len,
-                                                                 falcon_commit_data, &scriptsig_pk, &scriptsig_pk_len,
-                                                                 &scriptsig_sig, &scriptsig_sig_len)) {
-                            client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig pk_len=%zu sig_len=%zu\n",
-                                                             pindex->height, i, falcon_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
-                        } else {
-                            client->nodegroup->log_write_cb("[falcon-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch pk_len=%zu sig_len=%zu\n",
-                                                             pindex->height, i, falcon_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
-                        }
-                    } else {
-                        /* No same-TX scriptSig match — buffer for carrier TX_R match */
-                        client->nodegroup->log_write_cb("[falcon-commit] Pending at height=%d txpos=%u commit=%s source=op_return_only\n",
-                                                         pindex->height, i, falcon_commit_hex);
-                        if (pending_count < SPV_PQC_PENDING_MAX) {
-                            memcpy(pending_commits[pending_count].commit, falcon_commit_data, 32);
-                            pending_commits[pending_count].algo = SPV_PQC_FALCON;
-                            pending_commits[pending_count].txpos = i;
-                            pending_count++;
-                        }
+                    client->nodegroup->log_write_cb("[falcon-commit] Pending at height=%d txpos=%u commit=%s source=op_return\n",
+                                                     pindex->height, i, falcon_commit_hex);
+                    if (pending_count < SPV_PQC_PENDING_MAX) {
+                        memcpy(pending_commits[pending_count].commit, falcon_commit_data, 32);
+                        pending_commits[pending_count].algo = SPV_PQC_FALCON;
+                        pending_commits[pending_count].txpos = i;
+                        pending_count++;
                     }
                 }
+                /* Dilithium2: commitment-only (1312-byte pk + 2420-byte sig too large for carrier) */
                 uint8_t dilithium_commit_data[32];
                 if (dogecoin_tx_extract_dilithium2_commit(tx, dilithium_commit_data)) {
                     char dilithium_commit_hex[65];
                     utils_bin_to_hex(dilithium_commit_data, 32, dilithium_commit_hex);
-                    const uint8_t* scriptsig_pk = NULL;
-                    const uint8_t* scriptsig_sig = NULL;
-                    size_t scriptsig_pk_len = 0;
-                    size_t scriptsig_sig_len = 0;
-                    size_t scriptsig_vin_index = 0;
-                    if (spv_extract_scriptsig_pubkey_sig(tx, &scriptsig_pk, &scriptsig_pk_len, &scriptsig_sig, &scriptsig_sig_len, &scriptsig_vin_index)) {
-                        if (spv_validate_dilithium_scriptsig_commit(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len,
-                                                                    dilithium_commit_data, &scriptsig_pk, &scriptsig_pk_len,
-                                                                    &scriptsig_sig, &scriptsig_sig_len)) {
-                            client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig pk_len=%zu sig_len=%zu\n",
-                                                             pindex->height, i, dilithium_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
-                        } else {
-                            client->nodegroup->log_write_cb("[dilithium-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch pk_len=%zu sig_len=%zu\n",
-                                                             pindex->height, i, dilithium_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
-                        }
-                    } else {
-                        /* Commitment-only: Dilithium2 keys are too large for carrier mode */
-                        client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s source=commitment_only\n",
-                                                         pindex->height, i, dilithium_commit_hex);
-                    }
+                    client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s source=commitment_only\n",
+                                                     pindex->height, i, dilithium_commit_hex);
                 }
+                /* Raccoon-G-44: commitment-only (16KB pk + 65KB sig too large for carrier) */
                 uint8_t raccoong_commit_data[32];
                 if (dogecoin_tx_extract_raccoong44_commit(tx, raccoong_commit_data)) {
                     char raccoong_commit_hex[65];
                     utils_bin_to_hex(raccoong_commit_data, 32, raccoong_commit_hex);
-                    const uint8_t* scriptsig_pk = NULL;
-                    const uint8_t* scriptsig_sig = NULL;
-                    size_t scriptsig_pk_len = 0;
-                    size_t scriptsig_sig_len = 0;
-                    size_t scriptsig_vin_index = 0;
-                    if (spv_extract_scriptsig_pubkey_sig(tx, &scriptsig_pk, &scriptsig_pk_len, &scriptsig_sig, &scriptsig_sig_len, &scriptsig_vin_index)) {
-                        if (spv_validate_raccoong_scriptsig_commit(scriptsig_pk, scriptsig_pk_len, scriptsig_sig, scriptsig_sig_len,
-                                                                   raccoong_commit_data, &scriptsig_pk, &scriptsig_pk_len,
-                                                                   &scriptsig_sig, &scriptsig_sig_len)) {
-                            client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s scriptsig_vin=%zu source=scriptsig pk_len=%zu sig_len=%zu\n",
-                                                             pindex->height, i, raccoong_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
-                        } else {
-                            client->nodegroup->log_write_cb("[raccoong-commit] Invalid at height=%d txpos=%u commit=%s scriptsig_vin=%zu reason=commit_mismatch pk_len=%zu sig_len=%zu\n",
-                                                             pindex->height, i, raccoong_commit_hex, scriptsig_vin_index, scriptsig_pk_len, scriptsig_sig_len);
-                        }
-                    } else {
-                        /* Commitment-only: Raccoon-G keys are too large for carrier mode */
-                        client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s source=commitment_only\n",
-                                                         pindex->height, i, raccoong_commit_hex);
-                    }
+                    client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s source=commitment_only\n",
+                                                     pindex->height, i, raccoong_commit_hex);
                 }
 
                 /* --- Phase 2: Scan every TX for carrier-format scriptSigs (cross-TX carrier match) --- */
@@ -1209,22 +1022,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 utils_bin_to_hex((unsigned char*)buf->p, (size_t)hdr->data_len, hex);
 
                 dogecoin_bool ok = dogecoin_spv_handle_mempool_tx_hex(client, hex);
-
-                dogecoin_tx* mempool_tx = dogecoin_tx_new();
-                if (dogecoin_tx_deserialize((const unsigned char*)buf->p, (size_t)hdr->data_len, mempool_tx, NULL)) {
-                    size_t vin_index;
-                    for (vin_index = 0; vin_index < mempool_tx->vin->len; vin_index++) {
-                        dogecoin_tx_in* tx_in = vector_idx(mempool_tx->vin, vin_index);
-                        size_t witness_items = (tx_in && tx_in->witness_stack) ? tx_in->witness_stack->len : 0;
-                        client->nodegroup->log_write_cb("[smpv] tx witness vin=%zu items=%zu\n", vin_index, witness_items);
-                        for (size_t wit_index = 0; wit_index < witness_items; wit_index++) {
-                            cstring* witness_item = vector_idx(tx_in->witness_stack, wit_index);
-                            client->nodegroup->log_write_cb("[smpv] tx witness vin=%zu idx=%zu len=%zu\n",
-                                                            vin_index, wit_index, witness_item ? witness_item->len : 0);
-                        }
-                    }
-                }
-                dogecoin_tx_free(mempool_tx);
 
                 if (client->nodegroup && client->nodegroup->log_write_cb) {
                     client->nodegroup->log_write_cb(
