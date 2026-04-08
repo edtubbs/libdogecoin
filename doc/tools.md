@@ -790,7 +790,9 @@ Block    TxPos  Type           Source              Commitment (first 16 hex char
 6156760  27     falcon TX_C    op_return_only      6d320fc44e953d60...
 6156770  9      falcon TX_C    op_return_only      bbadbf7a8e4b95ab...
 
-Summary: 16 total validations (12 op_return_only TX_C, 4 carrier_scriptsig TX_R, 1 dilithium2)
+6156781  10     falcon TX_R    carrier_scriptsig   bbadbf7a8e4b95ab... (pk=897, sig=657)
+
+Summary: 17 total validations (12 op_return_only TX_C, 5 carrier_scriptsig TX_R, 1 dilithium2)
 ```
 
 #### Block Explorer Links
@@ -798,3 +800,5 @@ Summary: 16 total validations (12 op_return_only TX_C, 4 carrier_scriptsig TX_R,
 - TX_C `a9f2f84b`: https://chain.so/tx/DOGE/a9f2f84b3f2dff84c4505ac680ea6932224eb69c0960d00a5ad8f49df18b4e1e
 - TX_R `c32635aa`: https://chain.so/tx/DOGE/c32635aafa32abf9c89b5e366d647231c143b3fb1b925e51b51a67b6133e7924
 - TX_R `3bee4f9c`: https://chain.so/tx/DOGE/3bee4f9c11c6e03ab7117e4198a272b08b61546d7da85edef9c5ec6f74dd5f55
+- TX_C `30792ead`: https://chain.so/tx/DOGE/30792ead6159203b9b87f3c5ad323e9086b51fc038a8e1f8da14c1e61dcfd961
+- TX_R `ff82dc5d`: https://chain.so/tx/DOGE/ff82dc5d1ba99528adc8754354c4c44149cfaf3d2e26fefd2ee7922280863813
