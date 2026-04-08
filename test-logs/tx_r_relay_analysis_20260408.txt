@@ -1,0 +1,149 @@
+===============================================================================
+TX_R RELAY ANALYSIS - 2026-04-08
+Comparing 3 mined TX_R vs 2 unconfirmed TX_R to diagnose relay failure
+===============================================================================
+
+=== MINED TX_R (all confirmed on 2026-04-07) ===
+
+TX 6551ccceeceb32b77b5930efeaeedea3d6d7a05040f7a84ce2c652ed9fe4c51c
+  Block:      6156389 (2026-04-07 21:03:21 UTC)
+  Size:       1670 bytes
+  Fee:        200,000 koinu (0.002 DOGE, ~120 koinu/byte)
+  Input:      1 DOGE from P2SH carrier (A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q)
+  Output:     0.998 DOGE to DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  Header:     version=1 part_idx=0 part_total=1 pk_len=897 full_len=1549 sig_len=652
+  Tag:        FLC1FULL
+  Redeem:     OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_1
+
+TX 238fb58b352a7a2bbcd7eac7565f894ebeba020410b74cc76277f9336041b477
+  Block:      6156425 (2026-04-07 21:39:18 UTC)
+  Size:       1678 bytes
+  Fee:        200,000 koinu (0.002 DOGE, ~119 koinu/byte)
+  Input:      1 DOGE from P2SH carrier (A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q)
+  Output:     0.998 DOGE to DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  Header:     version=1 part_idx=0 part_total=1 pk_len=897 full_len=1557 sig_len=660
+  Tag:        FLC1FULL
+  Redeem:     OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_1
+
+TX 77fc29fd9e5124fa85bcc62bb9ab49b8b95b4f4544b521e7589ca980dd1725b4
+  Block:      6156450 (2026-04-07 22:10:33 UTC)
+  Size:       1674 bytes
+  Fee:        200,000 koinu (0.002 DOGE, ~119 koinu/byte)
+  Input:      1 DOGE from P2SH carrier (A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q)
+  Output:     0.998 DOGE to DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  Header:     version=1 part_idx=0 part_total=1 pk_len=897 full_len=1553 sig_len=656
+  Tag:        FLC1FULL
+  Redeem:     OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_1
+
+=== UNCONFIRMED TX_R (broadcast 2026-04-08, 0 confirmations) ===
+
+TX 3bee4f9c11c6e03ab7117e4198a272b08b61546d7da85edef9c5ec6f74dd5f55
+  Block:      Unassigned (0 confirmations)
+  Time:       2026-04-08 02:43:07 UTC
+  Size:       1675 bytes
+  Fee:        200,000 koinu (0.002 DOGE, ~120 koinu/byte)
+  Input:      1 DOGE from 4fd6eff0:2 (carrier, block 6156642)
+  Output:     0.998 DOGE to DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  Header:     version=1 part_idx=0 part_total=1 pk_len=897 full_len=1554 sig_len=657
+  Tag:        FLC1FULL
+  Redeem:     OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_1
+  Visible on: SoChain (0 conf), Blockchair (mempool). NOT on BlockCypher (404).
+
+TX c32635aafa32abf9c89b5e366d647231c143b3fb1b925e51b51a67b6133e7924
+  Block:      Unassigned (0 confirmations)
+  Time:       2026-04-08 02:44:49 UTC
+  Size:       1675 bytes
+  Fee:        500,000 koinu (0.005 DOGE, ~299 koinu/byte)
+  Input:      1 DOGE from cec2b43f:2 (carrier, block 6156662)
+  Output:     0.995 DOGE to DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  Header:     version=1 part_idx=0 part_total=1 pk_len=897 full_len=1554 sig_len=657
+  Tag:        FLC1FULL
+  Redeem:     OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_1
+  Visible on: SoChain (0 conf), Blockchair (mempool). NOT on BlockCypher (404).
+
+=== FORMAT COMPARISON ===
+
+  Field              Mined (77fc29fd)      Unconfirmed (3bee4f9c)  Unconfirmed (c32635aa)
+  ----               ----                  ----                    ----
+  Tag                FLC1FULL              FLC1FULL                FLC1FULL
+  scriptSig pushes   6                     6                       6
+  Redeem script      OP_DROP*5 OP_1        OP_DROP*5 OP_1          OP_DROP*5 OP_1
+  pk_len             897                   897                     897
+  sig_len            656                   657                     657
+  P2SH address       A6bAFnGqeK...        A6bAFnGqeK...          A6bAFnGqeK...
+  Fee                200,000               200,000                 500,000
+  Size               1674                  1675                    1675
+
+  RESULT: FORMAT IS IDENTICAL. The 1-byte sig_len variance is normal
+          Falcon-512 signature compression variation. No regression.
+
+=== ROOT CAUSE ANALYSIS ===
+
+The TX_R format is correct and identical between mined and unconfirmed versions.
+The relay/mining failure is NOT caused by a format or encoding regression.
+
+Root cause: Dogecoin relay policy rejects non-standard P2SH redeem scripts.
+
+  - The carrier redeem script OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_1
+    (hex: 757575757551) is consensus-valid but NOT standard.
+  - Dogecoin Core's MANDATORY_SCRIPT_VERIFY_FLAGS = SCRIPT_VERIFY_P2SH only.
+    The OP_DROP*5 OP_1 script evaluates correctly under P2SH consensus rules.
+  - However, IsStandardTx() / AreInputsStandard() reject non-standard
+    scriptPubKey types. P2SH scripts that don't match known templates
+    (P2PKH, P2SH-P2WPKH, multisig, etc.) are rejected at mempool policy level.
+  - Most Dogecoin nodes will NOT relay TX_R to peers.
+
+Why did the 3 old TX_R get mined?
+  - All 3 were mined within a 67-minute window (21:03 - 22:10 UTC, April 7).
+  - They likely reached a miner running with relaxed policy (e.g. -acceptnonstd=1)
+    or were submitted directly to a mining pool API.
+  - Once in a block, all nodes accept them (consensus-valid).
+
+Why are the 2 new TX_R stuck?
+  - They are visible on SoChain and Blockchair (limited mempool propagation).
+  - They are NOT visible on BlockCypher (rejected by most nodes).
+  - No miner with relaxed policy has picked them up yet.
+  - Higher fee (500k koinu on c32635aa) does NOT help because rejection is
+    policy-based (non-standard script type), not fee-based.
+
+=== SPV ADDRESS SCANNING ===
+
+The SPV node correctly detects carrier_scriptsig from the 3 mined TX_R:
+  [falcon-commit] height=6156389 commit=492c7dcb... source=carrier_scriptsig pk_len=897 sig_len=652
+  [falcon-commit] height=6156425 commit=d87439a6... source=carrier_scriptsig pk_len=897 sig_len=660
+  [falcon-commit] height=6156450 commit=5a6bc01c... source=carrier_scriptsig pk_len=897 sig_len=656
+
+SPV cannot detect unconfirmed TX_R because SPV only processes transactions
+within confirmed blocks. Until the TX_R are mined, SPV will continue showing:
+  "TX_C OP_RETURN commitment found; waiting for TX_R carrier_scriptsig match in a later block..."
+
+The SPV scanning for A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q is working correctly.
+It detects TX_C carrier outputs at that address and scans all block TX scriptSigs
+for FLC1FULL carrier tags. The issue is that unconfirmed TX_R never appear in blocks.
+
+=== RECOMMENDATIONS ===
+
+1. DIRECT MINER SUBMISSION: Submit TX_R directly to mining pool APIs or nodes
+   running with -acceptnonstd=1 to bypass relay policy rejection.
+
+2. FEE GUIDANCE: Keep TX_R fee at 500,000 koinu (0.005 DOGE) as documented.
+   While fee alone doesn't fix the non-standard rejection, higher fees may
+   incentivize miners who DO accept non-standard TXs to prioritize them.
+
+3. FUTURE: Phase 2 reserved-opcode upgrade will make PQC scripts standard,
+   eliminating the relay policy issue entirely.
+
+4. CARRIER OUTPUT VALUE: Maintain 1 DOGE (100,000,000 koinu) minimum to avoid
+   dust rejection, which is a separate policy check.
+
+=== TX CHAIN SUMMARY ===
+
+DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr balance: 36.924 DOGE (17 txs, 0 unconfirmed)
+
+Unspent P2SH carrier outputs at A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q:
+  b47b271f:2 -> 1 DOGE (block 6156590, commitment 94308315...)
+    Spend attempt: 160e5102 (from E2E test, never confirmed, not in any mempool)
+  4fd6eff0:2 -> 1 DOGE (block 6156642, commitment 09de67bc...)
+    Spend attempt: 3bee4f9c (in limited mempool, 0 confirmations)
+  cec2b43f:2 -> 1 DOGE (block 6156662, commitment 3a83c1c6...)
+    Spend attempt: c32635aa (in limited mempool, 0 confirmations)
