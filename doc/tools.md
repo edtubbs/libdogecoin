@@ -656,3 +656,145 @@ These scripts automate:
 
 For protocol rationale/specification details, see:
 - `doc/spec/bip-post-quantum-signature-commitments.mediawiki`
+
+### Mainnet PQC Carrier Transaction Examples (Confirmed April 8, 2026)
+
+The following real mainnet transactions demonstrate the two-transaction PQC carrier flow
+with SPV node validation of Falcon-512 commitments.
+
+#### Transaction Flow Overview
+
+```
+TX_C (Commitment Transaction) — standard P2PKH + OP_RETURN + P2SH
+  Input:  DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (funded address, secp256k1 signed)
+  Output 0: Change back to DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (P2PKH)
+  Output 1: OP_RETURN 6a24 FLC1 <32-byte SHA256 commitment>
+  Output 2: 1 DOGE to A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q (P2SH carrier output)
+
+TX_R (Reveal Transaction) — spends P2SH carrier with PQC payload in scriptSig
+  Input:  A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q (P2SH carrier from TX_C)
+  Output: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (return funds minus fee)
+```
+
+#### Commitment Math
+
+```
+commitment = SHA256( falcon_public_key || falcon_signature )
+
+Where:
+  falcon_public_key  = 897 bytes (Falcon-512 public key)
+  falcon_signature   = ~652-666 bytes (Falcon-512 signature over tx_sighash32)
+  tx_sighash32       = SHA256d(serialized_tx_input) — the sighash of the spending input
+```
+
+The 32-byte commitment is embedded in TX_C's OP_RETURN output.
+The full public key and signature are embedded in TX_R's scriptSig as 3 data pushes
+of up to 520 bytes each (the Bitcoin/Dogecoin script push limit).
+
+#### TX_R ScriptSig Structure (Carrier Mode)
+
+```
+scriptSig = <TAG8> <HDR8> <CHUNK0> <CHUNK1> <CHUNK2> <redeemScript>
+
+Where:
+  TAG8         = 08 464c433146554c4c   (8 bytes: "FLC1FULL" — Falcon-512 full reveal tag)
+  HDR8         = 08 0100010003810612   (8 bytes: version=1, part=1/1, pk_len=897, sig_len=variable)
+  CHUNK0       = 4d0802 <520 bytes>    (OP_PUSHDATA2, first 520 bytes of pk||sig)
+  CHUNK1       = 4d0802 <520 bytes>    (OP_PUSHDATA2, next 520 bytes of pk||sig)
+  CHUNK2       = 4d0202 <~517 bytes>   (OP_PUSHDATA2, remaining bytes of pk||sig)
+  redeemScript = 06 757575757551       (6 bytes: OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_1)
+```
+
+#### Confirmed TX_C Example: `a9f2f84b` (Block 6156750)
+
+```
+TXID: a9f2f84b3f2dff84c4505ac680ea6932224eb69c0960d00a5ad8f49df18b4e1e
+Block: 6156750 | Size: 271 bytes | Fee: 0.001 DOGE
+
+Input:
+  DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr  33.931 DOGE (standard secp256k1 P2PKH)
+
+Outputs:
+  [0] DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr  32.930 DOGE (P2PKH change)
+      script: 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+  [1] OP_RETURN  0 DOGE (Falcon-512 commitment)
+      script: 6a24 464c4331 43b877ae18aa928ce080b472e0c16758014d7a1885c9f9ef43b148ba0a942da6
+      decode: OP_RETURN OP_PUSH36 "FLC1" <32-byte commitment>
+      commitment: 43b877ae18aa928ce080b472e0c16758014d7a1885c9f9ef43b148ba0a942da6
+  [2] A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q  1.000 DOGE (P2SH carrier)
+      script: a9149b402803555511d15d81207d3e2cb3e6bc365e0e87
+
+SPV validation log:
+  [falcon-commit] Valid at height=6156750 txpos=11
+    commit=43b877ae18aa928ce080b472e0c16758014d7a1885c9f9ef43b148ba0a942da6
+    source=op_return_only
+```
+
+#### Confirmed TX_R Example: `c32635aa` (Block 6156750)
+
+```
+TXID: c32635aafa32abf9c89b5e366d647231c143b3fb1b925e51b51a67b6133e7924
+Block: 6156750 | Size: 1675 bytes | Fee: 0.005 DOGE (299 sat/byte)
+
+Input:
+  A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q  1.000 DOGE (P2SH carrier output)
+
+  scriptSig decode:
+    TAG:    464c433146554c4c  ("FLC1FULL")
+    HEADER: 0100010003810612  (v1, part 1/1, pk_len=897 [0x0381], sig_len depends on chunk sizes)
+    CHUNK0: 520 bytes — contains Falcon-512 public key bytes [0..519]
+    CHUNK1: 520 bytes — contains pk bytes [520..896] + signature bytes [0..142]
+    CHUNK2: 514 bytes — contains remaining signature bytes [143..656]
+    redeemScript: 757575757551 (OP_DROP×5 OP_1)
+
+  Extracted PQC data:
+    pk_len=897 bytes, pk_prefix=091f7e11e2bbcb2329bd0c53e1544303
+    sig_len=657 bytes, sig_prefix=3938a41d3ffc68a55583033a2be98c11
+
+Output:
+  [0] DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr  0.995 DOGE (P2PKH)
+      script: 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+
+SPV validation log:
+  [falcon-commit] Valid at height=6156750 txpos=12
+    commit=3a83c1c63136e11862220ce97e61f83e7deea2426a79767b70aeada9781058b3
+    carrier_vin=0 source=carrier_scriptsig
+    pk_len=897 sig_len=657
+    pk_prefix=091f7e11e2bbcb2329bd0c53e1544303
+    sig_prefix=3938a41d3ffc68a55583033a2be98c11
+
+Validation math:
+  SHA256(pk[897 bytes] || sig[657 bytes]) = 3a83c1c63136e11862220ce97e61f83e7deea2426a79767b70aeada9781058b3
+  This matches the commitment in the corresponding TX_C OP_RETURN at height=6156662.
+```
+
+#### SPV Node Validation Summary (All Confirmed PQC Transactions)
+
+```
+Block    TxPos  Type           Source              Commitment (first 16 hex chars)
+------   -----  ----           ------              --------------------------------
+6156358  8      falcon TX_C    op_return_only      0657e61928b8eb2b...
+6156374  21     falcon TX_C    op_return_only      492c7dcba00e3e48...
+6156388  27     falcon TX_C    op_return_only      d87439a60ba163f5...
+6156389  2      falcon TX_R    carrier_scriptsig   492c7dcba00e3e48... (pk=897, sig=652)
+6156399  21     falcon TX_C    op_return_only      5a6bc01cfa36880a...
+6156425  5      falcon TX_R    carrier_scriptsig   d87439a60ba163f5... (pk=897, sig=660)
+6156450  2      falcon TX_R    carrier_scriptsig   5a6bc01cfa36880a... (pk=897, sig=656)
+6156513  26     falcon TX_C    op_return_only      818da8f9c669bc93...
+6156590  6      falcon TX_C    op_return_only      94308315af523595...
+6156605  4      dilithium TX_C op_return_only      752b2c664c68d89d...
+6156642  13     falcon TX_C    op_return_only      09de67bc49953e88...
+6156662  34     falcon TX_C    op_return_only      3a83c1c63136e118...
+6156750  11     falcon TX_C    op_return_only      43b877ae18aa928c...
+6156750  12     falcon TX_R    carrier_scriptsig   3a83c1c63136e118... (pk=897, sig=657)
+6156760  27     falcon TX_C    op_return_only      6d320fc44e953d60...
+6156770  9      falcon TX_C    op_return_only      bbadbf7a8e4b95ab...
+
+Summary: 16 total validations (12 op_return_only TX_C, 4 carrier_scriptsig TX_R, 1 dilithium2)
+```
+
+#### Block Explorer Links
+
+- TX_C `a9f2f84b`: https://chain.so/tx/DOGE/a9f2f84b3f2dff84c4505ac680ea6932224eb69c0960d00a5ad8f49df18b4e1e
+- TX_R `c32635aa`: https://chain.so/tx/DOGE/c32635aafa32abf9c89b5e366d647231c143b3fb1b925e51b51a67b6133e7924
+- TX_R `3bee4f9c`: https://chain.so/tx/DOGE/3bee4f9c11c6e03ab7117e4198a272b08b61546d7da85edef9c5ec6f74dd5f55
