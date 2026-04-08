@@ -1,0 +1,20 @@
+
+==========================================
+  Raccoon-G-44 Mainnet Integration Test
+==========================================
+
+[0;34m[INFO][0m Checking required tools...
+[0;32m[SUCCESS][0m All tools available
+[0;34m[INFO][0m Using provided funded mainnet wallet...
+----- such generate_public_key: ./such -c generate_public_key -p QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w -----
+public key hex: 03c15308abaf34326d0274d022c70cd15db84809822154dc894001066ce6b97482
+p2pkh address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+----- such generate_public_key exit=0 -----
+[0;32m[SUCCESS][0m Mainnet funded wallet loaded: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+[0;34m[INFO][0m Generating Raccoon-G-44 keypair...
+----- such raccoong_keygen: ./such -c raccoong_keygen -----
+Generating Raccoon-G-44 keypair...
+Error: Failed to generate Raccoon-G-44 keypair
+
+----- such raccoong_keygen exit=1 -----
+[0;31m[ERROR][0m Failed to generate Raccoon-G keypair
