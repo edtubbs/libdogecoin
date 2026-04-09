@@ -41,6 +41,9 @@ The following can be set when running make: make FOO=bar
     ANDROID_TOOLCHAIN_BIN: Path to Android toolchain if installed via Android SDK Manager
     ANDROID_API_LEVEL: API level corresponding to the Android version targeted
     FALLBACK_DOWNLOAD_PATH: If a source file can't be fetched, try here before giving up
+    NO_LIBOQS: set to skip building liboqs (PQC library). Leave empty to include it (e.g. NO_LIBOQS=)
+    LIBOQS_RACCOON: set to 'y' to build the Raccoon-G fork of liboqs (edtubbs/liboqs).
+                    When omitted or empty, upstream liboqs (open-quantum-safe/liboqs) is used.
     DEBUG: disable some optimizations and enable more runtime checking
     HOST_ID_SALT: Optional salt to use when generating host package ids
     BUILD_ID_SALT: Optional salt to use when generating build package ids

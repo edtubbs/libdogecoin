@@ -174,9 +174,20 @@ AC_ARG_ENABLE([yubikey],
 
 AC_ARG_ENABLE([liboqs],
   [AS_HELP_STRING([--enable-liboqs],
-  [Build with liboqs (default is no)])],
+  [Build with upstream liboqs for Falcon-512 and Dilithium2 (default is no)])],
   [use_liboqs=$enableval],
   [use_liboqs=no])
+
+AC_ARG_ENABLE([liboqs-raccoon],
+  [AS_HELP_STRING([--enable-liboqs-raccoon],
+  [Build with liboqs raccoon fork for Falcon-512, Dilithium2, and Raccoon-G-44 (default is no)])],
+  [use_liboqs_raccoon=$enableval],
+  [use_liboqs_raccoon=no])
+
+if test "x$use_liboqs_raccoon" = xyes; then
+  use_liboqs=yes
+fi
+
 
 AC_ARG_ENABLE(tests,
   AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
@@ -308,6 +319,9 @@ if test "x$use_liboqs" = xyes; then
   AC_CHECK_LIB([oqs],[main],[LIBOQS=-loqs],AC_MSG_ERROR(liboqs missing))
   LIBS="$LIBS $LIBOQS"
   AC_DEFINE(USE_LIBOQS, 1, [Define this symbol if liboqs works])
+  if test "x$use_liboqs_raccoon" = xyes; then
+    AC_DEFINE(USE_LIBOQS_RACCOON, 1, [Define this symbol if liboqs raccoon fork is used])
+  fi
 fi
 
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
@@ -333,6 +347,7 @@ AM_CONDITIONAL([USE_OPENENCLAVE], [test "x$use_openenclave" = "xyes"])
 AM_CONDITIONAL([USE_OPTEE], [test "x$use_optee" = "xyes"])
 AM_CONDITIONAL([USE_YUBIKEY], [test "x$use_yubikey" = "xyes"])
 AM_CONDITIONAL([USE_LIBOQS], [test "x$use_liboqs" = "xyes"])
+AM_CONDITIONAL([USE_LIBOQS_RACCOON], [test "x$use_liboqs_raccoon" = "xyes"])
 AM_CONDITIONAL([USE_ARMV8], [test "x$armv8_crypto" = "xyes"])
 AM_CONDITIONAL([USE_ARMV82], [test "x$armv82_crypto" = "xyes"])
 AC_SUBST(LIB_VERSION_CURRENT, _LIB_VERSION_CURRENT)
@@ -368,6 +383,7 @@ echo "  openenclave     = $use_openenclave"
 echo "  optee           = $use_optee"
 echo "  Yubikey         = $use_yubikey"
 echo "  liboqs          = $use_liboqs"
+echo "  liboqs-raccoon  = $use_liboqs_raccoon"
 echo
 echo "  host            = $host"
 echo "  target os       = $TARGET_OS"
