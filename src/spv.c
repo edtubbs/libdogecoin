@@ -60,8 +60,13 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/vector.h>
+#include <dogecoin/pqc_carrier.h>
 #include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
+#include <dogecoin/rmd160.h>
+#ifdef USE_LIBOQS_RACCOON
+#include <dogecoin/pqc_raccoon.h>
+#endif
 #include <event2/event.h>
 
 /* Optional liboqs (Falcon-only) presence check; compile with -DUSE_LIBOQS */
@@ -185,6 +190,55 @@ static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 
+#ifdef USE_LIBOQS
+/* Maximum number of pending PQC OP_RETURN commitments buffered per block
+   for cross-TX carrier validation (TX_C has OP_RETURN, TX_R has scriptSig). */
+#define SPV_PQC_PENDING_MAX 16
+
+typedef struct spv_pqc_pending_commit {
+    uint8_t commit[32];           /* 32-byte commit hash - used as hash key */
+    dogecoin_pqc_algo_t algo;
+    uint32_t txpos;
+    uint32_t height;              /* block height where TX_C was seen */
+    uint8_t* txc_raw;             /* serialized TX_C for signature verification */
+    size_t txc_raw_len;
+    UT_hash_handle hh;            /* makes this structure hashable */
+} spv_pqc_pending_commit_t;
+
+/* Hash table for pending OP_RETURN commitments awaiting carrier TX_R match.
+   TX_C (commitment) may be in one block and TX_R (reveal) in a later block.
+   Key: 32-byte commit hash, provides O(1) lookup when TX_R arrives. */
+static spv_pqc_pending_commit_t* g_pending_commits = NULL;
+
+/* Helper: find pending commit by commit hash */
+static spv_pqc_pending_commit_t* spv_pqc_find_pending(const uint8_t* commit) {
+    spv_pqc_pending_commit_t* found = NULL;
+    HASH_FIND(hh, g_pending_commits, commit, 32, found);
+    return found;
+}
+
+/* Helper: add pending commit to hash table */
+static void spv_pqc_add_pending(spv_pqc_pending_commit_t* entry) {
+    /* Check for duplicate before adding */
+    spv_pqc_pending_commit_t* existing = spv_pqc_find_pending(entry->commit);
+    if (existing) {
+        /* Replace existing entry */
+        HASH_DEL(g_pending_commits, existing);
+        if (existing->txc_raw) dogecoin_free(existing->txc_raw);
+        dogecoin_free(existing);
+    }
+    HASH_ADD(hh, g_pending_commits, commit, 32, entry);
+}
+
+/* Helper: remove and free pending commit */
+static void spv_pqc_remove_pending(spv_pqc_pending_commit_t* entry) {
+    HASH_DEL(g_pending_commits, entry);
+    if (entry->txc_raw) dogecoin_free(entry->txc_raw);
+    dogecoin_free(entry);
+}
+
+#endif /* USE_LIBOQS */
+
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
 void dogecoin_net_spv_node_handshake_done(dogecoin_node *node);
@@ -270,12 +324,25 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     }
 
 #ifdef USE_LIBOQS
-    // Log what Falcon variants are present at runtime (minimal, no hard dependency).
+    // Log what PQC variants are present at runtime (minimal, no hard dependency).
     if (client->nodegroup && client->nodegroup->log_write_cb) {
+#ifdef USE_LIBOQS_RACCOON
+#ifndef OQS_SIG_alg_raccoon_g_44
+#define OQS_SIG_alg_raccoon_g_44 "Raccoon-G-44"
+#endif
         client->nodegroup->log_write_cb(
-            "[oqs] falcon_512=%s falcon_1024=%s (liboqs)\n",
+            "[oqs] falcon_512=%s falcon_1024=%s ml_dsa_44=%s raccoon_g_44=%s (liboqs)\n",
             OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_512) ? "enabled" : "disabled",
-            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_1024) ? "enabled" : "disabled");
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_1024) ? "enabled" : "disabled",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_ml_dsa_44) ? "enabled" : "disabled",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_raccoon_g_44) ? "enabled" : "disabled");
+#else
+        client->nodegroup->log_write_cb(
+            "[oqs] falcon_512=%s falcon_1024=%s ml_dsa_44=%s (liboqs)\n",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_512) ? "enabled" : "disabled",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_1024) ? "enabled" : "disabled",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_ml_dsa_44) ? "enabled" : "disabled");
+#endif
     }
 #endif
 
@@ -435,6 +502,17 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
         client->nodegroup = NULL;
     }
 
+#ifdef USE_LIBOQS
+    /* Release any pending PQC carrier commits that were never matched by a TX_R */
+    {
+        spv_pqc_pending_commit_t* entry;
+        spv_pqc_pending_commit_t* tmp;
+        HASH_ITER(hh, g_pending_commits, entry, tmp) {
+            spv_pqc_remove_pending(entry);
+        }
+    }
+#endif
+
     dogecoin_free(client);
 }
 
@@ -549,10 +627,10 @@ void dogecoin_net_spv_fill_block_locator(dogecoin_spv_client *client, vector_t *
     int64_t min_timestamp = client->oldest_item_of_interest - BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S; /* ensure we going back ~300 blocks */
     if (client->headers_db->getchaintip(client->headers_db_ctx)->height == 0) {
         if (client->use_checkpoints && client->oldest_item_of_interest > BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S) {
-            const dogecoin_checkpoint *checkpoint = memcmp(client->chainparams, &dogecoin_chainparams_main, 4) == 0 ? dogecoin_mainnet_checkpoint_array : dogecoin_testnet_checkpoint_array;
+            const dogecoin_checkpoint *checkpoint = (client->chainparams == &dogecoin_chainparams_main) ? dogecoin_mainnet_checkpoint_array : dogecoin_testnet_checkpoint_array;
             size_t mainnet_checkpoint_size = sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]);
             size_t testnet_checkpoint_size = sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]);
-            size_t length = memcmp(client->chainparams, &dogecoin_chainparams_main, 8) == 0 ? mainnet_checkpoint_size : testnet_checkpoint_size;
+            size_t length = (client->chainparams == &dogecoin_chainparams_main) ? mainnet_checkpoint_size : testnet_checkpoint_size;
             int i;
             for (i = (int)length - 1; i >= 0; i--) {
                 if (checkpoint[i].timestamp < min_timestamp) {
@@ -898,20 +976,168 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
                 
 #ifdef USE_LIBOQS
-                // Validate Falcon commit in canonical tagged OP_RETURN form (6a24 + "FLC1" + 32 bytes)
+                /* --- Phase 1: Detect OP_RETURN commitments --- */
+                /* Falcon-512: buffer for cross-TX carrier match (TX_C → pending, TX_R validates) */
                 uint8_t falcon_commit_data[32];
                 if (dogecoin_tx_extract_falcon512_commit(tx, falcon_commit_data)) {
                     char falcon_commit_hex[65];
                     utils_bin_to_hex(falcon_commit_data, 32, falcon_commit_hex);
-                    client->nodegroup->log_write_cb("[falcon-commit] Valid at height=%d txpos=%u commit=%s\n",
+                    client->nodegroup->log_write_cb("[falcon-commit] Pending at height=%d txpos=%u commit=%s source=op_return\n",
                                                      pindex->height, i, falcon_commit_hex);
+                    spv_pqc_pending_commit_t* entry = dogecoin_calloc(1, sizeof(spv_pqc_pending_commit_t));
+                    if (entry) {
+                        memcpy(entry->commit, falcon_commit_data, 32);
+                        entry->algo = DOGECOIN_PQC_ALGO_FALCON;
+                        entry->txpos = i;
+                        entry->height = pindex->height;
+                        entry->txc_raw = dogecoin_malloc(consumedlength);
+                        if (entry->txc_raw) {
+                            memcpy(entry->txc_raw, tx_raw, consumedlength);
+                            entry->txc_raw_len = consumedlength;
+                        }
+                        spv_pqc_add_pending(entry);
+                    }
                 }
+                /* Dilithium2: buffer for cross-TX carrier match (TX_C → pending, TX_R validates via multi-part carrier) */
                 uint8_t dilithium_commit_data[32];
                 if (dogecoin_tx_extract_dilithium2_commit(tx, dilithium_commit_data)) {
                     char dilithium_commit_hex[65];
                     utils_bin_to_hex(dilithium_commit_data, 32, dilithium_commit_hex);
-                    client->nodegroup->log_write_cb("[dilithium-commit] Valid at height=%d txpos=%u commit=%s\n",
+                    client->nodegroup->log_write_cb("[dilithium-commit] Pending at height=%d txpos=%u commit=%s source=op_return\n",
                                                      pindex->height, i, dilithium_commit_hex);
+                    spv_pqc_pending_commit_t* entry = dogecoin_calloc(1, sizeof(spv_pqc_pending_commit_t));
+                    if (entry) {
+                        memcpy(entry->commit, dilithium_commit_data, 32);
+                        entry->algo = DOGECOIN_PQC_ALGO_DILITHIUM;
+                        entry->txpos = i;
+                        entry->height = pindex->height;
+                        entry->txc_raw = dogecoin_malloc(consumedlength);
+                        if (entry->txc_raw) {
+                            memcpy(entry->txc_raw, tx_raw, consumedlength);
+                            entry->txc_raw_len = consumedlength;
+                        }
+                        spv_pqc_add_pending(entry);
+                    }
+                }
+                /* Raccoon-G-44: buffer for cross-TX carrier match (TX_C → pending, TX_R validates via multi-part carrier) */
+#ifdef USE_LIBOQS_RACCOON
+                uint8_t raccoong_commit_data[32];
+                if (dogecoin_tx_extract_raccoong44_commit(tx, raccoong_commit_data)) {
+                    char raccoong_commit_hex[65];
+                    utils_bin_to_hex(raccoong_commit_data, 32, raccoong_commit_hex);
+                    client->nodegroup->log_write_cb("[raccoong-commit] Pending at height=%d txpos=%u commit=%s source=op_return\n",
+                                                     pindex->height, i, raccoong_commit_hex);
+                    spv_pqc_pending_commit_t* entry = dogecoin_calloc(1, sizeof(spv_pqc_pending_commit_t));
+                    if (entry) {
+                        memcpy(entry->commit, raccoong_commit_data, 32);
+                        entry->algo = DOGECOIN_PQC_ALGO_RACCOONG;
+                        entry->txpos = i;
+                        entry->height = pindex->height;
+                        entry->txc_raw = dogecoin_malloc(consumedlength);
+                        if (entry->txc_raw) {
+                            memcpy(entry->txc_raw, tx_raw, consumedlength);
+                            entry->txc_raw_len = consumedlength;
+                        }
+                        spv_pqc_add_pending(entry);
+                    }
+                }
+#endif
+
+                /* --- Phase 2: Scan every TX for carrier-format scriptSigs (cross-TX carrier match) --- */
+                {
+                    dogecoin_pqc_algo_t carrier_algo;
+                    const uint8_t* carrier_pk = NULL;
+                    const uint8_t* carrier_sig = NULL;
+                    size_t carrier_pk_len = 0, carrier_sig_len = 0, carrier_vin = 0;
+                    uint8_t* carrier_buf = NULL;
+                    size_t carrier_buf_len = 0;
+                    if (dogecoin_pqc_carrier_extract_scriptsig(tx, &carrier_algo, &carrier_pk, &carrier_pk_len,
+                                                      &carrier_sig, &carrier_sig_len, &carrier_vin,
+                                                      &carrier_buf, &carrier_buf_len)) {
+                        /* Compute TX_R (reveal) txid for logging (display byte order) */
+                        uint256_t txr_hash;
+                        dogecoin_tx_hash(tx, txr_hash);
+                        uint8_t txr_hash_rev[32];
+                        for (int rb = 0; rb < 32; rb++) txr_hash_rev[rb] = ((uint8_t*)txr_hash)[31 - rb];
+                        char txr_txid_hex[65];
+                        utils_bin_to_hex(txr_hash_rev, 32, txr_txid_hex);
+
+                        uint8_t computed_commit[32];
+                        const char* algo_label = (carrier_algo == DOGECOIN_PQC_ALGO_FALCON) ? "falcon-commit" :
+                                                 (carrier_algo == DOGECOIN_PQC_ALGO_DILITHIUM) ? "dilithium-commit" :
+#ifdef USE_LIBOQS_RACCOON
+                                                 (carrier_algo == DOGECOIN_PQC_ALGO_RACCOONG) ? "raccoong-commit" :
+#endif
+                                                 "unknown-pqc";
+                        dogecoin_bool commit_ok = false;
+                        if (carrier_algo == DOGECOIN_PQC_ALGO_FALCON)
+                            commit_ok = dogecoin_falcon512_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
+                        else if (carrier_algo == DOGECOIN_PQC_ALGO_DILITHIUM)
+                            commit_ok = dogecoin_dilithium2_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
+#ifdef USE_LIBOQS_RACCOON
+                        else if (carrier_algo == DOGECOIN_PQC_ALGO_RACCOONG)
+                            commit_ok = dogecoin_raccoong44_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
+#endif
+
+                        if (commit_ok) {
+                            char commit_hex[65];
+                            utils_bin_to_hex(computed_commit, 32, commit_hex);
+                            char pk_prefix_hex[33] = {0};
+                            size_t pk_prefix_len = carrier_pk_len < 16 ? carrier_pk_len : 16;
+                            utils_bin_to_hex((unsigned char*)carrier_pk, pk_prefix_len, pk_prefix_hex);
+                            char sig_prefix_hex[33] = {0};
+                            size_t sig_prefix_len = carrier_sig_len < 16 ? carrier_sig_len : 16;
+                            utils_bin_to_hex((unsigned char*)carrier_sig, sig_prefix_len, sig_prefix_hex);
+
+                            /* Cross-validate: O(1) hash table lookup for matching OP_RETURN commitment */
+                            spv_pqc_pending_commit_t* matched_entry = spv_pqc_find_pending(computed_commit);
+                            dogecoin_bool matched = (matched_entry != NULL && matched_entry->algo == carrier_algo);
+                            uint32_t matched_txpos = 0;
+                            uint8_t* matched_txc_raw = NULL;
+                            size_t matched_txc_raw_len = 0;
+                            if (matched) {
+                                matched_txpos = matched_entry->txpos;
+                                matched_txc_raw = matched_entry->txc_raw;
+                                matched_txc_raw_len = matched_entry->txc_raw_len;
+                                /* Remove from hash table but don't free txc_raw yet (used below) */
+                                matched_entry->txc_raw = NULL;
+                                HASH_DEL(g_pending_commits, matched_entry);
+                                dogecoin_free(matched_entry);
+                            }
+
+                            if (matched) {
+                                client->nodegroup->log_write_cb("[%s] Valid at height=%d txpos=%u commit=%s carrier_vin=%zu source=carrier_scriptsig matched_txc_txpos=%u pk_len=%zu sig_len=%zu pk_prefix=%s sig_prefix=%s txr_txid=%s\n",
+                                                                 algo_label, pindex->height, i, commit_hex, carrier_vin, matched_txpos, carrier_pk_len, carrier_sig_len, pk_prefix_hex, sig_prefix_hex, txr_txid_hex);
+
+                                /* Phase 2: Verify PQC signature over TX_C sighash32 (via pqc_carrier module) */
+                                if (matched_txc_raw && matched_txc_raw_len > 0) {
+                                    uint8_t verify_sighash[32] = {0};
+                                    dogecoin_bool sig_verified = dogecoin_pqc_carrier_verify_reveal(
+                                        (dogecoin_pqc_algo_t)carrier_algo,
+                                        matched_txc_raw, matched_txc_raw_len,
+                                        carrier_pk, carrier_pk_len,
+                                        carrier_sig, carrier_sig_len,
+                                        verify_sighash);
+                                    char sighash_hex[65];
+                                    utils_bin_to_hex(verify_sighash, 32, sighash_hex);
+                                    client->nodegroup->log_write_cb("[%s] PQC signature verification %s at height=%d txpos=%u sighash=%s\n",
+                                        algo_label, sig_verified ? "PASSED" : "FAILED", pindex->height, i, sighash_hex);
+                                    if (sig_verified) {
+                                        client->nodegroup->log_write_cb("[%s] Reveal validated: TX_R=%s commit=%s pk_len=%zu sig_len=%zu height=%d\n",
+                                            algo_label, txr_txid_hex, commit_hex, carrier_pk_len, carrier_sig_len, pindex->height);
+                                    }
+                                    dogecoin_free(matched_txc_raw);
+                                }
+                            } else {
+                                client->nodegroup->log_write_cb("[%s] Unmatched at height=%d txpos=%u commit=%s carrier_vin=%zu source=carrier_scriptsig pk_len=%zu sig_len=%zu pk_prefix=%s sig_prefix=%s txr_txid=%s\n",
+                                                                 algo_label, pindex->height, i, commit_hex, carrier_vin, carrier_pk_len, carrier_sig_len, pk_prefix_hex, sig_prefix_hex, txr_txid_hex);
+                            }
+                        } else {
+                            client->nodegroup->log_write_cb("[%s] carrier found but commit_bytes failed at height=%d txpos=%u carrier_vin=%zu pk_len=%zu sig_len=%zu buf_len=%zu\n",
+                                                             algo_label, pindex->height, i, carrier_vin, carrier_pk_len, carrier_sig_len, carrier_buf_len);
+                        }
+                        if (carrier_buf) dogecoin_free(carrier_buf);
+                    }
                 }
 #endif
                 

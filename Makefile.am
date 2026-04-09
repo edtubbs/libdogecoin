@@ -54,8 +54,10 @@ noinst_HEADERS = \
     include/dogecoin/moon.h \
     include/dogecoin/portable_endian.h \
     include/dogecoin/pow.h \
+    include/dogecoin/pqc_carrier.h \
     include/dogecoin/pqc_dilithium.h \
     include/dogecoin/pqc_falcon.h \
+    include/dogecoin/pqc_raccoon.h \
     include/qr/png.h \
     include/qr/qr.h \
     include/qr/jpeg.h \
@@ -127,9 +129,16 @@ libdogecoin_la_SOURCES = \
 
 if USE_LIBOQS
 libdogecoin_la_SOURCES += \
+    src/pqc_carrier.c \
     src/pqc_dilithium.c \
     src/pqc_falcon.c
 endif
+
+if USE_LIBOQS_RACCOON
+libdogecoin_la_SOURCES += \
+    src/pqc_raccoon.c
+endif
+
 
 # NASM assembler setup
 NASM = nasm
