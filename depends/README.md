@@ -48,22 +48,6 @@ The following can be set when running make: make FOO=bar
     HOST_ID_SALT: Optional salt to use when generating host package ids
     BUILD_ID_SALT: Optional salt to use when generating build package ids
 
-PQC build examples:
-
-    # Upstream liboqs (Falcon-512, Dilithium2/3/5, SPHINCS+):
-    make HOST=x86_64-linux-gnu NO_LIBOQS=
-
-    # Raccoon-G fork (adds Raccoon-G-44 on top of upstream algorithms):
-    make HOST=x86_64-linux-gnu NO_LIBOQS= LIBOQS_RACCOON=y
-
-After building depends, configure libdogecoin with the matching flag:
-
-    # For upstream liboqs:
-    ./configure --prefix=`pwd`/depends/x86_64-linux-gnu --enable-liboqs
-
-    # For Raccoon-G fork:
-    ./configure --prefix=`pwd`/depends/x86_64-linux-gnu --enable-liboqs-raccoon
-
 If some packages are not built, the appropriate
 options will be passed to libdogecoin's configure. In this case, `--disable-net`.
 
