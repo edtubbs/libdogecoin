@@ -39,12 +39,12 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - dilithium2_sign (requires --enable-liboqs)
 - dilithium2_verify (requires --enable-liboqs)
 - dilithium2_commit (requires --enable-liboqs)
-- raccoong_keygen (requires --enable-liboqs)
-- raccoong_sign (requires --enable-liboqs)
-- raccoong_verify (requires --enable-liboqs)
-- raccoong_commit (requires --enable-liboqs)
-- raccoong_hd_derive (requires --enable-liboqs)
-- raccoong_hd_derive_pub (requires --enable-liboqs)
+- raccoong_keygen (requires --enable-liboqs-raccoon)
+- raccoong_sign (requires --enable-liboqs-raccoon)
+- raccoong_verify (requires --enable-liboqs-raccoon)
+- raccoong_commit (requires --enable-liboqs-raccoon)
+- raccoong_hd_derive (requires --enable-liboqs-raccoon)
+- raccoong_hd_derive_pub (requires --enable-liboqs-raccoon)
 
 So an example run of `such` could be something like this:
 ```
@@ -482,7 +482,7 @@ When using -n with a mnemonic, instead of main_wallet.db, spvnode will generate 
 
 ## Falcon-512 Post-Quantum Cryptography (PQC) Commands
 
-> **Note**: These commands are only available when libdogecoin is built with `--enable-liboqs` flag.
+> **Note**: Falcon and Dilithium commands require the `--enable-liboqs` configure flag. Raccoon-G commands require `--enable-liboqs-raccoon`.
 
 The `such` tool includes PQC commands for Falcon-512 and Dilithium2 commitments.
 
