@@ -41,22 +41,48 @@ LIBDOGECOIN_BEGIN_DECL
 #define DOGECOIN_PQC_RACCOON_PUSH_TOTAL (DOGECOIN_PQC_RACCOON_TAG_LEN + DOGECOIN_PQC_RACCOON_COMMIT_LEN)
 #define DOGECOIN_PQC_RACCOON_CHAINCODE_LEN 32
 
+/*
+ * Check if Raccoon-G-44 is available at runtime.
+ */
 #ifdef USE_LIBOQS_RACCOON
 LIBDOGECOIN_API dogecoin_bool dogecoin_raccoong44_is_available(void);
+
+/*
+ * Generate a Raccoon-G-44 keypair.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_raccoong44_keypair(uint8_t** pk, size_t* pk_len,
                                                             uint8_t** sk, size_t* sk_len);
+
+/*
+ * Sign a message with Raccoon-G-44.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_raccoong44_sign(const uint8_t* sk, size_t sk_len,
                                                         const uint8_t* msg, size_t msg_len,
                                                         uint8_t** sig, size_t* sig_len);
+
+/*
+ * Verify a Raccoon-G-44 signature.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_raccoong44_verify(const uint8_t* pk, size_t pk_len,
                                                           const uint8_t* msg, size_t msg_len,
                                                           const uint8_t* sig, size_t sig_len);
+
+/*
+ * Compute commit = SHA256(pk || sig).
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_raccoong44_commit_bytes(const uint8_t* pk, size_t pk_len,
                                                                 const uint8_t* signature, size_t signature_len,
                                                                 uint8_t commit32[DOGECOIN_PQC_RACCOON_COMMIT_LEN]);
 
+/*
+ * Append OP_RETURN output carrying "RCG4" || commit32 (0 DOGE).
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_add_raccoong44_commit(dogecoin_tx* tx,
                                                                  const uint8_t commit32[DOGECOIN_PQC_RACCOON_COMMIT_LEN]);
+
+/*
+ * Extract first "RCG4" commit32 from a transaction.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_extract_raccoong44_commit(const dogecoin_tx* tx,
                                                                      uint8_t out_commit32[DOGECOIN_PQC_RACCOON_COMMIT_LEN]);
 

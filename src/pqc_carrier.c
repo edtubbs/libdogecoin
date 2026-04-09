@@ -25,9 +25,8 @@
 
 */
 
-/**
- * @file pqc_carrier.c
- * @brief PQC P2SH carrier transaction construction and parsing.
+/*
+ * PQC P2SH carrier transaction construction and parsing.
  *
  * Implements the P2SH carrier mode for post-quantum signature commitment
  * transactions.  TX_C creates P2SH outputs whose redeem script is simply
@@ -52,7 +51,7 @@ static void script_push_op(cstring* s, uint8_t op)
     cstr_append_buf(s, &op, 1);
 }
 
-/**
+/*
  * Push arbitrary data onto a script buffer using the smallest
  * canonical push encoding (direct / OP_PUSHDATA1 / OP_PUSHDATA2).
  */
@@ -84,7 +83,7 @@ static void script_push_data(cstring* s, const uint8_t* data, size_t len)
     cstr_append_buf(s, data, len);
 }
 
-/**
+/*
  * Read one push-data element from raw script bytes starting at *off.
  * On success, *out points into the original buffer and *outlen is set.
  * Returns false on truncation or unexpected opcodes.
@@ -139,7 +138,7 @@ static void hash160(const uint8_t* data, size_t len, uint8_t out20[20])
     rmd160(h32, sizeof(h32), out20);
 }
 
-/**
+/*
  * Build the carrier redeem script: OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_1.
  * This script always succeeds after consuming the five data pushes in the
  * scriptSig, allowing miners to accept the TX_R spend.
@@ -159,7 +158,7 @@ dogecoin_bool dogecoin_pqc_carrier_build_redeemscript(cstring** out_redeem)
     return true;
 }
 
-/**
+/*
  * Build the P2SH scriptPubKey (OP_HASH160 <hash160(redeem)> OP_EQUAL) from
  * the carrier redeem script.  Used to create the carrier outputs in TX_C.
  */
@@ -182,7 +181,7 @@ dogecoin_bool dogecoin_pqc_carrier_build_p2sh_scriptpubkey(const cstring* redeem
     return true;
 }
 
-/**
+/*
  * Build a single carrier-part scriptSig for TX_R.
  *
  * Layout: <tag8> <8-byte-hdr> <chunk0..chunk4> <redeemscript>
@@ -239,7 +238,7 @@ dogecoin_bool dogecoin_pqc_carrier_build_part_scriptsig(
     return true;
 }
 
-/**
+/*
  * Parse a carrier-part scriptSig produced by
  * dogecoin_pqc_carrier_build_part_scriptsig().
  *
@@ -314,7 +313,7 @@ dogecoin_bool dogecoin_pqc_carrier_parse_part_scriptsig(
     return true;
 }
 
-/**
+/*
  * Append P2SH carrier outputs to a transaction (TX_C).
  *
  * Creates part_total outputs, each paying value koinu to carrier_spk.

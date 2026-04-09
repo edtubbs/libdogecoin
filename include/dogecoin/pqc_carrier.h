@@ -41,8 +41,19 @@ LIBDOGECOIN_BEGIN_DECL
 #define DOGECOIN_PQC_CARRIER_HDR_LEN 8
 #define DOGECOIN_PQC_CARRIER_TAG_LEN 8
 
+/*
+ * Build the OP_DROP-based redeem script used for PQC carrier P2SH outputs.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_build_redeemscript(cstring** out_redeem);
+
+/*
+ * Build a P2SH scriptPubKey from a redeem script.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_build_p2sh_scriptpubkey(const cstring* redeem, cstring** out_spk);
+
+/*
+ * Build a carrier scriptSig for one part of a multi-part PQC payload.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_build_part_scriptsig(
     const char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN],
     uint8_t part_index,
@@ -54,6 +65,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_build_part_scriptsig(
     const cstring* redeem,
     cstring** out_scriptsig);
 
+/*
+ * Parse a carrier scriptSig to extract the tag, part metadata, and payload.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_parse_part_scriptsig(
     const cstring* scriptsig,
     char out_tag8[DOGECOIN_PQC_CARRIER_TAG_LEN + 1],
@@ -65,6 +79,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_parse_part_scriptsig(
     size_t* out_part_data_len,
     cstring** out_redeem);
 
+/*
+ * Add carrier P2SH outputs to a transaction for the given number of parts.
+ */
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_add_pqc_carrier_outputs(
     dogecoin_tx* tx,
     const cstring* carrier_spk,
@@ -73,4 +90,4 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_tx_add_pqc_carrier_outputs(
 
 LIBDOGECOIN_END_DECL
 
-#endif
+#endif /* __LIBDOGECOIN_PQC_CARRIER_H__ */
