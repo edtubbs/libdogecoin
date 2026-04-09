@@ -2618,6 +2618,7 @@ int main(int argc, char* argv[])
         dogecoin_free(child_pk_hex);
     }
     #endif /* USE_LIBOQS_RACCOON */
+#endif /* USE_LIBOQS (keygen/sign/verify/commit commands) */
 #ifdef USE_LIBOQS
     else if (strcmp(cmd, "falcon_add_commit_tx") == 0) {
         // ./such -c falcon_add_commit_tx -x <raw_tx_hex> -s <falcon_commitment_hex>
