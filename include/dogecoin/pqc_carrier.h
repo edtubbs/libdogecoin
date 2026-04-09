@@ -41,18 +41,42 @@ LIBDOGECOIN_BEGIN_DECL
 #define DOGECOIN_PQC_CARRIER_HDR_LEN 8
 #define DOGECOIN_PQC_CARRIER_TAG_LEN 8
 
-/*
- * Build the OP_DROP-based redeem script used for PQC carrier P2SH outputs.
+/**
+ * @brief This function builds the OP_DROP-based redeem script
+ * used for PQC carrier P2SH outputs.
+ *
+ * @param out_redeem The pointer to receive the allocated redeem script.
+ *
+ * @return true if the script was built, false on error.
  */
 LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_build_redeemscript(cstring** out_redeem);
 
-/*
- * Build a P2SH scriptPubKey from a redeem script.
+/**
+ * @brief This function builds a P2SH scriptPubKey
+ * (OP_HASH160 <hash160(redeem)> OP_EQUAL) from a redeem script.
+ *
+ * @param redeem The pointer to the redeem script.
+ * @param out_spk The pointer to receive the allocated scriptPubKey.
+ *
+ * @return true if the scriptPubKey was built, false on error.
  */
 LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_build_p2sh_scriptpubkey(const cstring* redeem, cstring** out_spk);
 
-/*
- * Build a carrier scriptSig for one part of a multi-part PQC payload.
+/**
+ * @brief This function builds a carrier scriptSig for one
+ * part of a multi-part PQC payload.
+ *
+ * @param tag8 The 8-byte algorithm tag.
+ * @param part_index The zero-based index of this part.
+ * @param part_total The total number of parts.
+ * @param pk_len The public key length encoded in the header.
+ * @param full_len The full payload length encoded in the header.
+ * @param part_data The pointer to this part's data payload.
+ * @param part_data_len The length of the part data.
+ * @param redeem The pointer to the redeem script.
+ * @param out_scriptsig The pointer to receive the allocated scriptSig.
+ *
+ * @return true if the scriptSig was built, false on error.
  */
 LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_build_part_scriptsig(
     const char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN],
@@ -65,8 +89,21 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_build_part_scriptsig(
     const cstring* redeem,
     cstring** out_scriptsig);
 
-/*
- * Parse a carrier scriptSig to extract the tag, part metadata, and payload.
+/**
+ * @brief This function parses a carrier scriptSig to extract
+ * the tag, part metadata, and payload.
+ *
+ * @param scriptsig The pointer to the scriptSig to parse.
+ * @param out_tag8 The output buffer for the 8-byte tag (null-terminated).
+ * @param out_part_index The pointer to receive the part index.
+ * @param out_part_total The pointer to receive the part total.
+ * @param out_pk_len The pointer to receive the public key length.
+ * @param out_full_len The pointer to receive the full payload length.
+ * @param out_part_data The pointer to receive the allocated data payload.
+ * @param out_part_data_len The pointer to receive the data payload length.
+ * @param out_redeem The pointer to receive the allocated redeem script.
+ *
+ * @return true if parsing succeeded, false on error.
  */
 LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_parse_part_scriptsig(
     const cstring* scriptsig,
@@ -79,8 +116,16 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_parse_part_scriptsig(
     size_t* out_part_data_len,
     cstring** out_redeem);
 
-/*
- * Add carrier P2SH outputs to a transaction for the given number of parts.
+/**
+ * @brief This function adds carrier P2SH outputs to a
+ * transaction for the given number of parts.
+ *
+ * @param tx The pointer to the transaction to modify.
+ * @param carrier_spk The P2SH scriptPubKey for carrier outputs.
+ * @param value The value in koinu for each carrier output.
+ * @param part_total The number of carrier outputs to add.
+ *
+ * @return true if outputs were added, false on error.
  */
 LIBDOGECOIN_API dogecoin_bool dogecoin_tx_add_pqc_carrier_outputs(
     dogecoin_tx* tx,

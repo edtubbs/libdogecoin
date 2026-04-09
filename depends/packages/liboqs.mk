@@ -1,6 +1,6 @@
 package=liboqs
 
-ifeq ($(NO_LIBOQS_RACCOON),)
+ifeq ($(LIBOQS_RACCOON),y)
 # Raccoon fork (edtubbs/liboqs) — Falcon-512, Dilithium2, and Raccoon-G-44
 $(package)_version=v0.0.1
 $(package)_download_path=https://github.com/edtubbs/liboqs/archive/refs/tags
