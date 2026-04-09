@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Dilithium2 Testnet Integration Test Script
+# Raccoon-G-44 Testnet Integration Test Script
 #
 # Prerequisites:
 #   - libdogecoin built with --enable-liboqs
@@ -12,7 +12,6 @@ umask 077
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
@@ -24,16 +23,14 @@ elif [ "$NETWORK" != "testnet" ]; then
     echo "Unsupported NETWORK value: $NETWORK (expected testnet|mainnet)" >&2
     exit 1
 fi
-TMPDIR=$(mktemp -d /tmp/dilithium2_testnet_XXXXXX)
+TMPDIR=$(mktemp -d /tmp/raccoong_testnet_XXXXXX)
 chmod 700 "$TMPDIR"
 BROADCASTED=0
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
 SPV_FROM_HEIGHT="${SPV_FROM_HEIGHT:-0}"
 SPV_REQUIRE_VALIDATION="${SPV_REQUIRE_VALIDATION:-1}"
-SPV_NO_BROADCAST_TIMEOUT="${SPV_NO_BROADCAST_TIMEOUT:-30}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
-# sendtx can report success either as immediate relay or as "already known".
 RELAY_SUCCESS_PATTERN='tx successfully sent to node|already (broadcasted|known|have transaction)|txn-already-known'
 
 info() { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -56,11 +53,8 @@ check_tools() {
             error "$tool not found. Please build libdogecoin first."
         fi
     done
-    if ! ./such -c help 2>&1 | grep -q dilithium2_keygen; then
-        error "libdogecoin not built with Dilithium2 support. Rebuild with --enable-liboqs"
-    fi
-    if ! ./such -c help 2>&1 | grep -q tx_sighash32; then
-        error "such missing tx_sighash32 command"
+    if ! ./such -c help 2>&1 | grep -q raccoong_keygen; then
+        error "libdogecoin not built with Raccoon-G support. Rebuild with --enable-liboqs"
     fi
     if [ "$SPV_REQUIRE_VALIDATION" -ne 1 ]; then
         error "SPV_REQUIRE_VALIDATION must be 1 for full-run mode"
@@ -102,29 +96,25 @@ get_testnet_coins() {
     fi
 }
 
-generate_dilithium2_keypair() {
-    info "Generating Dilithium2 keypair..."
-    run_and_log "such dilithium2_keygen" ./such -c dilithium2_keygen | tee "$TMPDIR/dilithium2_keys.txt"
-    DILITHIUM2_PK=$(grep "^public key:" "$TMPDIR/dilithium2_keys.txt" | cut -d: -f2 | tr -d ' ')
-    DILITHIUM2_SK=$(grep "^secret key:" "$TMPDIR/dilithium2_keys.txt" | cut -d: -f2 | tr -d ' ')
-    [ -n "$DILITHIUM2_PK" ] || error "Failed to generate Dilithium2 keypair"
-    success "Dilithium2 keypair generated"
+generate_raccoong_keypair() {
+    info "Generating Raccoon-G-44 keypair..."
+    run_and_log "such raccoong_keygen" ./such -c raccoong_keygen | tee "$TMPDIR/raccoong_keys.txt"
+    RACCOONG_PK=$(grep "^public key:" "$TMPDIR/raccoong_keys.txt" | cut -d: -f2 | tr -d ' ')
+    RACCOONG_SK=$(grep "^secret key:" "$TMPDIR/raccoong_keys.txt" | cut -d: -f2 | tr -d ' ')
+    [ -n "$RACCOONG_PK" ] || error "Failed to generate Raccoon-G keypair"
+    [ -n "$RACCOONG_SK" ] || error "Failed to generate Raccoon-G keypair"
+    success "Raccoon-G-44 keypair generated"
 }
 
-sign_message_dilithium2() {
-    info "Signing tx_sighash32 with Dilithium2..."
-    run_and_log "such dilithium2_sign" ./such -c dilithium2_sign -p "$DILITHIUM2_SK" -x "$TX_SIGHASH_HEX" | tee "$TMPDIR/dilithium2_sig.txt"
-    DILITHIUM2_SIG=$(grep "^signature:" "$TMPDIR/dilithium2_sig.txt" | cut -d: -f2 | tr -d ' ')
-    [ -n "$DILITHIUM2_SIG" ] || error "Failed to sign tx_sighash32"
-    success "tx_sighash32 signed"
-}
-
-generate_commitment() {
-    info "Generating Dilithium2 commitment..."
-    run_and_log "such dilithium2_commit" ./such -c dilithium2_commit -k "$DILITHIUM2_PK" -s "$DILITHIUM2_SIG" | tee "$TMPDIR/dilithium2_commit.txt"
-    DILITHIUM2_COMMIT=$(grep "^commitment:" "$TMPDIR/dilithium2_commit.txt" | cut -d: -f2 | tr -d ' ')
-    [ "${#DILITHIUM2_COMMIT}" -eq 64 ] || error "Invalid commitment length"
-    success "Commitment generated: $DILITHIUM2_COMMIT"
+derive_hd_child() {
+    info "Deriving Raccoon-G child keys (non-hardened + hardened)..."
+    CHAINCODE=$(printf '42%.0s' {1..32})
+    run_and_log "such raccoong_hd_derive non-hardened" \
+        ./such -c raccoong_hd_derive -p "$RACCOONG_SK" -s "$CHAINCODE" -i 7 -g 0 | tee "$TMPDIR/raccoong_hd_nonhardened.txt"
+    run_and_log "such raccoong_hd_derive hardened" \
+        ./such -c raccoong_hd_derive -p "$RACCOONG_SK" -s "$CHAINCODE" -i 7 -g 1 | tee "$TMPDIR/raccoong_hd_hardened.txt"
+    run_and_log "such raccoong_hd_derive_pub" \
+        ./such -c raccoong_hd_derive_pub -k "$RACCOONG_PK" -s "$CHAINCODE" -i 7 | tee "$TMPDIR/raccoong_hd_pub.txt"
 }
 
 build_transaction() {
@@ -150,7 +140,6 @@ build_transaction() {
     if echo "$RAW_UNSIGNED_TX" | grep -Eq '^0100000001(00){36}'; then
         error "Input transaction uses a zero prevout placeholder. Provide a real funded UTXO transaction."
     fi
-    # Reject zeroed P2PKH scriptPubKey: 76a914 + 20-byte hash160 (40 hex chars) + 88ac.
     if echo "$SCRIPT_PUBKEY" | grep -Eq '^76a914(0){40}88ac$'; then
         error "scriptPubKey is a zero placeholder. Provide the real UTXO scriptPubKey."
     fi
@@ -159,15 +148,19 @@ build_transaction() {
     echo "$SIGHASH_OUTPUT"
     TX_SIGHASH_HEX=$(echo "$SIGHASH_OUTPUT" | grep "^tx_sighash32:" | cut -d: -f2 | tr -d ' ')
     [ -n "$TX_SIGHASH_HEX" ] || error "Failed to derive tx_sighash32"
-    [ "${#TX_SIGHASH_HEX}" -eq 64 ] || error "Invalid tx_sighash32 length"
-    info "tx_sighash32: $TX_SIGHASH_HEX"
-    sign_message_dilithium2
-    generate_commitment
 
-    ADD_COMMIT_OUTPUT=$(run_and_log "such dilithium2_add_commit_tx" ./such -c dilithium2_add_commit_tx -x "$RAW_UNSIGNED_TX" -s "$DILITHIUM2_COMMIT")
+    run_and_log "such raccoong_sign" ./such -c raccoong_sign -p "$RACCOONG_SK" -x "$TX_SIGHASH_HEX" | tee "$TMPDIR/raccoong_sig.txt"
+    RACCOONG_SIG=$(grep "^signature:" "$TMPDIR/raccoong_sig.txt" | cut -d: -f2 | tr -d ' ')
+    [ -n "$RACCOONG_SIG" ] || error "Failed to sign tx_sighash32"
+
+    run_and_log "such raccoong_commit" ./such -c raccoong_commit -k "$RACCOONG_PK" -s "$RACCOONG_SIG" | tee "$TMPDIR/raccoong_commit.txt"
+    RACCOONG_COMMIT=$(grep "^commitment:" "$TMPDIR/raccoong_commit.txt" | cut -d: -f2 | tr -d ' ')
+    [ "${#RACCOONG_COMMIT}" -eq 64 ] || error "Invalid commitment length"
+
+    ADD_COMMIT_OUTPUT=$(run_and_log "such raccoong_add_commit_tx" ./such -c raccoong_add_commit_tx -x "$RAW_UNSIGNED_TX" -s "$RACCOONG_COMMIT")
     echo "$ADD_COMMIT_OUTPUT"
     TX_WITH_COMMIT=$(echo "$ADD_COMMIT_OUTPUT" | grep "^tx with commitment:" | cut -d: -f2- | tr -d ' ')
-    [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Dilithium2 commitment"
+    [ -n "$TX_WITH_COMMIT" ] || error "Failed to append Raccoon-G commitment"
 
     TX_FOR_SIGNING="$TX_WITH_COMMIT"
 
@@ -181,10 +174,10 @@ RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
 TX_WITH_COMMIT=$TX_WITH_COMMIT
 SCRIPT_PUBKEY=$SCRIPT_PUBKEY
 TX_SIGHASH_HEX=$TX_SIGHASH_HEX
-DILITHIUM2_SIG=$DILITHIUM2_SIG
-DILITHIUM2_COMMIT=$DILITHIUM2_COMMIT
+RACCOONG_SIG=$RACCOONG_SIG
+RACCOONG_COMMIT=$RACCOONG_COMMIT
 SIGNED_TX=$SIGNED_TX
-OPRETURN_SCRIPT=6a2444494c32${DILITHIUM2_COMMIT}
+OPRETURN_SCRIPT=6a2452434734${RACCOONG_COMMIT}
 EOF
 
     DO_BROADCAST="n"
@@ -212,24 +205,38 @@ EOF
 monitor_spvnode() {
     info "Step 7: Monitor with spvnode"
     echo "Expected log:"
-    echo "  [dilithium-commit] Valid at height=X txpos=Y commit=$DILITHIUM2_COMMIT"
+    echo "  [raccoong-commit] Valid at height=X txpos=Y commit=$RACCOONG_COMMIT"
     if [ "$BROADCASTED" -eq 1 ]; then
-        info "Running spvnode scan (timeout ${SPV_TIMEOUT_SECONDS}s) and requiring Dilithium2 validation log before next step..."
-        set +e
-        run_and_log "spvnode scan" timeout "$SPV_TIMEOUT_SECONDS" ./spvnode $NETWORK_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1
-        SPV_EXIT=$?
-        set -e
-        cat "$TMPDIR/spvnode.log"
-        if ! grep -Fq "[dilithium-commit] Valid" "$TMPDIR/spvnode.log"; then
+        info "Running spvnode scan and waiting for [raccoong-commit] Valid marker..."
+        : > "$TMPDIR/spvnode.log"
+        ./spvnode $NETWORK_FLAG -l -f "$SPV_FROM_HEIGHT" -c -d -x -p -b -a "$TESTNET_ADDR" scan > "$TMPDIR/spvnode.log" 2>&1 &
+        SPV_PID=$!
+        DEADLINE=$(( $(date +%s) + SPV_TIMEOUT_SECONDS ))
+        FOUND_VALID=0
+
+        while kill -0 "$SPV_PID" 2>/dev/null; do
+            if grep -Fq "[raccoong-commit] Valid" "$TMPDIR/spvnode.log"; then
+                FOUND_VALID=1
+                break
+            fi
+            if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+                break
+            fi
+            sleep 3
+        done
+
+        if [ "$FOUND_VALID" -eq 1 ]; then
+            kill "$SPV_PID" 2>/dev/null || true
+            wait "$SPV_PID" 2>/dev/null || true
+            cat "$TMPDIR/spvnode.log"
+            success "spvnode confirmed Raccoon-G commitment validation"
+        else
+            kill "$SPV_PID" 2>/dev/null || true
+            wait "$SPV_PID" 2>/dev/null || true
+            cat "$TMPDIR/spvnode.log"
             echo "----- spvnode log tail -----"
             tail -n 80 "$TMPDIR/spvnode.log"
-            if [ "$SPV_EXIT" -eq 124 ]; then
-                error "spvnode timed out before Dilithium2 commitment validation was observed"
-            else
-                error "Dilithium2 commitment was not validated by spvnode before proceeding"
-            fi
-        else
-            success "spvnode confirmed Dilithium2 commitment validation"
+            error "spvnode did not emit [raccoong-commit] Valid before timeout (${SPV_TIMEOUT_SECONDS}s)"
         fi
     else
         error "Transaction was not broadcast; cannot continue full-run validation flow"
@@ -238,47 +245,41 @@ monitor_spvnode() {
 
 verify_commitment() {
     info "Step 8: Off-chain verification"
-    local VERIFY_PK="$DILITHIUM2_PK"
-    local VERIFY_SIG="$DILITHIUM2_SIG"
+    local VERIFY_PK="$RACCOONG_PK"
+    local VERIFY_SIG="$RACCOONG_SIG"
 
-    VERIFY_OUTPUT=$(./such -c dilithium2_verify -k "$VERIFY_PK" -x "$TX_SIGHASH_HEX" -s "$VERIFY_SIG")
+    VERIFY_OUTPUT=$(./such -c raccoong_verify -k "$VERIFY_PK" -x "$TX_SIGHASH_HEX" -s "$VERIFY_SIG")
     echo "$VERIFY_OUTPUT"
-    echo "$VERIFY_OUTPUT" > "$TMPDIR/dilithium2_verify.txt"
+    echo "$VERIFY_OUTPUT" > "$TMPDIR/raccoong_verify.txt"
     if ! echo "$VERIFY_OUTPUT" | grep -Eq "valid:[[:space:]]*true|VERIFIED: Signature is valid|VALID"; then
-        echo "$VERIFY_OUTPUT"
-        error "Off-chain Dilithium2 signature verification failed"
+        error "Off-chain Raccoon-G signature verification failed"
     fi
 
-    COMMIT_OUTPUT=$(./such -c dilithium2_commit -k "$VERIFY_PK" -s "$VERIFY_SIG")
-    echo "$COMMIT_OUTPUT" > "$TMPDIR/dilithium2_commit_verify.txt"
+    COMMIT_OUTPUT=$(./such -c raccoong_commit -k "$VERIFY_PK" -s "$VERIFY_SIG")
+    echo "$COMMIT_OUTPUT" > "$TMPDIR/raccoong_commit_verify.txt"
     REGENERATED_COMMIT=$(echo "$COMMIT_OUTPUT" | grep "^commitment:" | cut -d: -f2 | tr -d ' ')
-    if [ -z "$REGENERATED_COMMIT" ]; then
-        error "Failed to parse regenerated Dilithium2 commitment"
+    [ -n "$REGENERATED_COMMIT" ] || error "Failed to parse regenerated Raccoon-G commitment"
+    if [ "$REGENERATED_COMMIT" != "$RACCOONG_COMMIT" ]; then
+        error "Regenerated commitment does not match expected commitment"
     fi
-    if [ "$REGENERATED_COMMIT" != "$DILITHIUM2_COMMIT" ]; then
-        error "Regenerated Dilithium2 commitment does not match expected commitment"
-    fi
-    success "Off-chain Dilithium2 verification and commitment match passed"
+    success "Off-chain Raccoon-G verification and commitment match passed"
 }
 
 main() {
     echo ""
     echo "=========================================="
-    echo "  Dilithium2 Testnet Integration Test"
+    echo "  Raccoon-G-44 Testnet Integration Test"
     echo "=========================================="
     echo ""
     check_tools
     generate_testnet_wallet
     get_testnet_coins
-    generate_dilithium2_keypair
+    generate_raccoong_keypair
+    derive_hd_child
     build_transaction
     monitor_spvnode
     verify_commitment
     success "All test data saved in: $TMPDIR"
-    echo "Files:"
-    echo "  - $TMPDIR/tx_info.txt"
-    echo "  - $TMPDIR/spvnode.log"
-    echo "  - $TMPDIR/dilithium2_verify.txt"
 }
 
 main

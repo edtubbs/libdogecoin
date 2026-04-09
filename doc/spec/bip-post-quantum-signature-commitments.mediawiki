@@ -17,7 +17,7 @@ This document proposes a staged path for introducing post-quantum (PQ) signature
 In the initial stage, a PQ signature commitment is embedded in transaction outputs using a canonical OP_RETURN pattern to enable immediate interoperability and chain-level observability without a consensus change.
 In a later stage, this proposal is intended to migrate from OP_RETURN commitments to a dedicated reserved opcode path (for example via OP_SUCCESSx-based soft fork design), enabling native script-level validation semantics and stronger on-chain composability.
 
-The current implementation focus is Falcon-512 and Dilithium2 commitment publication and SPV-side commitment validation during block scan.
+The current implementation focus is Falcon-512, Dilithium2, and Raccoon-G-44 commitment publication and SPV-side commitment validation during block scan.
 This document is written in standard BIP format and can be adapted to a DIP process if/when a formal DIP track is preferred.
 
 ===Copyright===
@@ -60,6 +60,7 @@ Current libdogecoin tagged variants are:
 <source>
 Falcon-512:  0x6a 0x24 0x464c4331 <32-byte-commitment>   ; "FLC1"
 Dilithium2:  0x6a 0x24 0x44494c32 <32-byte-commitment>   ; "DIL2"
+Raccoon-G:   0x6a 0x24 0x52434734 <32-byte-commitment>   ; "RCG4"
 </source>
 
 Where:
@@ -68,6 +69,7 @@ Where:
 * <code>0x24</code> is push-36
 * <code>0x464c4331</code> is the Falcon identifier (<code>"FLC1"</code> in ASCII)
 * <code>0x44494c32</code> is the Dilithium2 identifier (<code>"DIL2"</code> in ASCII)
+* <code>0x52434734</code> is the Raccoon-G-44 identifier (<code>"RCG4"</code> in ASCII)
 * payload is exactly 4-byte tag + 32-byte commitment
 
 Non-canonical encodings are invalid for commitment interpretation under this proposal.
@@ -77,6 +79,7 @@ For implementation namespace clarity, libdogecoin defines identifier constants:
 <source>
 DOGECOIN_PQC_FALCON_TAG = "FLC1"
 DOGECOIN_PQC_DILITHIUM_TAG = "DIL2"
+DOGECOIN_PQC_RACCOON_TAG = "RCG4"
 </source>
 
 Current consensus-neutral Phase 1 interoperability in this proposal remains canonical tagged <code>OP_RETURN 0x24 <tag4> <32-byte-commitment></code>.
@@ -104,6 +107,102 @@ commitment32 = SHA256(public_key_bytes || signature_bytes)
 
 This keeps Phase 1 commitment publication consensus-neutral while still binding the off-chain PQ proof to a concrete transaction authorization digest.
 
+===Phase 1: On-chain PQ Verification Material via P2SH Data Carrier Outputs===
+
+Dogecoin does not support SegWit witness relay, and extra pushes in a P2PKH spending input scriptSig are non-standard under current relay policy.
+
+The canonical Phase 1 mechanism is the small tagged OP_RETURN commitment.
+
+A standard P2SH data-carrier pattern (TX_C + TX_R) MAY be used to publish full PQ verification material on-chain, but is OPTIONAL and subject to standard relay limits.
+
+Implementations MUST NOT assume that full PQ verification material is present on-chain.
+
+The P2SH carrier reveal MUST only be used when the encoded <code>public_key || signature</code> payload fits within standard transaction policy limits (including maximum push size and scriptSig size constraints).
+
+====Phase 1: Commitment Output====
+
+The commitment output remains canonical tagged OP_RETURN:
+
+<source>
+Falcon-512:  0x6a 0x24 0x464c4331 <32-byte-commitment>   ; "FLC1"
+Dilithium2:  0x6a 0x24 0x44494c32 <32-byte-commitment>   ; "DIL2"
+Raccoon-G:   0x6a 0x24 0x52434734 <32-byte-commitment>   ; "RCG4"
+</source>
+
+Commitment derivation:
+
+<source>
+commitment32 = SHA256(public_key_bytes || signature_bytes)
+</source>
+
+====Phase 1: Transaction Binding====
+
+The PQ signature payload SHOULD be the per-input transaction signature hash:
+
+<source>
+message32 = dogecoin_tx_sighash32(TX_BASE, scriptPubKey, input_index, hash_type)
+signature = PQ_SIGN(secret_key, message32)
+commitment32 = SHA256(public_key_bytes || signature_bytes)
+</source>
+
+Where TX_BASE is the base transaction template used for signing, before the OP_RETURN commitment output is appended (to avoid circular dependency).
+
+====Phase 1: P2SH Carrier Outputs in TX_C====
+
+TX_C creates one or more P2SH outputs that will later be spent to reveal the full PQ material:
+
+<source>
+scriptPubKey = OP_HASH160 <HASH160(redeemScript_carrier)> OP_EQUAL
+</source>
+
+The carrier redeemScript is intentionally small and standard. It exists only to clean the stack and return true. This allows the reveal tx scriptSig to carry data as pure pushes while still satisfying clean-stack policy.
+
+Constraints that matter for standardness include:
+
+* The pushed redeemScript is limited in size (520 bytes) and must execute to a single true stack element (clean stack).
+* Individual pushed stack elements are limited (520 bytes), so PQ material must be chunked into <=520-byte pieces.
+
+libdogecoin canonical carrier uses a fixed number of data pushes per input (three), giving about 1560 bytes of usable payload per carrier spend input (plus small headers).
+
+====Phase 1: Reveal scriptSig format in TX_R====
+
+TX_R spends each carrier output and reveals PQ material in push-only scriptSig, followed by the 6-byte redeemScript:
+
+<source>
+scriptSig pushes (push-only):
+  <TAG8> <HDR8> <CHUNK0> <CHUNK1> <CHUNK2> <redeemScript_carrier>
+
+TAG8:
+  "FLC1FULL" | "DIL2FULL" | "RCG4FULL"
+
+HDR8 (8 bytes):
+  [0] version = 0x01
+  [1] part_index (0..part_total-1)
+  [2] part_total
+  [3] reserved = 0x00
+  [4..5] pk_len (big-endian uint16)
+  [6..7] full_len (big-endian uint16)
+
+Payload:
+  The concatenation FULL = pubkey_bytes || signature_bytes is split into parts.
+  Each part is carried in up to three <=520-byte CHUNK pushes.
+  Empty chunks are encoded as OP_0 pushes.
+
+redeemScript_carrier:
+  OP_DROP repeated 5 times (TAG8,HDR8,CHUNK0,CHUNK1,CHUNK2), then OP_TRUE.
+</source>
+
+====Phase 1: Verification using on-chain data only====
+
+Given TX_R:
+
+# Parse each carrier spend input scriptSig, extract (TAG8,HDR8,CHUNKS), reconstruct FULL by ordering parts.
+# Split FULL into pk and sig using pk_len.
+# Recompute commitment32 = SHA256(pk || sig) and match it against TX_C canonical tagged OP_RETURN.
+# Compute message32 = dogecoin_tx_sighash32(TX_BASE, ...) per this proposal and verify PQ signature over message32.
+
+This yields a fully on-chain verifiable Phase 1 proof without SegWit, and without non-standard extra pushes in a P2PKH spending input.
+
 ===Phase 1: Base Transaction Binding===
 
 Because the OP_RETURN commitment payload is itself derived from the PQ signature, implementers must avoid circular dependency between:
@@ -128,6 +227,12 @@ Current libdogecoin behavior is compatible with this model:
 * PQC transaction-binding workflows should use <code>dogecoin_tx_sighash32(...)</code> to derive that same per-input transaction-digest context, then publish the PQ commitment in OP_RETURN.
 * SPV Phase 1 still validates canonical commitment encoding only; full signature verification remains an off-chain verifier responsibility.
 
+Raccoon-G-44 additionally supports BIP32-style HD derivation in the current implementation:
+
+* private-child derivation (<code>CKDpriv</code>-style) supports hardened and non-hardened index paths;
+* public-child derivation (<code>CKDpub</code>-style) supports non-hardened paths only; and
+* derivation paths require explicit chaincode input and deterministic index handling.
+
 Implementations MAY support additional PQ schemes in future revisions, but MUST preserve canonical on-chain encoding rules.
 
 ===Phase 1: SPV Validation Behavior===
@@ -135,9 +240,38 @@ Implementations MAY support additional PQ schemes in future revisions, but MUST 
 SPV implementations should:
 
 * parse transactions in scanned blocks;
-* detect canonical tagged Falcon and Dilithium2 commitment scripts;
-* treat only canonical encodings as valid commitments; and
-* surface deterministic commitment logs/telemetry for downstream verification workflows.
+* detect canonical tagged Falcon, Dilithium2, and Raccoon-G commitment scripts;
+* treat only canonical encodings as valid commitments;
+* surface deterministic commitment logs/telemetry for downstream verification workflows; and
+* when carrier-mode P2SH data is present, perform on-chain commitment validation by extracting the PQC public key and signature from the TX_R scriptSig and recomputing <code>SHA256(pk || sig)</code> to match against the TX_C OP_RETURN commitment.
+
+====SPV Commitment Validation Sources====
+
+SPV commitment detection operates in two modes depending on how PQ material is published:
+
+# '''Commitment-only:''' The commitment is detected in the OP_RETURN output. No PQ verification material is available on-chain. Log entry includes <code>source=commitment_only</code>.
+# '''Cross-TX P2SH carrier (TX_C + TX_R):''' The commitment OP_RETURN is in TX_C, and the full PQ public key + signature are revealed in TX_R's carrier scriptSig spending the P2SH outputs. Supported for all three algorithms (Falcon-512 via <code>FLC1FULL</code>, Dilithium2 via <code>DL21FULL</code>, Raccoon-G via <code>RCG4FULL</code>). The SPV scanner extracts pk and sig from the carrier-tagged scriptSig, recomputes <code>SHA256(pk || sig)</code>, and matches against buffered OP_RETURN commitments from the same block. Log entry includes <code>source=carrier_scriptsig matched_txc_txpos=... pk_len=... sig_len=... pk_prefix=... sig_prefix=...</code>.
+
+In all validated cases, the log emits the algorithm label (e.g. <code>[falcon-commit]</code>), block height, transaction position, the 32-byte commitment hex, and the validation source.
+
+====SPV Carrier Commitment Validation Algorithm====
+
+Given a TX_R with carrier-tagged scriptSig:
+
+# Parse scriptSig using <code>dogecoin_pqc_carrier_parse_part_scriptsig()</code> to extract tag, part metadata, and raw payload.
+# Identify the PQC algorithm from the 8-byte tag: <code>FLC1FULL</code> (Falcon-512).
+# Split the payload into public key (pk_len bytes) and signature (remaining bytes).
+# Recompute <code>commitment32 = SHA256(pk || sig)</code> using the algorithm-specific commit function.
+# Cross-validate: match the recomputed commitment against buffered OP_RETURN commitments from TX_C transactions in the same block. If matched, report <code>matched_txc_txpos</code> identifying the originating commitment transaction.
+# Log the validation result including pk_len, sig_len, and hex prefixes of pk and sig for diagnostic purposes.
+
+====Transaction Fee Guidance====
+
+For carrier mode transactions:
+
+* '''TX_C''' (commitment + carrier outputs): minimum relay fee is 100000 koinu (0.001 DOGE), matching Dogecoin's default <code>minrelaytxfee</code>.
+* '''TX_R''' (reveal, spending carrier outputs): minimum relay fee is 500000 koinu (0.005 DOGE). Since TX_R scriptSigs carry full PQ material (~1675 bytes for Falcon-512), the fee must satisfy the per-KB minimum relay rate (100000 koinu/KB). A fee of 500000 koinu (~300 koinu/byte) ensures reliable relay and timely mining.
+* '''Carrier output value:''' each P2SH carrier output must be at least 100000000 koinu (1 DOGE) to avoid dust rejection. Values below the dust threshold (100000 koinu / 0.001 DOGE) will be rejected by relay policy.
 
 ===Phase 2: Reserved Opcode Upgrade Path===
 
@@ -145,7 +279,7 @@ This proposal reserves a follow-up soft-fork design track to migrate from OP_RET
 The Phase 2 document is expected to define:
 
 * exact opcode assignment path;
-* witness/program format for PQ verification data;
+* script format for PQ verification data;
 * script evaluation and failure semantics; and
 * activation/deployment process.
 
@@ -161,11 +295,12 @@ In Phase 1, PQC commitments should be treated as an interoperability and migrati
 # Build transaction and derive per-input <code>sighash32</code>.
 # Sign <code>sighash32</code> with Falcon-512 or Dilithium2.
 # Publish <code>SHA256(pubkey || signature)</code> in canonical tagged OP_RETURN.
-# Keep full PQ verification material off-chain for validators/auditors.
+# Publish full PQ verification material on-chain via the P2SH carrier (TX_C + TX_R).
 
 This mirrors current implementation behavior:
 
 * <code>such</code> exposes PQ sign/verify/commit commands and commitment-output append commands.
+* Raccoon-G tooling includes HD child derivation commands for private (hardened/non-hardened) and public (non-hardened) paths.
 * PQ sign/verify command payload (<code>-x</code>) accepts transaction sighash bytes.
 * SPV commitment detection validates canonical encoding and emits deterministic commitment logs.
 
@@ -193,17 +328,105 @@ Current reference behavior exists in libdogecoin components that:
 
 * sign raw transaction inputs using existing <code>dogecoin_tx_sign_input(...)</code> secp/ECC authorization flow;
 * derive matching PQC signing messages with <code>dogecoin_tx_sighash32(...)</code>;
-* generate/verify Falcon-512 and Dilithium2 signatures over caller-provided message bytes;
+* generate/verify Falcon-512, Dilithium2, and Raccoon-G-44 signatures over caller-provided message bytes;
 * derive commitments from PQ verification material (<code>SHA256(pubkey || signature)</code>);
 * append/extract canonical tagged commitments in transaction OP_RETURN outputs; and
-* detect canonical commitments during SPV block scanning and emit deterministic commitment logs.
+* detect canonical commitments during SPV block scanning and emit deterministic commitment logs;
+* perform on-chain PQC commitment validation by extracting public key and signature from carrier scriptSig and recomputing SHA256(pk || sig); and
+* log PQC verification material details (pk_len, sig_len, pk/sig hex prefixes) for diagnostic and audit workflows.
 
 Current CLI wiring reflects this implementation model:
 
 * <code>such -c tx_sighash32</code> derives transaction-bound digest bytes for a selected input;
-* <code>such -c falcon_sign</code> / <code>dilithium2_sign</code> accept message bytes via <code>-x</code> (including tx_sighash32 hex);
-* <code>such -c falcon_commit</code> / <code>dilithium2_commit</code> derive commitment32 from public key + signature; and
-* <code>such -c falcon_add_commit_tx</code> / <code>dilithium2_add_commit_tx</code> attach canonical tagged commitments to raw tx outputs.
+* <code>such -c pqc_carrier_redeemscript</code>, <code>pqc_carrier_scriptpubkey</code>, <code>pqc_carrier_mkpart</code>, and <code>pqc_carrier_parsepart</code> are the canonical commands to build and inspect P2SH carrier payloads;
+* <code>such -c falcon_sign</code> / <code>dilithium2_sign</code> / <code>raccoong_sign</code> accept message bytes via <code>-x</code> (including tx_sighash32 hex);
+* <code>such -c falcon_commit</code> / <code>dilithium2_commit</code> / <code>raccoong_commit</code> derive commitment32 from public key + signature;
+* <code>such -c falcon_add_commit_tx</code> / <code>dilithium2_add_commit_tx</code> / <code>raccoong_add_commit_tx</code> attach canonical tagged commitments to raw tx outputs;
+* <code>such -c falcon_add_commit_and_carrier_tx</code> / <code>dilithium2_add_commit_and_carrier_tx</code> / <code>raccoong_add_commit_and_carrier_tx</code> attach both the OP_RETURN commitment and P2SH carrier outputs in a single operation; and
+* <code>such -c raccoong_hd_derive</code> / <code>raccoong_hd_derive_pub</code> expose HD derivation behavior used for wallet path modeling.
+
+Current end-to-end script behavior is aligned across mainnet and testnet flows:
+
+* commitment-only mode (<code>CARRIER_ENABLED=0</code>): publishes OP_RETURN commitment only, no P2SH carrier outputs;
+* carrier mode (<code>CARRIER_ENABLED=1</code>): publishes OP_RETURN commitment and creates P2SH carrier outputs in TX_C, then reveals full PQ verification material in TX_R spending the carrier outputs;
+* SPV scanning validates on-chain PQC commitments using carrier scriptSig data, logs pk_len/sig_len/prefix details; and
+* all transaction change outputs are sent back to the same funded address to enable chained testing.
+
+==Mainnet Examples==
+
+The following examples are from confirmed mainnet transactions demonstrating Phase 1 PQC commitment publication and SPV validation.
+
+===Falcon-512 Carrier Mode (TX_C + TX_R)===
+
+Commitment transaction (TX_C) with OP_RETURN commitment and P2SH carrier output:
+
+<source>
+TX_C txid:   b47b271ff454ce93e93f723b52959f9d14f44313c61706453c1a85aaced93031
+Block:       6156590 (mainnet, confirmed 2026-04-08T00:33:20Z)
+Funded addr: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+Carrier P2SH: A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q
+
+Outputs:
+  vout 0: 35.933 DOGE → DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (change)
+  vout 1: OP_RETURN 6a24 464c4331 94308315af52359db5af07391ab12fc14909dc6fe64182477ea61c96e8ab8b9f
+  vout 2: 1.0 DOGE → A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q (P2SH carrier)
+</source>
+
+SPV validation log for the OP_RETURN commitment:
+
+<source>
+[falcon-commit] Valid at height=6156590 txpos=6 commit=94308315af52359db5af07391ab12fc14909dc6fe64182477ea61c96e8ab8b9f source=op_return_only
+</source>
+
+SPV validation log for carrier_scriptsig (from earlier TX_R spending a carrier output):
+
+<source>
+[falcon-commit] Valid at height=6156389 txpos=2 commit=492c7dcba00e3e48cb22ce55ee4954312017ace60f2a40b523db9c17bfef85ef carrier_vin=0 source=carrier_scriptsig pk_len=897 sig_len=652 pk_prefix=09b26e7841a14148109e36c32561227c sig_prefix=3913b5adffe778500ac0e252705a81b0
+[falcon-commit] Valid at height=6156425 txpos=5 commit=d87439a60ba163f5e27fd9e259557b7fca77a5196494be649637310cd67206e5 carrier_vin=0 source=carrier_scriptsig pk_len=897 sig_len=660 pk_prefix=0952300ef52dc8d199b86c62fd98f199 sig_prefix=3956a8334554881d551118e122a98d23
+[falcon-commit] Valid at height=6156450 txpos=2 commit=5a6bc01cfa36880a634bc370596c762ed1f36c9f10c4b0894fdbf1085d6edb1b carrier_vin=0 source=carrier_scriptsig pk_len=897 sig_len=656 pk_prefix=096d02fd877d228e433eaf692c253887 sig_prefix=39a7c04c051fa2969b04ccfc0763bac0
+</source>
+
+The carrier_scriptsig validation extracts the full PQC public key (pk_len=897 bytes for Falcon-512) and signature from the TX_R scriptSig, recomputes <code>SHA256(pk || sig)</code>, and matches it against the OP_RETURN commitment from TX_C.
+
+===Dilithium2 Commitment-Only Mode===
+
+Commitment transaction (TX_C) with OP_RETURN commitment only:
+
+<source>
+TX_C txid:   5e0d3e7d8ef7d301a0688c477312824240d57f847338d8aaf66cfea3f3202b83
+Block:       6156605 (mainnet, confirmed 2026-04-08)
+Funded addr: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+
+Outputs:
+  vout 0: 0.997 DOGE → DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (change)
+  vout 1: OP_RETURN 6a24 44494c32 752b2c664c68d89d029c81ac30b6036d42dcdf1990937d669d878026ffcaf72f
+</source>
+
+SPV validation log:
+
+<source>
+[dilithium-commit] Valid at height=6156605 txpos=4 commit=752b2c664c68d89d029c81ac30b6036d42dcdf1990937d669d878026ffcaf72f source=op_return_only
+</source>
+
+===SPV Commitment Validation Summary===
+
+The SPV scanner detected and validated the following PQC commitments during mainnet block scan:
+
+<source>
+Height   TxPos  Algorithm   Source              Commitment (first 16 hex)
+6156358  8      Falcon-512  op_return_only      0657e61928b8eb2b...
+6156374  21     Falcon-512  op_return_only      492c7dcba00e3e48...
+6156388  27     Falcon-512  op_return_only      d87439a60ba163f5...
+6156389  2      Falcon-512  carrier_scriptsig   492c7dcba00e3e48...  (pk_len=897, sig_len=652)
+6156399  21     Falcon-512  op_return_only      5a6bc01cfa36880a...
+6156425  5      Falcon-512  carrier_scriptsig   d87439a60ba163f5...  (pk_len=897, sig_len=660)
+6156450  2      Falcon-512  carrier_scriptsig   5a6bc01cfa36880a...  (pk_len=897, sig_len=656)
+6156513  26     Falcon-512  op_return_only      818da8f9c669bc93...
+6156590  6      Falcon-512  op_return_only      94308315af52359d...
+6156605  4      Dilithium2  op_return_only      752b2c664c68d89d...
+</source>
+
+Note: Commitments at heights 6156389, 6156425, and 6156450 appear as both op_return_only (TX_C) and carrier_scriptsig (TX_R), demonstrating the two-transaction carrier pattern where TX_R reveals the full PQC verification material and the SPV scanner cross-validates the commitment.
 
 ==Deployment==
 

@@ -41,6 +41,7 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 
+
 /**
  * @brief This function frees the memory allocated
  * for a transaction input.
@@ -649,6 +650,11 @@ void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src)
     memcpy_safe(&dest->prevout, &src->prevout, sizeof(dest->prevout));
     dest->sequence = src->sequence;
 
+    if (dest->script_sig) {
+        cstr_free(dest->script_sig, true);
+        dest->script_sig = NULL;
+    }
+
     if (!src->script_sig) {
         dest->script_sig = NULL;
     } else {
@@ -712,7 +718,7 @@ void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
         for (i = 0; i < src->vin->len; i++) {
             dogecoin_tx_in *tx_in_old, *tx_in_new;
             tx_in_old = vector_idx(src->vin, i);
-            tx_in_new = dogecoin_malloc(sizeof(*tx_in_new));
+            tx_in_new = dogecoin_tx_in_new();
             dogecoin_tx_in_copy(tx_in_new, tx_in_old);
             vector_add(dest->vin, tx_in_new);
         }
@@ -1238,4 +1244,3 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
 int getAddrFromPubkeyHash(const char pubkey_hash[PUBKEYHASHLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]) {
     return dogecoin_pubkey_hash_to_p2pkh_address((char *)utils_hex_to_uint8(pubkey_hash), SCRIPT_PUBKEY_LENGTH, p2pkh_address, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main);
 }
-
