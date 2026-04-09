@@ -895,7 +895,7 @@ static dogecoin_bool such_tx_add_commit_and_carrier_outputs(
     uint64_t carrier_total = (uint64_t)part_total * carrier_value_koinu;
     if (tx->vout->len > 0) {
         dogecoin_tx_out* change_out = vector_idx(tx->vout, 0);
-        if (change_out->value < carrier_total) {
+        if ((uint64_t)change_out->value < carrier_total) {
             printf("Error: change output (%llu) too small for carrier total (%llu)\n",
                    (unsigned long long)change_out->value, (unsigned long long)carrier_total);
             cstr_free(carrier_spk, true);

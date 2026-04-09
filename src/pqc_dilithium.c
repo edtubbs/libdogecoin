@@ -92,7 +92,7 @@ dogecoin_bool dogecoin_dilithium2_commit_bytes(const uint8_t* pk, size_t pk_len,
 }
 
 /* Append tagged Dilithium2 commitment output (OP_RETURN "DIL2" || commit32). */
-dogecoin_bool dogecoin_tx_add_dilithium2_commit(dogecoin_tx* tx, const uint8_t* commit32) {
+dogecoin_bool dogecoin_tx_add_dilithium2_commit(dogecoin_tx* tx, const uint8_t commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]) {
     if (!tx || !commit32) {
         return false;
     }
@@ -121,8 +121,8 @@ dogecoin_bool dogecoin_tx_add_dilithium2_commit(dogecoin_tx* tx, const uint8_t* 
 }
 
 /* Extract first canonical Dilithium2 commitment from tx outputs, if present. */
-dogecoin_bool dogecoin_tx_extract_dilithium2_commit(const dogecoin_tx* tx, uint8_t* out32) {
-    if (!tx || !out32) {
+dogecoin_bool dogecoin_tx_extract_dilithium2_commit(const dogecoin_tx* tx, uint8_t out_commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]) {
+    if (!tx || !out_commit32) {
         return false;
     }
 
@@ -138,7 +138,7 @@ dogecoin_bool dogecoin_tx_extract_dilithium2_commit(const dogecoin_tx* tx, uint8
             p[0] == 0x6a &&
             p[1] == DOGECOIN_PQC_DILITHIUM_PUSH_TOTAL &&
             memcmp(p + 2, DOGECOIN_PQC_DILITHIUM_TAG, DOGECOIN_PQC_DILITHIUM_TAG_LEN) == 0) {
-            memcpy(out32, p + 2 + DOGECOIN_PQC_DILITHIUM_TAG_LEN, 32);
+            memcpy(out_commit32, p + 2 + DOGECOIN_PQC_DILITHIUM_TAG_LEN, 32);
             return true;
         }
     }
