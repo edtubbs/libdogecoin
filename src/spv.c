@@ -61,7 +61,9 @@
 #include <dogecoin/pqc_carrier.h>
 #include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
+#ifdef USE_LIBOQS_RACCOON
 #include <dogecoin/pqc_raccoon.h>
+#endif
 #include <event2/event.h>
 
 /* Optional liboqs (Falcon-only) presence check; compile with -DUSE_LIBOQS */
@@ -94,7 +96,9 @@ static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 typedef enum {
     SPV_PQC_FALCON,
     SPV_PQC_DILITHIUM,
+#ifdef USE_LIBOQS_RACCOON
     SPV_PQC_RACCOONG
+#endif
 } spv_pqc_algo_t;
 
 typedef struct {
@@ -139,8 +143,10 @@ static dogecoin_bool spv_extract_carrier_scriptsig(const dogecoin_tx* tx,
             algo = SPV_PQC_FALCON;
         else if (memcmp(tag8, "DL21FULL", 8) == 0)
             algo = SPV_PQC_DILITHIUM;
+#ifdef USE_LIBOQS_RACCOON
         else if (memcmp(tag8, "RCG4FULL", 8) == 0)
             algo = SPV_PQC_RACCOONG;
+#endif
         else {
             if (part_data) dogecoin_free(part_data);
             if (redeem) cstr_free(redeem, true);
@@ -252,17 +258,25 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     }
 
 #ifdef USE_LIBOQS
+    // Log what PQC variants are present at runtime (minimal, no hard dependency).
+    if (client->nodegroup && client->nodegroup->log_write_cb) {
+#ifdef USE_LIBOQS_RACCOON
 #ifndef OQS_SIG_alg_raccoon_g_44
 #define OQS_SIG_alg_raccoon_g_44 "Raccoon-G-44"
 #endif
-    // Log what PQC variants are present at runtime (minimal, no hard dependency).
-    if (client->nodegroup && client->nodegroup->log_write_cb) {
         client->nodegroup->log_write_cb(
             "[oqs] falcon_512=%s falcon_1024=%s ml_dsa_44=%s raccoon_g_44=%s (liboqs)\n",
             OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_512) ? "enabled" : "disabled",
             OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_1024) ? "enabled" : "disabled",
             OQS_SIG_alg_is_enabled(OQS_SIG_alg_ml_dsa_44) ? "enabled" : "disabled",
             OQS_SIG_alg_is_enabled(OQS_SIG_alg_raccoon_g_44) ? "enabled" : "disabled");
+#else
+        client->nodegroup->log_write_cb(
+            "[oqs] falcon_512=%s falcon_1024=%s ml_dsa_44=%s (liboqs)\n",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_512) ? "enabled" : "disabled",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_1024) ? "enabled" : "disabled",
+            OQS_SIG_alg_is_enabled(OQS_SIG_alg_ml_dsa_44) ? "enabled" : "disabled");
+#endif
     }
 #endif
 
@@ -805,6 +819,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                      pindex->height, i, dilithium_commit_hex);
                 }
                 /* Raccoon-G-44: commitment-only (16KB pk + 65KB sig too large for carrier) */
+#ifdef USE_LIBOQS_RACCOON
                 uint8_t raccoong_commit_data[32];
                 if (dogecoin_tx_extract_raccoong44_commit(tx, raccoong_commit_data)) {
                     char raccoong_commit_hex[65];
@@ -812,6 +827,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     client->nodegroup->log_write_cb("[raccoong-commit] Valid at height=%d txpos=%u commit=%s source=commitment_only\n",
                                                      pindex->height, i, raccoong_commit_hex);
                 }
+#endif
 
                 /* --- Phase 2: Scan every TX for carrier-format scriptSigs (cross-TX carrier match) --- */
                 {
@@ -826,14 +842,20 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                       &carrier_buf, &carrier_buf_len)) {
                         uint8_t computed_commit[32];
                         const char* algo_label = (carrier_algo == SPV_PQC_FALCON) ? "falcon-commit" :
-                                                 (carrier_algo == SPV_PQC_DILITHIUM) ? "dilithium-commit" : "raccoong-commit";
+                                                 (carrier_algo == SPV_PQC_DILITHIUM) ? "dilithium-commit" :
+#ifdef USE_LIBOQS_RACCOON
+                                                 (carrier_algo == SPV_PQC_RACCOONG) ? "raccoong-commit" :
+#endif
+                                                 "unknown-pqc";
                         dogecoin_bool commit_ok = false;
                         if (carrier_algo == SPV_PQC_FALCON)
                             commit_ok = dogecoin_falcon512_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
                         else if (carrier_algo == SPV_PQC_DILITHIUM)
                             commit_ok = dogecoin_dilithium2_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
+#ifdef USE_LIBOQS_RACCOON
                         else if (carrier_algo == SPV_PQC_RACCOONG)
                             commit_ok = dogecoin_raccoong44_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
+#endif
 
                         if (commit_ok) {
                             char commit_hex[65];

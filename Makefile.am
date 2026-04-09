@@ -130,7 +130,11 @@ if USE_LIBOQS
 libdogecoin_la_SOURCES += \
     src/pqc_carrier.c \
     src/pqc_dilithium.c \
-    src/pqc_falcon.c \
+    src/pqc_falcon.c
+endif
+
+if USE_LIBOQS_RACCOON
+libdogecoin_la_SOURCES += \
     src/pqc_raccoon.c
 endif
 

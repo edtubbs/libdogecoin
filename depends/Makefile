@@ -7,7 +7,8 @@ NO_QT ?=
 NO_WALLET ?=
 NO_UPNP ?=
 NO_YUBIKEY ?=
-NO_LIBOQS ?= y
+NO_LIBOQS ?=
+NO_LIBOQS_RACCOON ?=
 MULTIPROCESS ?=
 FALLBACK_DOWNLOAD_PATH ?= https://bitcoincore.org/depends-sources
 

@@ -22,7 +22,9 @@
 #include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
 #include <dogecoin/pqc_carrier.h>
+#ifdef USE_LIBOQS_RACCOON
 #include <dogecoin/pqc_raccoon.h>
+#endif
 
 /*
  * Transaction API tests (UTXO build/sign) plus optional Falcon-512 commit test.
@@ -663,6 +665,7 @@ void test_transaction()
     dogecoin_free(dsk);
     dogecoin_free(dsig);
 
+#ifdef USE_LIBOQS_RACCOON
     // optional Raccoon-G-44 OP_RETURN commit + HD derivation test
     uint8_t *rpk = NULL, *rsk = NULL, *rsig = NULL;
     size_t rpk_len = 0, rsk_len = 0, rsig_len = 0;
@@ -697,6 +700,7 @@ void test_transaction()
     dogecoin_free(child_sk);
     dogecoin_free(child_pk);
     dogecoin_free(child_pubonly);
+#endif /* USE_LIBOQS_RACCOON */
 
     cstring* carrier_redeem = NULL;
     cstring* carrier_spk = NULL;

@@ -67,7 +67,9 @@
 #include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
 #include <dogecoin/pqc_carrier.h>
+#ifdef USE_LIBOQS_RACCOON
 #include <dogecoin/pqc_raccoon.h>
+#endif
 
 // ******************************** SUCH -C TRANSACTION MENU ********************************
 #ifdef WITH_NET
@@ -687,18 +689,24 @@ static void print_usage()
     printf("dilithium2_sign (requires -p <dilithium2_secret_key_hex> -x <message_hex|tx_sighash_hex>),\n");
     printf("dilithium2_verify (requires -k <dilithium2_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
     printf("dilithium2_commit (requires -k <dilithium2_public_key_hex> -s <signature_hex>),\n");
+#ifdef USE_LIBOQS_RACCOON
     printf("raccoong_keygen (generates Raccoon-G-44 keypair),\n");
     printf("raccoong_sign (requires -p <raccoong_secret_key_hex> -x <message_hex|tx_sighash_hex>),\n");
     printf("raccoong_verify (requires -k <raccoong_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
     printf("raccoong_commit (requires -k <raccoong_public_key_hex> -s <signature_hex>),\n");
     printf("raccoong_hd_derive (requires -p <raccoong_secret_key_hex> -s <chaincode_hex> -i <child_index>, optional -g <0|1 hardened>),\n");
     printf("raccoong_hd_derive_pub (requires -k <raccoong_public_key_hex> -s <chaincode_hex> -i <child_index>),\n");
+#endif
     printf("falcon_add_commit_tx (requires -x <raw_tx_hex> -s <falcon_commitment_hex>),\n");
     printf("dilithium2_add_commit_tx (requires -x <raw_tx_hex> -s <dilithium2_commitment_hex>),\n");
+#ifdef USE_LIBOQS_RACCOON
     printf("raccoong_add_commit_tx (requires -x <raw_tx_hex> -s <raccoong_commitment_hex>),\n");
+#endif
     printf("falcon_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <falcon_commitment_hex> -k <falcon_pubkey_hex> -s <falcon_signature_hex> [-h <carrier_value_koinu, default 100000000>]),\n");
     printf("dilithium2_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <dilithium2_commitment_hex> -k <dilithium2_pubkey_hex> -s <dilithium2_signature_hex> [-h <carrier_value_koinu, default 100000000>]),\n");
+#ifdef USE_LIBOQS_RACCOON
     printf("raccoong_add_commit_and_carrier_tx (requires -x <raw_tx_hex> -m <raccoong_commitment_hex> -k <raccoong_pubkey_hex> -s <raccoong_signature_hex> [-h <carrier_value_koinu, default 100000000>]),\n");
+#endif
 #endif
     printf("\nExamples: \n");
     printf("Generate a testnet private ec keypair wif/hex:\n");
@@ -2413,6 +2421,7 @@ int main(int argc, char* argv[])
         printf("OP_RETURN script (prefix 6a24 + tag 44494c32='DIL2'): 6a2444494c32%s\n", commit_hex);
         dogecoin_free(pk); dogecoin_free(sig);
     }
+#ifdef USE_LIBOQS_RACCOON
     else if (strcmp(cmd, "raccoong_keygen") == 0) {
         uint8_t *pk = NULL, *sk = NULL;
         size_t pk_len = 0, sk_len = 0;
@@ -2608,7 +2617,7 @@ int main(int argc, char* argv[])
         dogecoin_free(child_pk);
         dogecoin_free(child_pk_hex);
     }
-    #endif
+    #endif /* USE_LIBOQS_RACCOON */
 #ifdef USE_LIBOQS
     else if (strcmp(cmd, "falcon_add_commit_tx") == 0) {
         // ./such -c falcon_add_commit_tx -x <raw_tx_hex> -s <falcon_commitment_hex>
@@ -2721,6 +2730,7 @@ int main(int argc, char* argv[])
         dogecoin_free(tx_with_commit_hex);
         dogecoin_tx_free(tx);
     }
+#ifdef USE_LIBOQS_RACCOON
     else if (strcmp(cmd, "raccoong_add_commit_tx") == 0) {
         if (!txhex || !scripthex) {
             return showError("Missing tx hex or commitment hex (use -x, -s)\n");
@@ -2775,9 +2785,13 @@ int main(int argc, char* argv[])
         dogecoin_free(tx_with_commit_hex);
         dogecoin_tx_free(tx);
     }
+#endif /* USE_LIBOQS_RACCOON */
     else if (strcmp(cmd, "falcon_add_commit_and_carrier_tx") == 0 ||
              strcmp(cmd, "dilithium2_add_commit_and_carrier_tx") == 0 ||
-             strcmp(cmd, "raccoong_add_commit_and_carrier_tx") == 0) {
+#ifdef USE_LIBOQS_RACCOON
+             strcmp(cmd, "raccoong_add_commit_and_carrier_tx") == 0 ||
+#endif
+             0) {
         if (!txhex || !derived_path || !pubkey || !scripthex) {
             return showError("Missing tx hex (-x), commitment hex (-m), pqc pubkey (-k), or pqc signature (-s)\n");
         }
@@ -2811,10 +2825,13 @@ int main(int argc, char* argv[])
         } else if (strcmp(cmd, "dilithium2_add_commit_and_carrier_tx") == 0) {
             add_commit_fn = dogecoin_tx_add_dilithium2_commit;
             tag4_ascii = "DIL2";
-        } else {
+        }
+#ifdef USE_LIBOQS_RACCOON
+        else if (strcmp(cmd, "raccoong_add_commit_and_carrier_tx") == 0) {
             add_commit_fn = dogecoin_tx_add_raccoong44_commit;
             tag4_ascii = "RCG4";
         }
+#endif
 
         cstring* carrier_spk = NULL;
         uint8_t part_total = 0;

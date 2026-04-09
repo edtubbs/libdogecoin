@@ -51,7 +51,9 @@
 #include <dogecoin/random.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/pqc_falcon.h>
+#ifdef USE_LIBOQS_RACCOON
 #include <dogecoin/pqc_raccoon.h>
+#endif
 #include <dogecoin/ecc.h>
 
 #define BUFFER_SIZE (1000 * 1000)
@@ -284,7 +286,8 @@ static void falcon512_commit_bytes_bench(benchmark_context *ctx) {
     ctx->totalTime += ctx->end - ctx->start; ctx->totalCycles += ctx->endCycles - ctx->startCycles;
 }
 
-/* ---- Raccoon-G (requires --enable-liboqs) ---- */
+#ifdef USE_LIBOQS_RACCOON
+/* ---- Raccoon-G (requires --enable-liboqs-raccoon) ---- */
 static void raccoong44_keypair_bench(benchmark_context *ctx) {
     uint8_t *pk = NULL;
     uint8_t *sk = NULL;
@@ -405,6 +408,7 @@ static void raccoong44_hd_nonhardened_bench(benchmark_context *ctx) {
     ctx->totalTime += ctx->end - ctx->start;
     ctx->totalCycles += ctx->endCycles - ctx->startCycles;
 }
+#endif /* USE_LIBOQS_RACCOON */
 
 /* ---- Other PQC Algorithms (Dilithium, SPHINCS+) ---- */
 #if defined(__GNUC__) || defined(__clang__)
@@ -1030,6 +1034,7 @@ int main(void) {
     run_benchmark(falcon512_commit_bytes_bench, "Falcon512-cmt", "pqc-commit");
 
     /* Raccoon-G (includes HD derivation primitives) */
+#ifdef USE_LIBOQS_RACCOON
     printf("\n--- Raccoon-G (PQC + HD Derivation) ---\n");
     if (dogecoin_raccoong44_is_available()) {
         run_benchmark(raccoong44_keypair_bench,      "RaccoonG-kp", "pqc-keypair");
@@ -1041,6 +1046,7 @@ int main(void) {
     } else {
         printf("%-16s %s\n", "RaccoonG", "not available");
     }
+#endif
 
     /* Dilithium variants - compare against Falcon */
     printf("\n--- Dilithium (NIST PQC Standard) - Compare vs Falcon ---\n");
