@@ -1123,7 +1123,9 @@ int main(void) {
 #ifdef USE_LIBOQS
     printf("  liboqs enabled:\n");
     printf("    - Falcon-512 (primary PQC baseline)\n");
+#ifdef USE_LIBOQS_RACCOON
     printf("    - Raccoon-G (PQC + BIP32-style HD derivations)\n");
+#endif
     printf("    - Dilithium-2/3/5 (NIST standard, lattice-based)\n");
     printf("    - SPHINCS+ (hash-based, conservative security)\n");
 #endif
