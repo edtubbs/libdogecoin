@@ -109,22 +109,15 @@ This keeps Phase 1 commitment publication consensus-neutral while still binding 
 
 ===Phase 1: On-chain PQ Verification Material via P2SH Data Carrier Outputs===
 
-Dogecoin does not support SegWit witness relay, and extra pushes in a P2PKH spending input scriptSig are non-standard under current relay policy. The canonical Phase 1 method therefore uses a standard P2SH data-carrier pattern: create one or more P2SH outputs, then spend them in a follow-up reveal transaction that discloses the PQ verification material in scriptSig in a fully standard way.
+Dogecoin does not support SegWit witness relay, and extra pushes in a P2PKH spending input scriptSig are non-standard under current relay policy.
 
-This is a two-transaction pattern:
+The canonical Phase 1 mechanism is the small tagged OP_RETURN commitment.
 
-# '''Commitment Tx (TX_C):''' carries the small tagged OP_RETURN commitment and creates N P2SH carrier outputs.
-# '''Reveal Tx (TX_R):''' spends those P2SH carrier outputs and reveals the PQ public key + PQ signature bytes in scriptSig.
+A standard P2SH data-carrier pattern (TX_C + TX_R) MAY be used to publish full PQ verification material on-chain, but is OPTIONAL and subject to standard relay limits.
 
-Note: TX_C and TX_R must be separate transactions because a transaction cannot spend its own outputs.
+Implementations MUST NOT assume that full PQ verification material is present on-chain.
 
-This keeps the Phase 1 OP_RETURN commitment unchanged, while ensuring the full PQ verification material is eventually available on-chain using standard P2SH spending rules.
-
-'''Algorithm-specific carrier mode support:'''
-
-* '''Falcon-512''' supports both commitment-only and carrier mode. The public key (897 bytes) and signature (~660 bytes) fit within 3 P2SH carrier outputs at 1 DOGE each.
-* '''Dilithium2 (ML-DSA-44)''' supports both commitment-only and carrier mode. The public key (1312 bytes) and signature (2420 bytes) require more P2SH carrier outputs than Falcon-512, resulting in higher on-chain cost.
-* '''Raccoon-G-44''' supports both commitment-only and carrier mode. The public key (~16 KB) and signature (~65 KB) require 32+ P2SH carrier outputs at 1 DOGE each, making carrier mode significantly more expensive.
+The P2SH carrier reveal MUST only be used when the encoded <code>public_key || signature</code> payload fits within standard transaction policy limits (including maximum push size and scriptSig size constraints).
 
 ====Phase 1: Commitment Output====
 
