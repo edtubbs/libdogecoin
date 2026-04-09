@@ -91,13 +91,8 @@ static void print_tx_debug(const dogecoin_tx* tx) {
     if (!tx) return;
     for (size_t vin_index = 0; vin_index < tx->vin->len; vin_index++) {
         dogecoin_tx_in* tx_in = vector_idx(tx->vin, vin_index);
-        size_t stack_items = (tx_in && tx_in->witness_stack) ? tx_in->witness_stack->len : 0;
-        printf("input[%zu] stack items: %zu\n", vin_index, stack_items);
-        for (size_t idx = 0; idx < stack_items; idx++) {
-            cstring* item = vector_idx(tx_in->witness_stack, idx);
-            char* hex = utils_uint8_to_hex((const uint8_t*)item->str, item->len);
-            printf("  item[%zu]: %s\n", idx, hex ? hex : "");
-        }
+        size_t scriptsig_len = (tx_in && tx_in->script_sig) ? tx_in->script_sig->len : 0;
+        printf("input[%zu] scriptsig_len: %zu\n", vin_index, scriptsig_len);
     }
 }
 
