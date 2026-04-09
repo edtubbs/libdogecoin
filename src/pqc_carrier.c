@@ -45,15 +45,30 @@
 #include <dogecoin/script.h>
 #include <dogecoin/sha2.h>
 
-/* Push a single opcode byte onto a script buffer. */
+/**
+ * @brief This function pushes a single opcode byte onto a
+ * script buffer.
+ *
+ * @param s The script buffer to append to.
+ * @param op The opcode byte.
+ *
+ * @return Nothing.
+ */
 static void script_push_op(cstring* s, uint8_t op)
 {
     cstr_append_buf(s, &op, 1);
 }
 
-/*
- * Push arbitrary data onto a script buffer using the smallest
- * canonical push encoding (direct / OP_PUSHDATA1 / OP_PUSHDATA2).
+/**
+ * @brief This function pushes arbitrary data onto a script
+ * buffer using the smallest canonical push encoding
+ * (direct / OP_PUSHDATA1 / OP_PUSHDATA2).
+ *
+ * @param s The script buffer to append to.
+ * @param data The pointer to the data bytes.
+ * @param len The length of the data.
+ *
+ * @return Nothing.
  */
 static void script_push_data(cstring* s, const uint8_t* data, size_t len)
 {
@@ -83,10 +98,18 @@ static void script_push_data(cstring* s, const uint8_t* data, size_t len)
     cstr_append_buf(s, data, len);
 }
 
-/*
- * Read one push-data element from raw script bytes starting at *off.
- * On success, *out points into the original buffer and *outlen is set.
- * Returns false on truncation or unexpected opcodes.
+/**
+ * @brief This function reads one push-data element from raw
+ * script bytes starting at *off.  On success, *out points
+ * into the original buffer and *outlen is set.
+ *
+ * @param s The pointer to the raw script bytes.
+ * @param slen The length of the script.
+ * @param off The pointer to the current offset (updated on success).
+ * @param out The pointer to receive the data pointer.
+ * @param outlen The pointer to receive the data length.
+ *
+ * @return true on success, false on truncation or unexpected opcodes.
  */
 static dogecoin_bool read_push(const uint8_t* s, size_t slen, size_t* off, const uint8_t** out, size_t* outlen)
 {
@@ -130,7 +153,16 @@ static dogecoin_bool read_push(const uint8_t* s, size_t slen, size_t* off, const
     return false;
 }
 
-/* Compute HASH160 (SHA-256 then RIPEMD-160) of data. */
+/**
+ * @brief This function computes HASH160 (SHA-256 then
+ * RIPEMD-160) of the given data.
+ *
+ * @param data The pointer to the input data.
+ * @param len The length of the input data.
+ * @param out20 The output buffer for the 20-byte hash.
+ *
+ * @return Nothing.
+ */
 static void hash160(const uint8_t* data, size_t len, uint8_t out20[20])
 {
     uint8_t h32[32];
@@ -138,10 +170,15 @@ static void hash160(const uint8_t* data, size_t len, uint8_t out20[20])
     rmd160(h32, sizeof(h32), out20);
 }
 
-/*
- * Build the carrier redeem script: OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_1.
- * This script always succeeds after consuming the five data pushes in the
+/**
+ * @brief This function builds the carrier redeem script:
+ * OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_1.  This script
+ * always succeeds after consuming the five data pushes in the
  * scriptSig, allowing miners to accept the TX_R spend.
+ *
+ * @param out_redeem The pointer to receive the allocated redeem script.
+ *
+ * @return true if the script was built, false on error.
  */
 dogecoin_bool dogecoin_pqc_carrier_build_redeemscript(cstring** out_redeem)
 {
@@ -158,9 +195,15 @@ dogecoin_bool dogecoin_pqc_carrier_build_redeemscript(cstring** out_redeem)
     return true;
 }
 
-/*
- * Build the P2SH scriptPubKey (OP_HASH160 <hash160(redeem)> OP_EQUAL) from
- * the carrier redeem script.  Used to create the carrier outputs in TX_C.
+/**
+ * @brief This function builds the P2SH scriptPubKey
+ * (OP_HASH160 <hash160(redeem)> OP_EQUAL) from the carrier
+ * redeem script.  Used to create the carrier outputs in TX_C.
+ *
+ * @param redeem The pointer to the redeem script.
+ * @param out_spk The pointer to receive the allocated scriptPubKey.
+ *
+ * @return true if the scriptPubKey was built, false on error.
  */
 dogecoin_bool dogecoin_pqc_carrier_build_p2sh_scriptpubkey(const cstring* redeem, cstring** out_spk)
 {
@@ -181,13 +224,24 @@ dogecoin_bool dogecoin_pqc_carrier_build_p2sh_scriptpubkey(const cstring* redeem
     return true;
 }
 
-/*
- * Build a single carrier-part scriptSig for TX_R.
+/**
+ * @brief This function builds a single carrier-part scriptSig
+ * for TX_R.  Layout: <tag8> <8-byte-hdr> <chunk0..chunk4>
+ * <redeemscript>.  The header encodes version, part index/total,
+ * and the public-key and full-payload lengths so the SPV parser
+ * can reassemble across parts.
  *
- * Layout: <tag8> <8-byte-hdr> <chunk0..chunk4> <redeemscript>
+ * @param tag8 The 8-byte algorithm tag.
+ * @param part_index The zero-based index of this part.
+ * @param part_total The total number of parts.
+ * @param pk_len The public key length encoded in the header.
+ * @param full_len The full payload length encoded in the header.
+ * @param part_data The pointer to this part's data payload.
+ * @param part_data_len The length of the part data.
+ * @param redeem The pointer to the redeem script.
+ * @param out_scriptsig The pointer to receive the allocated scriptSig.
  *
- * The header encodes version, part index/total, and the public-key and
- * full-payload lengths so the SPV parser can reassemble across parts.
+ * @return true if the scriptSig was built, false on error.
  */
 dogecoin_bool dogecoin_pqc_carrier_build_part_scriptsig(
     const char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN],
@@ -238,13 +292,25 @@ dogecoin_bool dogecoin_pqc_carrier_build_part_scriptsig(
     return true;
 }
 
-/*
- * Parse a carrier-part scriptSig produced by
- * dogecoin_pqc_carrier_build_part_scriptsig().
+/**
+ * @brief This function parses a carrier-part scriptSig produced
+ * by dogecoin_pqc_carrier_build_part_scriptsig().  Extracts the
+ * 8-byte tag, part index/total, pk/full lengths, the concatenated
+ * data payload, and the redeem script.  Caller must free
+ * *out_part_data with dogecoin_free() and *out_redeem with
+ * cstr_free().
  *
- * Extracts the 8-byte tag, part index/total, pk/full lengths, the
- * concatenated data payload, and the redeem script.  Caller must free
- * *out_part_data with dogecoin_free() and *out_redeem with cstr_free().
+ * @param scriptsig The pointer to the scriptSig to parse.
+ * @param out_tag8 The output buffer for the 8-byte tag (null-terminated).
+ * @param out_part_index The pointer to receive the part index.
+ * @param out_part_total The pointer to receive the part total.
+ * @param out_pk_len The pointer to receive the public key length.
+ * @param out_full_len The pointer to receive the full payload length.
+ * @param out_part_data The pointer to receive the allocated data payload.
+ * @param out_part_data_len The pointer to receive the data payload length.
+ * @param out_redeem The pointer to receive the allocated redeem script.
+ *
+ * @return true if parsing succeeded, false on error.
  */
 dogecoin_bool dogecoin_pqc_carrier_parse_part_scriptsig(
     const cstring* scriptsig,
@@ -313,11 +379,18 @@ dogecoin_bool dogecoin_pqc_carrier_parse_part_scriptsig(
     return true;
 }
 
-/*
- * Append P2SH carrier outputs to a transaction (TX_C).
+/**
+ * @brief This function appends P2SH carrier outputs to a
+ * transaction (TX_C).  Creates part_total outputs, each paying
+ * value koinu to carrier_spk.  TX_R will later spend each
+ * output with its carrier scriptSig.
  *
- * Creates part_total outputs, each paying value koinu to carrier_spk.
- * TX_R will later spend each output with its carrier scriptSig.
+ * @param tx The pointer to the transaction to modify.
+ * @param carrier_spk The P2SH scriptPubKey for carrier outputs.
+ * @param value The value in koinu for each carrier output.
+ * @param part_total The number of carrier outputs to add.
+ *
+ * @return true if outputs were added, false on error.
  */
 dogecoin_bool dogecoin_tx_add_pqc_carrier_outputs(
     dogecoin_tx* tx,

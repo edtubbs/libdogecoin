@@ -43,9 +43,17 @@
 #endif
 #endif
 
-/*
- * Helper hash primitive used by commitment builders.
- * Computes SHA256(pk || msg) and writes a 32-byte digest to out32.
+/**
+ * @brief This function computes SHA256(pk || msg) and writes
+ * a 32-byte digest to out32.
+ *
+ * @param out32 The output buffer for the 32-byte hash.
+ * @param pk The pointer to the public key bytes.
+ * @param pk_len The length of the public key.
+ * @param msg The pointer to the message bytes.
+ * @param msg_len The length of the message.
+ *
+ * @return Nothing.
  */
 static inline void sha256_pk_msg(uint8_t out32[32],
                                  const uint8_t* pk, size_t pk_len,
@@ -62,9 +70,20 @@ static inline void sha256_pk_msg(uint8_t out32[32],
     sha256_finalize(&ctx, out32);
 }
 
-/*
- * Derive deterministic child key bytes from parent material, chaincode,
- * and index using repeated SHA-256 blocks (domain-separated PRF).
+/**
+ * @brief This function derives deterministic child key bytes
+ * from parent material, chaincode, and index using repeated
+ * SHA-256 blocks with domain separation.
+ *
+ * @param out The output buffer for the derived bytes.
+ * @param out_len The number of bytes to derive.
+ * @param parent The pointer to the parent key bytes.
+ * @param parent_len The length of the parent key.
+ * @param chaincode The 32-byte chaincode.
+ * @param index The child index (bit 31 set for hardened).
+ * @param domain The domain separation byte.
+ *
+ * @return Nothing.
  */
 static void derive_hd_bytes(uint8_t* out, size_t out_len,
                             const uint8_t* parent, size_t parent_len,
@@ -97,7 +116,18 @@ static void derive_hd_bytes(uint8_t* out, size_t out_len,
     }
 }
 
-/* Compute a 32-byte Raccoon-G commitment from public key and signature bytes. */
+/**
+ * @brief This function computes a 32-byte Raccoon-G-44
+ * commitment as SHA256(pk || sig).
+ *
+ * @param pk The pointer to the public key bytes.
+ * @param pk_len The length of the public key.
+ * @param signature The pointer to the signature bytes.
+ * @param signature_len The length of the signature.
+ * @param out32 The output buffer for the 32-byte commitment.
+ *
+ * @return true if the commitment was computed, false on invalid input.
+ */
 dogecoin_bool dogecoin_raccoong44_commit_bytes(const uint8_t* pk, size_t pk_len,
                                                const uint8_t* signature, size_t signature_len,
                                                uint8_t out32[32])
@@ -109,7 +139,16 @@ dogecoin_bool dogecoin_raccoong44_commit_bytes(const uint8_t* pk, size_t pk_len,
     return true;
 }
 
-/* Append tagged Raccoon-G commitment output (OP_RETURN "RCG4" || commit32). */
+/**
+ * @brief This function appends an OP_RETURN output carrying
+ * the "RCG4" tag and a 32-byte Raccoon-G-44 commitment to a
+ * transaction.
+ *
+ * @param tx The pointer to the transaction to modify.
+ * @param commit32 The 32-byte commitment hash.
+ *
+ * @return true if the output was added, false on invalid input.
+ */
 dogecoin_bool dogecoin_tx_add_raccoong44_commit(dogecoin_tx* tx, const uint8_t commit32[DOGECOIN_PQC_RACCOON_COMMIT_LEN])
 {
     if (!tx || !commit32) {
@@ -139,7 +178,15 @@ dogecoin_bool dogecoin_tx_add_raccoong44_commit(dogecoin_tx* tx, const uint8_t c
     return true;
 }
 
-/* Extract first canonical Raccoon-G commitment from tx outputs, if present. */
+/**
+ * @brief This function extracts the first "RCG4" tagged
+ * Raccoon-G-44 commitment from a transaction's outputs.
+ *
+ * @param tx The pointer to the transaction to search.
+ * @param out32 The output buffer for the 32-byte commitment.
+ *
+ * @return true if a commitment was found, false otherwise.
+ */
 dogecoin_bool dogecoin_tx_extract_raccoong44_commit(const dogecoin_tx* tx, uint8_t out32[DOGECOIN_PQC_RACCOON_COMMIT_LEN])
 {
     if (!tx || !out32) {
@@ -167,7 +214,12 @@ dogecoin_bool dogecoin_tx_extract_raccoong44_commit(const dogecoin_tx* tx, uint8
 
 #ifdef USE_LIBOQS
 
-/* Selects the liboqs algorithm name for the Raccoon-G-44 signature scheme. */
+/**
+ * @brief This function selects the liboqs algorithm name
+ * for the Raccoon-G-44 signature scheme.
+ *
+ * @return The algorithm name string, or NULL if unavailable.
+ */
 static const char* get_raccoong_alg_name(void)
 {
     OQS_SIG* alg = OQS_SIG_new("Raccoon-G-44");
@@ -178,7 +230,13 @@ static const char* get_raccoong_alg_name(void)
     return NULL;
 }
 
-/* Probe whether the Raccoon-G-44 algorithm is usable in the linked liboqs. */
+/**
+ * @brief This function probes whether the Raccoon-G-44
+ * algorithm is usable in the linked liboqs by attempting
+ * a trial keypair generation.
+ *
+ * @return true if Raccoon-G-44 is available, false otherwise.
+ */
 dogecoin_bool dogecoin_raccoong44_is_available(void)
 {
     const char* alg_name = get_raccoong_alg_name();
@@ -207,7 +265,17 @@ dogecoin_bool dogecoin_raccoong44_is_available(void)
     return ok;
 }
 
-/* Generate Raccoon-G-44 key material. */
+/**
+ * @brief This function generates a Raccoon-G-44 keypair via
+ * liboqs and allocates the public and secret key buffers.
+ *
+ * @param pk The pointer to receive the allocated public key.
+ * @param pk_len The pointer to receive the public key length.
+ * @param sk The pointer to receive the allocated secret key.
+ * @param sk_len The pointer to receive the secret key length.
+ *
+ * @return true if the keypair was generated, false on error.
+ */
 dogecoin_bool dogecoin_raccoong44_keypair(uint8_t** pk, size_t* pk_len,
                                           uint8_t** sk, size_t* sk_len)
 {
@@ -248,7 +316,19 @@ dogecoin_bool dogecoin_raccoong44_keypair(uint8_t** pk, size_t* pk_len,
     return true;
 }
 
-/* Sign arbitrary message bytes with a Raccoon-G-44 secret key. */
+/**
+ * @brief This function signs a message with a Raccoon-G-44
+ * secret key and allocates the signature buffer.
+ *
+ * @param sk The pointer to the secret key.
+ * @param sk_len The length of the secret key.
+ * @param msg The pointer to the message to sign.
+ * @param msg_len The length of the message.
+ * @param sig_out The pointer to receive the allocated signature.
+ * @param sig_len The pointer to receive the signature length.
+ *
+ * @return true if signing succeeded, false on error.
+ */
 dogecoin_bool dogecoin_raccoong44_sign(const uint8_t* sk, size_t sk_len,
                                        const uint8_t* msg, size_t msg_len,
                                        uint8_t** sig_out, size_t* sig_len)
@@ -288,7 +368,19 @@ dogecoin_bool dogecoin_raccoong44_sign(const uint8_t* sk, size_t sk_len,
     return true;
 }
 
-/* Verify a Raccoon-G-44 signature for given message/public-key bytes. */
+/**
+ * @brief This function verifies a Raccoon-G-44 signature
+ * against a public key and message.
+ *
+ * @param pk The pointer to the public key.
+ * @param pk_len The length of the public key.
+ * @param msg The pointer to the message.
+ * @param msg_len The length of the message.
+ * @param sig The pointer to the signature.
+ * @param sig_len The length of the signature.
+ *
+ * @return true if the signature is valid, false otherwise.
+ */
 dogecoin_bool dogecoin_raccoong44_verify(const uint8_t* pk, size_t pk_len,
                                          const uint8_t* msg, size_t msg_len,
                                          const uint8_t* sig, size_t sig_len)
@@ -314,7 +406,23 @@ dogecoin_bool dogecoin_raccoong44_verify(const uint8_t* pk, size_t pk_len,
     return st == OQS_SUCCESS;
 }
 
-/* BIP32-style hardened/non-hardened child derivation from a Raccoon-G secret key. */
+/**
+ * @brief This function derives a child secret and public key
+ * from a parent Raccoon-G-44 secret key using BIP32-style
+ * hardened or non-hardened derivation.
+ *
+ * @param parent_sk The pointer to the parent secret key.
+ * @param parent_sk_len The length of the parent secret key.
+ * @param chaincode The 32-byte chaincode.
+ * @param index The child index.
+ * @param hardened Whether to use hardened derivation.
+ * @param child_sk The pointer to receive the allocated child secret key.
+ * @param child_sk_len The pointer to receive the child secret key length.
+ * @param child_pk The pointer to receive the allocated child public key.
+ * @param child_pk_len The pointer to receive the child public key length.
+ *
+ * @return true if derivation succeeded, false on error.
+ */
 dogecoin_bool dogecoin_raccoong44_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len,
                                                  const uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN],
                                                  uint32_t index, dogecoin_bool hardened,
@@ -360,7 +468,19 @@ dogecoin_bool dogecoin_raccoong44_hd_derive_priv(const uint8_t* parent_sk, size_
     return true;
 }
 
-/* Public-only non-hardened child derivation from a Raccoon-G public key. */
+/**
+ * @brief This function derives a child public key from a
+ * parent Raccoon-G-44 public key using non-hardened derivation.
+ *
+ * @param parent_pk The pointer to the parent public key.
+ * @param parent_pk_len The length of the parent public key.
+ * @param chaincode The 32-byte chaincode.
+ * @param index The child index (must not have bit 31 set).
+ * @param child_pk The pointer to receive the allocated child public key.
+ * @param child_pk_len The pointer to receive the child public key length.
+ *
+ * @return true if derivation succeeded, false on error.
+ */
 dogecoin_bool dogecoin_raccoong44_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
                                                 const uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN],
                                                 uint32_t index,
