@@ -1262,10 +1262,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                     dogecoin_tx* txc = dogecoin_tx_new();
                                     size_t txc_consumed = 0;
                                     if (dogecoin_tx_deserialize(matched_txc_raw, matched_txc_raw_len, txc, &txc_consumed)) {
-                                        /* Build TX_BASE by removing the OP_RETURN and P2SH carrier outputs.
-                                           TX_BASE is the transaction template before commitment/carrier outputs
-                                           were appended.  The carrier cost was deducted from the first output,
-                                           so we must add it back to restore the original value. */
+                                        /* Build sighash base: TX_C with OP_RETURN outputs removed.
+                                           The PQC signature covers sighash(TX_C minus OP_RETURN),
+                                           which includes the P2SH carrier outputs and the adjusted
+                                           vout[0] value (carrier cost already deducted). */
                                         dogecoin_tx* tx_base = dogecoin_tx_new();
                                         tx_base->version = txc->version;
                                         tx_base->locktime = txc->locktime;
@@ -1280,18 +1280,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                             }
                                             vector_add(tx_base->vin, copy);
                                         }
-                                        uint64_t carrier_total = 0;
                                         for (size_t vo = 0; vo < txc->vout->len; vo++) {
                                             dogecoin_tx_out* orig = vector_idx(txc->vout, vo);
                                             /* Skip OP_RETURN (nulldata) outputs - they start with 0x6a */
                                             if (orig->script_pubkey && orig->script_pubkey->len > 0 &&
                                                 (uint8_t)orig->script_pubkey->str[0] == 0x6a) {
-                                                continue;
-                                            }
-                                            /* Skip P2SH carrier outputs (OP_HASH160 prefix 0xa9, 23-byte script) */
-                                            if (orig->script_pubkey && orig->script_pubkey->len == 23 &&
-                                                (uint8_t)orig->script_pubkey->str[0] == 0xa9) {
-                                                carrier_total += orig->value;
                                                 continue;
                                             }
                                             dogecoin_tx_out* copy = dogecoin_tx_out_new();
@@ -1300,11 +1293,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                 copy->script_pubkey = cstr_new_buf(orig->script_pubkey->str, orig->script_pubkey->len);
                                             }
                                             vector_add(tx_base->vout, copy);
-                                        }
-                                        /* Restore carrier cost to first output (was deducted during TX_C construction) */
-                                        if (carrier_total > 0 && tx_base->vout->len > 0) {
-                                            dogecoin_tx_out* first_out = vector_idx(tx_base->vout, 0);
-                                            first_out->value += carrier_total;
                                         }
 
                                         /* Derive scriptPubKey from first input's scriptSig (extract pubkey hash for P2PKH) */
