@@ -250,27 +250,42 @@ SPV implementations should:
 SPV commitment detection operates in two modes depending on how PQ material is published:
 
 # '''Commitment-only:''' The commitment is detected in the OP_RETURN output. No PQ verification material is available on-chain. Log entry includes <code>source=commitment_only</code>.
-# '''Cross-TX P2SH carrier (TX_C + TX_R):''' The commitment OP_RETURN is in TX_C, and the full PQ public key + signature are revealed in TX_R's carrier scriptSig spending the P2SH outputs. Supported for all three algorithms (Falcon-512 via <code>FLC1FULL</code>, Dilithium2 via <code>DL21FULL</code>, Raccoon-G via <code>RCG4FULL</code>). The SPV scanner extracts pk and sig from the carrier-tagged scriptSig, recomputes <code>SHA256(pk || sig)</code>, and matches against buffered OP_RETURN commitments from the same block. Log entry includes <code>source=carrier_scriptsig matched_txc_txpos=... pk_len=... sig_len=... pk_prefix=... sig_prefix=...</code>.
+# '''Cross-TX P2SH carrier (TX_C + TX_R):''' The commitment OP_RETURN is in TX_C, and the full PQ public key + signature are revealed in TX_R's carrier scriptSig spending the P2SH outputs. Supported for all three algorithms (Falcon-512 via <code>FLC1FULL</code>, Dilithium2 via <code>DIL2FULL</code>, Raccoon-G via <code>RCG4FULL</code>). The SPV scanner extracts pk and sig from the carrier-tagged scriptSig, recomputes <code>SHA256(pk || sig)</code>, and matches against buffered OP_RETURN commitments from the same block. Log entry includes <code>source=carrier_scriptsig matched_txc_txpos=... pk_len=... sig_len=... pk_prefix=... sig_prefix=...</code>.
 
 In all validated cases, the log emits the algorithm label (e.g. <code>[falcon-commit]</code>), block height, transaction position, the 32-byte commitment hex, and the validation source.
 
 ====SPV Carrier Commitment Validation Algorithm====
 
-Given a TX_R with carrier-tagged scriptSig:
+Given a TX_R with carrier-tagged scriptSig(s):
 
-# Parse scriptSig using <code>dogecoin_pqc_carrier_parse_part_scriptsig()</code> to extract tag, part metadata, and raw payload.
-# Identify the PQC algorithm from the 8-byte tag: <code>FLC1FULL</code> (Falcon-512).
-# Split the payload into public key (pk_len bytes) and signature (remaining bytes).
+# For each vin, attempt to parse its scriptSig using <code>dogecoin_pqc_carrier_parse_part_scriptsig()</code> to extract the 8-byte tag, part metadata (part_index, part_total, pk_len, full_len), and raw payload chunk.
+# Identify the PQC algorithm from the 8-byte tag: <code>FLC1FULL</code> (Falcon-512), <code>DIL2FULL</code> (Dilithium2), or <code>RCG4FULL</code> (Raccoon-G-44).
+# '''Multi-part reassembly:''' if <code>part_total > 1</code>, collect payload chunks from all matching carrier-tagged vins indexed by <code>part_index</code> (0 to part_total-1), then concatenate in order. Truncate the result to <code>full_len</code> bytes. For Falcon-512 (1 part), the single vin payload is used directly. For Dilithium2 (3 parts) and Raccoon-G-44 (24 parts), the reassembly is required.
+# Split the reassembled payload FULL into public key (<code>pk_len</code> bytes) and signature (remaining bytes): <code>pk = FULL[0..pk_len)</code>, <code>sig = FULL[pk_len..full_len)</code>.
 # Recompute <code>commitment32 = SHA256(pk || sig)</code> using the algorithm-specific commit function.
 # Cross-validate: match the recomputed commitment against buffered OP_RETURN commitments from TX_C transactions in the same block. If matched, report <code>matched_txc_txpos</code> identifying the originating commitment transaction.
 # Log the validation result including pk_len, sig_len, and hex prefixes of pk and sig for diagnostic purposes.
+
+====Algorithm Carrier Sizes====
+
+{|
+! Algorithm !! pk_len !! sig_len !! full_len !! part_total !! Carrier Tag
+|-
+| Falcon-512 || 897 || ~690 || ~1587 || 1 || <code>FLC1FULL</code>
+|-
+| Dilithium2 || 1312 || 2420 || 3732 || 3 || <code>DIL2FULL</code>
+|-
+| Raccoon-G-44 || 16144 || 20768 || 36912 || 24 || <code>RCG4FULL</code>
+|}
+
+Each carrier vin scriptSig carries up to 3 chunks of ≤520 bytes (~1560 bytes of payload per part).
 
 ====Transaction Fee Guidance====
 
 For carrier mode transactions:
 
 * '''TX_C''' (commitment + carrier outputs): minimum relay fee is 100000 koinu (0.001 DOGE), matching Dogecoin's default <code>minrelaytxfee</code>.
-* '''TX_R''' (reveal, spending carrier outputs): minimum relay fee is 500000 koinu (0.005 DOGE). Since TX_R scriptSigs carry full PQ material (~1675 bytes for Falcon-512), the fee must satisfy the per-KB minimum relay rate (100000 koinu/KB). A fee of 500000 koinu (~300 koinu/byte) ensures reliable relay and timely mining.
+* '''TX_R''' (reveal, spending carrier outputs): minimum relay fee scales with transaction size. Since TX_R scriptSigs carry full PQ material, the fee must satisfy the per-KB minimum relay rate (100000 koinu/KB). Examples: Falcon-512 TX_R (~1675 bytes, 1 carrier vin) needs ~500000 koinu (0.005 DOGE); Dilithium2 TX_R (~5 KB, 3 carrier vins) needs ~1000000 koinu (0.01 DOGE); Raccoon-G-44 TX_R (~40 KB, 24 carrier vins) needs ~5000000 koinu (0.05 DOGE).
 * '''Carrier output value:''' each P2SH carrier output must be at least 100000000 koinu (1 DOGE) to avoid dust rejection. Values below the dust threshold (100000 koinu / 0.001 DOGE) will be rejected by relay policy.
 
 ===Phase 2: Reserved Opcode Upgrade Path===
