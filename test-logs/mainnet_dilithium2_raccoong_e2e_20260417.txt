@@ -1,0 +1,28 @@
+# Mainnet PQC End-to-End Test Log
+# Date: 2026-04-17
+# Algorithms: Dilithium2, Raccoon-G-44
+# spvnode command: ./spvnode -l -f 0 -d -x -p -q -b scan
+
+DEBUG: [oqs] falcon_512=enabled falcon_1024=enabled ml_dsa_44=enabled raccoon_g_44=enabled (liboqs)
+Available checkpoints (29 total):
+Selected checkpoint height 6169760
+DEBUG: [dilithium-commit] Pending at height=6169765 txpos=52 commit=6ea0fa35664c6fd745169c846038285a8087fb5e8abc09f3dd7a736740a730ba source=op_return
+DEBUG: [dilithium-commit] Valid at height=6169765 txpos=117 commit=6ea0fa35664c6fd745169c846038285a8087fb5e8abc09f3dd7a736740a730ba carrier_vin=0 source=carrier_scriptsig matched_txc_txpos=52 pk_len=1312 sig_len=2420 pk_prefix=c9d1ad48e5334f72c15a6e1c8132a7f4 sig_prefix=7399a2580b74134de63e9604219abc79
+DEBUG: [dilithium-commit] PQC signature verification FAILED at height=6169765 txpos=117 sighash=6337ff8db206af2711860ba752d1e741d3fa409b758ddc0d29f0cab790d7e131
+DEBUG: [raccoong-commit] Pending at height=6169772 txpos=86 commit=7d24c5af92e15fd55e27664c68b46104d0c044346a3771b4582cfa3728813670 source=op_return
+DEBUG: [raccoong-commit] Valid at height=6169772 txpos=93 commit=7d24c5af92e15fd55e27664c68b46104d0c044346a3771b4582cfa3728813670 carrier_vin=0 source=carrier_scriptsig matched_txc_txpos=86 pk_len=16144 sig_len=20768 pk_prefix=a5c0b842401e8b3f49d3b56af0935d1f sig_prefix=ef74aed43ce2cea09adaec1315bbb61b
+DEBUG: [raccoong-commit] PQC signature verification FAILED at height=6169772 txpos=93 sighash=d94ffec2561a0f3e84041dddcc39a8915ba85e1b5e39a11a95515eeb01bf25e9
+Sync completed, at height 6169843
+
+# Test Results:
+# Dilithium2 (TX_C a467ac9b, TX_R at txpos=117):
+#   - OP_RETURN commitment detection: PASS (height=6169765, txpos=52)
+#   - Multi-part carrier extraction (3 parts): PASS (pk_len=1312, sig_len=2420)
+#   - Commitment validation SHA256(pk||sig): PASS (matched txpos=52)
+#   - PQC sighash verification: FAILED (TX_BASE sighash mismatch - signing context unknown)
+#
+# Raccoon-G-44 (TX_C c6fe73ae, TX_R at txpos=93):
+#   - OP_RETURN commitment detection: PASS (height=6169772, txpos=86)
+#   - Multi-part carrier extraction (24 parts): PASS (pk_len=16144, sig_len=20768)
+#   - Commitment validation SHA256(pk||sig): PASS (matched txpos=86)
+#   - PQC sighash verification: FAILED (TX_BASE sighash mismatch - signing context unknown)
