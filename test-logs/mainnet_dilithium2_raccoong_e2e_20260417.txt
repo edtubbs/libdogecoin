@@ -1,28 +1,43 @@
 # Mainnet PQC End-to-End Test Log
 # Date: 2026-04-17
 # Algorithms: Dilithium2, Raccoon-G-44
+# Build: --enable-liboqs-raccoon (Raccoon fork v0.0.3, depends LIBOQS_RACCOON=y)
 # spvnode command: ./spvnode -l -f 0 -d -x -p -q -b scan
+# Checkpoint: height 6169760 (2026-04-17 17:49:43 UTC)
+# Dilithium2 commitment TX: https://chain.so/tx/DOGE/a467ac9b20aa3de5ba43f9098751174983ac1ef5160ae0ca51a83c564379b153
+# Raccoon-G commitment TX: https://chain.so/tx/DOGE/c6fe73aede0316cb1ee4151286281a35fbe14f8fab7751e91bfc3aec1423100e
+
+## Full spvnode PQC output:
 
 DEBUG: [oqs] falcon_512=enabled falcon_1024=enabled ml_dsa_44=enabled raccoon_g_44=enabled (liboqs)
 Available checkpoints (29 total):
 Selected checkpoint height 6169760
 DEBUG: [dilithium-commit] Pending at height=6169765 txpos=52 commit=6ea0fa35664c6fd745169c846038285a8087fb5e8abc09f3dd7a736740a730ba source=op_return
 DEBUG: [dilithium-commit] Valid at height=6169765 txpos=117 commit=6ea0fa35664c6fd745169c846038285a8087fb5e8abc09f3dd7a736740a730ba carrier_vin=0 source=carrier_scriptsig matched_txc_txpos=52 pk_len=1312 sig_len=2420 pk_prefix=c9d1ad48e5334f72c15a6e1c8132a7f4 sig_prefix=7399a2580b74134de63e9604219abc79
-DEBUG: [dilithium-commit] PQC signature verification FAILED at height=6169765 txpos=117 sighash=6337ff8db206af2711860ba752d1e741d3fa409b758ddc0d29f0cab790d7e131
+DEBUG: [dilithium-commit] PQC signature verification FAILED at height=6169765 txpos=117 sighash=7b86da21be7a96576d45c24acf8eb8297422162dccf4c2a275d4ef3638d17f1b
 DEBUG: [raccoong-commit] Pending at height=6169772 txpos=86 commit=7d24c5af92e15fd55e27664c68b46104d0c044346a3771b4582cfa3728813670 source=op_return
 DEBUG: [raccoong-commit] Valid at height=6169772 txpos=93 commit=7d24c5af92e15fd55e27664c68b46104d0c044346a3771b4582cfa3728813670 carrier_vin=0 source=carrier_scriptsig matched_txc_txpos=86 pk_len=16144 sig_len=20768 pk_prefix=a5c0b842401e8b3f49d3b56af0935d1f sig_prefix=ef74aed43ce2cea09adaec1315bbb61b
-DEBUG: [raccoong-commit] PQC signature verification FAILED at height=6169772 txpos=93 sighash=d94ffec2561a0f3e84041dddcc39a8915ba85e1b5e39a11a95515eeb01bf25e9
-Sync completed, at height 6169843
+DEBUG: [raccoong-commit] PQC signature verification FAILED at height=6169772 txpos=93 sighash=53daa3779243fb2408e6069c9339cf658e35307c40a460ef43ca66f82e986a4c
+Sync completed, at height 6170039
 
-# Test Results:
-# Dilithium2 (TX_C a467ac9b, TX_R at txpos=117):
-#   - OP_RETURN commitment detection: PASS (height=6169765, txpos=52)
+## Test Results:
+
+# Dilithium2 (TX_C a467ac9b20aa3de5ba43f9098751174983ac1ef5160ae0ca51a83c564379b153):
+#   - OP_RETURN commitment detection: PASS (height=6169765, txpos=52, tag=DIL2)
 #   - Multi-part carrier extraction (3 parts): PASS (pk_len=1312, sig_len=2420)
-#   - Commitment validation SHA256(pk||sig): PASS (matched txpos=52)
-#   - PQC sighash verification: FAILED (TX_BASE sighash mismatch - signing context unknown)
-#
-# Raccoon-G-44 (TX_C c6fe73ae, TX_R at txpos=93):
-#   - OP_RETURN commitment detection: PASS (height=6169772, txpos=86)
+#   - Commitment validation SHA256(pk||sig)==OP_RETURN: PASS (matched txpos=52)
+#   - PQC signature verification over TX_BASE sighash32: FAILED
+#     TX_BASE reconstructed by removing OP_RETURN+carrier outputs and restoring carrier value to vout[0].
+#     Sighash=7b86da21be7a96576d45c24acf8eb8297422162dccf4c2a275d4ef3638d17f1b
+#     The signing context (RAW_UNSIGNED_TX used at signing time) is not available on-chain;
+#     the sighash mismatch is expected when the original unsigned TX structure differs from
+#     the reconstructed TX_BASE (e.g. output ordering, values before carrier deduction).
+
+# Raccoon-G-44 (TX_C c6fe73aede0316cb1ee4151286281a35fbe14f8fab7751e91bfc3aec1423100e):
+#   - OP_RETURN commitment detection: PASS (height=6169772, txpos=86, tag=RCG4)
 #   - Multi-part carrier extraction (24 parts): PASS (pk_len=16144, sig_len=20768)
-#   - Commitment validation SHA256(pk||sig): PASS (matched txpos=86)
-#   - PQC sighash verification: FAILED (TX_BASE sighash mismatch - signing context unknown)
+#   - Commitment validation SHA256(pk||sig)==OP_RETURN: PASS (matched txpos=86)
+#   - PQC signature verification over TX_BASE sighash32: FAILED
+#     TX_BASE reconstructed by removing OP_RETURN+carrier outputs and restoring carrier value to vout[0].
+#     Sighash=53daa3779243fb2408e6069c9339cf658e35307c40a460ef43ca66f82e986a4c
+#     Same note as above regarding signing context not being available on-chain.
