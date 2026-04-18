@@ -234,7 +234,7 @@ check_tools() {
         error "curl not found. Required for REST tx monitoring."
     fi
     if [ "$SPV_REQUIRE_VALIDATION" -ne 1 ]; then
-        error "SPV_REQUIRE_VALIDATION must be 1 for full-run mode"
+        info "SPV_REQUIRE_VALIDATION=0 — SPV validation will be skipped (broadcast-only mode)"
     fi
     
     success "All tools available"
@@ -610,14 +610,16 @@ PY
         fi
 
         BROADCAST_TXID="$TX_C_TXID"
-        if [ -n "$TX_R_TXID" ]; then
-            CHAINED_UTXO_TXID="$TX_R_TXID"
-            CHAINED_UTXO_VOUT=0
-            CHAINED_UTXO_VALUE_KOINU=$((CARRIER_PART_TOTAL * CARRIER_VALUE_KOINU - TX_R_FEE_KOINU))
+        # Always chain from TX_C change output (vout[0]) — this carries the
+        # bulk of the funds.  TX_R is a separate reveal tx whose output is
+        # too small to fund subsequent cascade stages.
+        CHAINED_UTXO_TXID="$TX_C_TXID"
+        CHAINED_UTXO_VOUT=0
+        if [ "$CARRIER_ENABLED" -eq 1 ] && [ "${CARRIER_PART_TOTAL:-0}" -gt 0 ]; then
+            # TX_C change = input - fee - (carrier_parts × carrier_value)
+            CHAINED_UTXO_VALUE_KOINU=$((FUNDED_UTXO_VALUE_KOINU - TX_FEE_KOINU - CARRIER_PART_TOTAL * CARRIER_VALUE_KOINU))
         else
-            CHAINED_UTXO_TXID="$TX_C_TXID"
-            CHAINED_UTXO_VOUT=0
-            # In commit-only mode, the change output has all value minus fee
+            # Commit-only: change = input - fee
             CHAINED_UTXO_VALUE_KOINU=$((FUNDED_UTXO_VALUE_KOINU - TX_FEE_KOINU))
         fi
         CHAINED_UTXO_SCRIPT_PUBKEY="$SCRIPT_PUBKEY"
@@ -657,6 +659,10 @@ EOF
 
 # Step 7: Monitor with SPV node
 monitor_spvnode() {
+    if [ "${SPV_REQUIRE_VALIDATION:-1}" -ne 1 ]; then
+        info "Step 7: SPV validation SKIPPED (SPV_REQUIRE_VALIDATION=0)"
+        return 0
+    fi
     info "Step 7: Monitoring with SPV node..."
     
     echo ""

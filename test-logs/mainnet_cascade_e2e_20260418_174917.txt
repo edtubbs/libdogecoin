@@ -1,0 +1,1609 @@
++ set -euo pipefail
++++ dirname contrib/mainnet_pq_cascade_test.sh
+++ cd contrib/..
+++ pwd
++ ROOT_DIR=/home/runner/work/libdogecoin/libdogecoin
++ START_TXID=63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621
++ START_VOUT=0
++ START_VALUE_KOINU=4194000000
++ START_SCRIPT_PUBKEY=76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
++ SPV_TIMEOUT_SECONDS=1800
++ echo ==========================================
+==========================================
++ echo '  Mainnet PQ Cascade (Falcon->DIL2->RCG4)'
+  Mainnet PQ Cascade (Falcon->DIL2->RCG4)
++ echo ==========================================
+==========================================
++ echo START_TXID=63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621
+START_TXID=63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621
++ echo START_VOUT=0
+START_VOUT=0
++ echo START_VALUE_KOINU=4194000000
+START_VALUE_KOINU=4194000000
++ echo START_SCRIPT_PUBKEY=76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+START_SCRIPT_PUBKEY=76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
++ run_stage falcon mainnet_falcon_test.sh 63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621 0 4194000000 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
++ local label=falcon
++ local script_path=mainnet_falcon_test.sh
++ local txid=63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621
++ local vout=0
++ local value_koinu=4194000000
++ local script_pubkey=76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
++ local stage_log
++ local stage_tmp
+++ mktemp /tmp/falcon_cascade_XXXX.log
++ stage_log=/tmp/falcon_cascade_SJtd.log
++ cd /home/runner/work/libdogecoin/libdogecoin
++ NON_INTERACTIVE=1
++ AUTO_BROADCAST=1
++ NETWORK=mainnet
++ CARRIER_ENABLED=1
++ SPV_REQUIRE_VALIDATION=1
++ SPV_TIMEOUT_SECONDS=1800
++ FUNDED_UTXO_TXID=63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621
++ FUNDED_UTXO_VOUT=0
++ FUNDED_UTXO_VALUE_KOINU=4194000000
++ FUNDED_UTXO_SCRIPT_PUBKEY=76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
++ tee /tmp/falcon_cascade_SJtd.log
++ AUTO_PREPARE_TX_FROM_UTXO=1
++ contrib/mainnet_falcon_test.sh
+
+==========================================
+  Falcon-512 Mainnet Integration Test
+==========================================
+
+[0;34m[INFO][0m Checking required tools...
+[0;32m[SUCCESS][0m All tools available
+[0;34m[INFO][0m Step 1: Using provided funded mainnet wallet...
+----- such generate_public_key: ./such -c generate_public_key -p QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w -----
+public key hex: 03c15308abaf34326d0274d022c70cd15db84809822154dc894001066ce6b97482
+p2pkh address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+----- such generate_public_key exit=0 -----
+[0;32m[SUCCESS][0m Mainnet funded wallet loaded
+  Address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  Private Key (WIF): QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w
+  Public Key: 03c15308abaf34326d0274d022c70cd15db84809822154dc894001066ce6b97482
+RUN_CONTEXT
+NETWORK=mainnet
+WIF=QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w
+ADDRESS=DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+FUNDED_UTXO_TXID=63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621
+FUNDED_UTXO_VOUT=0
+TX_FEE_KOINU=100000
+FUNDED_UTXO_VALUE_KOINU=4194000000
+FUNDED_UTXO_SCRIPT_PUBKEY=76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+SCRIPT_PUBKEY=
+SPV_HEADERS_FILE=/tmp/falcon_mainnet_29903/spv_headers.db
+SPV_WALLET_FILE=/tmp/falcon_mainnet_29903/spv_wallet.db
+REST_SERVER=127.0.0.1:18983
+[0;34m[INFO][0m Step 3: Generating Falcon-512 keypair...
+----- such falcon_keygen: ./such -c falcon_keygen -----
+Generating Falcon-512 keypair...
+
+=== Falcon-512 Keypair Generated ===
+public key:  0976f6a4f633c5bc251da269c52669b11c56648d8d6a7b4cadc5e9920aa566b77a51085044114a46fa419d50f60289d9de6e57b250a5c60a870fbd2914fd9fc929d40b067d4b4d61cc544923d5d548a990206aebb3063e746246cfb7031d1361bc6a577a5112f96ddee16c02f1e9dcc5c8b29a1547b885f579441ab1efdc259b99296a5f13dcae5156e69e5f197dc553a44d946baf343410ba0053657de0c1980c3819cacda40c51dab965f7c9e64b185ec875aac0954fb00cdda13956c1251da58869d8f24571c8314b1c1772a9e6401dd3de5d7143a537a5b0b2964ae3090f7e165e7b93722be93e32c6a6c024c65cd844baf3562b3a04c1b83b9ee78e9d79f6b6a3225e950874d0858a80a9b066959aef27e1222855629eb946a8586b2238194c5167639fc3271a49c7f016ba59e9eee286449b7784da906c9cfc582493e6fc27a16ff59c559999faab382e7b19ec7a1d121b1951e07682d40bf0d4cec26b2967a4a8d82a7ba98125680684aa285b68e8eb029f744f02b360a08682eb64d3de322f512058afd8b6743deec8ae6279ad00ffc7771aea1b716566768c22623025d17aafbc7ff6892b1a9d832db43806f3cbf73304ecd8b4e968716e3d0027eaff563cb37ba7632caf106fb6c0e386295df067944a02ba926a048980a261c955b9bd5b764721a6453202fc3232571b6b8b96b734e4fb440a8b3728cbaaec4014b7be1c4056db7c0aa064a0e3e5451d245469ccc4d394fd15d55217db1938c279349311b992b351988df074d6bf1967ea554430a4d86547de43d05f27f9e1f832686d70705257149921a894a8bd0340fc4085679d58f8dfa35669f820c980988963eb3c3e351341678501140d171f022b16b1d356eb2e9e7ea02b22db9c3166a6086212578d245207335041f3a5e9a1e75863b1a5a0b621922d4bad99984bcce7de92c07b10b5ca70bc8d4664b1ab9d8b6afc492f58172544ddb571838e9cc236db6d1bd2134941045e68deafe8041137c053801afea2f51dd52aaae5e13eae45b3b1e0a826295b41a9566330906fba900e63406b1c660e849b7be255a43ed0f88055275a34d97bce621e003cd2b931871b727d5fe35802da346259f31fe373ab9227d26dc79d02f21c56acaeda1eb4a1aadf961d875d0e625c96836bde3fb97a544e0ea48b049253d150dea835a2d64d543ad0b9b69b0a29b2ba00fa836f9d052a93af8952a181347772e7bbb28d412759c709a29ca3e28809e321422198935297
+secret key:  590b903b07cfc30c0e84fc507e0320420c3002e83142000ffffbe07cf881bc0bb0c3f7e0bbf430b9fc1fbe2ff07e0bf0bfec6084ec51bee781010f7f7ce3d08407b24304503f006f8aeff07ef03181086f840f904403bf41141f03f7ef76e460ff0c4f86f7efc0fbd082002e05fff0fe0b907ce7f004eb8ffb03b1be139105ebef020bf042ec1e81f7f045041f00f8303a0802bdfbfdfef01140f00002147e82f7b0fc048047102044038f41fbe13fffce81f4603df4917afbdf820010fa13d083fc5fbfffdfbde810bf00107b1bcec303df3d083fc113f0370fee010ff07cf3ff7e141f3e080f80f86f39041044002f81083f01ffe203efeffdfc20bfe3bebffc1f41007ef90fc17b0fdff5273042ffe0c2eba038143fc3ffdd84f7ee03f48f80e7a17ffbcfc3e44f81ffd004fc00830bd003080e40f82f89f05ec02ff03bfff0460bc23f0fc182145f840ff30008307bfc0001f7e07d13dffe180fc2e41f46fc00841befbe07bff817dec4f42f84dfcfc3082f7f0c003dfbc1020baffffbb0c31bd080201e81e3f0430bff01ec1083f7b0be003ffffc4105ffaf7eff9085f00fc003e1fdf45f35136e3ffc00fa180f411fb0440ba0ff0ff07d0c2f82fc7001ff5040f8507de7efca104fb80c2fc4f8203de85108044043f83e4017b2bd0bff7f0c0f7cf0210003efc108417b1bef41fc204807cf870821c400013b23d1fd04113e13ff45eff0421bc1c2e401000c8f3eff8f7fe0020607d081105f42f3f0fe13df83080eb9fff07e106004efc03bf7dfbbefd202177eb6fc3f82e83f4023ff82ffe0040faf3707efbd1ba1bff8303c07effff7f13cf0604007e1bce80f4103513fe3f084dc4fbef8417df7d045103f7917c0bcf45f01fbe1ff0bff82f3aefe082f02f812c5fff1800fff7cf84fc3eb8fc100717ffc2f3ffc9084141fc6f801000bcf7e1810031fb04007a10118313f185f37fc6047ec31830350c4fbef40048ffbff8f3f1fbfbbf7a080f84e7ae04fbd0fa0c203ee84fbe03d039f430fae82f010c30831fb145044047f84f3bfc1fc0fbe145fbd184eff0c30c10391401010c72215020b11f3e602f907e7f517f61434c8fe1ecb24fbe7f5f0ecfe1b2704f2fd1af2261af7f9fd2df81fd9f5100cf01e2deaee1c08e7eb260ce50ee60a04fc2100f9e4f405e5fce3ea320309ddf930d4e4f2ecfe01f4e120e3f315eed0e9f2d3f70a0f13ec2a090ed011ebf90aedfcf2ee0e0c032bd90a0d12f406003406f8f709250001f1030ef718100706ecfa27ee15bf0ce737f11622f211071de1f2eedf280c2ac513fa0efadaf4e7f1160afadde8151126eb04d92010f9030ce6e414ecf110f4fd260101031a00fc0dea21e20ce323d5030a170dcd19d7e4f92fd30311feeaff36002ef30ef737e7f800e8e71d0a0e10c10bf8f9f8f302f72d1efd00e80806dc1426fef9fa0bece7f91be80e0007101621f0210be0db111dede506d53911ddf10fe4fcf920e41303d247eb0ffa0bf2f3ed051302f1193c00fde8ff10fa1bf4c11ff2eadb1921c616f1270aedc50301fd1c1002fa0d01d830f4061500ff15e104030e0512e4f40fe903e5ce0de71f13f3fb0c1101fe1020fc0d0711f322ff0e0b00f80104f81900f805f612fc13f415fa1c17eaf2dff0dd1302fbedfde2fa0dfff5e80e12f71515fc2cfaef22e107e70df2dbf3130ef6df06ee180cf9f7f0ff08f1040f0003f7fa0e05f10bf313f8ee151ee9f9feec053916f2eef1e828e204101adb1e08e2e1ed0dff182831f023f3c820fe12f31d2335f800240118d8
+pk length:   897 bytes
+sk length:   1281 bytes
+
+⚠️  Keep your secret key safe! Anyone with it can sign messages.
+----- such falcon_keygen exit=0 -----
+[0;32m[SUCCESS][0m Falcon-512 keypair generated
+  Public Key (1794 chars): 0976f6a4f633c5bc251da269c52669b11c56648d8d6a7b4cadc5e9920aa566b7...
+  Secret Key (2562 chars): 590b903b07cfc30c0e84fc507e0320420c3002e83142000ffffbe07cf881bc0b...
+[0;34m[INFO][0m Step 4: Building transaction and deriving tx_sighash32...
+[0;34m[INFO][0m Step 4a: Constructing unsigned transaction from known funded UTXO...
+UTXO_SELECTION
+selected_txid=63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621
+selected_vout=0
+selected_value_koinu=4194000000
+selected_source=known_utxo_constants
+tx_fee_koinu=100000
+send_value_koinu=4193900000
+selected_script_pubkey=76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+raw_unsigned_tx=01000000012146c4e0e369177a83c9b537486a5dda00932f78f7b5af43515bd5b6479bd7630000000000ffffffff01e0d5f9f9000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac00000000
+[0;32m[SUCCESS][0m Prepared RAW_UNSIGNED_TX and SCRIPT_PUBKEY from funded UTXO
+  UTXO: 63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621:0
+  UTXO value: 4194000000 koinu
+  Fee: 100000 koinu
+  Output value: 4193900000 koinu
+[0;34m[INFO][0m Using RAW_UNSIGNED_TX from environment
+[0;34m[INFO][0m Using SCRIPT_PUBKEY from environment
+----- such tx_sighash32: ./such -c tx_sighash32 -x 01000000012146c4e0e369177a83c9b537486a5dda00932f78f7b5af43515bd5b6479bd7630000000000ffffffff01e0d5f9f9000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac00000000 -s 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac -i 0 -h 1 -----
+tx_sighash32: 5fcb95f6179fdf57693cb823ad110b868380cb0be0e23a151149955f51bef439
+----- such tx_sighash32 exit=0 -----
+[0;32m[SUCCESS][0m Derived tx_sighash32: 5fcb95f6179fdf57693cb823ad110b868380cb0be0e23a151149955f51bef439
+[0;34m[INFO][0m Step 5: Signing tx_sighash32 with Falcon-512...
+----- such falcon_sign: ./such -c falcon_sign -p 590b903b07cfc30c0e84fc507e0320420c3002e83142000ffffbe07cf881bc0bb0c3f7e0bbf430b9fc1fbe2ff07e0bf0bfec6084ec51bee781010f7f7ce3d08407b24304503f006f8aeff07ef03181086f840f904403bf41141f03f7ef76e460ff0c4f86f7efc0fbd082002e05fff0fe0b907ce7f004eb8ffb03b1be139105ebef020bf042ec1e81f7f045041f00f8303a0802bdfbfdfef01140f00002147e82f7b0fc048047102044038f41fbe13fffce81f4603df4917afbdf820010fa13d083fc5fbfffdfbde810bf00107b1bcec303df3d083fc113f0370fee010ff07cf3ff7e141f3e080f80f86f39041044002f81083f01ffe203efeffdfc20bfe3bebffc1f41007ef90fc17b0fdff5273042ffe0c2eba038143fc3ffdd84f7ee03f48f80e7a17ffbcfc3e44f81ffd004fc00830bd003080e40f82f89f05ec02ff03bfff0460bc23f0fc182145f840ff30008307bfc0001f7e07d13dffe180fc2e41f46fc00841befbe07bff817dec4f42f84dfcfc3082f7f0c003dfbc1020baffffbb0c31bd080201e81e3f0430bff01ec1083f7b0be003ffffc4105ffaf7eff9085f00fc003e1fdf45f35136e3ffc00fa180f411fb0440ba0ff0ff07d0c2f82fc7001ff5040f8507de7efca104fb80c2fc4f8203de85108044043f83e4017b2bd0bff7f0c0f7cf0210003efc108417b1bef41fc204807cf870821c400013b23d1fd04113e13ff45eff0421bc1c2e401000c8f3eff8f7fe0020607d081105f42f3f0fe13df83080eb9fff07e106004efc03bf7dfbbefd202177eb6fc3f82e83f4023ff82ffe0040faf3707efbd1ba1bff8303c07effff7f13cf0604007e1bce80f4103513fe3f084dc4fbef8417df7d045103f7917c0bcf45f01fbe1ff0bff82f3aefe082f02f812c5fff1800fff7cf84fc3eb8fc100717ffc2f3ffc9084141fc6f801000bcf7e1810031fb04007a10118313f185f37fc6047ec31830350c4fbef40048ffbff8f3f1fbfbbf7a080f84e7ae04fbd0fa0c203ee84fbe03d039f430fae82f010c30831fb145044047f84f3bfc1fc0fbe145fbd184eff0c30c10391401010c72215020b11f3e602f907e7f517f61434c8fe1ecb24fbe7f5f0ecfe1b2704f2fd1af2261af7f9fd2df81fd9f5100cf01e2deaee1c08e7eb260ce50ee60a04fc2100f9e4f405e5fce3ea320309ddf930d4e4f2ecfe01f4e120e3f315eed0e9f2d3f70a0f13ec2a090ed011ebf90aedfcf2ee0e0c032bd90a0d12f406003406f8f709250001f1030ef718100706ecfa27ee15bf0ce737f11622f211071de1f2eedf280c2ac513fa0efadaf4e7f1160afadde8151126eb04d92010f9030ce6e414ecf110f4fd260101031a00fc0dea21e20ce323d5030a170dcd19d7e4f92fd30311feeaff36002ef30ef737e7f800e8e71d0a0e10c10bf8f9f8f302f72d1efd00e80806dc1426fef9fa0bece7f91be80e0007101621f0210be0db111dede506d53911ddf10fe4fcf920e41303d247eb0ffa0bf2f3ed051302f1193c00fde8ff10fa1bf4c11ff2eadb1921c616f1270aedc50301fd1c1002fa0d01d830f4061500ff15e104030e0512e4f40fe903e5ce0de71f13f3fb0c1101fe1020fc0d0711f322ff0e0b00f80104f81900f805f612fc13f415fa1c17eaf2dff0dd1302fbedfde2fa0dfff5e80e12f71515fc2cfaef22e107e70df2dbf3130ef6df06ee180cf9f7f0ff08f1040f0003f7fa0e05f10bf313f8ee151ee9f9feec053916f2eef1e828e204101adb1e08e2e1ed0dff182831f023f3c820fe12f31d2335f800240118d8 -x 5fcb95f6179fdf57693cb823ad110b868380cb0be0e23a151149955f51bef439 -----
+Signing message with Falcon-512...
+
+=== Falcon-512 Signature Generated ===
+signature:   39f27515a7852f3df827a90bf2b4bbbf42ef4f8c58aff7d12e0fb00daad2901ccc59c9df96662823606dcdfa1a0c918ddba45af1759fb8171f14796ec4b6bc0a8cbd6e4388ce53430fc03ded238d7e3a90a2d2cc5212fd59498ac1dd025365aa97e4bd9e26784f2761aeb052ac140b8a496154b9146c0c0d61ce3cec020f04cb4ad3ead2098376b306cf033968c8aa8b226afb1e34378c66fb0f012de8b358976e81f0655d46acbb4217c804cd1ea32bdae94bb19b4ee61545d93bb0e0a7534ef62db6641739ceff5177abb2cfce8f0483c15fbb4af126edb7ecdd49d28909e26cdae5aa8724a0ebef19c6e724f9ee7fac0c6e6a93ba5895ab4748ba71724f398d93be3f86808cb31db4a7f7961f7f128396689608fc2dc3ed51a0d1a956c77735b6535947de89e420a97c13a8af5a37046f40ddaa6504e6c25a4405b0fe1db5bfe5b3d0c25aaf1f121c9df471f11c8d8e4b9df76dd6c85f3a5923573b7aa91d46bcaecd513a1a6ae0dba2e50e3c459214b90ce7231f3b33f302d9a0b486e9d958102d655a351d44864b8d649c1d391210aa11c4b2df6a96793645e5f9bcc1771332e66ad19be4d37c7ae02dfdf7d11ed775cea397922eb3f259d145552fdefe0b7a8aca3c0b1a0a6bfa1cbeb63348c9d9f5898a6fbdcdc4e2e5192378ff9b2c9c3e74f05e31010cdf76dad3348ce31d9947ad165b74336d9ecadb4fbeb64d027ea8e89f1f01a747d29210a4d2606af7d17494b9e88fae6bde591955716499bdb6258a364a734c8991aa0c8a29eaa5c788874d9ccdd60d1413d061ed22d2cb464f0d1db8cb7b7575e993bd0f4c075a87f8f2aeb1c8ea6930ec47e266f505c32104edaec6e51a346ee98faaac176caea902e24164079a05cf72d27d4fd7ace2ee20e93de957fbce7ccd31654320
+sig length:  653 bytes
+msg length:  32 bytes
+----- such falcon_sign exit=0 -----
+[0;32m[SUCCESS][0m Falcon signature generated from tx_sighash32
+[0;34m[INFO][0m Step 6: Generating commitment from Falcon signature...
+----- such falcon_commit: ./such -c falcon_commit -k 0976f6a4f633c5bc251da269c52669b11c56648d8d6a7b4cadc5e9920aa566b77a51085044114a46fa419d50f60289d9de6e57b250a5c60a870fbd2914fd9fc929d40b067d4b4d61cc544923d5d548a990206aebb3063e746246cfb7031d1361bc6a577a5112f96ddee16c02f1e9dcc5c8b29a1547b885f579441ab1efdc259b99296a5f13dcae5156e69e5f197dc553a44d946baf343410ba0053657de0c1980c3819cacda40c51dab965f7c9e64b185ec875aac0954fb00cdda13956c1251da58869d8f24571c8314b1c1772a9e6401dd3de5d7143a537a5b0b2964ae3090f7e165e7b93722be93e32c6a6c024c65cd844baf3562b3a04c1b83b9ee78e9d79f6b6a3225e950874d0858a80a9b066959aef27e1222855629eb946a8586b2238194c5167639fc3271a49c7f016ba59e9eee286449b7784da906c9cfc582493e6fc27a16ff59c559999faab382e7b19ec7a1d121b1951e07682d40bf0d4cec26b2967a4a8d82a7ba98125680684aa285b68e8eb029f744f02b360a08682eb64d3de322f512058afd8b6743deec8ae6279ad00ffc7771aea1b716566768c22623025d17aafbc7ff6892b1a9d832db43806f3cbf73304ecd8b4e968716e3d0027eaff563cb37ba7632caf106fb6c0e386295df067944a02ba926a048980a261c955b9bd5b764721a6453202fc3232571b6b8b96b734e4fb440a8b3728cbaaec4014b7be1c4056db7c0aa064a0e3e5451d245469ccc4d394fd15d55217db1938c279349311b992b351988df074d6bf1967ea554430a4d86547de43d05f27f9e1f832686d70705257149921a894a8bd0340fc4085679d58f8dfa35669f820c980988963eb3c3e351341678501140d171f022b16b1d356eb2e9e7ea02b22db9c3166a6086212578d245207335041f3a5e9a1e75863b1a5a0b621922d4bad99984bcce7de92c07b10b5ca70bc8d4664b1ab9d8b6afc492f58172544ddb571838e9cc236db6d1bd2134941045e68deafe8041137c053801afea2f51dd52aaae5e13eae45b3b1e0a826295b41a9566330906fba900e63406b1c660e849b7be255a43ed0f88055275a34d97bce621e003cd2b931871b727d5fe35802da346259f31fe373ab9227d26dc79d02f21c56acaeda1eb4a1aadf961d875d0e625c96836bde3fb97a544e0ea48b049253d150dea835a2d64d543ad0b9b69b0a29b2ba00fa836f9d052a93af8952a181347772e7bbb28d412759c709a29ca3e28809e321422198935297 -s 39f27515a7852f3df827a90bf2b4bbbf42ef4f8c58aff7d12e0fb00daad2901ccc59c9df96662823606dcdfa1a0c918ddba45af1759fb8171f14796ec4b6bc0a8cbd6e4388ce53430fc03ded238d7e3a90a2d2cc5212fd59498ac1dd025365aa97e4bd9e26784f2761aeb052ac140b8a496154b9146c0c0d61ce3cec020f04cb4ad3ead2098376b306cf033968c8aa8b226afb1e34378c66fb0f012de8b358976e81f0655d46acbb4217c804cd1ea32bdae94bb19b4ee61545d93bb0e0a7534ef62db6641739ceff5177abb2cfce8f0483c15fbb4af126edb7ecdd49d28909e26cdae5aa8724a0ebef19c6e724f9ee7fac0c6e6a93ba5895ab4748ba71724f398d93be3f86808cb31db4a7f7961f7f128396689608fc2dc3ed51a0d1a956c77735b6535947de89e420a97c13a8af5a37046f40ddaa6504e6c25a4405b0fe1db5bfe5b3d0c25aaf1f121c9df471f11c8d8e4b9df76dd6c85f3a5923573b7aa91d46bcaecd513a1a6ae0dba2e50e3c459214b90ce7231f3b33f302d9a0b486e9d958102d655a351d44864b8d649c1d391210aa11c4b2df6a96793645e5f9bcc1771332e66ad19be4d37c7ae02dfdf7d11ed775cea397922eb3f259d145552fdefe0b7a8aca3c0b1a0a6bfa1cbeb63348c9d9f5898a6fbdcdc4e2e5192378ff9b2c9c3e74f05e31010cdf76dad3348ce31d9947ad165b74336d9ecadb4fbeb64d027ea8e89f1f01a747d29210a4d2606af7d17494b9e88fae6bde591955716499bdb6258a364a734c8991aa0c8a29eaa5c788874d9ccdd60d1413d061ed22d2cb464f0d1db8cb7b7575e993bd0f4c075a87f8f2aeb1c8ea6930ec47e266f505c32104edaec6e51a346ee98faaac176caea902e24164079a05cf72d27d4fd7ace2ee20e93de957fbce7ccd31654320 -----
+Generating Falcon-512 commitment...
+
+=== Falcon-512 Commitment Generated ===
+commitment:  90a88f71437bc0534f58beec47f22bc7c4edf0d1d1090c3264e36b2aae8cd0af
+length:      32 bytes
+
+This commitment can be included in an OP_RETURN output:
+OP_RETURN script: 6a24464c433190a88f71437bc0534f58beec47f22bc7c4edf0d1d1090c3264e36b2aae8cd0af
+
+To verify off-chain:
+1. Get the full signature from the signer
+2. Recompute: commit = SHA256(public_key || signature)
+3. Compare with this on-chain commitment
+----- such falcon_commit exit=0 -----
+[0;32m[SUCCESS][0m Commitment generated from tx-bound Falcon signature
+[0;34m[INFO][0m Step 6b: Building TX_C with OP_RETURN commitment + P2SH carrier outputs...
+----- such falcon_add_commit_and_carrier_tx: ./such -c falcon_add_commit_and_carrier_tx -x 01000000012146c4e0e369177a83c9b537486a5dda00932f78f7b5af43515bd5b6479bd7630000000000ffffffff01e0d5f9f9000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac00000000 -m 90a88f71437bc0534f58beec47f22bc7c4edf0d1d1090c3264e36b2aae8cd0af -k 0976f6a4f633c5bc251da269c52669b11c56648d8d6a7b4cadc5e9920aa566b77a51085044114a46fa419d50f60289d9de6e57b250a5c60a870fbd2914fd9fc929d40b067d4b4d61cc544923d5d548a990206aebb3063e746246cfb7031d1361bc6a577a5112f96ddee16c02f1e9dcc5c8b29a1547b885f579441ab1efdc259b99296a5f13dcae5156e69e5f197dc553a44d946baf343410ba0053657de0c1980c3819cacda40c51dab965f7c9e64b185ec875aac0954fb00cdda13956c1251da58869d8f24571c8314b1c1772a9e6401dd3de5d7143a537a5b0b2964ae3090f7e165e7b93722be93e32c6a6c024c65cd844baf3562b3a04c1b83b9ee78e9d79f6b6a3225e950874d0858a80a9b066959aef27e1222855629eb946a8586b2238194c5167639fc3271a49c7f016ba59e9eee286449b7784da906c9cfc582493e6fc27a16ff59c559999faab382e7b19ec7a1d121b1951e07682d40bf0d4cec26b2967a4a8d82a7ba98125680684aa285b68e8eb029f744f02b360a08682eb64d3de322f512058afd8b6743deec8ae6279ad00ffc7771aea1b716566768c22623025d17aafbc7ff6892b1a9d832db43806f3cbf73304ecd8b4e968716e3d0027eaff563cb37ba7632caf106fb6c0e386295df067944a02ba926a048980a261c955b9bd5b764721a6453202fc3232571b6b8b96b734e4fb440a8b3728cbaaec4014b7be1c4056db7c0aa064a0e3e5451d245469ccc4d394fd15d55217db1938c279349311b992b351988df074d6bf1967ea554430a4d86547de43d05f27f9e1f832686d70705257149921a894a8bd0340fc4085679d58f8dfa35669f820c980988963eb3c3e351341678501140d171f022b16b1d356eb2e9e7ea02b22db9c3166a6086212578d245207335041f3a5e9a1e75863b1a5a0b621922d4bad99984bcce7de92c07b10b5ca70bc8d4664b1ab9d8b6afc492f58172544ddb571838e9cc236db6d1bd2134941045e68deafe8041137c053801afea2f51dd52aaae5e13eae45b3b1e0a826295b41a9566330906fba900e63406b1c660e849b7be255a43ed0f88055275a34d97bce621e003cd2b931871b727d5fe35802da346259f31fe373ab9227d26dc79d02f21c56acaeda1eb4a1aadf961d875d0e625c96836bde3fb97a544e0ea48b049253d150dea835a2d64d543ad0b9b69b0a29b2ba00fa836f9d052a93af8952a181347772e7bbb28d412759c709a29ca3e28809e321422198935297 -s 39f27515a7852f3df827a90bf2b4bbbf42ef4f8c58aff7d12e0fb00daad2901ccc59c9df96662823606dcdfa1a0c918ddba45af1759fb8171f14796ec4b6bc0a8cbd6e4388ce53430fc03ded238d7e3a90a2d2cc5212fd59498ac1dd025365aa97e4bd9e26784f2761aeb052ac140b8a496154b9146c0c0d61ce3cec020f04cb4ad3ead2098376b306cf033968c8aa8b226afb1e34378c66fb0f012de8b358976e81f0655d46acbb4217c804cd1ea32bdae94bb19b4ee61545d93bb0e0a7534ef62db6641739ceff5177abb2cfce8f0483c15fbb4af126edb7ecdd49d28909e26cdae5aa8724a0ebef19c6e724f9ee7fac0c6e6a93ba5895ab4748ba71724f398d93be3f86808cb31db4a7f7961f7f128396689608fc2dc3ed51a0d1a956c77735b6535947de89e420a97c13a8af5a37046f40ddaa6504e6c25a4405b0fe1db5bfe5b3d0c25aaf1f121c9df471f11c8d8e4b9df76dd6c85f3a5923573b7aa91d46bcaecd513a1a6ae0dba2e50e3c459214b90ce7231f3b33f302d9a0b486e9d958102d655a351d44864b8d649c1d391210aa11c4b2df6a96793645e5f9bcc1771332e66ad19be4d37c7ae02dfdf7d11ed775cea397922eb3f259d145552fdefe0b7a8aca3c0b1a0a6bfa1cbeb63348c9d9f5898a6fbdcdc4e2e5192378ff9b2c9c3e74f05e31010cdf76dad3348ce31d9947ad165b74336d9ecadb4fbeb64d027ea8e89f1f01a747d29210a4d2606af7d17494b9e88fae6bde591955716499bdb6258a364a734c8991aa0c8a29eaa5c788874d9ccdd60d1413d061ed22d2cb464f0d1db8cb7b7575e993bd0f4c075a87f8f2aeb1c8ea6930ec47e266f505c32104edaec6e51a346ee98faaac176caea902e24164079a05cf72d27d4fd7ace2ee20e93de957fbce7ccd31654320 -h 100000000 -----
+tx with commitment and carrier outputs: 01000000012146c4e0e369177a83c9b537486a5dda00932f78f7b5af43515bd5b6479bd7630000000000ffffffff03e0f403f4000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac0000000000000000266a24464c433190a88f71437bc0534f58beec47f22bc7c4edf0d1d1090c3264e36b2aae8cd0af00e1f5050000000017a9149b402803555511d15d81207d3e2cb3e6bc365e0e8700000000
+carrier_part_total: 1
+carrier_output_value_koinu: 100000000
+carrier_first_vout: 2
+carrier_p2sh_scriptpubkey: a9149b402803555511d15d81207d3e2cb3e6bc365e0e87
+carrier_part_scriptsig[0]: 08464c433146554c4c08010001000381060e4d08020976f6a4f633c5bc251da269c52669b11c56648d8d6a7b4cadc5e9920aa566b77a51085044114a46fa419d50f60289d9de6e57b250a5c60a870fbd2914fd9fc929d40b067d4b4d61cc544923d5d548a990206aebb3063e746246cfb7031d1361bc6a577a5112f96ddee16c02f1e9dcc5c8b29a1547b885f579441ab1efdc259b99296a5f13dcae5156e69e5f197dc553a44d946baf343410ba0053657de0c1980c3819cacda40c51dab965f7c9e64b185ec875aac0954fb00cdda13956c1251da58869d8f24571c8314b1c1772a9e6401dd3de5d7143a537a5b0b2964ae3090f7e165e7b93722be93e32c6a6c024c65cd844baf3562b3a04c1b83b9ee78e9d79f6b6a3225e950874d0858a80a9b066959aef27e1222855629eb946a8586b2238194c5167639fc3271a49c7f016ba59e9eee286449b7784da906c9cfc582493e6fc27a16ff59c559999faab382e7b19ec7a1d121b1951e07682d40bf0d4cec26b2967a4a8d82a7ba98125680684aa285b68e8eb029f744f02b360a08682eb64d3de322f512058afd8b6743deec8ae6279ad00ffc7771aea1b716566768c22623025d17aafbc7ff6892b1a9d832db43806f3cbf73304ecd8b4e968716e3d0027eaff563cb37ba7632caf106fb6c0e386295df067944a02ba926a048980a261c955b9bd5b764721a6453202fc3232571b6b8b96b734e4fb440a8b3728cbaaec4014b7be1c4056db7c0a4d0802a064a0e3e5451d245469ccc4d394fd15d55217db1938c279349311b992b351988df074d6bf1967ea554430a4d86547de43d05f27f9e1f832686d70705257149921a894a8bd0340fc4085679d58f8dfa35669f820c980988963eb3c3e351341678501140d171f022b16b1d356eb2e9e7ea02b22db9c3166a6086212578d245207335041f3a5e9a1e75863b1a5a0b621922d4bad99984bcce7de92c07b10b5ca70bc8d4664b1ab9d8b6afc492f58172544ddb571838e9cc236db6d1bd2134941045e68deafe8041137c053801afea2f51dd52aaae5e13eae45b3b1e0a826295b41a9566330906fba900e63406b1c660e849b7be255a43ed0f88055275a34d97bce621e003cd2b931871b727d5fe35802da346259f31fe373ab9227d26dc79d02f21c56acaeda1eb4a1aadf961d875d0e625c96836bde3fb97a544e0ea48b049253d150dea835a2d64d543ad0b9b69b0a29b2ba00fa836f9d052a93af8952a181347772e7bbb28d412759c709a29ca3e28809e32142219893529739f27515a7852f3df827a90bf2b4bbbf42ef4f8c58aff7d12e0fb00daad2901ccc59c9df96662823606dcdfa1a0c918ddba45af1759fb8171f14796ec4b6bc0a8cbd6e4388ce53430fc03ded238d7e3a90a2d2cc5212fd59498ac1dd025365aa97e4bd9e26784f2761aeb052ac140b8a496154b9146c0c0d61ce3cec020f04cb4ad3ead2098376b306cf033968c8aa4dfe018b226afb1e34378c66fb0f012de8b358976e81f0655d46acbb4217c804cd1ea32bdae94bb19b4ee61545d93bb0e0a7534ef62db6641739ceff5177abb2cfce8f0483c15fbb4af126edb7ecdd49d28909e26cdae5aa8724a0ebef19c6e724f9ee7fac0c6e6a93ba5895ab4748ba71724f398d93be3f86808cb31db4a7f7961f7f128396689608fc2dc3ed51a0d1a956c77735b6535947de89e420a97c13a8af5a37046f40ddaa6504e6c25a4405b0fe1db5bfe5b3d0c25aaf1f121c9df471f11c8d8e4b9df76dd6c85f3a5923573b7aa91d46bcaecd513a1a6ae0dba2e50e3c459214b90ce7231f3b33f302d9a0b486e9d958102d655a351d44864b8d649c1d391210aa11c4b2df6a96793645e5f9bcc1771332e66ad19be4d37c7ae02dfdf7d11ed775cea397922eb3f259d145552fdefe0b7a8aca3c0b1a0a6bfa1cbeb63348c9d9f5898a6fbdcdc4e2e5192378ff9b2c9c3e74f05e31010cdf76dad3348ce31d9947ad165b74336d9ecadb4fbeb64d027ea8e89f1f01a747d29210a4d2606af7d17494b9e88fae6bde591955716499bdb6258a364a734c8991aa0c8a29eaa5c788874d9ccdd60d1413d061ed22d2cb464f0d1db8cb7b7575e993bd0f4c075a87f8f2aeb1c8ea6930ec47e266f505c32104edaec6e51a346ee98faaac176caea902e24164079a05cf72d27d4fd7ace2ee20e93de957fbce7ccd3165432006757575757551
+----- such falcon_add_commit_and_carrier_tx exit=0 -----
+[0;34m[INFO][0m Debugging TX_C unsigned format...
+=== TX_C_unsigned Debug (size=164 bytes) ===
+  version: 1
+  inputs: 1
+    in[0]: txid=63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621 vout=0 scriptSig_len=0 seq=ffffffff
+  outputs: 3
+    out[0]: 4093900000 koinu (40.93900000 DOGE) type=P2PKH spk_len=25 dust=OK
+    out[1]: 0 koinu (0.00000000 DOGE) type=OP_RETURN spk_len=38 dust=OK
+    out[2]: 100000000 koinu (1.00000000 DOGE) type=P2SH spk_len=23 dust=OK
+  locktime: 0
+=== end TX_C_unsigned ===
+[0;34m[INFO][0m Signing TX_C with secp256k1 on input 0...
+----- such sign TX_C: ./such -c sign -x 01000000012146c4e0e369177a83c9b537486a5dda00932f78f7b5af43515bd5b6479bd7630000000000ffffffff03e0f403f4000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac0000000000000000266a24464c433190a88f71437bc0534f58beec47f22bc7c4edf0d1d1090c3264e36b2aae8cd0af00e1f5050000000017a9149b402803555511d15d81207d3e2cb3e6bc365e0e8700000000 -s 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac -i 0 -h 1 -p QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w -----
+script: 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+script-type: TX_PUBKEYHASH
+inputindex: 0
+sighashtype: 1
+hash: 8a5fa53118a946802c7172fe9fb8bd65caf7ab4e99527b673a0e07ac6fcbb242
+
+Signature created:
+signature compact: 3d9af22731c74d2813bdd85385863772dba16a9f862bb86276be098a74fb26b90adba0c85690584c17dafa21ff3bcbb1a770d204e663cfda3e69ad4c31823bc7
+signature DER (+hashtype): 304402203d9af22731c74d2813bdd85385863772dba16a9f862bb86276be098a74fb26b902200adba0c85690584c17dafa21ff3bcbb1a770d204e663cfda3e69ad4c31823bc701
+signed TX: 01000000012146c4e0e369177a83c9b537486a5dda00932f78f7b5af43515bd5b6479bd763000000006a47304402203d9af22731c74d2813bdd85385863772dba16a9f862bb86276be098a74fb26b902200adba0c85690584c17dafa21ff3bcbb1a770d204e663cfda3e69ad4c31823bc7012103c15308abaf34326d0274d022c70cd15db84809822154dc894001066ce6b97482ffffffff03e0f403f4000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac0000000000000000266a24464c433190a88f71437bc0534f58beec47f22bc7c4edf0d1d1090c3264e36b2aae8cd0af00e1f5050000000017a9149b402803555511d15d81207d3e2cb3e6bc365e0e8700000000
+----- such sign TX_C exit=0 -----
+[0;32m[SUCCESS][0m Signed TX_C
+  Signed TX_C: 01000000012146c4e0e369177a83c9b537486a5dda00932f78f7b5af43515bd5b6479bd763000000...
+[0;34m[INFO][0m Debugging TX_C signed format...
+=== TX_C_signed Debug (size=270 bytes) ===
+  version: 1
+  inputs: 1
+    in[0]: txid=63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621 vout=0 scriptSig_len=106 seq=ffffffff
+  outputs: 3
+    out[0]: 4093900000 koinu (40.93900000 DOGE) type=P2PKH spk_len=25 dust=OK
+    out[1]: 0 koinu (0.00000000 DOGE) type=OP_RETURN spk_len=38 dust=OK
+    out[2]: 100000000 koinu (1.00000000 DOGE) type=P2SH spk_len=23 dust=OK
+  locktime: 0
+=== end TX_C_signed ===
+
+[0;34m[INFO][0m Broadcast attempt 1/3 for TX_C...
+----- sendtx TX_C attempt=1: ./sendtx -d -m 16 -s 30 01000000012146c4e0e369177a83c9b537486a5dda00932f78f7b5af43515bd5b6479bd763000000006a47304402203d9af22731c74d2813bdd85385863772dba16a9f862bb86276be098a74fb26b902200adba0c85690584c17dafa21ff3bcbb1a770d204e663cfda3e69ad4c31823bc7012103c15308abaf34326d0274d022c70cd15db84809822154dc894001066ce6b97482ffffffff03e0f403f4000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac0000000000000000266a24464c433190a88f71437bc0534f58beec47f22bc7c4edf0d1d1090c3264e36b2aae8cd0af00e1f5050000000017a9149b402803555511d15d81207d3e2cb3e6bc365e0e8700000000 -----
+input[0] scriptsig_len: 106
+Start broadcasting transaction: 130169cc6221749f586e88217bc70e648f2d167abd0e924a51e959a0484ce2e8 with timeout 30 seconds
+Trying to connect to nodes...
+DEBUG: Trying to connect to 1...
+DEBUG: Trying to connect to 2...
+DEBUG: Trying to connect to 3...
+DEBUG: Trying to connect to 4...
+DEBUG: Trying to connect to 5...
+DEBUG: Trying to connect to 6...
+DEBUG: Trying to connect to 7...
+DEBUG: Trying to connect to 8...
+DEBUG: Trying to connect to 9...
+DEBUG: Trying to connect to 10...
+DEBUG: Trying to connect to 11...
+DEBUG: Trying to connect to 12...
+DEBUG: Trying to connect to 13...
+DEBUG: Trying to connect to 14...
+DEBUG: Trying to connect to 15...
+DEBUG: Trying to connect to 16...
+DEBUG: Trying to connect to 17...
+DEBUG: Trying to connect to 18...
+DEBUG: Trying to connect to 19...
+DEBUG: Trying to connect to 20...
+DEBUG: Trying to connect to 21...
+DEBUG: Trying to connect to 22...
+DEBUG: Trying to connect to 23...
+DEBUG: Trying to connect to 24...
+DEBUG: Trying to connect to 25...
+DEBUG: Event callback on node 24
+DEBUG: Successful connected to node 24.
+DEBUG: sending message to node 24: version
+DEBUG: Connected nodes: 1
+DEBUG: Event callback on node 19
+DEBUG: Successful connected to node 19.
+DEBUG: sending message to node 19: version
+DEBUG: Connected nodes: 2
+DEBUG: Event callback on node 8
+DEBUG: Successful connected to node 8.
+DEBUG: sending message to node 8: version
+DEBUG: Connected nodes: 3
+DEBUG: received command from node 24: version
+DEBUG: Connected to node 24: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 24: verack
+DEBUG: received command from node 24: verack
+Successfully connected to peer 24 (35.245.112.212)
+DEBUG: sending message to node 24: inv
+DEBUG: received command from node 19: version
+DEBUG: Connected to node 19: /Shibetoshi:1.14.99/ (6171119)
+DEBUG: sending message to node 19: verack
+DEBUG: received command from node 19: verack
+Successfully connected to peer 19 (98.94.236.125)
+DEBUG: sending message to node 19: inv
+DEBUG: Event callback on node 21
+DEBUG: Successful connected to node 21.
+DEBUG: sending message to node 21: version
+DEBUG: Connected nodes: 4
+DEBUG: Event callback on node 11
+DEBUG: Successful connected to node 11.
+DEBUG: sending message to node 11: version
+DEBUG: Connected nodes: 5
+DEBUG: Event callback on node 13
+DEBUG: Successful connected to node 13.
+DEBUG: sending message to node 13: version
+DEBUG: Connected nodes: 6
+DEBUG: received command from node 24: sendheaders
+DEBUG: received command from node 24: sendcmpct
+DEBUG: received command from node 24: ping
+DEBUG: sending message to node 24: pong
+DEBUG: received command from node 24: addr
+DEBUG: received command from node 24: feefilter
+DEBUG: received command from node 19: sendheaders
+DEBUG: received command from node 19: sendcmpct
+DEBUG: received command from node 19: ping
+DEBUG: sending message to node 19: pong
+DEBUG: received command from node 19: addr
+DEBUG: received command from node 19: feefilter
+DEBUG: received command from node 8: version
+DEBUG: Connected to node 8: /Shibetoshi:1.14.7/ (6171119)
+DEBUG: sending message to node 8: verack
+DEBUG: received command from node 8: verack
+Successfully connected to peer 8 (205.209.103.218)
+DEBUG: sending message to node 8: inv
+DEBUG: Event callback on node 25
+DEBUG: Successful connected to node 25.
+DEBUG: sending message to node 25: version
+DEBUG: Connected nodes: 7
+DEBUG: received command from node 21: version
+DEBUG: Connected to node 21: /Shibetoshi:1.14.99/ (6171119)
+DEBUG: sending message to node 21: verack
+DEBUG: received command from node 21: verack
+Successfully connected to peer 21 (108.171.206.26)
+DEBUG: sending message to node 21: inv
+DEBUG: received command from node 8: sendheaders
+DEBUG: received command from node 8: sendcmpct
+DEBUG: received command from node 8: ping
+DEBUG: sending message to node 8: pong
+DEBUG: received command from node 8: addr
+DEBUG: received command from node 8: feefilter
+DEBUG: received command from node 11: version
+DEBUG: Connected to node 11: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 11: verack
+DEBUG: received command from node 11: verack
+Successfully connected to peer 11 (99.120.174.193)
+DEBUG: sending message to node 11: inv
+DEBUG: received command from node 13: version
+DEBUG: Connected to node 13: /Shibetoshi:1.14.8/ (6171119)
+DEBUG: sending message to node 13: verack
+DEBUG: received command from node 13: verack
+Successfully connected to peer 13 (72.228.49.208)
+DEBUG: sending message to node 13: inv
+DEBUG: Event callback on node 4
+DEBUG: Successful connected to node 4.
+DEBUG: sending message to node 4: version
+DEBUG: Connected nodes: 8
+DEBUG: Event callback on node 6
+DEBUG: Successful connected to node 6.
+DEBUG: sending message to node 6: version
+DEBUG: Connected nodes: 9
+DEBUG: Event callback on node 12
+DEBUG: Successful connected to node 12.
+DEBUG: sending message to node 12: version
+DEBUG: Connected nodes: 10
+DEBUG: Event callback on node 16
+DEBUG: Successful connected to node 16.
+DEBUG: sending message to node 16: version
+DEBUG: Connected nodes: 11
+DEBUG: Event callback on node 23
+DEBUG: Successful connected to node 23.
+DEBUG: sending message to node 23: version
+DEBUG: Connected nodes: 12
+DEBUG: Event callback on node 5
+DEBUG: Successful connected to node 5.
+DEBUG: sending message to node 5: version
+DEBUG: Connected nodes: 13
+DEBUG: Event callback on node 18
+DEBUG: Successful connected to node 18.
+DEBUG: sending message to node 18: version
+DEBUG: Connected nodes: 14
+DEBUG: Event callback on node 7
+DEBUG: Successful connected to node 7.
+DEBUG: sending message to node 7: version
+DEBUG: Connected nodes: 15
+DEBUG: Event callback on node 17
+DEBUG: Successful connected to node 17.
+DEBUG: sending message to node 17: version
+DEBUG: Connected nodes: 16
+DEBUG: received command from node 21: sendheaders
+DEBUG: received command from node 21: sendcmpct
+DEBUG: received command from node 21: ping
+DEBUG: sending message to node 21: pong
+DEBUG: received command from node 21: addr
+DEBUG: received command from node 21: feefilter
+DEBUG: Event callback on node 15
+DEBUG: Successful connected to node 15.
+DEBUG: sending message to node 15: version
+DEBUG: Connected nodes: 17
+DEBUG: Event callback on node 1
+DEBUG: Successful connected to node 1.
+DEBUG: sending message to node 1: version
+DEBUG: Connected nodes: 18
+DEBUG: Event callback on node 9
+DEBUG: Successful connected to node 9.
+DEBUG: sending message to node 9: version
+DEBUG: Connected nodes: 19
+DEBUG: Event callback on node 22
+DEBUG: Successful connected to node 22.
+DEBUG: sending message to node 22: version
+DEBUG: Connected nodes: 20
+DEBUG: Event callback on node 2
+DEBUG: Successful connected to node 2.
+DEBUG: sending message to node 2: version
+DEBUG: Connected nodes: 21
+DEBUG: Event callback on node 20
+DEBUG: Successful connected to node 20.
+DEBUG: sending message to node 20: version
+DEBUG: Connected nodes: 22
+DEBUG: received command from node 11: sendheaders
+DEBUG: received command from node 11: sendcmpct
+DEBUG: received command from node 11: ping
+DEBUG: sending message to node 11: pong
+DEBUG: received command from node 11: addr
+DEBUG: received command from node 11: feefilter
+DEBUG: received command from node 25: version
+DEBUG: Connected to node 25: /Shibetoshi:1.14.9(opreturn.net)/ (6171119)
+DEBUG: sending message to node 25: verack
+DEBUG: received command from node 25: verack
+Successfully connected to peer 25 (67.169.89.90)
+DEBUG: sending message to node 25: inv
+DEBUG: received command from node 13: sendheaders
+DEBUG: received command from node 13: sendcmpct
+DEBUG: received command from node 13: ping
+DEBUG: sending message to node 13: pong
+DEBUG: received command from node 13: addr
+DEBUG: received command from node 13: feefilter
+DEBUG: Event callback on node 14
+DEBUG: Successful connected to node 14.
+DEBUG: sending message to node 14: version
+DEBUG: Connected nodes: 23
+DEBUG: Event callback on node 10
+DEBUG: Successful connected to node 10.
+DEBUG: sending message to node 10: version
+DEBUG: Connected nodes: 24
+DEBUG: received command from node 25: sendheaders
+DEBUG: received command from node 25: sendcmpct
+DEBUG: received command from node 25: ping
+DEBUG: sending message to node 25: pong
+DEBUG: received command from node 25: addr
+DEBUG: received command from node 25: feefilter
+DEBUG: received command from node 6: version
+DEBUG: Connected to node 6: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 6: verack
+DEBUG: received command from node 6: verack
+Successfully connected to peer 6 (185.132.178.189)
+DEBUG: sending message to node 6: inv
+DEBUG: received command from node 4: version
+DEBUG: Connected to node 4: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 4: verack
+DEBUG: received command from node 4: verack
+Successfully connected to peer 4 (62.45.80.12)
+DEBUG: sending message to node 4: inv
+DEBUG: Event callback on node 3
+DEBUG: Successful connected to node 3.
+DEBUG: sending message to node 3: version
+DEBUG: Connected nodes: 25
+DEBUG: received command from node 23: version
+DEBUG: Connected to node 23: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 23: verack
+DEBUG: received command from node 23: verack
+Successfully connected to peer 23 (5.61.52.173)
+DEBUG: sending message to node 23: inv
+DEBUG: received command from node 16: version
+DEBUG: Connected to node 16: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 16: verack
+DEBUG: received command from node 16: verack
+Successfully connected to peer 16 (62.171.132.82)
+DEBUG: sending message to node 16: inv
+DEBUG: received command from node 12: version
+DEBUG: Connected to node 12: /Shibetoshi:1.14.7(DoOnlyGoodEveryday)/ (6171119)
+DEBUG: sending message to node 12: verack
+DEBUG: received command from node 12: verack
+Successfully connected to peer 12 (161.97.146.8)
+DEBUG: sending message to node 12: inv
+DEBUG: received command from node 5: version
+DEBUG: Connected to node 5: /Shibetoshi:1.14.7(DoOnlyGoodEveryday)/ (6171119)
+DEBUG: sending message to node 5: verack
+DEBUG: received command from node 5: verack
+Successfully connected to peer 5 (62.250.228.154)
+DEBUG: sending message to node 5: inv
+DEBUG: received command from node 18: version
+DEBUG: Connected to node 18: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 18: verack
+DEBUG: received command from node 18: verack
+Successfully connected to peer 18 (167.235.95.225)
+DEBUG: sending message to node 18: inv
+DEBUG: received command from node 7: version
+DEBUG: Connected to node 7: /Shibetoshi:1.14.7/ (6171119)
+DEBUG: sending message to node 7: verack
+DEBUG: received command from node 7: verack
+Successfully connected to peer 7 (162.55.108.77)
+DEBUG: sending message to node 7: inv
+DEBUG: received command from node 17: version
+DEBUG: Connected to node 17: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 17: verack
+DEBUG: received command from node 17: verack
+Successfully connected to peer 17 (152.53.151.253)
+DEBUG: sending message to node 17: inv
+DEBUG: received command from node 15: version
+DEBUG: Connected to node 15: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 15: verack
+DEBUG: received command from node 15: verack
+Successfully connected to peer 15 (23.88.0.168)
+DEBUG: received command from node 1: version
+DEBUG: Connected to node 1: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 1: verack
+DEBUG: received command from node 1: verack
+Successfully connected to peer 1 (188.138.39.205)
+DEBUG: received command from node 9: version
+DEBUG: Connected to node 9: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 9: verack
+DEBUG: received command from node 9: verack
+Successfully connected to peer 9 (90.126.63.77)
+DEBUG: received command from node 22: version
+DEBUG: Connected to node 22: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 22: verack
+DEBUG: received command from node 22: verack
+Successfully connected to peer 22 (78.46.234.155)
+DEBUG: received command from node 2: version
+DEBUG: Connected to node 2: /Shibetoshi:1.14.6/ (6171119)
+DEBUG: sending message to node 2: verack
+DEBUG: received command from node 2: verack
+Successfully connected to peer 2 (65.109.38.215)
+DEBUG: received command from node 20: version
+DEBUG: Connected to node 20: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 20: verack
+DEBUG: received command from node 20: verack
+Successfully connected to peer 20 (65.109.148.70)
+DEBUG: received command from node 14: version
+DEBUG: Connected to node 14: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 14: verack
+DEBUG: received command from node 14: verack
+Successfully connected to peer 14 (20.44.154.121)
+DEBUG: received command from node 6: sendheaders
+DEBUG: received command from node 6: sendcmpct
+DEBUG: received command from node 6: ping
+DEBUG: sending message to node 6: pong
+DEBUG: received command from node 6: addr
+DEBUG: received command from node 6: feefilter
+DEBUG: received command from node 4: sendheaders
+DEBUG: received command from node 4: sendcmpct
+DEBUG: received command from node 4: ping
+DEBUG: sending message to node 4: pong
+DEBUG: received command from node 4: addr
+DEBUG: received command from node 4: feefilter
+DEBUG: received command from node 23: sendheaders
+DEBUG: received command from node 23: sendcmpct
+DEBUG: received command from node 23: ping
+DEBUG: sending message to node 23: pong
+DEBUG: received command from node 23: feefilter
+DEBUG: received command from node 16: sendheaders
+DEBUG: received command from node 16: sendcmpct
+DEBUG: received command from node 16: ping
+DEBUG: sending message to node 16: pong
+DEBUG: received command from node 16: addr
+DEBUG: received command from node 16: feefilter
+DEBUG: received command from node 12: sendheaders
+DEBUG: received command from node 12: sendcmpct
+DEBUG: received command from node 12: ping
+DEBUG: sending message to node 12: pong
+DEBUG: received command from node 12: addr
+DEBUG: received command from node 12: feefilter
+DEBUG: received command from node 5: sendheaders
+DEBUG: received command from node 5: sendcmpct
+DEBUG: received command from node 5: ping
+DEBUG: sending message to node 5: pong
+DEBUG: received command from node 5: addr
+DEBUG: received command from node 5: feefilter
+DEBUG: received command from node 10: version
+DEBUG: Connected to node 10: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 10: verack
+DEBUG: received command from node 10: verack
+Successfully connected to peer 10 (34.64.251.232)
+DEBUG: received command from node 18: sendheaders
+DEBUG: received command from node 18: sendcmpct
+DEBUG: received command from node 18: ping
+DEBUG: sending message to node 18: pong
+DEBUG: received command from node 18: addr
+DEBUG: received command from node 18: feefilter
+DEBUG: received command from node 7: sendheaders
+DEBUG: received command from node 7: sendcmpct
+DEBUG: received command from node 7: ping
+DEBUG: sending message to node 7: pong
+DEBUG: received command from node 7: addr
+DEBUG: received command from node 7: feefilter
+DEBUG: received command from node 17: sendheaders
+DEBUG: received command from node 17: sendcmpct
+DEBUG: received command from node 17: ping
+DEBUG: sending message to node 17: pong
+DEBUG: received command from node 17: addr
+DEBUG: received command from node 17: feefilter
+DEBUG: received command from node 15: sendheaders
+DEBUG: received command from node 15: sendcmpct
+DEBUG: received command from node 15: ping
+DEBUG: sending message to node 15: pong
+DEBUG: received command from node 15: addr
+DEBUG: received command from node 15: feefilter
+DEBUG: received command from node 1: sendheaders
+DEBUG: received command from node 1: sendcmpct
+DEBUG: received command from node 1: ping
+DEBUG: sending message to node 1: pong
+DEBUG: received command from node 1: addr
+DEBUG: received command from node 1: feefilter
+DEBUG: received command from node 9: sendheaders
+DEBUG: received command from node 9: sendcmpct
+DEBUG: received command from node 9: ping
+DEBUG: sending message to node 9: pong
+DEBUG: received command from node 9: addr
+DEBUG: received command from node 9: feefilter
+DEBUG: received command from node 22: sendheaders
+DEBUG: received command from node 22: sendcmpct
+DEBUG: received command from node 22: ping
+DEBUG: sending message to node 22: pong
+DEBUG: received command from node 22: addr
+DEBUG: received command from node 22: feefilter
+DEBUG: received command from node 2: sendheaders
+DEBUG: received command from node 2: sendcmpct
+DEBUG: received command from node 2: ping
+DEBUG: sending message to node 2: pong
+DEBUG: received command from node 2: addr
+DEBUG: received command from node 2: feefilter
+DEBUG: received command from node 20: sendheaders
+DEBUG: received command from node 20: sendcmpct
+DEBUG: received command from node 20: ping
+DEBUG: sending message to node 20: pong
+DEBUG: received command from node 20: addr
+DEBUG: received command from node 20: feefilter
+DEBUG: received command from node 3: version
+DEBUG: Connected to node 3: /Shibetoshi:1.14.9/ (6171119)
+DEBUG: sending message to node 3: verack
+DEBUG: received command from node 3: verack
+Successfully connected to peer 3 (54.151.251.144)
+DEBUG: received command from node 14: sendheaders
+DEBUG: received command from node 14: sendcmpct
+DEBUG: received command from node 14: ping
+DEBUG: sending message to node 14: pong
+DEBUG: received command from node 14: addr
+DEBUG: received command from node 10: sendheaders
+DEBUG: received command from node 10: sendcmpct
+DEBUG: received command from node 10: ping
+DEBUG: sending message to node 10: pong
+DEBUG: received command from node 10: addr
+DEBUG: received command from node 10: feefilter
+DEBUG: received command from node 3: sendheaders
+DEBUG: received command from node 3: sendcmpct
+DEBUG: received command from node 3: ping
+DEBUG: sending message to node 3: pong
+DEBUG: received command from node 3: addr
+DEBUG: received command from node 3: feefilter
+DEBUG: received command from node 24: getdata
+DEBUG: sending message to node 24: tx
+tx successfully sent to node 24
+DEBUG: received command from node 19: getdata
+DEBUG: sending message to node 19: tx
+tx successfully sent to node 19
+DEBUG: received command from node 13: getdata
+DEBUG: sending message to node 13: tx
+tx successfully sent to node 13
+DEBUG: received command from node 8: getdata
+DEBUG: sending message to node 8: tx
+tx successfully sent to node 8
+DEBUG: received command from node 11: getdata
+DEBUG: sending message to node 11: tx
+tx successfully sent to node 11
+DEBUG: received command from node 21: getdata
+DEBUG: sending message to node 21: tx
+tx successfully sent to node 21
+DEBUG: received command from node 25: getdata
+DEBUG: sending message to node 25: tx
+tx successfully sent to node 25
+DEBUG: received command from node 23: getdata
+DEBUG: sending message to node 23: tx
+tx successfully sent to node 23
+DEBUG: received command from node 4: getdata
+DEBUG: sending message to node 4: tx
+tx successfully sent to node 4
+DEBUG: received command from node 12: getdata
+DEBUG: sending message to node 12: tx
+tx successfully sent to node 12
+DEBUG: received command from node 6: getdata
+DEBUG: sending message to node 6: tx
+tx successfully sent to node 6
+DEBUG: received command from node 7: getdata
+DEBUG: sending message to node 7: tx
+tx successfully sent to node 7
+DEBUG: received command from node 17: getdata
+DEBUG: sending message to node 17: tx
+tx successfully sent to node 17
+DEBUG: received command from node 16: getdata
+DEBUG: sending message to node 16: tx
+tx successfully sent to node 16
+DEBUG: received command from node 5: getdata
+DEBUG: sending message to node 5: tx
+tx successfully sent to node 5
+DEBUG: received command from node 18: getdata
+DEBUG: sending message to node 18: tx
+tx successfully sent to node 18
+DEBUG: received command from node 14: inv
+DEBUG: timer node 1, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 1: ping
+DEBUG: timer node 25, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 25
+DEBUG: timer node 24, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 24
+DEBUG: timer node 23, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 23
+DEBUG: timer node 22, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 22: ping
+DEBUG: timer node 21, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 21
+DEBUG: timer node 20, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 20: ping
+DEBUG: timer node 19, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 19
+DEBUG: timer node 18, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 18
+DEBUG: timer node 17, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 17
+DEBUG: timer node 16, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 16
+DEBUG: timer node 15, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 15: ping
+DEBUG: timer node 14, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 14: ping
+DEBUG: timer node 13, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 13
+DEBUG: timer node 12, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 12
+DEBUG: timer node 11, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 11
+DEBUG: timer node 10, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 10: ping
+DEBUG: timer node 9, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 9: ping
+DEBUG: timer node 8, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 8
+DEBUG: timer node 7, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 7
+DEBUG: timer node 6, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 6
+DEBUG: timer node 5, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 5
+DEBUG: timer node 4, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 4
+DEBUG: timer node 3, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 3: ping
+DEBUG: timer node 2, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 2: ping
+DEBUG: received command from node 15: pong
+DEBUG: received command from node 9: pong
+DEBUG: received command from node 1: pong
+DEBUG: received command from node 22: pong
+DEBUG: received command from node 2: pong
+DEBUG: received command from node 20: pong
+DEBUG: received command from node 14: pong
+DEBUG: received command from node 10: pong
+DEBUG: received command from node 3: pong
+DEBUG: received command from node 10: inv
+DEBUG: timer node 1, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 3, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 9, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 14, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 15, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 6 secs (timeout is: 30)
+DEBUG: received command from node 9: inv
+DEBUG: received command from node 20: inv
+DEBUG: received command from node 3: inv
+DEBUG: timer node 1, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 15, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 14, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 9, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 3, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 9 secs (timeout is: 30)
+DEBUG: received command from node 2: inv
+DEBUG: timer node 1, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 3, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 9, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 14, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 15, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 12 secs (timeout is: 30)
+DEBUG: received command from node 1: inv
+DEBUG: timer node 1, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 15, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 14, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 9, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 3, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 15 secs (timeout is: 30)
+DEBUG: received command from node 15: inv
+DEBUG: timer node 1, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 3, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 9, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 14, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 15, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 1, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 15, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 14, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 9, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 3, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 21 secs (timeout is: 30)
+DEBUG: received command from node 14: inv
+DEBUG: received command from node 22: inv
+DEBUG: received command from node 10: inv
+DEBUG: timer node 1, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 3, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 9, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 14, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 15, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 24 secs (timeout is: 30)
+DEBUG: received command from node 15: inv
+DEBUG: received command from node 1: inv
+DEBUG: timer node 1, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 15, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 14, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 9, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 3, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 27 secs (timeout is: 30)
+DEBUG: received command from node 9: inv
+DEBUG: received command from node 2: inv
+DEBUG: received command from node 3: inv
+DEBUG: timer node 1, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 3, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 9, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 14, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 15, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 1, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 1
+DEBUG: timer node 22, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 22
+DEBUG: timer node 20, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 20
+DEBUG: timer node 15, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 15
+DEBUG: timer node 14, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 14
+DEBUG: timer node 10, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 10
+DEBUG: timer node 9, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 9
+DEBUG: timer node 3, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 3
+DEBUG: timer node 2, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 2
+
+
+Result:
+=============
+Max nodes to connect to: 16
+Successfully connected to nodes: 25
+Informed nodes: 16
+Requested from nodes: 16
+Seen on other nodes: 0
+
+sendtx-note: The transaction was not relayed back. Your transaction is very likely invalid (or was already broadcasted and picked up by an invalid node)
+----- sendtx TX_C attempt=1 exit=0 -----
+[0;32m[SUCCESS][0m TX_C broadcast accepted on attempt 1: 130169cc6221749f586e88217bc70e648f2d167abd0e924a51e959a0484ce2e8
+[0;32m[SUCCESS][0m TX_C broadcast accepted/known: 130169cc6221749f586e88217bc70e648f2d167abd0e924a51e959a0484ce2e8
+[0;34m[INFO][0m Waiting for TX_C visibility before building TX_R...
+[0;34m[INFO][0m TX_C not yet visible via REST (continuing anyway)
+[0;34m[INFO][0m Debugging TX_R format...
+=== TX_R_signed Debug (size=1671 bytes) ===
+  version: 1
+  inputs: 1
+    in[0]: txid=130169cc6221749f586e88217bc70e648f2d167abd0e924a51e959a0484ce2e8 vout=2 scriptSig_len=1584 seq=ffffffff
+  outputs: 1
+    out[0]: 99500000 koinu (0.99500000 DOGE) type=P2PKH spk_len=25 dust=OK
+  locktime: 0
+=== end TX_R_signed ===
+[0;34m[INFO][0m Broadcast attempt 1/3 for TX_R...
+----- sendtx TX_R attempt=1: ./sendtx -d -m 16 -s 30 0100000001e8e24c48a059e9514a920ebd7a162d8f640ec77b21886e589f742162cc69011302000000fd300608464c433146554c4c08010001000381060e4d08020976f6a4f633c5bc251da269c52669b11c56648d8d6a7b4cadc5e9920aa566b77a51085044114a46fa419d50f60289d9de6e57b250a5c60a870fbd2914fd9fc929d40b067d4b4d61cc544923d5d548a990206aebb3063e746246cfb7031d1361bc6a577a5112f96ddee16c02f1e9dcc5c8b29a1547b885f579441ab1efdc259b99296a5f13dcae5156e69e5f197dc553a44d946baf343410ba0053657de0c1980c3819cacda40c51dab965f7c9e64b185ec875aac0954fb00cdda13956c1251da58869d8f24571c8314b1c1772a9e6401dd3de5d7143a537a5b0b2964ae3090f7e165e7b93722be93e32c6a6c024c65cd844baf3562b3a04c1b83b9ee78e9d79f6b6a3225e950874d0858a80a9b066959aef27e1222855629eb946a8586b2238194c5167639fc3271a49c7f016ba59e9eee286449b7784da906c9cfc582493e6fc27a16ff59c559999faab382e7b19ec7a1d121b1951e07682d40bf0d4cec26b2967a4a8d82a7ba98125680684aa285b68e8eb029f744f02b360a08682eb64d3de322f512058afd8b6743deec8ae6279ad00ffc7771aea1b716566768c22623025d17aafbc7ff6892b1a9d832db43806f3cbf73304ecd8b4e968716e3d0027eaff563cb37ba7632caf106fb6c0e386295df067944a02ba926a048980a261c955b9bd5b764721a6453202fc3232571b6b8b96b734e4fb440a8b3728cbaaec4014b7be1c4056db7c0a4d0802a064a0e3e5451d245469ccc4d394fd15d55217db1938c279349311b992b351988df074d6bf1967ea554430a4d86547de43d05f27f9e1f832686d70705257149921a894a8bd0340fc4085679d58f8dfa35669f820c980988963eb3c3e351341678501140d171f022b16b1d356eb2e9e7ea02b22db9c3166a6086212578d245207335041f3a5e9a1e75863b1a5a0b621922d4bad99984bcce7de92c07b10b5ca70bc8d4664b1ab9d8b6afc492f58172544ddb571838e9cc236db6d1bd2134941045e68deafe8041137c053801afea2f51dd52aaae5e13eae45b3b1e0a826295b41a9566330906fba900e63406b1c660e849b7be255a43ed0f88055275a34d97bce621e003cd2b931871b727d5fe35802da346259f31fe373ab9227d26dc79d02f21c56acaeda1eb4a1aadf961d875d0e625c96836bde3fb97a544e0ea48b049253d150dea835a2d64d543ad0b9b69b0a29b2ba00fa836f9d052a93af8952a181347772e7bbb28d412759c709a29ca3e28809e32142219893529739f27515a7852f3df827a90bf2b4bbbf42ef4f8c58aff7d12e0fb00daad2901ccc59c9df96662823606dcdfa1a0c918ddba45af1759fb8171f14796ec4b6bc0a8cbd6e4388ce53430fc03ded238d7e3a90a2d2cc5212fd59498ac1dd025365aa97e4bd9e26784f2761aeb052ac140b8a496154b9146c0c0d61ce3cec020f04cb4ad3ead2098376b306cf033968c8aa4dfe018b226afb1e34378c66fb0f012de8b358976e81f0655d46acbb4217c804cd1ea32bdae94bb19b4ee61545d93bb0e0a7534ef62db6641739ceff5177abb2cfce8f0483c15fbb4af126edb7ecdd49d28909e26cdae5aa8724a0ebef19c6e724f9ee7fac0c6e6a93ba5895ab4748ba71724f398d93be3f86808cb31db4a7f7961f7f128396689608fc2dc3ed51a0d1a956c77735b6535947de89e420a97c13a8af5a37046f40ddaa6504e6c25a4405b0fe1db5bfe5b3d0c25aaf1f121c9df471f11c8d8e4b9df76dd6c85f3a5923573b7aa91d46bcaecd513a1a6ae0dba2e50e3c459214b90ce7231f3b33f302d9a0b486e9d958102d655a351d44864b8d649c1d391210aa11c4b2df6a96793645e5f9bcc1771332e66ad19be4d37c7ae02dfdf7d11ed775cea397922eb3f259d145552fdefe0b7a8aca3c0b1a0a6bfa1cbeb63348c9d9f5898a6fbdcdc4e2e5192378ff9b2c9c3e74f05e31010cdf76dad3348ce31d9947ad165b74336d9ecadb4fbeb64d027ea8e89f1f01a747d29210a4d2606af7d17494b9e88fae6bde591955716499bdb6258a364a734c8991aa0c8a29eaa5c788874d9ccdd60d1413d061ed22d2cb464f0d1db8cb7b7575e993bd0f4c075a87f8f2aeb1c8ea6930ec47e266f505c32104edaec6e51a346ee98faaac176caea902e24164079a05cf72d27d4fd7ace2ee20e93de957fbce7ccd3165432006757575757551ffffffff01e03fee05000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac00000000 -----
+input[0] scriptsig_len: 1584
+Start broadcasting transaction: 21d9287cf087027e60b7aef0a047f732c93b619dfdebffde4472568b95d9470c with timeout 30 seconds
+Trying to connect to nodes...
+DEBUG: Trying to connect to 1...
+DEBUG: Trying to connect to 2...
+DEBUG: Trying to connect to 3...
+DEBUG: Trying to connect to 4...
+DEBUG: Trying to connect to 5...
+DEBUG: Trying to connect to 6...
+DEBUG: Trying to connect to 7...
+DEBUG: Trying to connect to 8...
+DEBUG: Trying to connect to 9...
+DEBUG: Trying to connect to 10...
+DEBUG: Trying to connect to 11...
+DEBUG: Trying to connect to 12...
+DEBUG: Trying to connect to 13...
+DEBUG: Trying to connect to 14...
+DEBUG: Trying to connect to 15...
+DEBUG: Trying to connect to 16...
+DEBUG: Trying to connect to 17...
+DEBUG: Trying to connect to 18...
+DEBUG: Trying to connect to 19...
+DEBUG: Trying to connect to 20...
+DEBUG: Trying to connect to 21...
+DEBUG: Trying to connect to 22...
+DEBUG: Trying to connect to 23...
+DEBUG: Trying to connect to 24...
+DEBUG: Trying to connect to 25...
+DEBUG: Event callback on node 13
+DEBUG: Successful connected to node 13.
+DEBUG: sending message to node 13: version
+DEBUG: Connected nodes: 1
+DEBUG: Event callback on node 7
+DEBUG: Successful connected to node 7.
+DEBUG: sending message to node 7: version
+DEBUG: Connected nodes: 2
+DEBUG: Event callback on node 12
+DEBUG: Successful connected to node 12.
+DEBUG: sending message to node 12: version
+DEBUG: Connected nodes: 3
+DEBUG: received command from node 7: version
+DEBUG: Connected to node 7: /Shibetoshi:1.14.99/ (6171121)
+DEBUG: sending message to node 7: verack
+DEBUG: received command from node 7: verack
+Successfully connected to peer 7 (98.94.236.125)
+DEBUG: sending message to node 7: inv
+DEBUG: received command from node 13: version
+DEBUG: Connected to node 13: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 13: verack
+DEBUG: received command from node 13: verack
+Successfully connected to peer 13 (35.245.112.212)
+DEBUG: sending message to node 13: inv
+DEBUG: Event callback on node 1
+DEBUG: Successful connected to node 1.
+DEBUG: sending message to node 1: version
+DEBUG: Connected nodes: 4
+DEBUG: Event callback on node 14
+DEBUG: Successful connected to node 14.
+DEBUG: sending message to node 14: version
+DEBUG: Connected nodes: 5
+DEBUG: Event callback on node 11
+DEBUG: Successful connected to node 11.
+DEBUG: sending message to node 11: version
+DEBUG: Connected nodes: 6
+DEBUG: received command from node 12: version
+DEBUG: Connected to node 12: /Shibetoshi:1.14.7/ (6171121)
+DEBUG: sending message to node 12: verack
+DEBUG: received command from node 12: verack
+Successfully connected to peer 12 (205.209.103.218)
+DEBUG: sending message to node 12: inv
+DEBUG: received command from node 7: sendheaders
+DEBUG: received command from node 7: sendcmpct
+DEBUG: received command from node 7: ping
+DEBUG: sending message to node 7: pong
+DEBUG: received command from node 7: addr
+DEBUG: received command from node 7: feefilter
+DEBUG: received command from node 13: sendheaders
+DEBUG: received command from node 13: sendcmpct
+DEBUG: received command from node 13: ping
+DEBUG: sending message to node 13: pong
+DEBUG: received command from node 13: addr
+DEBUG: received command from node 13: feefilter
+DEBUG: Event callback on node 3
+DEBUG: Successful connected to node 3.
+DEBUG: sending message to node 3: version
+DEBUG: Connected nodes: 7
+DEBUG: received command from node 1: version
+DEBUG: Connected to node 1: /Shibetoshi:1.14.99/ (6171121)
+DEBUG: sending message to node 1: verack
+DEBUG: received command from node 1: verack
+Successfully connected to peer 1 (108.171.206.26)
+DEBUG: sending message to node 1: inv
+DEBUG: received command from node 12: sendheaders
+DEBUG: received command from node 12: sendcmpct
+DEBUG: received command from node 12: ping
+DEBUG: sending message to node 12: pong
+DEBUG: received command from node 12: addr
+DEBUG: received command from node 12: feefilter
+DEBUG: received command from node 14: version
+DEBUG: Connected to node 14: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 14: verack
+DEBUG: received command from node 14: verack
+Successfully connected to peer 14 (99.120.174.193)
+DEBUG: sending message to node 14: inv
+DEBUG: received command from node 11: version
+DEBUG: Connected to node 11: /Shibetoshi:1.14.8/ (6171121)
+DEBUG: sending message to node 11: verack
+DEBUG: received command from node 11: verack
+Successfully connected to peer 11 (72.228.49.208)
+DEBUG: sending message to node 11: inv
+DEBUG: Event callback on node 24
+DEBUG: Successful connected to node 24.
+DEBUG: sending message to node 24: version
+DEBUG: Connected nodes: 8
+DEBUG: Event callback on node 15
+DEBUG: Successful connected to node 15.
+DEBUG: sending message to node 15: version
+DEBUG: Connected nodes: 9
+DEBUG: Event callback on node 19
+DEBUG: Successful connected to node 19.
+DEBUG: sending message to node 19: version
+DEBUG: Connected nodes: 10
+DEBUG: Event callback on node 4
+DEBUG: Successful connected to node 4.
+DEBUG: sending message to node 4: version
+DEBUG: Connected nodes: 11
+DEBUG: Event callback on node 8
+DEBUG: Successful connected to node 8.
+DEBUG: sending message to node 8: version
+DEBUG: Connected nodes: 12
+DEBUG: Event callback on node 25
+DEBUG: Successful connected to node 25.
+DEBUG: sending message to node 25: version
+DEBUG: Connected nodes: 13
+DEBUG: Event callback on node 17
+DEBUG: Successful connected to node 17.
+DEBUG: sending message to node 17: version
+DEBUG: Connected nodes: 14
+DEBUG: Event callback on node 9
+DEBUG: Successful connected to node 9.
+DEBUG: sending message to node 9: version
+DEBUG: Connected nodes: 15
+DEBUG: received command from node 1: sendheaders
+DEBUG: received command from node 1: sendcmpct
+DEBUG: received command from node 1: ping
+DEBUG: sending message to node 1: pong
+DEBUG: received command from node 1: addr
+DEBUG: received command from node 1: feefilter
+DEBUG: Event callback on node 6
+DEBUG: Successful connected to node 6.
+DEBUG: sending message to node 6: version
+DEBUG: Connected nodes: 16
+DEBUG: Event callback on node 5
+DEBUG: Successful connected to node 5.
+DEBUG: sending message to node 5: version
+DEBUG: Connected nodes: 17
+DEBUG: Event callback on node 23
+DEBUG: Successful connected to node 23.
+DEBUG: sending message to node 23: version
+DEBUG: Connected nodes: 18
+DEBUG: Event callback on node 16
+DEBUG: Successful connected to node 16.
+DEBUG: sending message to node 16: version
+DEBUG: Connected nodes: 19
+DEBUG: Event callback on node 21
+DEBUG: Successful connected to node 21.
+DEBUG: sending message to node 21: version
+DEBUG: Connected nodes: 20
+DEBUG: Event callback on node 10
+DEBUG: Successful connected to node 10.
+DEBUG: sending message to node 10: version
+DEBUG: Connected nodes: 21
+DEBUG: Event callback on node 20
+DEBUG: Successful connected to node 20.
+DEBUG: sending message to node 20: version
+DEBUG: Connected nodes: 22
+DEBUG: received command from node 3: version
+DEBUG: Connected to node 3: /Shibetoshi:1.14.9(opreturn.net)/ (6171121)
+DEBUG: sending message to node 3: verack
+DEBUG: received command from node 3: verack
+Successfully connected to peer 3 (67.169.89.90)
+DEBUG: sending message to node 3: inv
+DEBUG: received command from node 14: sendheaders
+DEBUG: received command from node 14: sendcmpct
+DEBUG: received command from node 14: ping
+DEBUG: sending message to node 14: pong
+DEBUG: received command from node 14: addr
+DEBUG: received command from node 14: feefilter
+DEBUG: Event callback on node 22
+DEBUG: Successful connected to node 22.
+DEBUG: sending message to node 22: version
+DEBUG: Connected nodes: 23
+DEBUG: received command from node 11: sendheaders
+DEBUG: received command from node 11: sendcmpct
+DEBUG: received command from node 11: ping
+DEBUG: sending message to node 11: pong
+DEBUG: received command from node 11: addr
+DEBUG: received command from node 11: feefilter
+DEBUG: Event callback on node 2
+DEBUG: Successful connected to node 2.
+DEBUG: sending message to node 2: version
+DEBUG: Connected nodes: 24
+DEBUG: received command from node 3: sendheaders
+DEBUG: received command from node 3: sendcmpct
+DEBUG: received command from node 3: ping
+DEBUG: sending message to node 3: pong
+DEBUG: received command from node 24: version
+DEBUG: Connected to node 24: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 24: verack
+DEBUG: received command from node 24: verack
+Successfully connected to peer 24 (62.45.80.12)
+DEBUG: sending message to node 24: inv
+DEBUG: received command from node 15: version
+DEBUG: Connected to node 15: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 15: verack
+DEBUG: received command from node 15: verack
+Successfully connected to peer 15 (185.132.178.189)
+DEBUG: sending message to node 15: inv
+DEBUG: Event callback on node 18
+DEBUG: Successful connected to node 18.
+DEBUG: sending message to node 18: version
+DEBUG: Connected nodes: 25
+DEBUG: received command from node 19: version
+DEBUG: Connected to node 19: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 19: verack
+DEBUG: received command from node 19: verack
+Successfully connected to peer 19 (5.61.52.173)
+DEBUG: sending message to node 19: inv
+DEBUG: received command from node 3: addr
+DEBUG: received command from node 3: feefilter
+DEBUG: received command from node 4: version
+DEBUG: Connected to node 4: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 4: verack
+DEBUG: received command from node 4: verack
+Successfully connected to peer 4 (62.171.132.82)
+DEBUG: sending message to node 4: inv
+DEBUG: received command from node 8: version
+DEBUG: Connected to node 8: /Shibetoshi:1.14.7(DoOnlyGoodEveryday)/ (6171121)
+DEBUG: sending message to node 8: verack
+DEBUG: received command from node 8: verack
+Successfully connected to peer 8 (161.97.146.8)
+DEBUG: sending message to node 8: inv
+DEBUG: received command from node 25: version
+DEBUG: Connected to node 25: /Shibetoshi:1.14.7(DoOnlyGoodEveryday)/ (6171121)
+DEBUG: sending message to node 25: verack
+DEBUG: received command from node 25: verack
+Successfully connected to peer 25 (62.250.228.154)
+DEBUG: sending message to node 25: inv
+DEBUG: received command from node 17: version
+DEBUG: Connected to node 17: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 17: verack
+DEBUG: received command from node 17: verack
+Successfully connected to peer 17 (167.235.95.225)
+DEBUG: sending message to node 17: inv
+DEBUG: received command from node 9: version
+DEBUG: Connected to node 9: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 9: verack
+DEBUG: received command from node 9: verack
+Successfully connected to peer 9 (152.53.151.253)
+DEBUG: sending message to node 9: inv
+DEBUG: received command from node 6: version
+DEBUG: Connected to node 6: /Shibetoshi:1.14.7/ (6171121)
+DEBUG: sending message to node 6: verack
+DEBUG: received command from node 6: verack
+Successfully connected to peer 6 (162.55.108.77)
+DEBUG: sending message to node 6: inv
+DEBUG: received command from node 5: version
+DEBUG: Connected to node 5: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 5: verack
+DEBUG: received command from node 5: verack
+Successfully connected to peer 5 (23.88.0.168)
+DEBUG: received command from node 23: version
+DEBUG: Connected to node 23: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 23: verack
+DEBUG: received command from node 23: verack
+Successfully connected to peer 23 (188.138.39.205)
+DEBUG: received command from node 16: version
+DEBUG: Connected to node 16: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 16: verack
+DEBUG: received command from node 16: verack
+Successfully connected to peer 16 (78.46.234.155)
+DEBUG: received command from node 21: version
+DEBUG: Connected to node 21: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 21: verack
+DEBUG: received command from node 21: verack
+Successfully connected to peer 21 (90.126.63.77)
+DEBUG: received command from node 10: version
+DEBUG: Connected to node 10: /Shibetoshi:1.14.6/ (6171121)
+DEBUG: sending message to node 10: verack
+DEBUG: received command from node 10: verack
+Successfully connected to peer 10 (65.109.38.215)
+DEBUG: received command from node 20: version
+DEBUG: Connected to node 20: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 20: verack
+DEBUG: received command from node 20: verack
+Successfully connected to peer 20 (65.109.148.70)
+DEBUG: received command from node 22: version
+DEBUG: Connected to node 22: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 22: verack
+DEBUG: received command from node 22: verack
+Successfully connected to peer 22 (20.44.154.121)
+DEBUG: received command from node 24: sendheaders
+DEBUG: received command from node 24: sendcmpct
+DEBUG: received command from node 24: ping
+DEBUG: sending message to node 24: pong
+DEBUG: received command from node 24: addr
+DEBUG: received command from node 15: sendheaders
+DEBUG: received command from node 15: sendcmpct
+DEBUG: received command from node 15: ping
+DEBUG: sending message to node 15: pong
+DEBUG: received command from node 15: addr
+DEBUG: received command from node 15: feefilter
+DEBUG: received command from node 24: feefilter
+DEBUG: received command from node 19: sendheaders
+DEBUG: received command from node 19: sendcmpct
+DEBUG: received command from node 19: ping
+DEBUG: sending message to node 19: pong
+DEBUG: received command from node 19: feefilter
+DEBUG: received command from node 4: sendheaders
+DEBUG: received command from node 4: sendcmpct
+DEBUG: received command from node 4: ping
+DEBUG: sending message to node 4: pong
+DEBUG: received command from node 4: addr
+DEBUG: received command from node 4: feefilter
+DEBUG: received command from node 25: sendheaders
+DEBUG: received command from node 8: sendheaders
+DEBUG: received command from node 8: sendcmpct
+DEBUG: received command from node 25: sendcmpct
+DEBUG: received command from node 25: ping
+DEBUG: sending message to node 25: pong
+DEBUG: received command from node 8: ping
+DEBUG: sending message to node 8: pong
+DEBUG: received command from node 8: addr
+DEBUG: received command from node 8: feefilter
+DEBUG: received command from node 2: version
+DEBUG: Connected to node 2: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 2: verack
+DEBUG: received command from node 25: addr
+DEBUG: received command from node 25: feefilter
+DEBUG: received command from node 2: verack
+Successfully connected to peer 2 (34.64.251.232)
+DEBUG: received command from node 17: sendheaders
+DEBUG: received command from node 17: sendcmpct
+DEBUG: received command from node 17: ping
+DEBUG: sending message to node 17: pong
+DEBUG: received command from node 17: addr
+DEBUG: received command from node 17: feefilter
+DEBUG: received command from node 9: sendheaders
+DEBUG: received command from node 9: sendcmpct
+DEBUG: received command from node 9: ping
+DEBUG: sending message to node 9: pong
+DEBUG: received command from node 9: addr
+DEBUG: received command from node 9: feefilter
+DEBUG: received command from node 6: sendheaders
+DEBUG: received command from node 6: sendcmpct
+DEBUG: received command from node 6: ping
+DEBUG: sending message to node 6: pong
+DEBUG: received command from node 6: addr
+DEBUG: received command from node 6: feefilter
+DEBUG: received command from node 5: sendheaders
+DEBUG: received command from node 5: sendcmpct
+DEBUG: received command from node 5: ping
+DEBUG: sending message to node 5: pong
+DEBUG: received command from node 5: addr
+DEBUG: received command from node 5: feefilter
+DEBUG: received command from node 23: sendheaders
+DEBUG: received command from node 23: sendcmpct
+DEBUG: received command from node 23: ping
+DEBUG: sending message to node 23: pong
+DEBUG: received command from node 23: addr
+DEBUG: received command from node 23: feefilter
+DEBUG: received command from node 16: sendheaders
+DEBUG: received command from node 16: sendcmpct
+DEBUG: received command from node 16: ping
+DEBUG: sending message to node 16: pong
+DEBUG: received command from node 16: addr
+DEBUG: received command from node 16: feefilter
+DEBUG: received command from node 21: sendheaders
+DEBUG: received command from node 21: sendcmpct
+DEBUG: received command from node 21: ping
+DEBUG: sending message to node 21: pong
+DEBUG: received command from node 21: addr
+DEBUG: received command from node 21: feefilter
+DEBUG: received command from node 10: sendheaders
+DEBUG: received command from node 10: sendcmpct
+DEBUG: received command from node 10: ping
+DEBUG: sending message to node 10: pong
+DEBUG: received command from node 10: addr
+DEBUG: received command from node 10: feefilter
+DEBUG: received command from node 20: sendheaders
+DEBUG: received command from node 20: sendcmpct
+DEBUG: received command from node 20: ping
+DEBUG: sending message to node 20: pong
+DEBUG: received command from node 20: addr
+DEBUG: received command from node 20: feefilter
+DEBUG: received command from node 18: version
+DEBUG: Connected to node 18: /Shibetoshi:1.14.9/ (6171121)
+DEBUG: sending message to node 18: verack
+DEBUG: received command from node 18: verack
+Successfully connected to peer 18 (54.151.251.144)
+DEBUG: received command from node 22: sendheaders
+DEBUG: received command from node 22: sendcmpct
+DEBUG: received command from node 22: ping
+DEBUG: sending message to node 22: pong
+DEBUG: received command from node 22: addr
+DEBUG: received command from node 2: sendheaders
+DEBUG: received command from node 2: sendcmpct
+DEBUG: received command from node 2: ping
+DEBUG: sending message to node 2: pong
+DEBUG: received command from node 2: addr
+DEBUG: received command from node 2: feefilter
+DEBUG: received command from node 18: sendheaders
+DEBUG: received command from node 18: sendcmpct
+DEBUG: received command from node 18: ping
+DEBUG: sending message to node 18: pong
+DEBUG: received command from node 18: addr
+DEBUG: received command from node 18: feefilter
+DEBUG: received command from node 22: inv
+DEBUG: received command from node 7: getdata
+DEBUG: sending message to node 7: tx
+tx successfully sent to node 7
+DEBUG: received command from node 12: getdata
+DEBUG: sending message to node 12: tx
+tx successfully sent to node 12
+DEBUG: received command from node 13: getdata
+DEBUG: sending message to node 13: tx
+tx successfully sent to node 13
+DEBUG: received command from node 11: getdata
+DEBUG: sending message to node 11: tx
+tx successfully sent to node 11
+DEBUG: received command from node 1: getdata
+DEBUG: sending message to node 1: tx
+tx successfully sent to node 1
+DEBUG: received command from node 14: getdata
+DEBUG: sending message to node 14: tx
+tx successfully sent to node 14
+DEBUG: received command from node 13: inv
+DEBUG: received command from node 3: getdata
+DEBUG: sending message to node 3: tx
+tx successfully sent to node 3
+DEBUG: received command from node 9: getdata
+DEBUG: sending message to node 9: tx
+tx successfully sent to node 9
+DEBUG: received command from node 24: getdata
+DEBUG: sending message to node 24: tx
+tx successfully sent to node 24
+DEBUG: received command from node 19: getdata
+DEBUG: sending message to node 19: tx
+tx successfully sent to node 19
+DEBUG: received command from node 8: getdata
+DEBUG: sending message to node 8: tx
+tx successfully sent to node 8
+DEBUG: received command from node 25: getdata
+DEBUG: sending message to node 25: tx
+tx successfully sent to node 25
+DEBUG: received command from node 6: getdata
+DEBUG: sending message to node 6: tx
+tx successfully sent to node 6
+DEBUG: received command from node 4: getdata
+DEBUG: sending message to node 4: tx
+tx successfully sent to node 4
+DEBUG: received command from node 17: getdata
+DEBUG: sending message to node 17: tx
+tx successfully sent to node 17
+DEBUG: received command from node 15: getdata
+DEBUG: sending message to node 15: tx
+tx successfully sent to node 15
+DEBUG: received command from node 17: inv
+DEBUG: received command from node 15: inv
+DEBUG: received command from node 7: inv
+DEBUG: timer node 1, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 1
+DEBUG: timer node 3, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 3
+DEBUG: timer node 7, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 7
+DEBUG: timer node 6, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 6
+DEBUG: timer node 13, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 13
+DEBUG: timer node 12, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 12
+DEBUG: timer node 2, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 2: ping
+DEBUG: timer node 5, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 5: ping
+DEBUG: timer node 11, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 11
+DEBUG: timer node 10, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 10: ping
+DEBUG: timer node 4, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 4
+DEBUG: timer node 9, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 9
+DEBUG: timer node 8, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 8
+DEBUG: timer node 24, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 24
+DEBUG: timer node 21, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 21: ping
+DEBUG: timer node 25, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 25
+DEBUG: timer node 22, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 22: ping
+DEBUG: timer node 23, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 23: ping
+DEBUG: timer node 20, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 20: ping
+DEBUG: timer node 19, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 19
+DEBUG: timer node 17, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 17
+DEBUG: timer node 16, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 16: ping
+DEBUG: timer node 14, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 14
+DEBUG: timer node 18, delta: 3 secs (timeout is: 30)
+DEBUG: sending message to node 18: ping
+DEBUG: timer node 15, delta: 3 secs (timeout is: 30)
+DEBUG: Disconnect node 15
+DEBUG: received command from node 5: pong
+DEBUG: received command from node 23: pong
+DEBUG: received command from node 21: pong
+DEBUG: received command from node 16: pong
+DEBUG: received command from node 10: pong
+DEBUG: received command from node 20: pong
+DEBUG: received command from node 22: pong
+DEBUG: received command from node 2: pong
+DEBUG: received command from node 18: pong
+DEBUG: received command from node 21: inv
+DEBUG: received command from node 10: inv
+DEBUG: received command from node 20: inv
+DEBUG: received command from node 18: inv
+DEBUG: received command from node 2: inv
+DEBUG: received command from node 5: inv
+DEBUG: timer node 2, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 5, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 18, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 23, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 16, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 6 secs (timeout is: 30)
+DEBUG: timer node 21, delta: 6 secs (timeout is: 30)
+DEBUG: received command from node 22: inv
+DEBUG: received command from node 16: inv
+DEBUG: received command from node 10: inv
+DEBUG: received command from node 21: inv
+DEBUG: received command from node 2: inv
+DEBUG: received command from node 20: inv
+DEBUG: timer node 10, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 5, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 16, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 23, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 18, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 21, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 9 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 5, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 18, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 23, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 16, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 12 secs (timeout is: 30)
+DEBUG: timer node 21, delta: 12 secs (timeout is: 30)
+DEBUG: received command from node 5: inv
+DEBUG: timer node 10, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 5, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 16, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 23, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 18, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 21, delta: 15 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 15 secs (timeout is: 30)
+DEBUG: received command from node 22: inv
+DEBUG: received command from node 18: inv
+DEBUG: received command from node 22: inv
+DEBUG: received command from node 22: inv
+DEBUG: received command from node 21: inv
+DEBUG: received command from node 5: inv
+DEBUG: timer node 10, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 5, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 18, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 23, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 16, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 18 secs (timeout is: 30)
+DEBUG: timer node 21, delta: 18 secs (timeout is: 30)
+DEBUG: received command from node 23: inv
+DEBUG: received command from node 21: addr
+DEBUG: received command from node 2: inv
+DEBUG: received command from node 20: inv
+DEBUG: received command from node 18: inv
+DEBUG: timer node 10, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 5, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 16, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 23, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 18, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 21, delta: 21 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 21 secs (timeout is: 30)
+DEBUG: received command from node 10: inv
+DEBUG: timer node 10, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 5, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 18, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 23, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 16, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 24 secs (timeout is: 30)
+DEBUG: timer node 21, delta: 24 secs (timeout is: 30)
+DEBUG: received command from node 16: inv
+DEBUG: timer node 10, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 5, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 16, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 23, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 18, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 21, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 27 secs (timeout is: 30)
+DEBUG: timer node 10, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 2, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 5, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 20, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 18, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 23, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 16, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 22, delta: 30 secs (timeout is: 30)
+DEBUG: timer node 21, delta: 30 secs (timeout is: 30)
+DEBUG: received command from node 22: inv
+DEBUG: received command from node 22: inv
+DEBUG: received command from node 2: inv
+DEBUG: received command from node 21: inv
+DEBUG: received command from node 23: inv
+DEBUG: timer node 10, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 10
+DEBUG: timer node 5, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 5
+DEBUG: timer node 2, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 2
+DEBUG: timer node 16, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 16
+DEBUG: timer node 23, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 23
+DEBUG: timer node 18, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 18
+DEBUG: timer node 20, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 20
+DEBUG: timer node 21, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 21
+DEBUG: timer node 22, delta: 33 secs (timeout is: 30)
+DEBUG: Disconnect node 22
+
+
+Result:
+=============
+Max nodes to connect to: 16
+Successfully connected to nodes: 25
+Informed nodes: 16
+Requested from nodes: 16
+Seen on other nodes: 0
+
+sendtx-note: The transaction was not relayed back. Your transaction is very likely invalid (or was already broadcasted and picked up by an invalid node)
+----- sendtx TX_R attempt=1 exit=0 -----
+[0;32m[SUCCESS][0m TX_R broadcast accepted on attempt 1: 21d9287cf087027e60b7aef0a047f732c93b619dfdebffde4472568b95d9470c
+[0;32m[SUCCESS][0m TX_R broadcast accepted/known: 21d9287cf087027e60b7aef0a047f732c93b619dfdebffde4472568b95d9470c
+CHAINED_UTXO
+chained_utxo_txid=130169cc6221749f586e88217bc70e648f2d167abd0e924a51e959a0484ce2e8
+chained_utxo_vout=0
+chained_utxo_value_koinu=4093900000
+chained_utxo_script_pubkey=76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+[0;34m[INFO][0m Step 7: Monitoring with SPV node...
+
+After broadcasting your transaction, monitor it with block scan mode:
+
+  # -l no prompt, -c continuous, -d debug, -x smpv, -p checkpoint, -a address
+  ./spvnode  -l -c -d -x -p -a "DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr" scan
+
+Then switch to full block scan mode (or use -b directly):
+
+  ./spvnode  -l -c -d -x -p -b -a "DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr" scan
+
+The SPV node will:
+  - Sync mainnet blockchain headers
+  - Track wallet activity for: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  - Download and scan blocks in full mode
+  - Detect Falcon commitments
+  - Log: [falcon-commit] Valid at height=X txpos=Y commit=90a88f71437bc0534f58beec47f22bc7c4edf0d1d1090c3264e36b2aae8cd0af
+
+[0;34m[INFO][0m SPV sync may take time. Be patient!
+[0;34m[INFO][0m SPV watching addresses: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q
+[0;34m[INFO][0m Running spvnode scan with REST monitoring until txid and carrier_scriptsig commitment validation are both confirmed...
+DEBUG: [oqs] falcon_512=enabled falcon_1024=enabled ml_dsa_44=enabled raccoon_g_44=enabled (liboqs)
+HTTP server initialized on port 18983
+DEBUG: HTTP server initialized
+DEBUG: [smpv] enabled
+[smpv] enabled via CLI flag
+address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+address: DKHz8ef9Kkvj6DGL971PBSipB8Hk1Zr3sf
+Filtered block mode disabled (use -g/--filtered_blocks to enable)
+
+Connected 0 headers, now at height: 0
+done
+Discover peers...
+Connecting to the p2p network...
+DEBUG: Trying to connect to 1...
+DEBUG: Trying to connect to 2...
+DEBUG: Trying to connect to 3...
+DEBUG: Trying to connect to 4...
+DEBUG: Trying to connect to 5...
+DEBUG: Trying to connect to 6...
+DEBUG: Trying to connect to 7...
+DEBUG: Trying to connect to 8...
+DEBUG: Trying to connect to 9...
+DEBUG: Trying to connect to 10...
+DEBUG: Trying to connect to 11...
+DEBUG: Trying to connect to 12...
+DEBUG: Trying to connect to 13...
+DEBUG: Trying to connect to 14...
+DEBUG: Trying to connect to 15...
+DEBUG: Trying to connect to 16...
+DEBUG: Trying to connect to 17...
+DEBUG: Trying to connect to 18...
+DEBUG: Trying to connect to 19...
+DEBUG: Trying to connect to 20...
+DEBUG: Trying to connect to 21...
+DEBUG: Trying to connect to 22...
+DEBUG: Trying to connect to 23...
+DEBUG: Trying to connect to 24...
+DEBUG: Trying to connect to 25...
+DEBUG: Event callback on node 1
+DEBUG: Successful connected to node 1.
+DEBUG: check if more nodes are required (connected to already: 25): false
+DEBUG: sending message to node 1: version
+DEBUG: Connected nodes: 1
+DEBUG: Event callback on node 12
+DEBUG: Successful connected to node 12.
+DEBUG: check if more nodes are required (connected to already: 25): false
+DEBUG: sending message to node 12: version
+DEBUG: Connected nodes: 2
+DEBUG: Event callback on node 21
+DEBUG: Successful connected to node 21.
+DEBUG: check if more nodes are required (connected to already: 25): false
+DEBUG: sending message to node 21: version
+DEBUG: Connected nodes: 3
