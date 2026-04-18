@@ -195,6 +195,19 @@ static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
    for cross-TX carrier validation (TX_C has OP_RETURN, TX_R has scriptSig). */
 #define SPV_PQC_PENDING_MAX 16
 
+/* P2PKH scriptSig length bounds for PQC sighash derivation.
+   A valid P2PKH scriptSig is: <push DER_sig+hashtype> <push compressed_pubkey>
+   Min: 1 (push opcode) + 71 (min DER sig + hashtype) + 1 (push opcode) + 33 (pubkey) = 106
+   Max: 1 + 73 + 1 + 33 = 108, but allow up to 180 for safety margin. */
+#define SPV_MIN_P2PKH_SCRIPTSIG_LEN 106
+#define SPV_MAX_P2PKH_SCRIPTSIG_LEN 180
+
+/* DER signature push length bounds (includes 1-byte sighash type).
+   Min: 8 (shortest valid DER) + 1 (hashtype) = 9.
+   Max: 72 (longest valid DER) + 1 (hashtype) = 73. */
+#define SPV_MIN_DER_SIG_PUSH_LEN 9
+#define SPV_MAX_DER_SIG_PUSH_LEN 73
+
 typedef enum {
     SPV_PQC_FALCON,
     SPV_PQC_DILITHIUM,
@@ -1328,21 +1341,17 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                         dogecoin_bool sig_verified = false;
                                         if (tx_base->vin->len > 0) {
                                             dogecoin_tx_in* first_in = vector_idx(txc->vin, 0);
-                                            /* A valid P2PKH scriptSig is: <DER_sig+hashtype> <compressed_pubkey>
-                                               DER sig push = 71-73 bytes + push opcode (1 byte)
-                                               Compressed pubkey push = 33 bytes + push opcode (1 byte)
-                                               Minimum total: 1 + 71 + 1 + 33 = 106 bytes (typical ~107-108) */
-                                            if (first_in->script_sig && first_in->script_sig->len >= 106 &&
-                                                first_in->script_sig->len <= 180) {
+                                            /* Validate P2PKH scriptSig bounds (see SPV_MIN/MAX_P2PKH_SCRIPTSIG_LEN) */
+                                            if (first_in->script_sig && first_in->script_sig->len >= SPV_MIN_P2PKH_SCRIPTSIG_LEN &&
+                                                first_in->script_sig->len <= SPV_MAX_P2PKH_SCRIPTSIG_LEN) {
                                                 const uint8_t* ss = (const uint8_t*)first_in->script_sig->str;
                                                 size_t sslen = first_in->script_sig->len;
                                                 /* Parse: first push is DER sig+hashtype, second push is compressed pubkey (33 bytes) */
                                                 size_t pos = 0;
                                                 uint8_t sig_push_len = ss[pos++];
-                                                /* Standard DER sig + 1-byte hashtype: 9..73 bytes.
-                                                   Reject OP_PUSHDATA1/2/4 (0x4c-0x4e) — DER sigs are always < 76 bytes
+                                                /* Reject OP_PUSHDATA1/2/4 (0x4c-0x4e) — DER sigs are always < 76 bytes
                                                    so the push opcode is always a direct 1-byte length. */
-                                                if (sig_push_len < 9 || sig_push_len > 73) {
+                                                if (sig_push_len < SPV_MIN_DER_SIG_PUSH_LEN || sig_push_len > SPV_MAX_DER_SIG_PUSH_LEN) {
                                                     /* Not a standard P2PKH DER signature push; skip. */
                                                     goto pqc_verify_done;
                                                 }
