@@ -145,7 +145,7 @@ signature = PQ_SIGN(secret_key, message32)
 commitment32 = SHA256(public_key_bytes || signature_bytes)
 </source>
 
-Where TX_BASE is the base transaction template used for signing, before the OP_RETURN commitment output is appended (to avoid circular dependency).
+Where TX_BASE is the base transaction template used for signing, before the OP_RETURN commitment output and any P2SH carrier outputs are appended (to avoid circular dependency). In carrier mode, the carrier cost is deducted from the first output during TX_C construction; verifiers must reverse this adjustment when reconstructing TX_BASE from TX_C.
 
 ====Phase 1: P2SH Carrier Outputs in TX_C====
 
@@ -199,7 +199,7 @@ Given TX_R:
 # Parse each carrier spend input scriptSig, extract (TAG8,HDR8,CHUNKS), reconstruct FULL by ordering parts.
 # Split FULL into pk and sig using pk_len.
 # Recompute commitment32 = SHA256(pk || sig) and match it against TX_C canonical tagged OP_RETURN.
-# Compute message32 = dogecoin_tx_sighash32(TX_BASE, ...) per this proposal and verify PQ signature over message32.
+# Compute message32 = dogecoin_tx_sighash32(TX_BASE, ...) per this proposal and verify PQ signature over message32. TX_BASE is reconstructed from TX_C by removing the OP_RETURN commitment output and all P2SH carrier outputs, then restoring the total carrier value to the first output.
 
 This yields a fully on-chain verifiable Phase 1 proof without SegWit, and without non-standard extra pushes in a P2PKH spending input.
 

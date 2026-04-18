@@ -1,5 +1,5 @@
 # Mainnet PQC End-to-End Test Log
-# Date: 2026-04-17
+# Date: 2026-04-18
 # Algorithms: Dilithium2, Raccoon-G-44
 # Build: --enable-liboqs-raccoon (Raccoon fork v0.0.3, depends LIBOQS_RACCOON=y)
 # spvnode command: ./spvnode -l -f 0 -d -p -q -b scan
@@ -14,11 +14,11 @@ Available checkpoints (29 total):
 Selected checkpoint height 6169760
 DEBUG: [dilithium-commit] Pending at height=6169765 txpos=52 commit=6ea0fa35664c6fd745169c846038285a8087fb5e8abc09f3dd7a736740a730ba source=op_return
 DEBUG: [dilithium-commit] Valid at height=6169765 txpos=117 commit=6ea0fa35664c6fd745169c846038285a8087fb5e8abc09f3dd7a736740a730ba carrier_vin=0 source=carrier_scriptsig matched_txc_txpos=52 pk_len=1312 sig_len=2420 pk_prefix=c9d1ad48e5334f72c15a6e1c8132a7f4 sig_prefix=7399a2580b74134de63e9604219abc79
-DEBUG: [dilithium-commit] PQC signature verification FAILED at height=6169765 txpos=117 sighash=081d6df5256fb2ea7d22e14e1a09b7f5d8ae2f22832930123a8d6ef7d41e3ebf
+DEBUG: [dilithium-commit] PQC signature verification FAILED at height=6169765 txpos=117 sighash=7b86da21be7a96576d45c24acf8eb8297422162dccf4c2a275d4ef3638d17f1b
 DEBUG: [raccoong-commit] Pending at height=6169772 txpos=86 commit=7d24c5af92e15fd55e27664c68b46104d0c044346a3771b4582cfa3728813670 source=op_return
 DEBUG: [raccoong-commit] Valid at height=6169772 txpos=93 commit=7d24c5af92e15fd55e27664c68b46104d0c044346a3771b4582cfa3728813670 carrier_vin=0 source=carrier_scriptsig matched_txc_txpos=86 pk_len=16144 sig_len=20768 pk_prefix=a5c0b842401e8b3f49d3b56af0935d1f sig_prefix=ef74aed43ce2cea09adaec1315bbb61b
-DEBUG: [raccoong-commit] PQC signature verification FAILED at height=6169772 txpos=93 sighash=af7b8854a994e44956c162caa87f9fc41bc5283fe23b150ed65722294703d4ec
-Sync completed, at height 6170039
+DEBUG: [raccoong-commit] PQC signature verification FAILED at height=6169772 txpos=93 sighash=53daa3779243fb2408e6069c9339cf658e35307c40a460ef43ca66f82e986a4c
+Sync completed, at height 6170141
 
 ## Test Results:
 
@@ -26,19 +26,30 @@ Sync completed, at height 6170039
 #   - OP_RETURN commitment detection: PASS (height=6169765, txpos=52, tag=DIL2)
 #   - Multi-part carrier extraction (3 parts): PASS (pk_len=1312, sig_len=2420)
 #   - Commitment validation SHA256(pk||sig)==OP_RETURN: PASS (matched txpos=52)
-#   - PQC signature verification over TX_C-minus-OP_RETURN sighash: FAILED
-#     TX_C has 2 inputs, 6 outputs (2 P2PKH + 1 OP_RETURN + 3 P2SH carriers).
-#     tx_base = TX_C with OP_RETURN stripped (5 outputs remaining).
-#     Sighash=081d6df5256fb2ea7d22e14e1a09b7f5d8ae2f22832930123a8d6ef7d41e3ebf
-#     The on-chain transactions were signed before the TX_C-minus-OP_RETURN sighash
-#     protocol was adopted. New transactions using the updated signing flow will verify.
+#   - TX_BASE reconstruction (strip OP_RETURN + 3 P2SH carriers, restore carrier cost): PASS
+#   - Sighash cross-check: SPV sighash matches `such -c tx_sighash32` output exactly
+#   - PQC signature verification: FAILED (expected — see root cause below)
 
 # Raccoon-G-44 (TX_C c6fe73aede0316cb1ee4151286281a35fbe14f8fab7751e91bfc3aec1423100e):
 #   - OP_RETURN commitment detection: PASS (height=6169772, txpos=86, tag=RCG4)
 #   - Multi-part carrier extraction (24 parts): PASS (pk_len=16144, sig_len=20768)
 #   - Commitment validation SHA256(pk||sig)==OP_RETURN: PASS (matched txpos=86)
-#   - PQC signature verification over TX_C-minus-OP_RETURN sighash: FAILED
-#     TX_C has 3 inputs, 27 outputs (2 P2PKH + 1 OP_RETURN + 24 P2SH carriers).
-#     tx_base = TX_C with OP_RETURN stripped (26 outputs remaining).
-#     Sighash=af7b8854a994e44956c162caa87f9fc41bc5283fe23b150ed65722294703d4ec
-#     Same note as above.
+#   - TX_BASE reconstruction (strip OP_RETURN + 24 P2SH carriers, restore carrier cost): PASS
+#   - Sighash cross-check: SPV sighash matches `such -c tx_sighash32` output exactly
+#   - PQC signature verification: FAILED (expected — see root cause below)
+
+## Root Cause Analysis:
+#
+# The on-chain transactions were produced by edtubbs/dogecoin branch
+# copilot/add-pqc-implementation. That implementation's GUI (sendcoinsdialog.cpp)
+# signs a CUSTOM domain-separated digest instead of sighash32(TX_BASE):
+#
+#   message = SHA256("DGC-PQC-SIG-V1|" + algorithm + "|" + pubkey_hex + "|"
+#                    + address + "|" + amount + "|" + subtractFee + ";")
+#
+# This does NOT match the BIP spec which requires:
+#   message32 = dogecoin_tx_sighash32(TX_BASE, scriptPubKey, input_index, hash_type)
+#
+# The libdogecoin SPV verification correctly reconstructs TX_BASE per the spec.
+# The fix must be applied in the dogecoin node's PQC implementation to sign
+# sighash32(TX_BASE) instead of the custom digest.
