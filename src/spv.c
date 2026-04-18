@@ -1280,6 +1280,21 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                             }
                                             vector_add(tx_base->vin, copy);
                                         }
+                                        /* Precompute the canonical carrier P2SH scriptPubKey so we
+                                           match only real carrier outputs, not arbitrary P2SH payments.
+                                           redeemScript = OP_DROP OP_DROP OP_DROP OP_DROP OP_DROP OP_TRUE */
+                                        uint8_t carrier_redeem[6] = {0x75, 0x75, 0x75, 0x75, 0x75, 0x51};
+                                        uint8_t carrier_sha[32];
+                                        sha256_raw(carrier_redeem, sizeof(carrier_redeem), carrier_sha);
+                                        uint8_t carrier_h160[20];
+                                        rmd160(carrier_sha, sizeof(carrier_sha), carrier_h160);
+                                        /* OP_HASH160 PUSH20 <hash> OP_EQUAL */
+                                        uint8_t carrier_spk[23];
+                                        carrier_spk[0]  = 0xa9; /* OP_HASH160 */
+                                        carrier_spk[1]  = 0x14; /* PUSH 20 bytes */
+                                        memcpy(carrier_spk + 2, carrier_h160, 20);
+                                        carrier_spk[22] = 0x87; /* OP_EQUAL */
+
                                         uint64_t carrier_total = 0;
                                         for (size_t vo = 0; vo < txc->vout->len; vo++) {
                                             dogecoin_tx_out* orig = vector_idx(txc->vout, vo);
@@ -1288,9 +1303,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                 (uint8_t)orig->script_pubkey->str[0] == 0x6a) {
                                                 continue;
                                             }
-                                            /* Skip P2SH carrier outputs (OP_HASH160 prefix 0xa9, 23-byte script) */
+                                            /* Skip P2SH carrier outputs — exact match against the
+                                               canonical carrier scriptPubKey only, so legitimate
+                                               P2SH payments are never misidentified as carriers. */
                                             if (orig->script_pubkey && orig->script_pubkey->len == 23 &&
-                                                (uint8_t)orig->script_pubkey->str[0] == 0xa9) {
+                                                memcmp(orig->script_pubkey->str, carrier_spk, 23) == 0) {
                                                 carrier_total += orig->value;
                                                 continue;
                                             }
@@ -1336,11 +1353,15 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                         cstr_append_buf(spk, hash160, 20);
                                                         cstr_append_buf(spk, p2pkh_suffix, 2);
 
+                                                        /* Compute sighash32 using exactly the same
+                                                           dogecoin_tx_sighash() path that secp256k1
+                                                           uses to sign P2PKH inputs — the PQC
+                                                           signature covers the identical digest. */
                                                         uint8_t sighash[32];
-                                                        if (dogecoin_tx_sighash32(tx_base, spk, 0, 1, sighash)) {
+                                                        if (dogecoin_tx_sighash32(tx_base, spk, 0, SIGHASH_ALL, sighash)) {
                                                             char sighash_hex[65];
                                                             utils_bin_to_hex(sighash, 32, sighash_hex);
-                                                            /* Verify PQC signature over sighash */
+                                                            /* Verify PQC signature over the same sighash */
                                                             if (carrier_algo == SPV_PQC_FALCON)
                                                                 sig_verified = dogecoin_falcon512_verify(carrier_pk, carrier_pk_len, sighash, 32, carrier_sig, carrier_sig_len);
                                                             else if (carrier_algo == SPV_PQC_DILITHIUM)
