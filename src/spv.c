@@ -1328,17 +1328,31 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                         dogecoin_bool sig_verified = false;
                                         if (tx_base->vin->len > 0) {
                                             dogecoin_tx_in* first_in = vector_idx(txc->vin, 0);
-                                            if (first_in->script_sig && first_in->script_sig->len > 35) {
+                                            /* A valid P2PKH scriptSig is: <DER_sig+hashtype> <compressed_pubkey>
+                                               DER sig push = 71-73 bytes + push opcode (1 byte)
+                                               Compressed pubkey push = 33 bytes + push opcode (1 byte)
+                                               Minimum total: 1 + 71 + 1 + 33 = 106 bytes (typical ~107-108) */
+                                            if (first_in->script_sig && first_in->script_sig->len >= 106 &&
+                                                first_in->script_sig->len <= 180) {
                                                 const uint8_t* ss = (const uint8_t*)first_in->script_sig->str;
                                                 size_t sslen = first_in->script_sig->len;
-                                                /* Parse: first push is DER sig, second push is compressed pubkey (33 bytes) */
+                                                /* Parse: first push is DER sig+hashtype, second push is compressed pubkey (33 bytes) */
                                                 size_t pos = 0;
                                                 uint8_t sig_push_len = ss[pos++];
-                                                if (sig_push_len < 0x4c) pos += sig_push_len;
-                                                else if (sig_push_len == 0x4c) { pos += 1 + ss[pos]; }
-                                                if (pos < sslen) {
-                                                    uint8_t pk_push_len = ss[pos++];
-                                                    if (pk_push_len == 33 && pos + 33 <= sslen) {
+                                                /* Standard DER sig + 1-byte hashtype: 9..73 bytes.
+                                                   Reject OP_PUSHDATA1/2/4 (0x4c-0x4e) — DER sigs are always < 76 bytes
+                                                   so the push opcode is always a direct 1-byte length. */
+                                                if (sig_push_len < 9 || sig_push_len > 73) {
+                                                    /* Not a standard P2PKH DER signature push; skip. */
+                                                    goto pqc_verify_done;
+                                                }
+                                                if (pos + sig_push_len > sslen) goto pqc_verify_done;
+                                                /* Validate DER envelope: must start with 0x30 (SEQUENCE) */
+                                                if (ss[pos] != 0x30) goto pqc_verify_done;
+                                                pos += sig_push_len;
+                                                if (pos >= sslen) goto pqc_verify_done;
+                                                uint8_t pk_push_len = ss[pos++];
+                                                if (pk_push_len == 33 && pos + 33 <= sslen) {
                                                         const uint8_t* ecdsa_pk = ss + pos;
                                                         /* Compute HASH160 of the pubkey (SHA256 + RIPEMD160) */
                                                         uint8_t sha_out[32];
@@ -1378,7 +1392,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                         }
                                                         cstr_free(spk, true);
                                                     }
-                                                }
+                                                pqc_verify_done: ;
                                             }
                                         }
                                         dogecoin_tx_free(tx_base);

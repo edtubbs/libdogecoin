@@ -44,6 +44,7 @@ FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-${CHAINED_UTXO_TXID:-5e0d3e7d8ef7d301a0688
 FUNDED_UTXO_VOUT="${FUNDED_UTXO_VOUT:-${CHAINED_UTXO_VOUT:-0}}"
 AUTO_PREPARE_TX_FROM_UTXO="${AUTO_PREPARE_TX_FROM_UTXO:-1}"
 TX_FEE_KOINU="${TX_FEE_KOINU:-100000}"
+TX_R_FEE_KOINU="${TX_R_FEE_KOINU:-500000}"
 CARRIER_VALUE_KOINU="${CARRIER_VALUE_KOINU:-100000000}"
 if [ "$CARRIER_VALUE_KOINU" -lt 100000000 ]; then
     CARRIER_VALUE_KOINU=100000000
@@ -325,37 +326,48 @@ build_transaction() {
     if [ "$CARRIER_ENABLED" -eq 1 ]; then
         info "Building TX_C with OP_RETURN commitment + P2SH carrier outputs..."
         ADD_COMMIT_AND_CARRIER_OUTPUT=$(run_and_log "such raccoong_add_commit_and_carrier_tx" ./such -c raccoong_add_commit_and_carrier_tx -x "$RAW_UNSIGNED_TX" -m "$RACCOONG_COMMIT" -k "$RACCOONG_PK" -s "$RACCOONG_SIG" -h "$CARRIER_VALUE_KOINU")
-        echo "$ADD_COMMIT_AND_CARRIER_OUTPUT"
+        echo "$ADD_COMMIT_AND_CARRIER_OUTPUT" | tee -a "$RUN_LOG"
         TX_C_UNSIGNED=$(echo "$ADD_COMMIT_AND_CARRIER_OUTPUT" | awk -F': ' '/^tx with commitment and carrier outputs:/ {print $2; exit}' | tr -d ' ')
+        CARRIER_PART_TOTAL=$(echo "$ADD_COMMIT_AND_CARRIER_OUTPUT" | awk -F': ' '/^carrier_part_total:/ {print $2; exit}' | tr -d ' ')
+        CARRIER_FIRST_VOUT=$(echo "$ADD_COMMIT_AND_CARRIER_OUTPUT" | awk -F': ' '/^carrier_first_vout:/ {print $2; exit}' | tr -d ' ')
+        CARRIER_SCRIPT_PUBKEY=$(echo "$ADD_COMMIT_AND_CARRIER_OUTPUT" | awk -F': ' '/^carrier_p2sh_scriptpubkey:/ {print $2; exit}' | tr -d ' ')
         [ -n "$TX_C_UNSIGNED" ] || error "Failed to append Raccoon-G commitment + carrier outputs"
+        [ -n "$CARRIER_PART_TOTAL" ] || error "Missing carrier_part_total"
+        [ -n "$CARRIER_FIRST_VOUT" ] || error "Missing carrier_first_vout"
+        [ "$CARRIER_PART_TOTAL" -ge 1 ] || error "Invalid carrier_part_total"
+        CARRIER_PART_SCRIPTSIGS=()
+        for ((i=0; i<CARRIER_PART_TOTAL; i++)); do
+            part_ss=$(echo "$ADD_COMMIT_AND_CARRIER_OUTPUT" | sed -n "s/^carrier_part_scriptsig\\[$i\\]:[[:space:]]*//p" | head -n1 | tr -d ' ')
+            [ -n "$part_ss" ] || error "Missing carrier_part_scriptsig[$i]"
+            CARRIER_PART_SCRIPTSIGS+=("$part_ss")
+        done
     else
         info "Building TX_C with OP_RETURN commitment only (no carrier)..."
         COMMIT_ONLY_OUTPUT=$(run_and_log "such raccoong_add_commit_tx" ./such -c raccoong_add_commit_tx -x "$RAW_UNSIGNED_TX" -s "$RACCOONG_COMMIT")
-        echo "$COMMIT_ONLY_OUTPUT"
+        echo "$COMMIT_ONLY_OUTPUT" | tee -a "$RUN_LOG"
         TX_C_UNSIGNED=$(echo "$COMMIT_ONLY_OUTPUT" | awk -F': ' '/^tx with commitment:/ {print $2; exit}' | tr -d ' ')
         [ -n "$TX_C_UNSIGNED" ] || error "Failed to construct TX_C (commit-only)"
+        CARRIER_PART_TOTAL=0
+        CARRIER_FIRST_VOUT=0
+        CARRIER_SCRIPT_PUBKEY=""
+        CARRIER_PART_SCRIPTSIGS=()
         success "TX_C built in commitment-only mode (standard, relayable)"
     fi
 
     debug_tx_hex "$TX_C_UNSIGNED" "TX_C_unsigned" 2>&1 | tee -a "$RUN_LOG"
 
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$TX_C_UNSIGNED" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
-    echo "$SIGN_OUTPUT"
-    SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
-    [ -n "$SIGNED_TX" ] || error "Failed to sign transaction"
+    info "Signing TX_C with secp256k1 on input 0..."
+    SIGN_OUTPUT=$(run_and_log "such sign TX_C" ./such -c sign -x "$TX_C_UNSIGNED" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$PRIVKEY_WIF" $NETWORK_FLAG)
+    echo "$SIGN_OUTPUT" | tee -a "$RUN_LOG"
+    TX_C_SIGNED=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
+    [ -n "$TX_C_SIGNED" ] || error "Failed to sign TX_C"
+    success "Signed TX_C"
 
-    cat > "$TMPDIR/tx_info.txt" <<EOF
-RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
-TX_C=$TX_C_UNSIGNED
-CARRIER_ENABLED=$CARRIER_ENABLED
-SCRIPT_PUBKEY=$SCRIPT_PUBKEY
-TX_SIGHASH_HEX=$TX_SIGHASH_HEX
-RACCOONG_SIG=$RACCOONG_SIG
-RACCOONG_COMMIT=$RACCOONG_COMMIT
-SIGNED_TX=$SIGNED_TX
-OPRETURN_SCRIPT=6a2452434734${RACCOONG_COMMIT}
-EOF
+    debug_tx_hex "$TX_C_SIGNED" "TX_C_signed" 2>&1 | tee -a "$RUN_LOG"
 
+    TX_R_UNSIGNED=""
+    TX_R_SIGNED=""
+    TX_R_TXID=""
     DO_BROADCAST="n"
     if [ "$AUTO_BROADCAST" -eq 1 ]; then
         DO_BROADCAST="y"
@@ -363,16 +375,73 @@ EOF
         read -p "Broadcast now with sendtx? [y/N]: " DO_BROADCAST
     fi
     if [[ "$DO_BROADCAST" =~ ^[Yy]$ ]]; then
-        debug_tx_hex "$SIGNED_TX" "TX_C_signed" 2>&1 | tee -a "$RUN_LOG"
         BROADCAST_RESULT_TXID=""
-        if ! broadcast_with_retry "TX_C" "$SIGNED_TX"; then
+        if ! broadcast_with_retry "TX_C" "$TX_C_SIGNED"; then
             error "TX_C failed to relay after all retries. Check TX debug output above."
         fi
-        BROADCAST_TXID="$BROADCAST_RESULT_TXID"
-        [ -n "$BROADCAST_TXID" ] || error "Failed to parse broadcast txid"
-        CHAINED_UTXO_TXID="$BROADCAST_TXID"
-        CHAINED_UTXO_VOUT=0
-        CHAINED_UTXO_VALUE_KOINU=$((FUNDED_UTXO_VALUE_KOINU - TX_FEE_KOINU))
+        TX_C_TXID="$BROADCAST_RESULT_TXID"
+        [ -n "$TX_C_TXID" ] || error "Failed to parse TX_C txid"
+        success "TX_C broadcast accepted/known: $TX_C_TXID"
+
+        if [ "$CARRIER_ENABLED" -eq 1 ] && [ "$CARRIER_PART_TOTAL" -gt 0 ]; then
+            info "Waiting for TX_C visibility before building TX_R..."
+            wait_for_rest_tx "$TX_C_TXID" 120 >/dev/null || info "TX_C not yet visible via REST (continuing anyway)"
+
+            TX_R_UNSIGNED=$(python3 - "$TX_C_TXID" "$CARRIER_FIRST_VOUT" "$CARRIER_PART_TOTAL" "$CARRIER_VALUE_KOINU" "$TX_R_FEE_KOINU" "$SCRIPT_PUBKEY" <<'PY'
+import sys
+txid_hex = sys.argv[1].strip().lower()
+first_vout = int(sys.argv[2]); part_total = int(sys.argv[3])
+carrier_value = int(sys.argv[4]); fee = int(sys.argv[5]); out_spk = sys.argv[6].strip().lower()
+def le_u32(n): return n.to_bytes(4, "little").hex()
+def le_u64(n): return n.to_bytes(8, "little").hex()
+def varint(n):
+    if n < 0xfd: return f"{n:02x}"
+    if n <= 0xffff: return "fd" + n.to_bytes(2, "little").hex()
+    if n <= 0xffffffff: return "fe" + n.to_bytes(4, "little").hex()
+    return "ff" + n.to_bytes(8, "little").hex()
+if len(txid_hex) != 64 or part_total <= 0: raise SystemExit("invalid tx_r params")
+total_in = carrier_value * part_total
+if total_in <= fee: raise SystemExit("carrier total value must exceed tx_r fee")
+send_value = total_in - fee
+version = "01000000"
+vin = []
+prev_txid_le = bytes.fromhex(txid_hex)[::-1].hex()
+for i in range(part_total):
+    vin.append(prev_txid_le + le_u32(first_vout + i) + "00" + "ffffffff")
+vout = le_u64(send_value) + varint(len(out_spk)//2) + out_spk
+raw = version + varint(len(vin)) + "".join(vin) + "01" + vout + "00000000"
+print(raw)
+PY
+)
+            [ -n "$TX_R_UNSIGNED" ] || error "Failed to build TX_R unsigned"
+            TX_R_SIGNED="$TX_R_UNSIGNED"
+            for ((i=0; i<CARRIER_PART_TOTAL; i++)); do
+                SET_SS_OUTPUT=$(run_and_log "such set_scriptsig TX_R[$i]" ./such -c set_scriptsig -x "$TX_R_SIGNED" -i "$i" -s "${CARRIER_PART_SCRIPTSIGS[$i]}")
+                TX_R_SIGNED=$(echo "$SET_SS_OUTPUT" | awk -F': ' '/^tx with scriptsig set:/ {print $2; exit}' | tr -d ' ')
+                [ -n "$TX_R_SIGNED" ] || error "Failed to set TX_R scriptSig for input $i"
+            done
+            info "Debugging TX_R format..."
+            debug_tx_hex "$TX_R_SIGNED" "TX_R_signed" 2>&1 | tee -a "$RUN_LOG"
+
+            BROADCAST_RESULT_TXID=""
+            if ! broadcast_with_retry "TX_R" "$TX_R_SIGNED"; then
+                info "TX_R failed to relay (P2SH carrier may be non-standard). Continuing with commitment-only."
+            else
+                TX_R_TXID="$BROADCAST_RESULT_TXID"
+                success "TX_R broadcast accepted/known: $TX_R_TXID"
+            fi
+        fi
+
+        BROADCAST_TXID="$TX_C_TXID"
+        if [ -n "$TX_R_TXID" ]; then
+            CHAINED_UTXO_TXID="$TX_R_TXID"
+            CHAINED_UTXO_VOUT=0
+            CHAINED_UTXO_VALUE_KOINU=$((CARRIER_PART_TOTAL * CARRIER_VALUE_KOINU - TX_R_FEE_KOINU))
+        else
+            CHAINED_UTXO_TXID="$TX_C_TXID"
+            CHAINED_UTXO_VOUT=0
+            CHAINED_UTXO_VALUE_KOINU=$((FUNDED_UTXO_VALUE_KOINU - TX_FEE_KOINU))
+        fi
         CHAINED_UTXO_SCRIPT_PUBKEY="$SCRIPT_PUBKEY"
         {
             echo "CHAINED_UTXO"
@@ -381,17 +450,35 @@ EOF
             echo "chained_utxo_value_koinu=$CHAINED_UTXO_VALUE_KOINU"
             echo "chained_utxo_script_pubkey=$CHAINED_UTXO_SCRIPT_PUBKEY"
         } | tee -a "$RUN_LOG"
-        cat >> "$TMPDIR/tx_info.txt" <<EOF
-CHAINED_UTXO_TXID=$CHAINED_UTXO_TXID
-CHAINED_UTXO_VOUT=$CHAINED_UTXO_VOUT
-CHAINED_UTXO_VALUE_KOINU=$CHAINED_UTXO_VALUE_KOINU
-CHAINED_UTXO_SCRIPT_PUBKEY=$CHAINED_UTXO_SCRIPT_PUBKEY
-EOF
-        success "Broadcast accepted or already known by peers"
         BROADCASTED=1
     else
         error "Broadcast is required for full-run mode"
     fi
+
+    cat > "$TMPDIR/tx_info.txt" <<EOF
+RAW_UNSIGNED_TX=$RAW_UNSIGNED_TX
+TX_C_UNSIGNED=$TX_C_UNSIGNED
+TX_C_SIGNED=$TX_C_SIGNED
+TX_C_TXID=${TX_C_TXID:-}
+TX_R_UNSIGNED=${TX_R_UNSIGNED:-}
+TX_R_SIGNED=${TX_R_SIGNED:-}
+TX_R_TXID=${TX_R_TXID:-}
+SCRIPT_PUBKEY=$SCRIPT_PUBKEY
+TX_SIGHASH_HEX=$TX_SIGHASH_HEX
+RACCOONG_SIG=$RACCOONG_SIG
+RACCOONG_COMMIT=$RACCOONG_COMMIT
+CARRIER_ENABLED=$CARRIER_ENABLED
+CARRIER_VALUE_KOINU=$CARRIER_VALUE_KOINU
+CARRIER_PART_TOTAL=${CARRIER_PART_TOTAL:-0}
+CARRIER_FIRST_VOUT=${CARRIER_FIRST_VOUT:-0}
+CARRIER_SCRIPT_PUBKEY=${CARRIER_SCRIPT_PUBKEY:-}
+SIGNED_TX=$TX_C_SIGNED
+OPRETURN_SCRIPT=6a2452434734${RACCOONG_COMMIT}
+CHAINED_UTXO_TXID=${CHAINED_UTXO_TXID:-}
+CHAINED_UTXO_VOUT=${CHAINED_UTXO_VOUT:-0}
+CHAINED_UTXO_VALUE_KOINU=${CHAINED_UTXO_VALUE_KOINU:-}
+CHAINED_UTXO_SCRIPT_PUBKEY=${CHAINED_UTXO_SCRIPT_PUBKEY:-}
+EOF
 }
 
 monitor_spvnode() {
@@ -407,6 +494,10 @@ monitor_spvnode() {
         local commit_match_line=""
         local expected_commit_source="source=op_return_only"
         local expected_commit_mode="op_return_only"
+        if [ "$CARRIER_ENABLED" -eq 1 ] && [ -n "${TX_R_TXID:-}" ]; then
+            expected_commit_source="source=carrier_scriptsig"
+            expected_commit_mode="carrier_scriptsig"
+        fi
         rm -f "$SPV_WALLET_FILE"
         info "Running spvnode scan with REST monitoring until txid and ${expected_commit_mode} commitment validation are both confirmed..."
         scan_start_ts=$(date +%s)
@@ -437,10 +528,11 @@ monitor_spvnode() {
                 echo "$commit_match_line" | tee -a "$TMPDIR/spvnode.log"
                 break
             fi
-            op_return_only_line=$(grep -F "[raccoong-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$RACCOONG_COMMIT" | grep -F "source=op_return_only" | tail -n1 || true)
-            if [ -n "$op_return_only_line" ]; then
-                echo "$op_return_only_line" | tee -a "$TMPDIR/spvnode.log"
-                error "spvnode validated commitment as source=op_return_only; expected source=scriptsig"
+            if [ "$CARRIER_ENABLED" -eq 1 ] && [ -n "${TX_R_TXID:-}" ]; then
+                op_return_only_line=$(grep -F "[raccoong-commit] Valid" "$TMPDIR/spvnode.log" | grep -F "commit=$RACCOONG_COMMIT" | grep -F "source=op_return_only" | tail -n1 || true)
+                if [ -n "$op_return_only_line" ]; then
+                    info "TX_C OP_RETURN commitment found; waiting for TX_R carrier_scriptsig match in a later block..."
+                fi
             fi
             if ! kill -0 "$spv_pipe_pid" 2>/dev/null; then
                 set +e

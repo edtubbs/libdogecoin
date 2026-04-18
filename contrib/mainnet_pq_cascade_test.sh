@@ -31,6 +31,7 @@ run_stage() {
         NON_INTERACTIVE=1 \
         AUTO_BROADCAST=1 \
         NETWORK=mainnet \
+        CARRIER_ENABLED=1 \
         SPV_REQUIRE_VALIDATION=1 \
         SPV_TIMEOUT_SECONDS="$SPV_TIMEOUT_SECONDS" \
         FUNDED_UTXO_TXID="$txid" \
