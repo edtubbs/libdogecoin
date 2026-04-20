@@ -1218,6 +1218,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     if (spv_extract_carrier_scriptsig(tx, &carrier_algo, &carrier_pk, &carrier_pk_len,
                                                       &carrier_sig, &carrier_sig_len, &carrier_vin,
                                                       &carrier_buf, &carrier_buf_len)) {
+                        /* Compute TX_R (reveal) txid for logging */
+                        uint256_t txr_hash;
+                        dogecoin_tx_hash(tx, txr_hash);
+                        char txr_txid_hex[65];
+                        utils_bin_to_hex((uint8_t*)txr_hash, 32, txr_txid_hex);
+
                         uint8_t computed_commit[32];
                         const char* algo_label = (carrier_algo == SPV_PQC_FALCON) ? "falcon-commit" :
                                                  (carrier_algo == SPV_PQC_DILITHIUM) ? "dilithium-commit" :
@@ -1267,8 +1273,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             }
 
                             if (matched) {
-                                client->nodegroup->log_write_cb("[%s] Valid at height=%d txpos=%u commit=%s carrier_vin=%zu source=carrier_scriptsig matched_txc_txpos=%u pk_len=%zu sig_len=%zu pk_prefix=%s sig_prefix=%s\n",
-                                                                 algo_label, pindex->height, i, commit_hex, carrier_vin, matched_txpos, carrier_pk_len, carrier_sig_len, pk_prefix_hex, sig_prefix_hex);
+                                client->nodegroup->log_write_cb("[%s] Valid at height=%d txpos=%u commit=%s carrier_vin=%zu source=carrier_scriptsig matched_txc_txpos=%u pk_len=%zu sig_len=%zu pk_prefix=%s sig_prefix=%s txr_txid=%s\n",
+                                                                 algo_label, pindex->height, i, commit_hex, carrier_vin, matched_txpos, carrier_pk_len, carrier_sig_len, pk_prefix_hex, sig_prefix_hex, txr_txid_hex);
 
                                 /* Phase 2: Verify PQC signature over TX_C sighash32 */
                                 if (matched_txc_raw && matched_txc_raw_len > 0) {
@@ -1395,6 +1401,10 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 #endif
                                                             client->nodegroup->log_write_cb("[%s] PQC signature verification %s at height=%d txpos=%u sighash=%s\n",
                                                                 algo_label, sig_verified ? "PASSED" : "FAILED", pindex->height, i, sighash_hex);
+                                                            if (sig_verified) {
+                                                                client->nodegroup->log_write_cb("[%s] Reveal validated: TX_R=%s commit=%s pk_len=%zu sig_len=%zu height=%d\n",
+                                                                    algo_label, txr_txid_hex, commit_hex, carrier_pk_len, carrier_sig_len, pindex->height);
+                                                            }
                                                         } else {
                                                             client->nodegroup->log_write_cb("[%s] sighash32 computation failed at height=%d txpos=%u\n",
                                                                 algo_label, pindex->height, i);
@@ -1410,8 +1420,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                 }
                                 if (matched_txc_raw) dogecoin_free(matched_txc_raw);
                             } else {
-                                client->nodegroup->log_write_cb("[%s] Unmatched at height=%d txpos=%u commit=%s carrier_vin=%zu source=carrier_scriptsig pk_len=%zu sig_len=%zu pk_prefix=%s sig_prefix=%s\n",
-                                                                 algo_label, pindex->height, i, commit_hex, carrier_vin, carrier_pk_len, carrier_sig_len, pk_prefix_hex, sig_prefix_hex);
+                                client->nodegroup->log_write_cb("[%s] Unmatched at height=%d txpos=%u commit=%s carrier_vin=%zu source=carrier_scriptsig pk_len=%zu sig_len=%zu pk_prefix=%s sig_prefix=%s txr_txid=%s\n",
+                                                                 algo_label, pindex->height, i, commit_hex, carrier_vin, carrier_pk_len, carrier_sig_len, pk_prefix_hex, sig_prefix_hex, txr_txid_hex);
                             }
                         } else {
                             client->nodegroup->log_write_cb("[%s] carrier found but commit_bytes failed at height=%d txpos=%u carrier_vin=%zu pk_len=%zu sig_len=%zu buf_len=%zu\n",

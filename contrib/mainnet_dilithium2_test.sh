@@ -547,6 +547,18 @@ monitor_spvnode() {
             if [ -n "$commit_match_line" ]; then
                 success "spvnode confirmed ${expected_commit_mode} Dilithium2 commitment validation for expected commit"
                 echo "$commit_match_line" | tee -a "$TMPDIR/spvnode.log"
+                # Check for reveal validation (PQC signature verification + TX_R)
+                reveal_line=$(grep -F "[dilithium-commit] Reveal validated" "$TMPDIR/spvnode.log" | grep -F "commit=$DILITHIUM2_COMMIT" | tail -n1 || true)
+                if [ -n "$reveal_line" ]; then
+                    success "spvnode confirmed Dilithium2 reveal (TX_R) validated with PQC signature"
+                    echo "$reveal_line" | tee -a "$TMPDIR/spvnode.log"
+                else
+                    sighash_line=$(grep -F "[dilithium-commit] PQC signature verification PASSED" "$TMPDIR/spvnode.log" | tail -n1 || true)
+                    if [ -n "$sighash_line" ]; then
+                        success "spvnode confirmed Dilithium2 PQC signature verification PASSED"
+                        echo "$sighash_line" | tee -a "$TMPDIR/spvnode.log"
+                    fi
+                fi
                 break
             fi
             if [ "$CARRIER_ENABLED" -eq 1 ] && [ -n "${TX_R_TXID:-}" ]; then

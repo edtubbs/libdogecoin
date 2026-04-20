@@ -740,6 +740,18 @@ monitor_spvnode() {
             if [ -n "$commit_match_line" ]; then
                 success "spvnode confirmed ${expected_commit_mode} Falcon commitment validation for expected commit"
                 echo "$commit_match_line" | tee -a "$RUN_LOG"
+                # Check for reveal validation (PQC signature verification + TX_R)
+                reveal_line=$(grep -F "[falcon-commit] Reveal validated" "$TMPDIR/spvnode.log" | grep -F "commit=$FALCON_COMMIT" | tail -n1 || true)
+                if [ -n "$reveal_line" ]; then
+                    success "spvnode confirmed Falcon reveal (TX_R) validated with PQC signature"
+                    echo "$reveal_line" | tee -a "$RUN_LOG"
+                else
+                    sighash_line=$(grep -F "[falcon-commit] PQC signature verification PASSED" "$TMPDIR/spvnode.log" | tail -n1 || true)
+                    if [ -n "$sighash_line" ]; then
+                        success "spvnode confirmed Falcon PQC signature verification PASSED"
+                        echo "$sighash_line" | tee -a "$RUN_LOG"
+                    fi
+                fi
                 break
             fi
             if [ "$CARRIER_ENABLED" -eq 1 ] && [ -n "$TX_R_TXID" ]; then
