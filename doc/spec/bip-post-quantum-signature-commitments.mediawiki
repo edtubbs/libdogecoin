@@ -285,8 +285,8 @@ Each carrier vin scriptSig carries up to 3 chunks of ≤520 bytes (~1560 bytes o
 For carrier mode transactions:
 
 * '''TX_C''' (commitment + carrier outputs): minimum relay fee is 100000 koinu (0.001 DOGE), matching Dogecoin's default <code>minrelaytxfee</code>.
-* '''TX_R''' (reveal, spending carrier outputs): minimum relay fee scales with transaction size. Since TX_R scriptSigs carry full PQ material, the fee must satisfy the per-KB minimum relay rate (100000 koinu/KB). Examples: Falcon-512 TX_R (~1675 bytes, 1 carrier vin) needs ~500000 koinu (0.005 DOGE); Dilithium2 TX_R (~5 KB, 3 carrier vins) needs ~1000000 koinu (0.01 DOGE); Raccoon-G-44 TX_R (~40 KB, 24 carrier vins) needs ~5000000 koinu (0.05 DOGE).
-* '''Carrier output value:''' each P2SH carrier output must be at least 100000000 koinu (1 DOGE) to avoid dust rejection. Values below the dust threshold (100000 koinu / 0.001 DOGE) will be rejected by relay policy.
+* '''TX_R''' (reveal, spending carrier outputs): minimum relay fee scales with transaction size. Since TX_R scriptSigs carry full PQ material, the fee must satisfy the per-KB minimum relay rate (100000 koinu/KB) and should include sufficient margin for miner inclusion. Examples: Falcon-512 TX_R (~1675 bytes, 1 carrier vin) needs ~2000000 koinu (0.02 DOGE); Dilithium2 TX_R (~5 KB, 3 carrier vins) needs ~10000000 koinu (0.1 DOGE); Raccoon-G-44 TX_R (~39 KB, 24 carrier vins) needs ~100000000 koinu (1.0 DOGE).
+* '''Carrier output value:''' each P2SH carrier output must be at least 100000000 koinu (1 DOGE). Values at or above 1 DOGE per output ensure the carrier UTXO set is accepted by relay nodes and provide sufficient funding for the TX_R fee when spent.
 
 ===Phase 2: Reserved Opcode Upgrade Path===
 
@@ -373,75 +373,112 @@ The following examples are from confirmed mainnet transactions demonstrating Pha
 
 ===Falcon-512 Carrier Mode (TX_C + TX_R)===
 
-Commitment transaction (TX_C) with OP_RETURN commitment and P2SH carrier output:
+Commitment transaction (TX_C) with OP_RETURN commitment and P2SH carrier output (cascade run 2026-04-20):
 
 <source>
-TX_C txid:   b47b271ff454ce93e93f723b52959f9d14f44313c61706453c1a85aaced93031
-Block:       6156590 (mainnet, confirmed 2026-04-08T00:33:20Z)
+TX_C txid:   f26940627dad32d5f86c1b17f9be96bf413dbe78b181721b73677d6fe7bd81ed
+Block:       6173895 (mainnet, confirmed 2026-04-20)
 Funded addr: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
-Carrier P2SH: A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q
 
 Outputs:
-  vout 0: 35.933 DOGE → DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (change)
-  vout 1: OP_RETURN 6a24 464c4331 94308315af52359db5af07391ab12fc14909dc6fe64182477ea61c96e8ab8b9f
+  vout 0: change → DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  vout 1: OP_RETURN 6a24 464c4331 e780b663d19966bc8f4ca355fb61bdf7d6b66885e8a75a212bd368a6fb0dcac2
   vout 2: 1.0 DOGE → A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q (P2SH carrier)
 </source>
 
-SPV validation log for the OP_RETURN commitment:
+Reveal transaction (TX_R) spending the P2SH carrier output:
 
 <source>
-[falcon-commit] Valid at height=6156590 txpos=6 commit=94308315af52359db5af07391ab12fc14909dc6fe64182477ea61c96e8ab8b9f source=op_return_only
+TX_R txid:   a65bbc366c3c670a8b5c57a205db818365e8b9cb955683eec2f171f6d4c52ff5
+Block:       6173895 (mainnet, confirmed 2026-04-20)
 </source>
 
-SPV validation log for carrier_scriptsig (from earlier TX_R spending a carrier output):
+SPV validation log showing commitment detection and Phase 2 PQC signature verification:
 
 <source>
-[falcon-commit] Valid at height=6156389 txpos=2 commit=492c7dcba00e3e48cb22ce55ee4954312017ace60f2a40b523db9c17bfef85ef carrier_vin=0 source=carrier_scriptsig pk_len=897 sig_len=652 pk_prefix=09b26e7841a14148109e36c32561227c sig_prefix=3913b5adffe778500ac0e252705a81b0
-[falcon-commit] Valid at height=6156425 txpos=5 commit=d87439a60ba163f5e27fd9e259557b7fca77a5196494be649637310cd67206e5 carrier_vin=0 source=carrier_scriptsig pk_len=897 sig_len=660 pk_prefix=0952300ef52dc8d199b86c62fd98f199 sig_prefix=3956a8334554881d551118e122a98d23
-[falcon-commit] Valid at height=6156450 txpos=2 commit=5a6bc01cfa36880a634bc370596c762ed1f36c9f10c4b0894fdbf1085d6edb1b carrier_vin=0 source=carrier_scriptsig pk_len=897 sig_len=656 pk_prefix=096d02fd877d228e433eaf692c253887 sig_prefix=39a7c04c051fa2969b04ccfc0763bac0
+[falcon-commit] Pending at height=6173895 txpos=42 commit=e780b663d19966bc8f4ca355fb61bdf7d6b66885e8a75a212bd368a6fb0dcac2 source=op_return
+[falcon-commit] Valid at height=6173895 txpos=50 commit=e780b663d19966bc8f4ca355fb61bdf7d6b66885e8a75a212bd368a6fb0dcac2 carrier_vin=0 source=carrier_scriptsig matched_txc_txpos=42 pk_len=897 sig_len=655 pk_prefix=0978c210806a874a28557a233283faba sig_prefix=39cd6f5e4151d353a21d07702c2526ff txr_txid=a65bbc366c3c670a8b5c57a205db818365e8b9cb955683eec2f171f6d4c52ff5
+[falcon-commit] PQC signature verification PASSED at height=6173895 txpos=50 sighash=b13fc8828d8855d6c7870a68d98611d73ba93846a188bf6a764c5cbbf5673c32
+[falcon-commit] Reveal validated: TX_R=a65bbc366c3c670a8b5c57a205db818365e8b9cb955683eec2f171f6d4c52ff5 commit=e780b663d19966bc8f4ca355fb61bdf7d6b66885e8a75a212bd368a6fb0dcac2 pk_len=897 sig_len=655 height=6173895
 </source>
 
-The carrier_scriptsig validation extracts the full PQC public key (pk_len=897 bytes for Falcon-512) and signature from the TX_R scriptSig, recomputes <code>SHA256(pk || sig)</code>, and matches it against the OP_RETURN commitment from TX_C.
+===Dilithium2 Carrier Mode (TX_C + TX_R)===
 
-===Dilithium2 Commitment-Only Mode===
-
-Commitment transaction (TX_C) with OP_RETURN commitment only:
+Commitment transaction (TX_C) with OP_RETURN commitment and P2SH carrier outputs (cascade run 2026-04-20):
 
 <source>
-TX_C txid:   5e0d3e7d8ef7d301a0688c477312824240d57f847338d8aaf66cfea3f3202b83
-Block:       6156605 (mainnet, confirmed 2026-04-08)
+TX_C txid:   822044a82f070da8d9d4a7c6e6e26359b50300b5ee1020c10fe0c76a11b7c933
+Block:       6173897 (mainnet, confirmed 2026-04-20)
 Funded addr: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
 
 Outputs:
-  vout 0: 0.997 DOGE → DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (change)
-  vout 1: OP_RETURN 6a24 44494c32 752b2c664c68d89d029c81ac30b6036d42dcdf1990937d669d878026ffcaf72f
+  vout 0: change → DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  vout 1: OP_RETURN 6a24 44494c32 f8dda582556e73e4abd62f6f69354faebed920100bec13944516ffea226c99ca
+  vout 2–4: 1.0 DOGE each → A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q (P2SH carrier, 3 parts)
 </source>
 
-SPV validation log:
+Reveal transaction (TX_R) spending all three P2SH carrier outputs:
 
 <source>
-[dilithium-commit] Valid at height=6156605 txpos=4 commit=752b2c664c68d89d029c81ac30b6036d42dcdf1990937d669d878026ffcaf72f source=op_return_only
+TX_R txid:   7e36376ad9124a89788557f556b4138e2a0ad110158e0284461a345e83ad5eaa
+Block:       6173902 (mainnet, confirmed 2026-04-20)
 </source>
+
+SPV validation log showing commitment detection and Phase 2 PQC signature verification:
+
+<source>
+[dilithium-commit] Pending at height=6173897 txpos=16 commit=f8dda582556e73e4abd62f6f69354faebed920100bec13944516ffea226c99ca source=op_return
+[dilithium-commit] Valid at height=6173902 txpos=11 commit=f8dda582556e73e4abd62f6f69354faebed920100bec13944516ffea226c99ca carrier_vin=0 source=carrier_scriptsig matched_txc_txpos=16 pk_len=1312 sig_len=2420 pk_prefix=e3fbad9d3c6daac8b9d2fabe0392ae5f sig_prefix=a3a936b6aebb20ce42aa73f13c9349a4 txr_txid=7e36376ad9124a89788557f556b4138e2a0ad110158e0284461a345e83ad5eaa
+[dilithium-commit] PQC signature verification PASSED at height=6173902 txpos=11 sighash=247b35092bd91541a6dee7b7b7ea89ab4ec153eaca26a2624ab411f01b42e99a
+[dilithium-commit] Reveal validated: TX_R=7e36376ad9124a89788557f556b4138e2a0ad110158e0284461a345e83ad5eaa commit=f8dda582556e73e4abd62f6f69354faebed920100bec13944516ffea226c99ca pk_len=1312 sig_len=2420 height=6173902
+</source>
+
+===Raccoon-G-44 Carrier Mode (TX_C + TX_R)===
+
+Commitment transaction (TX_C) with OP_RETURN commitment and 24 P2SH carrier outputs (cascade run 2026-04-20):
+
+<source>
+TX_C txid:   b6e065cbb0b42166a3fa0708c664df4a4a726e4b51ec47541634117dc7477c04
+Block:       confirmed mainnet 2026-04-20
+Funded addr: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+Commitment:  4f1f783ea83ca3686886ad3e89232e19504dba5500f5d1f1f4c2c3fa253386e6
+
+Outputs:
+  vout 0: change → DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  vout 1: OP_RETURN 6a24 52434734 4f1f783ea83ca3686886ad3e89232e19504dba5500f5d1f1f4c2c3fa253386e6
+  vout 2–25: 0.1 DOGE each → A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q (P2SH carrier, 24 parts)
+</source>
+
+Reveal transaction (TX_R, 38802 bytes, spending all 24 P2SH carrier outputs):
+
+<source>
+TX_R txid:   01a4461de63c21cdeb375c2ffd0c31f07ac9f523654abf09f4e3e56d15ad0258
+Status:      broadcast to mainnet mempool 2026-04-20 (confirmation pending)
+pk_len:      16144 (Raccoon-G-44 public key)
+sig_len:     20768 (Raccoon-G-44 signature)
+part_total:  24 carrier vins (RCG4FULL tag)
+</source>
+
+Note: The Raccoon-G-44 TX_R fee must be at least 1.0 DOGE (100000000 koinu) for reliable miner inclusion given the ~39 KB transaction size.
 
 ===SPV Commitment Validation Summary===
 
-The SPV scanner detected and validated the following PQC commitments during mainnet block scan:
+The SPV scanner detected and validated the following PQC commitments during mainnet block scan (cascade run 2026-04-20):
 
 <source>
-Height   TxPos  Algorithm   Source              Commitment (first 16 hex)
-6156358  8      Falcon-512  op_return_only      0657e61928b8eb2b...
-6156374  21     Falcon-512  op_return_only      492c7dcba00e3e48...
-6156388  27     Falcon-512  op_return_only      d87439a60ba163f5...
-6156389  2      Falcon-512  carrier_scriptsig   492c7dcba00e3e48...  (pk_len=897, sig_len=652)
-6156399  21     Falcon-512  op_return_only      5a6bc01cfa36880a...
-6156425  5      Falcon-512  carrier_scriptsig   d87439a60ba163f5...  (pk_len=897, sig_len=660)
-6156450  2      Falcon-512  carrier_scriptsig   5a6bc01cfa36880a...  (pk_len=897, sig_len=656)
-6156513  26     Falcon-512  op_return_only      818da8f9c669bc93...
-6156590  6      Falcon-512  op_return_only      94308315af52359d...
-6156605  4      Dilithium2  op_return_only      752b2c664c68d89d...
+Height   TxPos  Algorithm     Source              Commitment (first 16 hex)        Details
+6173849  17     Falcon-512    op_return_only      51a04c03e2f542b6...
+6173849  20     Falcon-512    carrier_scriptsig   51a04c03e2f542b6...              (pk_len=897, sig_len=654, PASSED)
+6173855  21     Dilithium2    op_return_only      ca9002ea6cd424d9...
+6173866  28     Dilithium2    op_return_only      e86bf13eb2aa3037...
+6173871  20     Dilithium2    carrier_scriptsig   e86bf13eb2aa3037...              (pk_len=1312, sig_len=2420, PASSED)
+6173895  42     Falcon-512    op_return_only      e780b663d19966bc...
+6173895  50     Falcon-512    carrier_scriptsig   e780b663d19966bc...              (pk_len=897, sig_len=655, PASSED)
+6173897  16     Dilithium2    op_return_only      f8dda58255...
+6173902  11     Dilithium2    carrier_scriptsig   f8dda58255...                    (pk_len=1312, sig_len=2420, PASSED)
 </source>
 
-Note: Commitments at heights 6156389, 6156425, and 6156450 appear as both op_return_only (TX_C) and carrier_scriptsig (TX_R), demonstrating the two-transaction carrier pattern where TX_R reveals the full PQC verification material and the SPV scanner cross-validates the commitment.
+Note: Validated carrier_scriptsig entries demonstrate the two-transaction carrier pattern (TX_C + TX_R) with full Phase 2 PQC signature verification PASSED for both Falcon-512 and Dilithium2.
 
 ==Deployment==
 

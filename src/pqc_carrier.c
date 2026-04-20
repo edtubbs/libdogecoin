@@ -44,6 +44,15 @@
 #include <dogecoin/rmd160.h>
 #include <dogecoin/script.h>
 #include <dogecoin/sha2.h>
+#include <dogecoin/tx.h>
+#include <dogecoin/utils.h>
+#ifdef USE_LIBOQS
+#include <dogecoin/pqc_falcon.h>
+#include <dogecoin/pqc_dilithium.h>
+#endif
+#ifdef USE_LIBOQS_RACCOON
+#include <dogecoin/pqc_raccoon.h>
+#endif
 
 /**
  * @brief This function pushes a single opcode byte onto a
@@ -409,3 +418,354 @@ dogecoin_bool dogecoin_tx_add_pqc_carrier_outputs(
     }
     return true;
 }
+
+#ifdef USE_LIBOQS
+
+/**
+ * @brief Extract PQC pubkey+sig from carrier-format scriptSigs in a transaction.
+ *
+ * Handles both single-part carriers (Falcon-512) and multi-part carriers
+ * (Dilithium2 with 3 parts, Raccoon-G with 24 parts).  Multi-part payloads
+ * are reassembled by collecting all carrier-tagged vins, ordering by
+ * part_index, and concatenating.
+ *
+ * @param tx The transaction to scan.
+ * @param out_algo The detected PQC algorithm.
+ * @param out_pk Pointer into carrier_buf for the public key.
+ * @param out_pk_len Length of the public key.
+ * @param out_sig Pointer into carrier_buf for the signature.
+ * @param out_sig_len Length of the signature.
+ * @param out_vin_index Index of the first carrier vin.
+ * @param carrier_buf Reassembled payload buffer (caller frees with dogecoin_free).
+ * @param carrier_buf_len Total length of reassembled payload.
+ *
+ * @return true if carrier data was extracted, false otherwise.
+ */
+dogecoin_bool dogecoin_pqc_carrier_extract_scriptsig(
+    const dogecoin_tx* tx,
+    dogecoin_pqc_algo_t* out_algo,
+    const uint8_t** out_pk, size_t* out_pk_len,
+    const uint8_t** out_sig, size_t* out_sig_len,
+    size_t* out_vin_index,
+    uint8_t** carrier_buf, size_t* carrier_buf_len)
+{
+    if (!tx || !out_algo || !out_pk || !out_pk_len || !out_sig || !out_sig_len || !out_vin_index || !carrier_buf || !carrier_buf_len)
+        return false;
+    *carrier_buf = NULL;
+    *carrier_buf_len = 0;
+
+    /* First pass: find any carrier-tagged vin to discover algo and part_total */
+    dogecoin_pqc_algo_t algo = DOGECOIN_PQC_ALGO_FALCON;
+    uint8_t discovered_total = 0;
+    uint16_t discovered_pk_len = 0;
+    uint16_t discovered_full_len = 0;
+    size_t first_vin = 0;
+    dogecoin_bool found_any = false;
+    char match_tag[DOGECOIN_PQC_CARRIER_TAG_LEN + 1];
+
+    for (size_t vin = 0; vin < tx->vin->len; vin++) {
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, vin);
+        if (!tx_in || !tx_in->script_sig || tx_in->script_sig->len < 20)
+            continue;
+        char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN + 1];
+        uint8_t pi = 0, pt = 0;
+        uint16_t pk_l = 0, fl = 0;
+        uint8_t* pd = NULL;
+        size_t pdl = 0;
+        cstring* rd = NULL;
+        if (!dogecoin_pqc_carrier_parse_part_scriptsig(tx_in->script_sig, tag8, &pi, &pt,
+                                                        &pk_l, &fl, &pd, &pdl, &rd)) {
+            continue;
+        }
+        if (pd) dogecoin_free(pd);
+        if (rd) cstr_free(rd, true);
+
+        if (memcmp(tag8, "FLC1FULL", 8) == 0)
+            algo = DOGECOIN_PQC_ALGO_FALCON;
+        else if (memcmp(tag8, "DIL2FULL", 8) == 0)
+            algo = DOGECOIN_PQC_ALGO_DILITHIUM;
+#ifdef USE_LIBOQS_RACCOON
+        else if (memcmp(tag8, "RCG4FULL", 8) == 0)
+            algo = DOGECOIN_PQC_ALGO_RACCOONG;
+#endif
+        else
+            continue;
+
+        memcpy(match_tag, tag8, DOGECOIN_PQC_CARRIER_TAG_LEN + 1);
+        discovered_total = pt;
+        discovered_pk_len = pk_l;
+        discovered_full_len = fl;
+        first_vin = vin;
+        found_any = true;
+        break;
+    }
+
+    if (!found_any || discovered_total == 0 || discovered_full_len == 0 || discovered_pk_len == 0)
+        return false;
+
+    /* Allocate part collection arrays */
+    uint8_t** parts_data = (uint8_t**)dogecoin_calloc(discovered_total, sizeof(uint8_t*));
+    size_t*  parts_len  = (size_t*)dogecoin_calloc(discovered_total, sizeof(size_t));
+    if (!parts_data || !parts_len) {
+        if (parts_data) dogecoin_free(parts_data);
+        if (parts_len) dogecoin_free(parts_len);
+        return false;
+    }
+
+    uint8_t parts_found = 0;
+
+    /* Second pass: collect all parts with matching tag */
+    for (size_t vin = 0; vin < tx->vin->len && parts_found < discovered_total; vin++) {
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, vin);
+        if (!tx_in || !tx_in->script_sig || tx_in->script_sig->len < 20)
+            continue;
+        char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN + 1];
+        uint8_t pi = 0, pt = 0;
+        uint16_t pk_l = 0, fl = 0;
+        uint8_t* pd = NULL;
+        size_t pdl = 0;
+        cstring* rd = NULL;
+        if (!dogecoin_pqc_carrier_parse_part_scriptsig(tx_in->script_sig, tag8, &pi, &pt,
+                                                        &pk_l, &fl, &pd, &pdl, &rd)) {
+            continue;
+        }
+        if (rd) cstr_free(rd, true);
+
+        if (memcmp(tag8, match_tag, DOGECOIN_PQC_CARRIER_TAG_LEN) != 0 ||
+            pt != discovered_total || pi >= discovered_total) {
+            if (pd) dogecoin_free(pd);
+            continue;
+        }
+
+        if (parts_data[pi]) {
+            /* Duplicate part_index -- skip */
+            if (pd) dogecoin_free(pd);
+            continue;
+        }
+        parts_data[pi] = pd;
+        parts_len[pi] = pdl;
+        parts_found++;
+    }
+
+    /* Verify all parts were collected */
+    if (parts_found != discovered_total) {
+        for (uint8_t i = 0; i < discovered_total; i++) {
+            if (parts_data[i]) dogecoin_free(parts_data[i]);
+        }
+        dogecoin_free(parts_data);
+        dogecoin_free(parts_len);
+        return false;
+    }
+
+    /* Reassemble full payload: concatenate parts in order */
+    size_t total_len = 0;
+    for (uint8_t i = 0; i < discovered_total; i++)
+        total_len += parts_len[i];
+
+    /* Truncate to full_len if parts carry padding beyond payload */
+    if (total_len > (size_t)discovered_full_len)
+        total_len = (size_t)discovered_full_len;
+
+    uint8_t* full_buf = (uint8_t*)dogecoin_malloc(total_len);
+    if (!full_buf) {
+        for (uint8_t i = 0; i < discovered_total; i++) {
+            if (parts_data[i]) dogecoin_free(parts_data[i]);
+        }
+        dogecoin_free(parts_data);
+        dogecoin_free(parts_len);
+        return false;
+    }
+
+    size_t offset = 0;
+    for (uint8_t i = 0; i < discovered_total; i++) {
+        size_t copy_len = parts_len[i];
+        if (offset + copy_len > total_len)
+            copy_len = total_len - offset;
+        if (copy_len > 0)
+            memcpy(full_buf + offset, parts_data[i], copy_len);
+        offset += copy_len;
+        dogecoin_free(parts_data[i]);
+    }
+    dogecoin_free(parts_data);
+    dogecoin_free(parts_len);
+
+    /* Split into pk and sig */
+    if (total_len < (size_t)(discovered_pk_len + 1) || discovered_pk_len == 0) {
+        dogecoin_free(full_buf);
+        return false;
+    }
+
+    size_t sig_len = total_len - discovered_pk_len;
+    *out_algo = algo;
+    *out_pk = full_buf;
+    *out_pk_len = discovered_pk_len;
+    *out_sig = full_buf + discovered_pk_len;
+    *out_sig_len = sig_len;
+    *out_vin_index = first_vin;
+    *carrier_buf = full_buf;
+    *carrier_buf_len = total_len;
+    return true;
+}
+
+/**
+ * @brief Verify a PQC carrier reveal by reconstructing TX_BASE from raw TX_C
+ * bytes, deriving the sighash32, and verifying the PQC signature over it.
+ *
+ * TX_BASE is reconstructed from TX_C by stripping the OP_RETURN commitment
+ * output and all canonical P2SH carrier outputs, then restoring the total
+ * carrier value to the first output.  This is the same transaction template
+ * that was signed when the PQC signature was originally produced.
+ *
+ * @param algo The PQC algorithm.
+ * @param txc_raw The serialized TX_C bytes.
+ * @param txc_raw_len The length of the serialized TX_C.
+ * @param pk The PQC public key bytes.
+ * @param pk_len The length of the public key.
+ * @param sig The PQC signature bytes.
+ * @param sig_len The length of the signature.
+ * @param out_sighash Output buffer for the computed 32-byte sighash (zeroed on failure).
+ *
+ * @return true iff the PQC signature verified successfully over the sighash.
+ */
+dogecoin_bool dogecoin_pqc_carrier_verify_reveal(
+    dogecoin_pqc_algo_t algo,
+    const uint8_t* txc_raw,
+    size_t txc_raw_len,
+    const uint8_t* pk,
+    size_t pk_len,
+    const uint8_t* sig,
+    size_t sig_len,
+    uint8_t out_sighash[32])
+{
+    if (out_sighash) memset(out_sighash, 0, 32);
+    if (!txc_raw || txc_raw_len == 0 || !pk || pk_len == 0 || !sig || sig_len == 0)
+        return false;
+
+    dogecoin_tx* txc = dogecoin_tx_new();
+    if (!txc) return false;
+    size_t consumed = 0;
+    if (!dogecoin_tx_deserialize(txc_raw, txc_raw_len, txc, &consumed)) {
+        dogecoin_tx_free(txc);
+        return false;
+    }
+
+    /* Build TX_BASE by removing the OP_RETURN and P2SH carrier outputs.
+       Precompute the canonical carrier P2SH scriptPubKey for exact matching. */
+    uint8_t carrier_redeem[6] = {0x75, 0x75, 0x75, 0x75, 0x75, 0x51};
+    uint8_t carrier_sha[32];
+    sha256_raw(carrier_redeem, sizeof(carrier_redeem), carrier_sha);
+    uint8_t carrier_h160[20];
+    rmd160(carrier_sha, sizeof(carrier_sha), carrier_h160);
+    uint8_t carrier_spk[23];
+    carrier_spk[0]  = 0xa9; /* OP_HASH160 */
+    carrier_spk[1]  = 0x14; /* PUSH 20 bytes */
+    memcpy(carrier_spk + 2, carrier_h160, 20);
+    carrier_spk[22] = 0x87; /* OP_EQUAL */
+
+    dogecoin_tx* tx_base = dogecoin_tx_new();
+    if (!tx_base) {
+        dogecoin_tx_free(txc);
+        return false;
+    }
+    tx_base->version = txc->version;
+    tx_base->locktime = txc->locktime;
+
+    for (size_t vi = 0; vi < txc->vin->len; vi++) {
+        dogecoin_tx_in* orig = vector_idx(txc->vin, vi);
+        dogecoin_tx_in* copy = dogecoin_tx_in_new();
+        memcpy(copy->prevout.hash, orig->prevout.hash, sizeof(copy->prevout.hash));
+        copy->prevout.n = orig->prevout.n;
+        copy->sequence = orig->sequence;
+        if (orig->script_sig && orig->script_sig->len > 0) {
+            copy->script_sig = cstr_new_buf(orig->script_sig->str, orig->script_sig->len);
+        }
+        vector_add(tx_base->vin, copy);
+    }
+
+    uint64_t carrier_total = 0;
+    for (size_t vo = 0; vo < txc->vout->len; vo++) {
+        dogecoin_tx_out* orig = vector_idx(txc->vout, vo);
+        /* Skip OP_RETURN (nulldata) outputs */
+        if (orig->script_pubkey && orig->script_pubkey->len > 0 &&
+            (uint8_t)orig->script_pubkey->str[0] == 0x6a) {
+            continue;
+        }
+        /* Skip canonical P2SH carrier outputs — exact match only */
+        if (orig->script_pubkey && orig->script_pubkey->len == 23 &&
+            memcmp(orig->script_pubkey->str, carrier_spk, 23) == 0) {
+            carrier_total += orig->value;
+            continue;
+        }
+        dogecoin_tx_out* copy = dogecoin_tx_out_new();
+        copy->value = orig->value;
+        if (orig->script_pubkey && orig->script_pubkey->len > 0) {
+            copy->script_pubkey = cstr_new_buf(orig->script_pubkey->str, orig->script_pubkey->len);
+        }
+        vector_add(tx_base->vout, copy);
+    }
+
+    /* Restore carrier cost to first output (was deducted during TX_C construction) */
+    if (carrier_total > 0 && tx_base->vout->len > 0) {
+        dogecoin_tx_out* first_out = vector_idx(tx_base->vout, 0);
+        first_out->value += carrier_total;
+    }
+
+    dogecoin_bool verified = false;
+    if (txc->vin->len > 0) {
+        dogecoin_tx_in* first_in = vector_idx(txc->vin, 0);
+        /* Validate P2PKH scriptSig bounds */
+        if (first_in->script_sig &&
+            first_in->script_sig->len >= DOGECOIN_PQC_MIN_P2PKH_SCRIPTSIG_LEN &&
+            first_in->script_sig->len <= DOGECOIN_PQC_MAX_P2PKH_SCRIPTSIG_LEN) {
+            const uint8_t* ss = (const uint8_t*)first_in->script_sig->str;
+            size_t sslen = first_in->script_sig->len;
+            size_t pos = 0;
+            uint8_t sig_push_len = ss[pos++];
+            /* Reject OP_PUSHDATA1/2/4 — DER sigs are always < 76 bytes */
+            if (sig_push_len >= DOGECOIN_PQC_MIN_DER_SIG_PUSH_LEN &&
+                sig_push_len <= DOGECOIN_PQC_MAX_DER_SIG_PUSH_LEN &&
+                pos + sig_push_len <= sslen &&
+                ss[pos] == 0x30 /* DER SEQUENCE */) {
+                pos += sig_push_len;
+                if (pos < sslen) {
+                    uint8_t pk_push_len = ss[pos++];
+                    if (pk_push_len == 33 && pos + 33 <= sslen) {
+                        const uint8_t* ecdsa_pk = ss + pos;
+                        /* Compute HASH160 of the pubkey */
+                        uint8_t sha_out[32];
+                        sha256_raw(ecdsa_pk, 33, sha_out);
+                        uint8_t h160[20];
+                        rmd160(sha_out, 32, h160);
+                        /* Build P2PKH scriptPubKey */
+                        cstring* spk = cstr_new_sz(25);
+                        uint8_t p2pkh_prefix[] = {0x76, 0xa9, 0x14};
+                        uint8_t p2pkh_suffix[] = {0x88, 0xac};
+                        cstr_append_buf(spk, p2pkh_prefix, 3);
+                        cstr_append_buf(spk, h160, 20);
+                        cstr_append_buf(spk, p2pkh_suffix, 2);
+
+                        uint8_t sighash[32];
+                        if (dogecoin_tx_sighash32(tx_base, spk, 0, SIGHASH_ALL, sighash)) {
+                            if (out_sighash) memcpy(out_sighash, sighash, 32);
+                            if (algo == DOGECOIN_PQC_ALGO_FALCON)
+                                verified = dogecoin_falcon512_verify(pk, pk_len, sighash, 32, sig, sig_len);
+                            else if (algo == DOGECOIN_PQC_ALGO_DILITHIUM)
+                                verified = dogecoin_dilithium2_verify(pk, pk_len, sighash, 32, sig, sig_len);
+#ifdef USE_LIBOQS_RACCOON
+                            else if (algo == DOGECOIN_PQC_ALGO_RACCOONG)
+                                verified = dogecoin_raccoong44_verify(pk, pk_len, sighash, 32, sig, sig_len);
+#endif
+                        }
+                        cstr_free(spk, true);
+                    }
+                }
+            }
+        }
+    }
+
+    dogecoin_tx_free(tx_base);
+    dogecoin_tx_free(txc);
+    return verified;
+}
+
+#endif /* USE_LIBOQS */

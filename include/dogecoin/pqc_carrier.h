@@ -41,6 +41,28 @@ LIBDOGECOIN_BEGIN_DECL
 #define DOGECOIN_PQC_CARRIER_HDR_LEN 8
 #define DOGECOIN_PQC_CARRIER_TAG_LEN 8
 
+/* P2PKH scriptSig length bounds for PQC sighash derivation.
+   A valid P2PKH scriptSig is: <push DER_sig+hashtype> <push compressed_pubkey>
+   Min: 1 (push opcode) + 71 (min DER sig + hashtype) + 1 (push opcode) + 33 (pubkey) = 106
+   Max: 1 + 73 + 1 + 33 = 108, but allow up to 180 for safety margin. */
+#define DOGECOIN_PQC_MIN_P2PKH_SCRIPTSIG_LEN 106
+#define DOGECOIN_PQC_MAX_P2PKH_SCRIPTSIG_LEN 180
+
+/* DER signature push length bounds (includes 1-byte sighash type).
+   Min: 8 (shortest valid DER) + 1 (hashtype) = 9.
+   Max: 72 (longest valid DER) + 1 (hashtype) = 73. */
+#define DOGECOIN_PQC_MIN_DER_SIG_PUSH_LEN 9
+#define DOGECOIN_PQC_MAX_DER_SIG_PUSH_LEN 73
+
+/* PQC algorithm discriminant used by carrier extraction and SPV validation. */
+typedef enum {
+    DOGECOIN_PQC_ALGO_FALCON,
+    DOGECOIN_PQC_ALGO_DILITHIUM,
+#ifdef USE_LIBOQS_RACCOON
+    DOGECOIN_PQC_ALGO_RACCOONG
+#endif
+} dogecoin_pqc_algo_t;
+
 /*
  * Build the OP_DROP-based redeem script for PQC carrier P2SH outputs.
  */
@@ -87,6 +109,37 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_tx_add_pqc_carrier_outputs(
     const cstring* carrier_spk,
     uint64_t value,
     uint8_t part_total);
+
+/*
+ * Extract PQC pubkey+sig from carrier-format scriptSigs (multi-part reassembly).
+ * Caller must free *carrier_buf with dogecoin_free().
+ */
+LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_extract_scriptsig(
+    const dogecoin_tx* tx,
+    dogecoin_pqc_algo_t* out_algo,
+    const uint8_t** out_pk,
+    size_t* out_pk_len,
+    const uint8_t** out_sig,
+    size_t* out_sig_len,
+    size_t* out_vin_index,
+    uint8_t** carrier_buf,
+    size_t* carrier_buf_len);
+
+/*
+ * Phase 2: verify a PQC carrier reveal by reconstructing TX_BASE from raw TX_C
+ * bytes, deriving the sighash32, and verifying the PQC signature over it.
+ * out_sighash receives the computed sighash (zeroed on failure).
+ * Returns true iff the signature is valid.
+ */
+LIBDOGECOIN_API dogecoin_bool dogecoin_pqc_carrier_verify_reveal(
+    dogecoin_pqc_algo_t algo,
+    const uint8_t* txc_raw,
+    size_t txc_raw_len,
+    const uint8_t* pk,
+    size_t pk_len,
+    const uint8_t* sig,
+    size_t sig_len,
+    uint8_t out_sighash[32]);
 
 LIBDOGECOIN_END_DECL
 
