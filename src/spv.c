@@ -1218,11 +1218,13 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     if (spv_extract_carrier_scriptsig(tx, &carrier_algo, &carrier_pk, &carrier_pk_len,
                                                       &carrier_sig, &carrier_sig_len, &carrier_vin,
                                                       &carrier_buf, &carrier_buf_len)) {
-                        /* Compute TX_R (reveal) txid for logging */
+                        /* Compute TX_R (reveal) txid for logging (display byte order) */
                         uint256_t txr_hash;
                         dogecoin_tx_hash(tx, txr_hash);
+                        uint8_t txr_hash_rev[32];
+                        for (int rb = 0; rb < 32; rb++) txr_hash_rev[rb] = ((uint8_t*)txr_hash)[31 - rb];
                         char txr_txid_hex[65];
-                        utils_bin_to_hex((uint8_t*)txr_hash, 32, txr_txid_hex);
+                        utils_bin_to_hex(txr_hash_rev, 32, txr_txid_hex);
 
                         uint8_t computed_commit[32];
                         const char* algo_label = (carrier_algo == SPV_PQC_FALCON) ? "falcon-commit" :
