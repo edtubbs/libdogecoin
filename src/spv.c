@@ -216,13 +216,58 @@ typedef enum {
 #endif
 } spv_pqc_algo_t;
 
-typedef struct {
-    uint8_t commit[32];
+typedef struct spv_pqc_pending_commit {
+    uint8_t commit[32];       /* 32-byte commit hash - used as hash key */
     spv_pqc_algo_t algo;
     uint32_t txpos;
-    uint8_t* txc_raw;     /* serialized TX_C for signature verification */
+    uint32_t height;          /* block height where TX_C was seen */
+    uint8_t* txc_raw;         /* serialized TX_C for signature verification */
     size_t txc_raw_len;
+    UT_hash_handle hh;        /* makes this structure hashable */
 } spv_pqc_pending_commit_t;
+
+/* Hash table for pending OP_RETURN commitments awaiting carrier TX_R match.
+   TX_C (commitment) may be in one block and TX_R (reveal) in a later block.
+   Key: 32-byte commit hash, provides O(1) lookup when TX_R arrives. */
+static spv_pqc_pending_commit_t* g_pending_commits = NULL;
+
+/* Helper: find pending commit by commit hash */
+static spv_pqc_pending_commit_t* spv_pqc_find_pending(const uint8_t* commit) {
+    spv_pqc_pending_commit_t* found = NULL;
+    HASH_FIND(hh, g_pending_commits, commit, 32, found);
+    return found;
+}
+
+/* Helper: add pending commit to hash table */
+static void spv_pqc_add_pending(spv_pqc_pending_commit_t* entry) {
+    /* Check for duplicate before adding */
+    spv_pqc_pending_commit_t* existing = spv_pqc_find_pending(entry->commit);
+    if (existing) {
+        /* Replace existing entry */
+        HASH_DEL(g_pending_commits, existing);
+        if (existing->txc_raw) dogecoin_free(existing->txc_raw);
+        dogecoin_free(existing);
+    }
+    HASH_ADD(hh, g_pending_commits, commit, 32, entry);
+}
+
+/* Helper: remove and free pending commit */
+static void spv_pqc_remove_pending(spv_pqc_pending_commit_t* entry) {
+    HASH_DEL(g_pending_commits, entry);
+    if (entry->txc_raw) dogecoin_free(entry->txc_raw);
+    dogecoin_free(entry);
+}
+
+/* Helper: expire old pending commits (older than max_age blocks) */
+static void spv_pqc_expire_pending(uint32_t current_height, uint32_t max_age) {
+    spv_pqc_pending_commit_t* entry;
+    spv_pqc_pending_commit_t* tmp;
+    HASH_ITER(hh, g_pending_commits, entry, tmp) {
+        if (entry->height + max_age < current_height) {
+            spv_pqc_remove_pending(entry);
+        }
+    }
+}
 
 /**
  * @brief Extract PQC pubkey+sig from carrier-format scriptSigs.
@@ -1094,11 +1139,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             uint64_t coinbase_value = 0;
 
             size_t consumedlength = 0;
-#ifdef USE_LIBOQS
-            /* Per-block buffer for pending OP_RETURN commitments awaiting carrier TX_R match */
-            spv_pqc_pending_commit_t pending_commits[SPV_PQC_PENDING_MAX];
-            size_t pending_count = 0;
-#endif
             unsigned int i;
             for (i = 0; i < amount_of_txs; i++)
             {
@@ -1148,18 +1188,18 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     utils_bin_to_hex(falcon_commit_data, 32, falcon_commit_hex);
                     client->nodegroup->log_write_cb("[falcon-commit] Pending at height=%d txpos=%u commit=%s source=op_return\n",
                                                      pindex->height, i, falcon_commit_hex);
-                    if (pending_count < SPV_PQC_PENDING_MAX) {
-                        memcpy(pending_commits[pending_count].commit, falcon_commit_data, 32);
-                        pending_commits[pending_count].algo = SPV_PQC_FALCON;
-                        pending_commits[pending_count].txpos = i;
-                        pending_commits[pending_count].txc_raw = dogecoin_malloc(consumedlength);
-                        if (pending_commits[pending_count].txc_raw) {
-                            memcpy(pending_commits[pending_count].txc_raw, tx_raw, consumedlength);
-                            pending_commits[pending_count].txc_raw_len = consumedlength;
-                        } else {
-                            pending_commits[pending_count].txc_raw_len = 0;
+                    spv_pqc_pending_commit_t* entry = dogecoin_calloc(1, sizeof(spv_pqc_pending_commit_t));
+                    if (entry) {
+                        memcpy(entry->commit, falcon_commit_data, 32);
+                        entry->algo = SPV_PQC_FALCON;
+                        entry->txpos = i;
+                        entry->height = pindex->height;
+                        entry->txc_raw = dogecoin_malloc(consumedlength);
+                        if (entry->txc_raw) {
+                            memcpy(entry->txc_raw, tx_raw, consumedlength);
+                            entry->txc_raw_len = consumedlength;
                         }
-                        pending_count++;
+                        spv_pqc_add_pending(entry);
                     }
                 }
                 /* Dilithium2: buffer for cross-TX carrier match (TX_C → pending, TX_R validates via multi-part carrier) */
@@ -1169,18 +1209,18 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     utils_bin_to_hex(dilithium_commit_data, 32, dilithium_commit_hex);
                     client->nodegroup->log_write_cb("[dilithium-commit] Pending at height=%d txpos=%u commit=%s source=op_return\n",
                                                      pindex->height, i, dilithium_commit_hex);
-                    if (pending_count < SPV_PQC_PENDING_MAX) {
-                        memcpy(pending_commits[pending_count].commit, dilithium_commit_data, 32);
-                        pending_commits[pending_count].algo = SPV_PQC_DILITHIUM;
-                        pending_commits[pending_count].txpos = i;
-                        pending_commits[pending_count].txc_raw = dogecoin_malloc(consumedlength);
-                        if (pending_commits[pending_count].txc_raw) {
-                            memcpy(pending_commits[pending_count].txc_raw, tx_raw, consumedlength);
-                            pending_commits[pending_count].txc_raw_len = consumedlength;
-                        } else {
-                            pending_commits[pending_count].txc_raw_len = 0;
+                    spv_pqc_pending_commit_t* entry = dogecoin_calloc(1, sizeof(spv_pqc_pending_commit_t));
+                    if (entry) {
+                        memcpy(entry->commit, dilithium_commit_data, 32);
+                        entry->algo = SPV_PQC_DILITHIUM;
+                        entry->txpos = i;
+                        entry->height = pindex->height;
+                        entry->txc_raw = dogecoin_malloc(consumedlength);
+                        if (entry->txc_raw) {
+                            memcpy(entry->txc_raw, tx_raw, consumedlength);
+                            entry->txc_raw_len = consumedlength;
                         }
-                        pending_count++;
+                        spv_pqc_add_pending(entry);
                     }
                 }
                 /* Raccoon-G-44: buffer for cross-TX carrier match (TX_C → pending, TX_R validates via multi-part carrier) */
@@ -1191,18 +1231,18 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     utils_bin_to_hex(raccoong_commit_data, 32, raccoong_commit_hex);
                     client->nodegroup->log_write_cb("[raccoong-commit] Pending at height=%d txpos=%u commit=%s source=op_return\n",
                                                      pindex->height, i, raccoong_commit_hex);
-                    if (pending_count < SPV_PQC_PENDING_MAX) {
-                        memcpy(pending_commits[pending_count].commit, raccoong_commit_data, 32);
-                        pending_commits[pending_count].algo = SPV_PQC_RACCOONG;
-                        pending_commits[pending_count].txpos = i;
-                        pending_commits[pending_count].txc_raw = dogecoin_malloc(consumedlength);
-                        if (pending_commits[pending_count].txc_raw) {
-                            memcpy(pending_commits[pending_count].txc_raw, tx_raw, consumedlength);
-                            pending_commits[pending_count].txc_raw_len = consumedlength;
-                        } else {
-                            pending_commits[pending_count].txc_raw_len = 0;
+                    spv_pqc_pending_commit_t* entry = dogecoin_calloc(1, sizeof(spv_pqc_pending_commit_t));
+                    if (entry) {
+                        memcpy(entry->commit, raccoong_commit_data, 32);
+                        entry->algo = SPV_PQC_RACCOONG;
+                        entry->txpos = i;
+                        entry->height = pindex->height;
+                        entry->txc_raw = dogecoin_malloc(consumedlength);
+                        if (entry->txc_raw) {
+                            memcpy(entry->txc_raw, tx_raw, consumedlength);
+                            entry->txc_raw_len = consumedlength;
                         }
-                        pending_count++;
+                        spv_pqc_add_pending(entry);
                     }
                 }
 #endif
@@ -1253,25 +1293,20 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             size_t sig_prefix_len = carrier_sig_len < 16 ? carrier_sig_len : 16;
                             utils_bin_to_hex((unsigned char*)carrier_sig, sig_prefix_len, sig_prefix_hex);
 
-                            /* Cross-validate: match computed carrier commitment against buffered OP_RETURN commitments  */
-                            dogecoin_bool matched = false;
+                            /* Cross-validate: O(1) hash table lookup for matching OP_RETURN commitment */
+                            spv_pqc_pending_commit_t* matched_entry = spv_pqc_find_pending(computed_commit);
+                            dogecoin_bool matched = (matched_entry != NULL && matched_entry->algo == carrier_algo);
                             uint32_t matched_txpos = 0;
                             uint8_t* matched_txc_raw = NULL;
                             size_t matched_txc_raw_len = 0;
-                            for (size_t pc = 0; pc < pending_count; pc++) {
-                                if (pending_commits[pc].algo == carrier_algo &&
-                                    memcmp(pending_commits[pc].commit, computed_commit, 32) == 0) {
-                                    matched = true;
-                                    matched_txpos = pending_commits[pc].txpos;
-                                    matched_txc_raw = pending_commits[pc].txc_raw;
-                                    matched_txc_raw_len = pending_commits[pc].txc_raw_len;
-                                    /* Remove matched entry by shifting (but don't free txc_raw yet) */
-                                    pending_commits[pc].txc_raw = NULL;
-                                    for (size_t rm = pc; rm + 1 < pending_count; rm++)
-                                        pending_commits[rm] = pending_commits[rm + 1];
-                                    pending_count--;
-                                    break;
-                                }
+                            if (matched) {
+                                matched_txpos = matched_entry->txpos;
+                                matched_txc_raw = matched_entry->txc_raw;
+                                matched_txc_raw_len = matched_entry->txc_raw_len;
+                                /* Remove from hash table but don't free txc_raw yet (used below) */
+                                matched_entry->txc_raw = NULL;
+                                HASH_DEL(g_pending_commits, matched_entry);
+                                dogecoin_free(matched_entry);
                             }
 
                             if (matched) {
@@ -1452,13 +1487,8 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 dogecoin_tx_free(tx);
             }
 #ifdef USE_LIBOQS
-            /* Free any unmatched pending commit TX_C buffers */
-            for (size_t pc = 0; pc < pending_count; pc++) {
-                if (pending_commits[pc].txc_raw) {
-                    dogecoin_free(pending_commits[pc].txc_raw);
-                    pending_commits[pc].txc_raw = NULL;
-                }
-            }
+            /* Expire pending commits older than 100 blocks (TX_R should arrive within a few blocks) */
+            spv_pqc_expire_pending(pindex->height, 100);
 #endif
             client->last_block_total_tx_size = total_tx_size;
 
