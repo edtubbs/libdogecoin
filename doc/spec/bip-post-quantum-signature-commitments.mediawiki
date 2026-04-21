@@ -469,7 +469,7 @@ Commitment transaction (TX_C, Run 2) with OP_RETURN commitment and 24 P2SH carri
 <source>
 TX_C txid:   913f89a45debf6951c70253e55c75bda8e53ff9521d08670ed2355006252a30d
 Input UTXO:  b6e065cbb0b42166a3fa0708c664df4a4a726e4b51ec47541634117dc7477c04:0 (cascade change)
-Status:      broadcast to mainnet mempool 2026-04-20
+Block:       6174161 (mainnet, confirmed 2026-04-20T23:30:10Z, txpos=26)
 Funded addr: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
 Commitment:  7dd12252cd2b388c117d5eb0c26d4d518ce077d07b8100060fbc3e604e0531c8
 
@@ -483,12 +483,22 @@ Reveal transaction (TX_R, Run 2, ~39 KB, spending all 24 P2SH carrier outputs):
 
 <source>
 TX_R txid:   9f3b3b49bc156db86b92553b8cf80ee4240d96e2d7fc38712e6551900642020e
-Status:      broadcast to mainnet mempool 2026-04-20
+Block:       6174161 (mainnet, confirmed 2026-04-20T23:30:10Z, txpos=32)
 TX_R fee:    1.0 DOGE (100000000 koinu) — adequate for ~39 KB at ≥0.001 DOGE/kB relay rate
+TX_R size:   38802 bytes
 pk_len:      16144 (Raccoon-G-44 public key)
 sig_len:     20768 (Raccoon-G-44 signature)
 part_total:  24 carrier vins (RCG4FULL tag)
 Off-chain verification: PASSED (signature valid; SHA256(pk||sig) matches TX_C OP_RETURN commitment)
+</source>
+
+SPV validation log showing commitment detection and Phase 2 PQC signature verification (block 6174161):
+
+<source>
+[raccoong-commit] Pending at height=6174161 txpos=26 commit=7dd12252cd2b388c117d5eb0c26d4d518ce077d07b8100060fbc3e604e0531c8 source=op_return
+[raccoong-commit] Valid at height=6174161 txpos=32 commit=7dd12252cd2b388c117d5eb0c26d4d518ce077d07b8100060fbc3e604e0531c8 carrier_vin=0..23 source=carrier_scriptsig matched_txc_txpos=26 pk_len=16144 sig_len=20768 pk_prefix=8c8a6acb1f159d9b sig_prefix=be947bf65d1aaf20 txr_txid=9f3b3b49bc156db86b92553b8cf80ee4240d96e2d7fc38712e6551900642020e
+[raccoong-commit] PQC signature verification PASSED at height=6174161 txpos=32 sighash=bbed8f63bedf2336730b90d241ecc8eaa8afb065ba06afbf990de4233f03022b
+[raccoong-commit] Reveal validated: TX_R=9f3b3b49bc156db86b92553b8cf80ee4240d96e2d7fc38712e6551900642020e commit=7dd12252cd2b388c117d5eb0c26d4d518ce077d07b8100060fbc3e604e0531c8 pk_len=16144 sig_len=20768 height=6174161
 </source>
 
 Note: The Raccoon-G-44 TX_R fee must be at least 1.0 DOGE (100000000 koinu) for reliable miner inclusion given the ~39 KB transaction size.
@@ -508,10 +518,11 @@ Height   TxPos  Algorithm     Source              Commitment (first 16 hex)     
 6173895  50     Falcon-512    carrier_scriptsig   e780b663d19966bc...              (pk_len=897, sig_len=655, PASSED)
 6173897  16     Dilithium2    op_return_only      f8dda58255...
 6173902  11     Dilithium2    carrier_scriptsig   f8dda58255...                    (pk_len=1312, sig_len=2420, PASSED)
-pending  -      Raccoon-G-44  off_chain_verify    7dd12252cd2b388c...              (pk_len=16144, sig_len=20768, PASSED, TX_R=9f3b3b49bc156db86b92553b8cf80ee4240d96e2d7fc38712e6551900642020e)
+6174161  26     Raccoon-G-44  op_return_only      7dd12252cd2b388c...
+6174161  32     Raccoon-G-44  carrier_scriptsig   7dd12252cd2b388c...              (pk_len=16144, sig_len=20768, PASSED)
 </source>
 
-Note: Validated carrier_scriptsig entries demonstrate the two-transaction carrier pattern (TX_C + TX_R) with full Phase 2 PQC signature verification PASSED for Falcon-512 and Dilithium2. The Raccoon-G-44 entry shows off-chain verification (SHA256(pk||sig) matches TX_C OP_RETURN commitment; SPV node scan pending TX_R confirmation).
+Note: Validated carrier_scriptsig entries demonstrate the two-transaction carrier pattern (TX_C + TX_R) with full Phase 2 PQC signature verification PASSED for Falcon-512, Dilithium2, and Raccoon-G-44.
 
 ==Deployment==
 
