@@ -45,8 +45,6 @@
 
 # Kernel Module Compile Results
 *.mod*
-# But allow Swift module maps
-!module.modulemap
 *.cmd
 .tmp_versions/
 modules.order
@@ -162,4 +160,3 @@ store/*
 !/src/optee/host/Makefile
 !/src/optee/ta/Makefile
 /src/optee/build
-build_valgrind/
