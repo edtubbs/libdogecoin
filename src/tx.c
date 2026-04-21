@@ -201,6 +201,10 @@ void dogecoin_tx_free(dogecoin_tx* tx)
  */
 int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p2pkh, int is_mainnet) {
     if (!txout) return false;
+    /* P2PKH scriptPubKey is exactly 25 bytes (OP_DUP OP_HASH160 <20-byte-hash> OP_EQUALVERIFY OP_CHECKSIG).
+       Reject anything shorter to avoid an unsigned underflow in the loop condition below
+       (copy->script_pubkey->len - 4 wraps to SIZE_MAX when len < 4). */
+    if (!txout->script_pubkey || txout->script_pubkey->len < 25) return false;
     const dogecoin_chainparams* chain = is_mainnet ? &dogecoin_chainparams_main : &dogecoin_chainparams_test;
     dogecoin_tx_out* copy = dogecoin_tx_out_new();
     dogecoin_tx_out_copy(copy, txout);
