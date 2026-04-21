@@ -586,4 +586,9 @@ void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t 
     memcpy_safe(db->chainbottom->hash, hash, sizeof(uint256_t));
     memcpy_safe(db->chainbottom->chainwork, chainwork, sizeof(uint256_t));
     db->chaintip = db->chainbottom;
+    /* Add to tree so dogecoin_btree_tdestroy (in dogecoin_headers_db_free) and
+       the trim path (dogecoin_btree_tdelete) can properly free this block. */
+    if (db->use_binary_tree) {
+        dogecoin_btree_tsearch(db->chainbottom, &db->tree_root, dogecoin_header_compare);
+    }
 }
