@@ -740,7 +740,9 @@ int main(int argc, char* argv[]) {
 #if WITH_WALLET
             dogecoin_wallet_free(wallet);
 #endif
-            ret = EXIT_FAILURE;
+            dogecoin_spv_client_free(client);
+            dogecoin_ecc_stop();
+            return EXIT_FAILURE;
         } else {
             if (spv_select_checkpoint) {
                 int loaded_start_height = -1;

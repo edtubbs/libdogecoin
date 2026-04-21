@@ -196,10 +196,14 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
              memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)))
         {
             fprintf(stderr, "Error reading database file\n");
+            fclose(db->headers_tree_file);
+            db->headers_tree_file = NULL;
             return false;
         }
         if (le32toh(*(buf+sizeof(file_hdr_magic))) > current_version) {
             fprintf(stderr, "Unsupported file version\n");
+            fclose(db->headers_tree_file);
+            db->headers_tree_file = NULL;
             return false;
         }
     }
