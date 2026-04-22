@@ -194,6 +194,8 @@ static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 /* Maximum number of pending PQC OP_RETURN commitments buffered per block
    for cross-TX carrier validation (TX_C has OP_RETURN, TX_R has scriptSig). */
 #define SPV_PQC_PENDING_MAX 16
+/* Expire unmatched pending commits after this many blocks (~6 hrs on Dogecoin ~1-min blocks). */
+#define SPV_PQC_PENDING_EXPIRY_BLOCKS 144
 
 typedef struct spv_pqc_pending_commit {
     uint8_t commit[32];           /* 32-byte commit hash - used as hash key */
@@ -217,6 +219,19 @@ static spv_pqc_pending_commit_t* spv_pqc_find_pending(const uint8_t* commit) {
     return found;
 }
 
+/* Helper: evict oldest pending commit when the table is at capacity */
+static void spv_pqc_evict_if_full(void) {
+    if (HASH_COUNT(g_pending_commits) < SPV_PQC_PENDING_MAX) return;
+    spv_pqc_pending_commit_t* oldest = NULL;
+    spv_pqc_pending_commit_t* entry;
+    spv_pqc_pending_commit_t* tmp;
+    HASH_ITER(hh, g_pending_commits, entry, tmp) {
+        if (!oldest || entry->height < oldest->height)
+            oldest = entry;
+    }
+    if (oldest) spv_pqc_remove_pending(oldest);
+}
+
 /* Helper: add pending commit to hash table */
 static void spv_pqc_add_pending(spv_pqc_pending_commit_t* entry) {
     /* Check for duplicate before adding */
@@ -226,6 +241,9 @@ static void spv_pqc_add_pending(spv_pqc_pending_commit_t* entry) {
         HASH_DEL(g_pending_commits, existing);
         if (existing->txc_raw) dogecoin_free(existing->txc_raw);
         dogecoin_free(existing);
+    } else {
+        /* Enforce capacity limit (evict oldest entry if at max) */
+        spv_pqc_evict_if_full();
     }
     HASH_ADD(hh, g_pending_commits, commit, 32, entry);
 }
@@ -934,6 +952,30 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
             size_t consumedlength = 0;
             unsigned int i;
+
+#ifdef USE_LIBOQS
+            /* Expire unmatched pending PQC commits older than SPV_PQC_PENDING_EXPIRY_BLOCKS blocks.
+               Crafted OP_RETURN outputs that match the tag pattern but have no valid TX_R will be
+               cleared here so they do not accumulate indefinitely in memory. */
+            {
+                spv_pqc_pending_commit_t* _e;
+                spv_pqc_pending_commit_t* _etmp;
+                HASH_ITER(hh, g_pending_commits, _e, _etmp) {
+                    if (pindex->height > _e->height &&
+                        (pindex->height - _e->height) >= SPV_PQC_PENDING_EXPIRY_BLOCKS) {
+                        char _chex[65];
+                        utils_bin_to_hex(_e->commit, 32, _chex);
+                        const char* _label = (_e->algo == DOGECOIN_PQC_ALGO_FALCON) ? "falcon-commit" :
+                                             (_e->algo == DOGECOIN_PQC_ALGO_DILITHIUM) ? "dilithium-commit" :
+                                             "pqc-commit";
+                        client->nodegroup->log_write_cb("[%s] Expired unmatched commit=%s seen_height=%u current_height=%u\n",
+                                                         _label, _chex, _e->height, pindex->height);
+                        spv_pqc_remove_pending(_e);
+                    }
+                }
+            }
+#endif
+
             for (i = 0; i < amount_of_txs; i++)
             {
                 const unsigned char* tx_raw = (const unsigned char*)buf->p;
