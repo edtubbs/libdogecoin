@@ -80,11 +80,16 @@ ring only addresses innocuous gap-fill caused by concurrent peers.
 
 ### What the master-writer model implies
 
-* **No headers DB lock is needed on the SPV hot path.** There is exactly one
-  thread that writes the DB, so the `sync_lock` in
-  `src/headersdb_file.c` is only useful for legacy callers that access the
-  DB from a context other than the SPV master thread (REST, tools). Its cost
-  is a single uncontended mutex acquisition per call in the SPV build.
+* **No headers DB lock is needed — headersdb is single-writer by contract.**
+  The SPV master thread is the only writer, and legacy tools (`spvnode`,
+  `such`, `sendtx`) are single-threaded, so the previous `sync_lock` has
+  been removed from `src/headersdb_file.c`. The `sync_lock` field is kept
+  as a reserved `void*` to preserve ABI for callers that embed
+  `dogecoin_headers_db` in their own structures; the field is never
+  dereferenced. If a future caller needs to share a single
+  `dogecoin_headers_db` across threads, provide a `*_ts` wrapper that
+  wraps your own mutex around the call site rather than re-adding a lock
+  inside the DB.
 * **Workers do not see partially-written DB state.** They only produce parsed
   batches; they cannot race with the master.
 * **No mid-batch staging.** If a batch fails structurally mid-way (bad PoW,
@@ -97,9 +102,11 @@ ring only addresses innocuous gap-fill caused by concurrent peers.
 
 * `dogecoin_ctx_acquire` / `dogecoin_ctx_release` — context refcount is
   guarded by a process-wide mutex (`src/context.c`).
-* `dogecoin_headersdb_*` read-only APIs (`find`, `getchaintip`,
-  `fill_blocklocator_tip`) — guarded by the per-DB `sync_lock`. Mixing writes
-  from outside the SPV master thread is supported but rare.
+* `dogecoin_headersdb_*` read APIs (`find`, `getchaintip`,
+  `fill_blocklocator_tip`) on a DB owned by one writer — the DB itself is
+  single-writer; concurrent reads from other threads are safe only while
+  the writer is not committing. If you need true multi-reader safety,
+  serialize calls externally (e.g. with your own `rwlock`).
 * `dogecoin_ecc_start` / `dogecoin_ecc_stop` — process-wide singletons,
   refcounted.
 * Read access to chain parameters (`&dogecoin_chainparams_main`, etc.) — they
