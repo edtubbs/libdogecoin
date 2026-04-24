@@ -160,3 +160,10 @@ store/*
 !/src/optee/host/Makefile
 !/src/optee/ta/Makefile
 /src/optee/build
+
+/spvnode
+/sendtx
+/such
+/spvnode_ts
+/sendtx_ts
+/such_ts
