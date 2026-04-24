@@ -345,6 +345,12 @@ static dogecoin_bool spv_stage_batch(dogecoin_spv_client* client, int nodeid, ui
     spv_headers_stage_ctx* stage = (spv_headers_stage_ctx*)client->headers_stage_ctx;
     if (!stage || !payload || payload_len == 0) return false;
 
+    /* Allocate the new payload buffer up-front so we can bail out without disturbing
+     * staging accounting (count/dropped_total) if the allocation fails. */
+    uint8_t* copy = (uint8_t*)dogecoin_calloc(1, payload_len);
+    if (!copy) return false;
+    memcpy(copy, payload, payload_len);
+
     /* avoid duplicate staging for the same prev_block */
     for (size_t i = 0; i < SPV_HEADERS_STAGE_CAPACITY; i++) {
         if (stage->slots[i].in_use && memcmp(stage->slots[i].prev_block, prev_block, 32) == 0) {
@@ -368,9 +374,7 @@ static dogecoin_bool spv_stage_batch(dogecoin_spv_client* client, int nodeid, ui
     }
 
     spv_header_stage_slot* slot = &stage->slots[target];
-    slot->payload = (uint8_t*)dogecoin_calloc(1, payload_len);
-    if (!slot->payload) return false;
-    memcpy(slot->payload, payload, payload_len);
+    slot->payload = copy;
     slot->payload_len = payload_len;
     slot->amount_of_headers = amount_of_headers;
     slot->nodeid = nodeid;
@@ -459,8 +463,8 @@ static void spv_commit_parsed_headers_batch(dogecoin_spv_client* client, int nod
         if (spv_batch_peek_prev_block(payload, payload_len, prev_block)) {
             dogecoin_blockindex* tip = client->headers_db ? client->headers_db->getchaintip(client->headers_db_ctx) : NULL;
             if (tip && memcmp(prev_block, tip->hash, 32) != 0) {
-                dogecoin_blockindex* known = dogecoin_headersdb_find((dogecoin_headers_db*)client->headers_db_ctx, prev_block);
-                if (known) {
+                dogecoin_blockindex* prev_block_index = dogecoin_headersdb_find((dogecoin_headers_db*)client->headers_db_ctx, prev_block);
+                if (prev_block_index) {
                     if (spv_stage_batch(client, nodeid, amount_of_headers, payload, payload_len, prev_block)) {
                         return;
                     }

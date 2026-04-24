@@ -151,4 +151,4 @@ Chaintip at height ...
 ```
 
 An example capture is kept under
-`doc/verification/spvnode_ts_threaded_headers_sample.txt`.
+`doc/verification/spvnode_ts_phase2_thread_safe_sample.txt`.
