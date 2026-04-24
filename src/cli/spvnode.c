@@ -736,6 +736,10 @@ int main(int argc, char* argv[]) {
         dogecoin_ecc_start();
         dogecoin_bool headers_memonly = (dbfile != NULL) && (!strcmp(dbfile, "0") || !strcmp(dbfile, "no"));
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, headers_memonly, use_checkpoint, full_sync, maxnodes, http_server);
+#ifdef DOGECOIN_THREAD_SAFE
+        /* Thread-safe CLI build: opt into master-writer pipeline with bounded out-of-order staging. */
+        dogecoin_spv_client_enable_thread_safe_mode(client);
+#endif
         if (headers_target_nodeid >= 0) {
             dogecoin_spv_set_headers_target_node(client, headers_target_nodeid);
             if (debug) {

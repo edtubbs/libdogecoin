@@ -329,7 +329,7 @@ inst_PROGRAMS += such_ts
 such_ts_LDADD = $(such_LDADD)
 such_ts_SOURCES = $(such_SOURCES)
 such_ts_CFLAGS = $(such_CFLAGS)
-such_ts_CPPFLAGS = $(such_CPPFLAGS)
+such_ts_CPPFLAGS = $(such_CPPFLAGS) -DDOGECOIN_THREAD_SAFE=1
 such_ts_LDFLAGS = $(such_LDFLAGS)
 
 if WITH_NET
@@ -345,7 +345,7 @@ inst_PROGRAMS += sendtx_ts
 sendtx_ts_LDADD = $(sendtx_LDADD)
 sendtx_ts_SOURCES = $(sendtx_SOURCES)
 sendtx_ts_CFLAGS = $(sendtx_CFLAGS)
-sendtx_ts_CPPFLAGS = $(sendtx_CPPFLAGS)
+sendtx_ts_CPPFLAGS = $(sendtx_CPPFLAGS) -DDOGECOIN_THREAD_SAFE=1
 sendtx_ts_LDFLAGS = $(sendtx_LDFLAGS)
 
 inst_PROGRAMS += spvnode
@@ -360,7 +360,7 @@ inst_PROGRAMS += spvnode_ts
 spvnode_ts_LDADD = $(spvnode_LDADD)
 spvnode_ts_SOURCES = $(spvnode_SOURCES)
 spvnode_ts_CFLAGS = $(spvnode_CFLAGS)
-spvnode_ts_CPPFLAGS = $(spvnode_CPPFLAGS)
+spvnode_ts_CPPFLAGS = $(spvnode_CPPFLAGS) -DDOGECOIN_THREAD_SAFE=1
 spvnode_ts_LDFLAGS = $(spvnode_LDFLAGS)
 endif
 endif

@@ -1,0 +1,45 @@
+Phase 2 thread-safe pipeline verification for spvnode_ts
+========================================================
+
+Command (testnet, in-memory headers, 4 workers):
+  ./spvnode_ts -d -p -c -l -o 4 -t -f 0 scan
+
+Boot banner confirming TS opt-in at client construction:
+----------------------------------------------------------
+spvnode workers: 4
+DEBUG: SPV thread-safe mode enabled: master-writer pipeline with 8 out-of-order staging slots
+...
+DEBUG: Connected 2000 headers
+DEBUG: Chaintip at height 5902000
+DEBUG: Connected 2000 headers
+DEBUG: Chaintip at height 5904000
+
+Interpretation
+--------------
+- `SPV thread-safe mode enabled` is emitted by
+  `dogecoin_spv_client_enable_thread_safe_mode()` which the `_ts` binary calls
+  right after `dogecoin_spv_client_new()`. It confirms:
+    * the master-writer pipeline is active (only the main thread writes the
+      headers DB),
+    * a bounded (8-slot) out-of-order header-batch staging ring is provisioned
+      on this client.
+- `Connected 2000 headers ... Chaintip at height ...` lines confirm the master
+  thread is the sole writer and the tip advances monotonically cycle over
+  cycle.
+- `Staged out-of-order headers batch from node X (count=..., staged=N)` and
+  `Draining staged headers batch from node X (count=..., remaining_staged=N)`
+  are emitted only when a peer delivers a batch whose first header's
+  `prev_block` is already known in the headers DB but is not the current tip
+  (a small gap-fill). Peers that deliver batches many hours ahead of the
+  current tip (unknown `prev_block`) still fall through to the legacy
+  "not in sequence" path as before; this is intentional to bound resource use.
+
+Compile-time flag
+-----------------
+Both CMake and autotools define `DOGECOIN_THREAD_SAFE=1` on the `_ts` CLI
+targets only:
+  - Makefile.am: `spvnode_ts_CPPFLAGS += -DDOGECOIN_THREAD_SAFE=1`
+  - CMakeLists.txt: `TARGET_COMPILE_DEFINITIONS(spvnode_ts PRIVATE DOGECOIN_THREAD_SAFE=1)`
+
+The legacy `spvnode`, `sendtx`, and `such` binaries are unchanged and do not
+call `dogecoin_spv_client_enable_thread_safe_mode()`.

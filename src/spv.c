@@ -127,6 +127,54 @@ typedef struct spv_header_parse_result_ {
 
 typedef struct spv_headers_pipeline_ctx_ spv_headers_pipeline_ctx;
 
+/* Bounded master-writer staging for out-of-order header batches.
+ * Workers never touch these slots. When the main thread receives a parsed batch whose first
+ * header's prev_block does not match the current chaintip but is already known in headersdb,
+ * the batch is staged here instead of being rejected. After every successful commit that
+ * advances the tip, staged batches whose stored prev_block equals the new tip hash are re-applied.
+ */
+#define SPV_HEADERS_STAGE_CAPACITY 8
+
+typedef struct spv_header_stage_slot_ {
+    int in_use;
+    int nodeid;
+    uint32_t amount_of_headers;
+    uint8_t* payload;       /* owned */
+    size_t payload_len;
+    uint8_t prev_block[32]; /* little-endian hash of the first header's prev_block */
+} spv_header_stage_slot;
+
+typedef struct spv_headers_stage_ctx_ {
+    spv_header_stage_slot slots[SPV_HEADERS_STAGE_CAPACITY];
+    size_t count;
+    uint64_t staged_total;
+    uint64_t drained_total;
+    uint64_t dropped_total;
+} spv_headers_stage_ctx;
+
+static spv_headers_stage_ctx* spv_headers_stage_init(void)
+{
+    return (spv_headers_stage_ctx*)dogecoin_calloc(1, sizeof(spv_headers_stage_ctx));
+}
+
+static void spv_headers_stage_free(spv_headers_stage_ctx* stage)
+{
+    if (!stage) return;
+    for (size_t i = 0; i < SPV_HEADERS_STAGE_CAPACITY; i++) {
+        if (stage->slots[i].in_use && stage->slots[i].payload) {
+            dogecoin_free(stage->slots[i].payload);
+        }
+    }
+    dogecoin_free(stage);
+}
+
+static void spv_headers_stage_clear_slot(spv_header_stage_slot* slot)
+{
+    if (!slot) return;
+    if (slot->payload) dogecoin_free(slot->payload);
+    memset(slot, 0, sizeof(*slot));
+}
+
 static dogecoin_node* spv_find_node_by_id(dogecoin_spv_client* client, int nodeid)
 {
     size_t i;
@@ -279,6 +327,116 @@ static spv_headers_pipeline_ctx* spv_headers_pipeline_init(void) { return NULL; 
 static void spv_headers_pipeline_free(spv_headers_pipeline_ctx* ctx) { UNUSED(ctx); }
 #endif
 
+/* Forward declaration so staging helpers can call the committer. */
+static void spv_commit_parsed_headers_batch(dogecoin_spv_client* client, int nodeid, uint32_t amount_of_headers, const uint8_t* payload, size_t payload_len, dogecoin_bool parse_ok);
+
+/* Read the first header's prev_block (32 bytes at offset 4 of the serialized header).
+ * Returns true on success; false if payload is too short. */
+static dogecoin_bool spv_batch_peek_prev_block(const uint8_t* payload, size_t payload_len, uint8_t out_prev_block[32])
+{
+    /* block header layout: 4 (version) + 32 (prev_block) + ... */
+    if (!payload || payload_len < 36) return false;
+    memcpy(out_prev_block, payload + 4, 32);
+    return true;
+}
+
+static dogecoin_bool spv_stage_batch(dogecoin_spv_client* client, int nodeid, uint32_t amount_of_headers, const uint8_t* payload, size_t payload_len, const uint8_t prev_block[32])
+{
+    spv_headers_stage_ctx* stage = (spv_headers_stage_ctx*)client->headers_stage_ctx;
+    if (!stage || !payload || payload_len == 0) return false;
+
+    /* avoid duplicate staging for the same prev_block */
+    for (size_t i = 0; i < SPV_HEADERS_STAGE_CAPACITY; i++) {
+        if (stage->slots[i].in_use && memcmp(stage->slots[i].prev_block, prev_block, 32) == 0) {
+            /* already staged for this prev; prefer the more recent payload */
+            spv_headers_stage_clear_slot(&stage->slots[i]);
+            stage->count--;
+            break;
+        }
+    }
+
+    size_t target = SPV_HEADERS_STAGE_CAPACITY;
+    for (size_t i = 0; i < SPV_HEADERS_STAGE_CAPACITY; i++) {
+        if (!stage->slots[i].in_use) { target = i; break; }
+    }
+    if (target == SPV_HEADERS_STAGE_CAPACITY) {
+        /* capacity full; drop the oldest (index 0) to make room */
+        spv_headers_stage_clear_slot(&stage->slots[0]);
+        stage->count--;
+        stage->dropped_total++;
+        target = 0;
+    }
+
+    spv_header_stage_slot* slot = &stage->slots[target];
+    slot->payload = (uint8_t*)dogecoin_calloc(1, payload_len);
+    if (!slot->payload) return false;
+    memcpy(slot->payload, payload, payload_len);
+    slot->payload_len = payload_len;
+    slot->amount_of_headers = amount_of_headers;
+    slot->nodeid = nodeid;
+    memcpy(slot->prev_block, prev_block, 32);
+    slot->in_use = 1;
+    stage->count++;
+    stage->staged_total++;
+
+    if (client->nodegroup && client->nodegroup->log_write_cb) {
+        client->nodegroup->log_write_cb("Staged out-of-order headers batch from node %d (count=%u, staged=%zu)\n", nodeid, amount_of_headers, stage->count);
+    }
+    return true;
+}
+
+static void spv_stage_drain_for_tip(dogecoin_spv_client* client)
+{
+    spv_headers_stage_ctx* stage = (spv_headers_stage_ctx*)client->headers_stage_ctx;
+    if (!stage || stage->count == 0 || !client->headers_db) return;
+    /* Drain as long as any staged slot's prev_block matches the current chaintip hash.
+     * Committing can advance the tip further, enabling additional drains. */
+    int made_progress = 1;
+    while (made_progress) {
+        made_progress = 0;
+        dogecoin_blockindex* tip = client->headers_db->getchaintip(client->headers_db_ctx);
+        if (!tip) break;
+        for (size_t i = 0; i < SPV_HEADERS_STAGE_CAPACITY; i++) {
+            spv_header_stage_slot* slot = &stage->slots[i];
+            if (!slot->in_use) continue;
+            if (memcmp(slot->prev_block, tip->hash, 32) != 0) continue;
+
+            /* Take ownership locally so recursive commit doesn't see it in staging. */
+            uint8_t* payload = slot->payload;
+            size_t payload_len = slot->payload_len;
+            uint32_t amount_of_headers = slot->amount_of_headers;
+            int nodeid = slot->nodeid;
+            slot->payload = NULL;
+            slot->in_use = 0;
+            slot->payload_len = 0;
+            slot->amount_of_headers = 0;
+            stage->count--;
+            stage->drained_total++;
+
+            if (client->nodegroup && client->nodegroup->log_write_cb) {
+                client->nodegroup->log_write_cb("Draining staged headers batch from node %d (count=%u, remaining_staged=%zu)\n", nodeid, amount_of_headers, stage->count);
+            }
+            spv_commit_parsed_headers_batch(client, nodeid, amount_of_headers, payload, payload_len, true);
+            dogecoin_free(payload);
+            made_progress = 1;
+            break; /* re-read chaintip before next slot scan */
+        }
+    }
+}
+
+void dogecoin_spv_client_enable_thread_safe_mode(dogecoin_spv_client* client)
+{
+    if (!client) return;
+    if (client->thread_safe_mode) return;
+    if (!client->headers_stage_ctx) {
+        client->headers_stage_ctx = spv_headers_stage_init();
+    }
+    client->thread_safe_mode = true;
+    if (client->nodegroup && client->nodegroup->log_write_cb) {
+        client->nodegroup->log_write_cb("SPV thread-safe mode enabled: master-writer pipeline with %d out-of-order staging slots\n", SPV_HEADERS_STAGE_CAPACITY);
+    }
+}
+
 static void spv_commit_parsed_headers_batch(dogecoin_spv_client* client, int nodeid, uint32_t amount_of_headers, const uint8_t* payload, size_t payload_len, dogecoin_bool parse_ok)
 {
     dogecoin_node* node = spv_find_node_by_id(client, nodeid);
@@ -289,6 +447,27 @@ static void spv_commit_parsed_headers_batch(dogecoin_spv_client* client, int nod
     if (!parse_ok) {
         client->nodegroup->log_write_cb("Header payload parse failed from node %d\n", node->nodeid);
         return;
+    }
+
+    /* Out-of-order staging pre-check: if the batch's first header does not build on the current
+     * chaintip but its prev_block is already in the headers DB, stage the batch for later drain
+     * rather than rejecting it (and penalizing the peer with an invalid-sequence streak).
+     * Only active when the staging ring has been provisioned (spv client thread-safe mode or
+     * explicit init). Keeps legacy behavior unchanged for non-staged clients. */
+    if (client->headers_stage_ctx && amount_of_headers > 0) {
+        uint8_t prev_block[32];
+        if (spv_batch_peek_prev_block(payload, payload_len, prev_block)) {
+            dogecoin_blockindex* tip = client->headers_db ? client->headers_db->getchaintip(client->headers_db_ctx) : NULL;
+            if (tip && memcmp(prev_block, tip->hash, 32) != 0) {
+                dogecoin_blockindex* known = dogecoin_headersdb_find((dogecoin_headers_db*)client->headers_db_ctx, prev_block);
+                if (known) {
+                    if (spv_stage_batch(client, nodeid, amount_of_headers, payload, payload_len, prev_block)) {
+                        return;
+                    }
+                    /* staging failed (e.g. alloc) -> fall through to legacy commit */
+                }
+            }
+        }
     }
 
     unsigned int connected_headers = 0;
@@ -343,6 +522,12 @@ static void spv_commit_parsed_headers_batch(dogecoin_spv_client* client, int nod
     client->nodegroup->log_write_cb("Connected %d headers\n", connected_headers);
     client->nodegroup->log_write_cb("Headers batch stats node %d: connected=%u duplicate=%u invalid=%u total=%u\n", node->nodeid, connected_headers, duplicate_headers, invalid_headers, amount_of_headers);
     client->nodegroup->log_write_cb("Chaintip at height %d\n", chaintip->height);
+
+    /* If the tip advanced, try to drain any staged batches that now connect. */
+    if (connected_headers > 0) {
+        spv_stage_drain_for_tip(client);
+        chaintip = client->headers_db->getchaintip(client->headers_db_ctx);
+    }
 
     if (client->header_message_processed && client->header_message_processed(client, node, chaintip) == false)
         return;
@@ -543,6 +728,8 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->smpv_ctx = NULL;
     client->smpv_enabled = false;
     client->headers_pipeline_ctx = spv_headers_pipeline_init();
+    client->headers_stage_ctx = NULL;
+    client->thread_safe_mode = false;
 
     return client;
 }
@@ -615,6 +802,11 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
     if (client->headers_pipeline_ctx) {
         spv_headers_pipeline_free((spv_headers_pipeline_ctx*)client->headers_pipeline_ctx);
         client->headers_pipeline_ctx = NULL;
+    }
+
+    if (client->headers_stage_ctx) {
+        spv_headers_stage_free((spv_headers_stage_ctx*)client->headers_stage_ctx);
+        client->headers_stage_ctx = NULL;
     }
 
     if (client->headers_db)

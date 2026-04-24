@@ -87,6 +87,8 @@ typedef struct dogecoin_spv_client_
     void* smpv_ctx;
     dogecoin_bool smpv_enabled;
     void* headers_pipeline_ctx;
+    void* headers_stage_ctx;         /* bounded out-of-order header batch staging (master-writer) */
+    dogecoin_bool thread_safe_mode;  /* set by dogecoin_spv_client_enable_thread_safe_mode() in TS builds */
 
     /* callbacks */
     /* ========= */
@@ -110,6 +112,9 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_spv_handle_mempool_tx_hex(dogecoin_spv_cl
 LIBDOGECOIN_API void dogecoin_spv_get_smpv_stats(dogecoin_spv_client* client, uint32_t* total_txs, uint32_t* watched_addrs);
 LIBDOGECOIN_API void dogecoin_net_spv_request_mempool(dogecoin_spv_client *client);
 LIBDOGECOIN_API void dogecoin_spv_set_headers_target_node(dogecoin_spv_client* client, int nodeid);
+/* Opt-in to thread-safe runtime mode. Enables debug logging for the master-writer pipeline and
+   bounded out-of-order header batch staging. Safe to call multiple times; no-op on NULL. */
+LIBDOGECOIN_API void dogecoin_spv_client_enable_thread_safe_mode(dogecoin_spv_client* client);
 
 LIBDOGECOIN_END_DECL
 
