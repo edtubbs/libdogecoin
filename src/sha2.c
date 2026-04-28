@@ -209,6 +209,21 @@ extern void sha256_block_avx(const void *, void *);
 extern void sha512_block_sse(const void *, void *);
 extern void sha512_block_avx(const void *, void *);
 
+/*
+ * Multi-way SHA-256 double-hash kernels (Bitcoin Core style).
+ * Each routine consumes N blocks of 64 input bytes and produces N blocks of 32
+ * output bytes, where N = 4 for SSE4.1 and N = 8 for AVX2. They are only
+ * defined on x86 builds with the corresponding ISA enabled.
+ */
+#if defined(USE_AVX2) && (defined(__x86_64__) || defined(__amd64__) || defined(__i386__))
+extern void libdogecoin_sha256d64_avx2(unsigned char* out, const unsigned char* in);
+#define LIBDOGECOIN_HAVE_SHA256D64_AVX2 1
+#endif
+#if defined(USE_SSE) && (defined(__x86_64__) || defined(__amd64__) || defined(__i386__))
+extern void libdogecoin_sha256d64_sse41(unsigned char* out, const unsigned char* in);
+#define LIBDOGECOIN_HAVE_SHA256D64_SSE41 1
+#endif
+
 /*** SHA-XYZ INITIAL HASH VALUES AND CONSTANTS ************************/
 
 /* Hash constant words K for SHA-1: */
@@ -1298,6 +1313,29 @@ void sha256d64(const uint8_t* input, size_t blocks, uint8_t* digest)
     sha256_context context;
     uint8_t block[SHA256_BLOCK_LENGTH];
     uint8_t mid[SHA256_DIGEST_LENGTH];
+
+    /*
+     * SIMD multi-way kernels: process 8 (AVX2) or 4 (SSE4.1) 64-byte blocks at
+     * a time, doing both SHA-256 rounds in parallel across lanes. This matches
+     * the SHA256D64 fast-path used by Bitcoin/Dogecoin Core for merkle leaf
+     * hashing.
+     */
+#ifdef LIBDOGECOIN_HAVE_SHA256D64_AVX2
+    while (blocks >= 8) {
+        libdogecoin_sha256d64_avx2(digest, input);
+        input += 8 * SHA256_BLOCK_LENGTH;
+        digest += 8 * SHA256_DIGEST_LENGTH;
+        blocks -= 8;
+    }
+#endif
+#ifdef LIBDOGECOIN_HAVE_SHA256D64_SSE41
+    while (blocks >= 4) {
+        libdogecoin_sha256d64_sse41(digest, input);
+        input += 4 * SHA256_BLOCK_LENGTH;
+        digest += 4 * SHA256_DIGEST_LENGTH;
+        blocks -= 4;
+    }
+#endif
 
     while (blocks--) {
         sha256_init(&context);

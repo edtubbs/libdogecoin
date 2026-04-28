@@ -173,6 +173,16 @@ libdogecoin_la_DEPENDENCIES = $(ASM_LIB_FILES)
 CLEANFILES = $(ASM_OBJECT_FILES) $(ASM_LIB_FILES)
 endif
 
+if USE_AVX2
+libdogecoin_la_SOURCES += \
+    src/crypto/sha256_avx2.c
+endif
+
+if USE_SSE
+libdogecoin_la_SOURCES += \
+    src/crypto/sha256_sse41.c
+endif
+
 if USE_SSE2
 libdogecoin_la_SOURCES += \
     src/scrypt-sse2.c
