@@ -1138,12 +1138,10 @@ int main(int argc, char* argv[])
             return showError("failed to list encryption keys in tpm\n");
             }
 
-#if defined (_WIN64) && !defined(__MINGW64__)
         /* display encryption key names */
         for (int i = 0; i < count; i++) {
             wprintf(L"%ls\n", names[i]);
             }
-#endif
         /* free memory */
         for (int i = 0; i < count; i++) {
             dogecoin_free(names[i]);
