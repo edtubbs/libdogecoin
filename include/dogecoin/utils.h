@@ -5,7 +5,7 @@
  Copyright (c) 2015 Douglas J. Bakkum
  Copyright (c) 2015 Jonas Schnelli
  Copyright (c) 2022 bluezr
- Copyright (c) 2022 The Dogecoin Foundation
+ Copyright (c) 2022-2024 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -39,8 +39,10 @@
 #include <dogecoin/mem.h>
 #include <dogecoin/vector.h>
 
-#define TO_UINT8_HEX_BUF_LEN 2048
+/* 100 000-byte standard-tx → 200 000 hex chars + NUL */
+#define TO_UINT8_HEX_BUF_LEN 200001
 #define VARINT_LEN 20
+#define MAX_LEN 128
 
 #define BEGIN(a)            ((char*)&(a))
 #define END(a)              ((char*)&((&(a))[1]))
@@ -54,15 +56,20 @@ LIBDOGECOIN_BEGIN_DECL
 
 LIBDOGECOIN_API void utils_clear_buffers(void);
 LIBDOGECOIN_API void utils_hex_to_bin(const char* str, unsigned char* out, size_t inLen, size_t* outLen);
-LIBDOGECOIN_API void utils_bin_to_hex(unsigned char* bin_in, size_t inlen, char* hex_out);
+LIBDOGECOIN_API void utils_bin_to_hex(const unsigned char* bin_in, size_t inlen, char* hex_out);
 LIBDOGECOIN_API uint8_t* utils_hex_to_uint8(const char* str);
 LIBDOGECOIN_API char* utils_uint8_to_hex(const uint8_t* bin, size_t l);
 LIBDOGECOIN_API void utils_reverse_hex(char* h, size_t len);
+LIBDOGECOIN_API signed char utils_hex_digit(char c);
 LIBDOGECOIN_API void utils_uint256_sethex(char* psz, uint8_t* out);
-LIBDOGECOIN_API uint256* uint256S(const char *str);
+LIBDOGECOIN_API uint256_t* uint256S(const char *str);
 LIBDOGECOIN_API unsigned char* parse_hex(const char* psz);
 LIBDOGECOIN_API void swap_bytes(uint8_t *buf, int buf_size);
 LIBDOGECOIN_API const char *find_needle(const char *haystack, size_t haystack_length, const char *needle, size_t needle_length);
+LIBDOGECOIN_API uint8_t* bytes_find(uint8_t* haystack, size_t haystackLen, uint8_t* needle, size_t needleLen);
+LIBDOGECOIN_API char* to_string(uint8_t* x);
+LIBDOGECOIN_API char* hash_to_string(uint8_t* x);
+LIBDOGECOIN_API uint8_t* hash_to_bytes(uint8_t* x);
 LIBDOGECOIN_API void* safe_malloc(size_t size);
 LIBDOGECOIN_API void dogecoin_cheap_random_bytes(uint8_t* buf, size_t len);
 LIBDOGECOIN_API void dogecoin_get_default_datadir(cstring* path_out);
@@ -75,18 +82,20 @@ LIBDOGECOIN_API void prepend(char* s, const char* t);
 LIBDOGECOIN_API void append(char* s, char* t);
 LIBDOGECOIN_API char* concat(char* prefix, char* suffix);
 LIBDOGECOIN_API void slice(const char *str, char *result, size_t start, size_t end);
+LIBDOGECOIN_API void replace_last_after_delim(const char *str, char* delim, char* replacement);
 LIBDOGECOIN_API void text_to_hex(char* in, char* out);
 LIBDOGECOIN_API const char* get_build();
+LIBDOGECOIN_API char* getpass(const char *prompt);
 LIBDOGECOIN_API void dogecoin_str_reverse(char s[]);
 LIBDOGECOIN_API void dogecoin_uitoa(int n, char s[]);
 LIBDOGECOIN_API bool dogecoin_network_enabled();
-
+LIBDOGECOIN_API int integer_length(int x);
+LIBDOGECOIN_API int file_copy (char src [], char dest []);
 unsigned int base64_int(unsigned int ch);
 unsigned int base64_encoded_size(unsigned int in_size);
 unsigned int base64_decoded_size(unsigned int in_size);
 unsigned int base64_encode(const unsigned char* in, unsigned int in_len, unsigned char* out);
 unsigned int base64_decode(const unsigned char* in, unsigned int in_len, unsigned char* out);
-int integer_length(int x);
 
 #define _SEARCH_PRIVATE
 #ifdef _SEARCH_PRIVATE
@@ -107,11 +116,10 @@ static inline void dogecoin_btree_tdestroy(void *root, void (*freekey)(void *))
 
     if (r == 0)
         return;
-    if (freekey) goto end;
-    if (r->left && !freekey) dogecoin_btree_tdestroy(r->left, freekey);
-    if (r->right && !freekey) dogecoin_btree_tdestroy(r->right, freekey);
-    
-end:
+
+    if (r->left) dogecoin_btree_tdestroy(r->left, freekey);
+    if (r->right) dogecoin_btree_tdestroy(r->right, freekey);
+
     if (freekey) freekey(r->key);
     dogecoin_free(r);
 }

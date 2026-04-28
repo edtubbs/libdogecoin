@@ -5,7 +5,7 @@
  Copyright (c) 2015 Douglas J. Bakkum
  Copyright (c) 2015 Jonas Schnelli
  Copyright (c) 2022 bluezr
- Copyright (c) 2022 The Dogecoin Foundation
+ Copyright (c) 2022-2024 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -44,9 +44,9 @@
 /**
  * @brief This function frees the memory allocated
  * for a transaction input.
- * 
+ *
  * @param tx_in The pointer to the transaction input to be freed.
- * 
+ *
  * @return Nothing.
  */
 void dogecoin_tx_in_free(dogecoin_tx_in* tx_in)
@@ -71,9 +71,9 @@ void dogecoin_tx_in_free(dogecoin_tx_in* tx_in)
  * @brief This function casts data from a channel buffer to
  * a transaction input object and then frees it by calling
  * dogecoin_tx_in_free().
- * 
+ *
  * @param data The pointer to the data to be freed.
- * 
+ *
  * @return Nothing.
  */
 void dogecoin_tx_in_free_cb(void* data)
@@ -90,7 +90,7 @@ void dogecoin_tx_in_free_cb(void* data)
 /**
  * @brief This function creates a new dogecoin transaction
  * input object and initializes it to all zeroes.
- * 
+ *
  * @return A pointer to the new transaction input object.
  */
 dogecoin_tx_in* dogecoin_tx_in_new()
@@ -99,6 +99,7 @@ dogecoin_tx_in* dogecoin_tx_in_new()
     tx_in = dogecoin_calloc(1, sizeof(*tx_in));
     dogecoin_mem_zero(&tx_in->prevout, sizeof(tx_in->prevout));
     tx_in->sequence = UINT32_MAX;
+    tx_in->prevout.n = UINT32_MAX;
     return tx_in;
 }
 
@@ -106,9 +107,9 @@ dogecoin_tx_in* dogecoin_tx_in_new()
 /**
  * @brief This function frees the memory allocated
  * for a transaction output.
- * 
+ *
  * @param tx_in The pointer to the transaction output to be freed.
- * 
+ *
  * @return Nothing.
  */
 void dogecoin_tx_out_free(dogecoin_tx_out* tx_out)
@@ -132,9 +133,9 @@ void dogecoin_tx_out_free(dogecoin_tx_out* tx_out)
  * @brief This function casts data from a channel buffer to
  * a transaction output object and then frees it by calling
  * dogecoin_tx_out_free().
- * 
+ *
  * @param data The pointer to the data to be freed.
- * 
+ *
  * @return Nothing.
  */
 void dogecoin_tx_out_free_cb(void* data)
@@ -151,7 +152,7 @@ void dogecoin_tx_out_free_cb(void* data)
 /**
  * @brief This function creates a new dogecoin transaction
  * output object and initializes it to all zeroes.
- * 
+ *
  * @return A pointer to the new transaction output object.
  */
 dogecoin_tx_out* dogecoin_tx_out_new()
@@ -166,9 +167,9 @@ dogecoin_tx_out* dogecoin_tx_out_new()
 /**
  * @brief This function frees the memory allocated
  * for a full transaction.
- * 
+ *
  * @param tx_in The pointer to the transaction to be freed.
- * 
+ *
  * @return Nothing.
  */
 void dogecoin_tx_free(dogecoin_tx* tx)
@@ -189,12 +190,12 @@ void dogecoin_tx_free(dogecoin_tx* tx)
 
 /**
  * It takes a pointer to a dogecoin_tx_out, copies to a new dogecoin_tx_out
- * converts dogecoin_tx_out->script_pubkey to a p2pkh address, and 
+ * converts dogecoin_tx_out->script_pubkey to a p2pkh address, and
  * frees the copy.
- * 
+ *
  * @param txout The data to be copied which contains the script hash we want.
  * @param p2pkh The variable out we want to contain the converted script hash in.
- * 
+ *
  * @return int
  */
 int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p2pkh, int is_mainnet) {
@@ -222,22 +223,23 @@ int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p
                 break;
         }
     }
-    if (!dogecoin_p2pkh_addr_from_hash160(stripped_array, chain, p2pkh, 35)) {
+    if (!dogecoin_p2pkh_addr_from_hash160(stripped_array, chain, p2pkh, P2PKHLEN)) {
         printf("failed to convert hash160 to p2pkh!\n");
         return false;
     }
     dogecoin_free(stripped_array);
+    dogecoin_tx_out_free(copy);
     return true;
 }
 
 /**
  * It takes a pointer to a script_pubkey, copies to a new script_pubkey
- * converts script_pubkey to a p2pkh address, and 
+ * converts script_pubkey to a p2pkh address, and
  * frees the copy.
- * 
+ *
  * @param script_pubkey The data to be copied which contains the script hash we want.
  * @param p2pkh The variable out we want to contain the converted script hash in.
- * 
+ *
  * @return int
  */
 dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey_hex, size_t script_pubkey_hex_length, char* p2pkh, const dogecoin_chainparams* chain) {
@@ -262,7 +264,7 @@ dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey_hex, siz
                 break;
         }
     }
-    if (!dogecoin_p2pkh_addr_from_hash160(stripped_array, chain, p2pkh, 35)) {
+    if (!dogecoin_p2pkh_addr_from_hash160(stripped_array, chain, p2pkh, P2PKHLEN)) {
         printf("failed to convert hash160 to p2pkh!\n");
         return false;
     }
@@ -272,19 +274,19 @@ dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char* script_pubkey_hex, siz
 
 /**
  * It takes a p2pkh address and converts it to a compressed public key in
- * hexadecimal format. It then strips the network prefix and checksum and 
+ * hexadecimal format. It then strips the network prefix and checksum and
  * prepends OP_DUP and OP_HASH160 and appends OP_EQUALVERIFY and OP_CHECKSIG.
- * 
+ *
  * @param p2pkh The variable out we want to contain the converted script hash in.
  * @param pubkey_hash The variable that will store the pubkey hash.
- * 
+ *
  * @return int
  */
 dogecoin_bool dogecoin_p2pkh_address_to_pubkey_hash(char* p2pkh, char* pubkey_hash) {
     if (!p2pkh) return false;
- 
+
     // strlen(p2pkh) + 1 = 35
-    unsigned char dec[35]; //problem is here, it works if its char**
+    unsigned char dec[P2PKHLEN]; //problem is here, it works if its char**
 
     // MLUMIN: MSVC
     size_t decoded_length = dogecoin_base58_decode_check(p2pkh, (uint8_t*)&dec, sizeof(dec) / sizeof(dec[0]));
@@ -293,7 +295,7 @@ dogecoin_bool dogecoin_p2pkh_address_to_pubkey_hash(char* p2pkh, char* pubkey_ha
         printf("failed base58 decode\n");
         return false;
     }
-    
+
     //decoded bytes = [1-byte versionbits][20-byte hash][4-byte checksum]
     char* b58_decode_hex = utils_uint8_to_hex((const uint8_t*)dec, decoded_length - 4);
     //concatenate the fields
@@ -304,17 +306,17 @@ dogecoin_bool dogecoin_p2pkh_address_to_pubkey_hash(char* p2pkh, char* pubkey_ha
 /**
  * It takes a p2pkh address and converts it to a compressed public key in
  * hexadecimal format. It then strips the network prefix and checksum
- * 
+ *
  * @param p2pkh The variable out we want to contain the converted script hash in.
  * @param pubkey_hash The variable that will store the pubkey hash.
- * 
+ *
  * @return int
  */
 char* dogecoin_address_to_pubkey_hash(char* p2pkh) {
     if (!p2pkh) return false;
- 
+
     // strlen(p2pkh) + 1 = 35
-    unsigned char dec[35]; //problem is here, it works if its char**
+    unsigned char dec[P2PKHLEN]; //problem is here, it works if its char**
 
     // MLUMIN: MSVC
     size_t decoded_length = dogecoin_base58_decode_check(p2pkh, (uint8_t*)&dec, sizeof(dec) / sizeof(dec[0]));
@@ -323,7 +325,7 @@ char* dogecoin_address_to_pubkey_hash(char* p2pkh) {
         printf("failed base58 decode\n");
         return false;
     }
-    
+
     //decoded bytes = [1-byte versionbits][20-byte hash][4-byte checksum]
     char* b58_decode_hex = utils_uint8_to_hex((const uint8_t*)dec, decoded_length - 4);
     return &b58_decode_hex[2];
@@ -336,9 +338,9 @@ char* dogecoin_address_to_pubkey_hash(char* p2pkh) {
  * public hexadecimal key and generates the corresponding p2pkh address. Finally it converts
  * the p2pkh to a script pubkey hash, frees the previous structs from memory and returns the
  * script pubkey hash.
- * 
+ *
  * @param p2pkh The variable out we want to contain the converted script hash in.
- * 
+ *
  * @return char* The script public key hash.
  */
 char* dogecoin_private_key_wif_to_pubkey_hash(char* private_key_wif) {
@@ -357,7 +359,7 @@ char* dogecoin_private_key_wif_to_pubkey_hash(char* private_key_wif) {
         return false;
     }
 
-    char new_wif_privkey[53];
+    char new_wif_privkey[PRIVKEYWIFLEN];
     size_t sizeout = sizeof(new_wif_privkey);
     dogecoin_privkey_encode_wif(&key, chain, new_wif_privkey, &sizeout);
 
@@ -385,7 +387,7 @@ char* dogecoin_private_key_wif_to_pubkey_hash(char* private_key_wif) {
  * @brief This function creates a new dogecoin transaction
  * object and initializes it to all zeroes except for the
  * version, which is set to 1.
- * 
+ *
  * @return A pointer to the new transaction object.
  */
 dogecoin_tx* dogecoin_tx_new()
@@ -403,10 +405,10 @@ dogecoin_tx* dogecoin_tx_new()
 /**
  * @brief This function takes information from a buffer
  * and deserializes it into a transaction input object.
- * 
+ *
  * @param tx_in The pointer to the transaction input to deserialize into.
  * @param buf The pointer to the buffer containing the transaction input information.
- * 
+ *
  * @return 1 if deserialized successfully, 0 otherwise.
  */
 dogecoin_bool dogecoin_tx_in_deserialize(dogecoin_tx_in* tx_in, struct const_buffer* buf)
@@ -428,10 +430,10 @@ dogecoin_bool dogecoin_tx_in_deserialize(dogecoin_tx_in* tx_in, struct const_buf
 /**
  * @brief This function takes information from a buffer
  * and deserializes it into a transaction output object.
- * 
+ *
  * @param tx_in The pointer to the transaction output to deserialize into.
  * @param buf The pointer to the buffer containing the transaction output information.
- * 
+ *
  * @return 1 if deserialized successfully, 0 otherwise.
  */
 dogecoin_bool dogecoin_tx_out_deserialize(dogecoin_tx_out* tx_out, struct const_buffer* buf)
@@ -449,12 +451,12 @@ dogecoin_bool dogecoin_tx_out_deserialize(dogecoin_tx_out* tx_out, struct const_
 /**
  * @brief This function takes information from a string
  * and deserializes it into a full transaction object.
- * 
+ *
  * @param tx_serialized The string containing the transaction information.
  * @param inlen The length of the string to be read.
  * @param tx The pointer to the transaction object to be deserialized into.
  * @param consumed_length The pointer to the total number of characters successfully deserialized.
- * 
+ *
  * @return 1 if deserialized successfully, 0 otherwise.
  */
 int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, dogecoin_tx* tx, size_t* consumed_length)
@@ -472,6 +474,18 @@ int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, do
     uint32_t vlen;
     if (!deser_varlen(&vlen, &buf)) {
         return false;
+    }
+
+    uint8_t flags = 0;
+    if (vlen == 0) {
+        /* We read a dummy or an empty vin. */
+        deser_bytes(&flags, &buf, 1);
+        if (flags != 0) {
+            // contains witness, deser the vin len
+            if (!deser_varlen(&vlen, &buf)) {
+                return false;
+            }
+        }
     }
 
     unsigned int i;
@@ -499,6 +513,27 @@ int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, do
         }
     }
 
+    if ((flags & 1)) {
+        /* The witness flag is present, and we support witnesses. */
+        flags ^= 1;
+        for (i = 0; i < tx->vin->len; i++) {
+            if (!deser_varlen(&vlen, &buf))
+                return false;
+            for (size_t j = 0; j < vlen; j++) {
+                cstring* witness_item = cstr_new_sz(1024);
+                if (!deser_varstr(&witness_item, &buf)) {
+                    cstr_free(witness_item, true);
+                    return false;
+                }
+                cstr_free(witness_item, true);
+            }
+        }
+    }
+    if (flags) {
+        /* Unknown flag in the serialization */
+        return false;
+    }
+
     if (!deser_u32(&tx->locktime, &buf)) {
         return false;
     }
@@ -512,10 +547,10 @@ int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, do
 
 /**
  * @brief This function serializes a transaction input.
- * 
+ *
  * @param s The pointer to the cstring to serialize the data into.
  * @param tx_in The pointer to the transaction input to serialize.
- * 
+ *
  * @return Nothing.
  */
 void dogecoin_tx_in_serialize(cstring* s, const dogecoin_tx_in* tx_in)
@@ -529,10 +564,10 @@ void dogecoin_tx_in_serialize(cstring* s, const dogecoin_tx_in* tx_in)
 
 /**
  * @brief This function serializes a transaction output.
- * 
+ *
  * @param s The pointer to the cstring to serialize the data into.
  * @param tx_out The pointer to the transaction output to serialize.
- * 
+ *
  * @return Nothing.
  */
 void dogecoin_tx_out_serialize(cstring* s, const dogecoin_tx_out* tx_out)
@@ -544,10 +579,10 @@ void dogecoin_tx_out_serialize(cstring* s, const dogecoin_tx_out* tx_out)
 
 /**
  * @brief This function serializes a full transaction.
- * 
+ *
  * @param s The pointer to the cstring to serialize the data into.
  * @param tx The pointer to the transaction to serialize.
- * 
+ *
  * @return Nothing.
  */
 void dogecoin_tx_serialize(cstring* s, const dogecoin_tx* tx)
@@ -584,13 +619,13 @@ void dogecoin_tx_serialize(cstring* s, const dogecoin_tx* tx)
 /**
  * @brief This function performs a double SHA256 hash
  * on a given transaction.
- * 
+ *
  * @param tx The pointer to the transaction to hash.
  * @param hashout The result of the hashing operation.
- * 
+ *
  * @return Nothing.
  */
-void dogecoin_tx_hash(const dogecoin_tx* tx, uint256 hashout)
+void dogecoin_tx_hash(const dogecoin_tx* tx, uint256_t hashout)
 {
     cstring* txser = cstr_new_sz(1024);
     dogecoin_tx_serialize(txser, tx);
@@ -603,10 +638,10 @@ void dogecoin_tx_hash(const dogecoin_tx* tx, uint256 hashout)
 /**
  * @brief This function makes a copy of a given transaction
  * input object.
- * 
+ *
  * @param dest The pointer to the copy of the transaction input.
  * @param src The pointer to the original transaction input.
- * 
+ *
  * @return Nothing.
  */
 void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src)
@@ -628,10 +663,10 @@ void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src)
 /**
  * @brief This function makes a copy of a given transaction
  * output object.
- * 
+ *
  * @param dest The pointer to the copy of the transaction output.
  * @param src The pointer to the original transaction output.
- * 
+ *
  * @return Nothing.
  */
 void dogecoin_tx_out_copy(dogecoin_tx_out* dest, const dogecoin_tx_out* src)
@@ -652,10 +687,10 @@ void dogecoin_tx_out_copy(dogecoin_tx_out* dest, const dogecoin_tx_out* src)
 /**
  * @brief This function makes a copy of a given transaction
  * object.
- * 
+ *
  * @param dest The pointer to the copy of the transaction.
  * @param src The pointer to the original transaction.
- * 
+ *
  * @return Nothing.
  */
 void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
@@ -708,13 +743,13 @@ void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
 /**
  * @brief This function performs a double SHA256 hash
  * on the input data of a given transaction.
- * 
+ *
  * @param tx The pointer to the transaction whose inputs will be hashed.
  * @param hash The result of the hashed inputs.
- * 
+ *
  * @return Nothing.
  */
-void dogecoin_tx_prevout_hash(const dogecoin_tx* tx, uint256 hash)
+void dogecoin_tx_prevout_hash(const dogecoin_tx* tx, uint256_t hash)
 {
     cstring* s = cstr_new_sz(512);
     unsigned int i;
@@ -731,15 +766,15 @@ void dogecoin_tx_prevout_hash(const dogecoin_tx* tx, uint256 hash)
 
 /**
  * @brief This function performs a double SHA256 hash
- * on the sequence numbers of all the transaction's 
+ * on the sequence numbers of all the transaction's
  * inputs
- * 
+ *
  * @param tx The pointer to the transaction whose inputs will be hashed.
  * @param hash The result of the hashed inputs.
- * 
+ *
  * @return Nothing.
  */
-void dogecoin_tx_sequence_hash(const dogecoin_tx* tx, uint256 hash)
+void dogecoin_tx_sequence_hash(const dogecoin_tx* tx, uint256_t hash)
 {
     cstring* s = cstr_new_sz(512);
     unsigned int i;
@@ -756,13 +791,13 @@ void dogecoin_tx_sequence_hash(const dogecoin_tx* tx, uint256 hash)
 /**
  * @brief This function perform a double SHA256 hash
  * on the serialized outputs of a given transaction.
- * 
+ *
  * @param tx The pointer to the transaction whose outputs will be hashed.
  * @param hash The result of the hashed outputs.
- * 
+ *
  * @return Nothing.
  */
-void dogecoin_tx_outputs_hash(const dogecoin_tx* tx, uint256 hash)
+void dogecoin_tx_outputs_hash(const dogecoin_tx* tx, uint256_t hash)
 {
     if (!tx->vout || !hash) return;
     cstring* s = cstr_new_sz(512);
@@ -781,16 +816,16 @@ void dogecoin_tx_outputs_hash(const dogecoin_tx* tx, uint256 hash)
  * @brief This function takes an existing transaction and
  * generates a signature hash to lock its inputs from being
  * double-spent.
- * 
+ *
  * @param tx_to The pointer to the existing transaction.
  * @param fromPubKey The pointer to the cstring containing the public key of the sender.
  * @param in_num The index of the input being signed.
  * @param hashtype The type of signature hash to perform.
  * @param hash The generated signature hash.
- * 
+ *
  * @return 1 if signature hash is generated successfully, 0 otherwise.
  */
-dogecoin_bool dogecoin_tx_sighash(const dogecoin_tx* tx_to, const cstring* fromPubKey, size_t in_num, int hashtype, uint256 hash)
+dogecoin_bool dogecoin_tx_sighash(const dogecoin_tx* tx_to, const cstring* fromPubKey, size_t in_num, int hashtype, uint256_t hash)
 {
     if (in_num >= tx_to->vin->len || !tx_to->vout) {
         return false;
@@ -800,7 +835,7 @@ dogecoin_bool dogecoin_tx_sighash(const dogecoin_tx* tx_to, const cstring* fromP
 
     dogecoin_tx* tx_tmp = dogecoin_tx_new();
     dogecoin_tx_copy(tx_tmp, tx_to);
-    
+
     // standard sighash (SIGVERSION_BASE)
     cstring* new_script = cstr_new_sz(fromPubKey->len);
     dogecoin_script_copy_without_op_codeseperator(fromPubKey, new_script);
@@ -881,13 +916,13 @@ out:
 /**
  * @brief This function adds another transaction output to
  * an existing transaction.
- * 
+ *
  * @param tx The pointer to the transaction which will be updated.
  * @param amount The amount that will be sent to the new destination.
  * @param data The pubkey data to be embedded in the new transaction.
  * @param datalen The length of the pubkey data to be embedded.
- * 
- * @return dogecoin_bool 
+ *
+ * @return dogecoin_bool
  */
 dogecoin_bool dogecoin_tx_add_data_out(dogecoin_tx* tx, const int64_t amount, const uint8_t* data, const size_t datalen)
 {
@@ -907,15 +942,15 @@ dogecoin_bool dogecoin_tx_add_data_out(dogecoin_tx* tx, const int64_t amount, co
 
 
 /**
- * @brief This function adds another transaction output 
+ * @brief This function adds another transaction output
  * containing the puzzle hash for the miner to solve to
  * an existing transaction.
- * 
+ *
  * @param tx The pointer to the transaction which will be updated.
  * @param amount The amount that will be sent in the transaction.
  * @param puzzle The puzzle that the miner must solve in order to spend the coin.
  * @param puzzlelen The length of the puzzle in bytes.
- * 
+ *
  * @return 1 if the puzzle was added successfully, 0 otherwise.
  */
 dogecoin_bool dogecoin_tx_add_puzzle_out(dogecoin_tx* tx, const int64_t amount, const uint8_t* puzzle, const size_t puzzlelen)
@@ -937,15 +972,15 @@ dogecoin_bool dogecoin_tx_add_puzzle_out(dogecoin_tx* tx, const int64_t amount, 
 
 /**
  * @brief This function adds another transaction output
- * containing the destination address to an existing 
+ * containing the destination address to an existing
  * transaction.
- * 
+ *
  * @param tx The pointer to the transaction which will be updated.
  * @param chain The pointer to the chainparams which contain the prefixes for the address types.
- * @param amount The amount that will be sent in the transaction. 
+ * @param amount The amount that will be sent in the transaction.
  * @param address The address to send coins to, which can be a P2PKH, P2SH, or P2WPKH address.
- * 
- * @return 1 if the address was added successfully, 0 otherwise. 
+ *
+ * @return 1 if the address was added successfully, 0 otherwise.
  */
 dogecoin_bool dogecoin_tx_add_address_out(dogecoin_tx* tx, const dogecoin_chainparams* chain, int64_t amount, const char* address)
 {
@@ -966,14 +1001,14 @@ dogecoin_bool dogecoin_tx_add_address_out(dogecoin_tx* tx, const dogecoin_chainp
 /**
  * @brief This function adds a new P2PKH output to an
  * existing transaction.
- * 
+ *
  * @param tx The pointer to the transaction which will be updated.
  * @param amount The amount that will be sent in the transaction.
  * @param hash160 The hash160 of the sender public key.
- * 
+ *
  * @return 1 if the output is added successfully.
  */
-dogecoin_bool dogecoin_tx_add_p2pkh_hash160_out(dogecoin_tx* tx, int64_t amount, uint160 hash160)
+dogecoin_bool dogecoin_tx_add_p2pkh_hash160_out(dogecoin_tx* tx, int64_t amount, uint160_t hash160)
 {
     dogecoin_tx_out* tx_out = dogecoin_tx_out_new();
     tx_out->script_pubkey = cstr_new_sz(1024);
@@ -987,14 +1022,14 @@ dogecoin_bool dogecoin_tx_add_p2pkh_hash160_out(dogecoin_tx* tx, int64_t amount,
 /**
  * @brief This function adds a new P2SH output to an
  * existing transaction.
- * 
+ *
  * @param tx The pointer to the transaction which will be updated.
  * @param amount The amount that will be sent in the transaction.
  * @param hash160 The hash160 of the sender public key.
- * 
+ *
  * @return 1 if the output is added successfully.
  */
-dogecoin_bool dogecoin_tx_add_p2sh_hash160_out(dogecoin_tx* tx, int64_t amount, uint160 hash160)
+dogecoin_bool dogecoin_tx_add_p2sh_hash160_out(dogecoin_tx* tx, int64_t amount, uint160_t hash160)
 {
     dogecoin_tx_out* tx_out = dogecoin_tx_out_new();
     tx_out->script_pubkey = cstr_new_sz(1024);
@@ -1009,16 +1044,16 @@ dogecoin_bool dogecoin_tx_add_p2sh_hash160_out(dogecoin_tx* tx, int64_t amount, 
  * @brief This function adds an output to an existing
  * transaction by hashing the given public key and calling
  * dogecoin_tx_add_p2pkh_hash160_out() using this hash.
- * 
+ *
  * @param tx The pointer to the transaction which will be updated.
  * @param amount The amount that will be sent in the transaction.
  * @param pubkey The pointer to the public key to be hashed.
- * 
+ *
  * @return 1 if the output was added successfully.
  */
 dogecoin_bool dogecoin_tx_add_p2pkh_out(dogecoin_tx* tx, int64_t amount, const dogecoin_pubkey* pubkey)
 {
-    uint160 hash160;
+    uint160_t hash160;
     dogecoin_pubkey_get_hash160(pubkey, hash160);
     return dogecoin_tx_add_p2pkh_hash160_out(tx, amount, hash160);
 }
@@ -1027,9 +1062,9 @@ dogecoin_bool dogecoin_tx_add_p2pkh_out(dogecoin_tx* tx, int64_t amount, const d
 /**
  * @brief This function checks whether a transaction
  * outpoint is null.
- * 
+ *
  * @param tx The pointer to the transaction outpoint to check.
- * 
+ *
  * @return 1 if the outpoint is null.
  */
 dogecoin_bool dogecoin_tx_outpoint_is_null(dogecoin_tx_outpoint* tx)
@@ -1042,11 +1077,11 @@ dogecoin_bool dogecoin_tx_outpoint_is_null(dogecoin_tx_outpoint* tx)
 /**
  * @brief This function checks whether a transaction was
  * a coinbase transaction, which is true if the transaction
- * has only one input, the previous transaction hash is 
- * empty, and the transaction index is UINT32_MAX. 
- * 
+ * has only one input, the previous transaction hash is
+ * empty, and the transaction index is UINT32_MAX.
+ *
  * @param tx The pointer to the transaction to check.
- * @return dogecoin_bool 
+ * @return dogecoin_bool
  */
 dogecoin_bool dogecoin_tx_is_coinbase(dogecoin_tx* tx)
 {
@@ -1063,9 +1098,9 @@ dogecoin_bool dogecoin_tx_is_coinbase(dogecoin_tx* tx)
 /**
  * @brief This function converts the result of the signing
  * into a regular string.
- * 
+ *
  * @param result The string representation of the signing result.
- * 
+ *
  * @return The string representation of the signing result, "UNKNOWN" if result is unrecognized.
  */
 const char* dogecoin_tx_sign_result_to_str(const enum dogecoin_tx_sign_result result)
@@ -1092,7 +1127,7 @@ const char* dogecoin_tx_sign_result_to_str(const enum dogecoin_tx_sign_result re
 /**
  * @brief This function signs the inputs of a given
  * transaction using the private key and signature.
- * 
+ *
  * @param tx_in_out The pointer to the transaction to be signed.
  * @param script The pointer to the cstring containing the script to be signed.
  * @param privkey The pointer to the private key to be used to sign the transaction.
@@ -1101,7 +1136,7 @@ const char* dogecoin_tx_sign_result_to_str(const enum dogecoin_tx_sign_result re
  * @param sigcompact_out The signature in compact format.
  * @param sigder_out The DER-encoded signature.
  * @param sigder_len_out The length of the signature in DER format.
- * 
+ *
  * @return The code denoting which errors occurred, if any.
  */
 enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, const cstring* script, const dogecoin_key* privkey, size_t inputindex, int sighashtype, uint8_t* sigcompact_out, uint8_t* sigder_out, size_t* sigder_len_out)
@@ -1117,7 +1152,7 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
     if (!dogecoin_privkey_is_valid(privkey)) {
         return DOGECOIN_SIGN_INVALID_KEY;
     }
-    
+
     // calculate pubkey
     dogecoin_pubkey pubkey;
     dogecoin_pubkey_init(&pubkey);
@@ -1129,14 +1164,14 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
 
     cstring* script_sign = cstr_new_cstr(script); //copy the script because we may modify it
     dogecoin_tx_in* tx_in = vector_idx(tx_in_out->vin, inputindex);
-    vector* script_pushes = vector_new(1, free);
+    vector_t* script_pushes = vector_new(1, free);
 
     enum dogecoin_tx_out_type type = dogecoin_script_classify(script, script_pushes);
     if (type == DOGECOIN_TX_PUBKEYHASH && script_pushes->len == 1) {
         // check if given private key matches the script
-        uint160 hash160;
+        uint160_t hash160;
         dogecoin_pubkey_get_hash160(&pubkey, hash160);
-        uint160* hash160_in_script = vector_idx(script_pushes, 0);
+        uint160_t* hash160_in_script = vector_idx(script_pushes, 0);
         if (memcmp(hash160_in_script, hash160, sizeof(hash160)) != 0) {
             res = DOGECOIN_SIGN_NO_KEY_MATCH; //sign anyways
         }
@@ -1146,7 +1181,7 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
     }
     vector_free(script_pushes, true);
 
-    uint256 sighash;
+    uint256_t sighash;
     dogecoin_mem_zero(sighash, sizeof(sighash));
     if (!dogecoin_tx_sighash(tx_in_out, script_sign, inputindex, sighashtype, sighash)) {
         cstr_free(script_sign, true);
@@ -1191,3 +1226,16 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
     }
     return res;
 }
+
+/** This function gets the address from a given pubkey hash.
+ *
+ * @param pubkey_hash The pointer to the pubkey hash.
+ * @param is_testnet The pointer to the chainparams which contain the prefixes for the address types.
+ * @param p2pkh_address The address to send coins to, which can be a P2PKH, P2SH, or P2WPKH address.
+ *
+ * @return 1 if the address was added successfully, 0 otherwise.
+ */
+int getAddrFromPubkeyHash(const char pubkey_hash[PUBKEYHASHLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]) {
+    return dogecoin_pubkey_hash_to_p2pkh_address((char *)utils_hex_to_uint8(pubkey_hash), SCRIPT_PUBKEY_LENGTH, p2pkh_address, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main);
+}
+

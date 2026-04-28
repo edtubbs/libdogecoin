@@ -4,7 +4,7 @@
 
  Copyright (c) 2015 Jonas Schnelli
  Copyright (c) 2023 bluezr
- Copyright (c) 2023 The Dogecoin Foundation
+ Copyright (c) 2023-2024 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -46,13 +46,13 @@ typedef struct dogecoin_headers_db_interface_
 {
     void* (*init)(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only);
     void (*free)(void *db);
-    dogecoin_bool (*load)(void *db, const char *filename);
-    void (*fill_blocklocator_tip)(void* db, vector *blocklocators);
+    dogecoin_bool (*load)(void *db, const char *filename, dogecoin_bool prompt);
+    void (*fill_blocklocator_tip)(void* db, vector_t *blocklocators);
     dogecoin_blockindex *(*connect_hdr)(void* db, struct const_buffer *buf, dogecoin_bool load_process, dogecoin_bool *connected);
     dogecoin_blockindex* (*getchaintip)(void *db);
     dogecoin_bool (*disconnect_tip)(void *db);
     dogecoin_bool (*has_checkpoint_start)(void *db);
-    void (*set_checkpoint_start)(void *db, uint256 hash, uint32_t height);
+    void (*set_checkpoint_start)(void *db, uint256_t hash, uint32_t height, uint256_t chainwork);
 } dogecoin_headers_db_interface;
 
 LIBDOGECOIN_END_DECL

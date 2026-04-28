@@ -4,7 +4,7 @@
  * Copyright (c) 2022 edtubbs
  * Copyright (c) 2022 bluezr
  * Copyright (c) 2022 michilumin
- * Copyright (c) 2023 The Dogecoin Foundation
+ * Copyright (c) 2023-2024 The Dogecoin Foundation
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the "Software"),
@@ -31,14 +31,13 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/random.h>
 #include <dogecoin/sha2.h>
+#include <dogecoin/utf8proc.h>
 
 #ifdef _WIN32
 #ifndef WINVER
 #define WINVER 0x0600
 #endif
 #include <windows.h>
-#elif USE_UNISTRING
-#include <uninorm.h>
 #endif
 
 /*
@@ -415,42 +414,39 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
 
     return 0;
 
-#elif USE_UNISTRING
-    /* normalize the passphrase and salt */
-    size_t norm_pass_len, norm_salt_len;
-
-    uint8_t *norm_pass;
-    uint8_t *norm_salt;
-
-    norm_pass = u8_normalize(UNINORM_NFKD, (const uint8_t *) pass, strlen(pass), NULL, &norm_pass_len);
-    if (norm_pass == NULL) {
-        fprintf(stderr, "ERROR: normalizing passphrase\n");
+#else
+    /* normalise passphrase and salt (NFKD) */
+    uint8_t *norm_pass = (uint8_t *)utf8proc_NFKD(
+                             (const utf8proc_uint8_t *)pass);
+    if (!norm_pass) {
+        fprintf(stderr, "ERROR: normalising passphrase\n");
         dogecoin_free(salt);
         return -1;
     }
-    norm_salt = u8_normalize(UNINORM_NFKD, (const uint8_t *) salt, strlen(salt), NULL, &norm_salt_len);
-    if (norm_salt == NULL) {
-        fprintf(stderr, "ERROR: normalizing salt\n");
+
+    uint8_t *norm_salt = (uint8_t *)utf8proc_NFKD(
+                             (const utf8proc_uint8_t *)salt);
+    if (!norm_salt) {
+        fprintf(stderr, "ERROR: normalising salt\n");
         dogecoin_free(salt);
         dogecoin_free(norm_pass);
         return -1;
     }
 
-    /* we're done with salt */
+    /* done with the original salt buffer */
     dogecoin_free(salt);
 
-    /* pbkdf2 hmac sha512 */
-    pbkdf2_hmac_sha512((const unsigned char*) norm_pass, norm_pass_len, (const unsigned char*) norm_salt, norm_salt_len, ITERATIONS, seed);
+    size_t norm_pass_len = strlen((const char *)norm_pass);
+    size_t norm_salt_len = strlen((const char *)norm_salt);
+
+    /* PBKDF2-HMAC-SHA512 */
+    pbkdf2_hmac_sha512(norm_pass,  norm_pass_len,
+                       norm_salt,  norm_salt_len,
+                       ITERATIONS, seed);
 
     dogecoin_free(norm_pass);
     dogecoin_free(norm_salt);
-
     return 0;
-#else
-
-    fprintf(stderr, "ERROR: no normalizer\n");
-    dogecoin_free(salt);
-    return -1;
 #endif
 
 }
@@ -461,6 +457,7 @@ int get_root_seed(const char *pass, const char *passphrase, SEED seed) {
  */
 
 int get_custom_words(const char *filepath, char* wordlist[]) {
+#ifndef USE_OPTEE /* OPTEE does not support file I/O */
     int i = 0;
     FILE * fp;
     char word[1024];
@@ -480,11 +477,13 @@ int get_custom_words(const char *filepath, char* wordlist[]) {
     while (fscanf(fp, "%s", word) == 1) {
         if (i >= LANG_WORD_CNT) {
             fprintf(stderr, "ERROR: too many words in file\n");
+            fclose(fp);
             return -1;
         }
         wordlist[i] = malloc(strlen(word) + 1);
         if (wordlist[i] == NULL) {
             fprintf(stderr, "ERROR: cannot allocate memory\n");
+            fclose(fp);
             return -1;
         }
         strcpy(wordlist[i], word);
@@ -499,6 +498,11 @@ int get_custom_words(const char *filepath, char* wordlist[]) {
     }
 
     return 0;
+#else
+    (void)filepath;
+    (void)wordlist;
+    return -1;
+#endif
 }
 
 /*
@@ -701,6 +705,144 @@ int produce_mnemonic_sentence(const int segSize, const int checksumBits, const c
 }
 
 /**
+ * @brief This function verifies the mnemonic sentence.
+ *
+ * @param mnemonic The mnemonic sentence to verify.
+ * @param wordlist The wordlist to use for verification.
+ * @param space The character to separate mnemonic words.
+ *
+ * @return 0 (success), -1 (fail)
+*/
+int verify_mnemonic_sentence(const char* mnemonic, const char* wordlist[], const char* space)
+{
+    if (!mnemonic || !wordlist || !space) {
+        fprintf(stderr, "ERROR: invalid input arguments\n");
+        return -1;
+    }
+
+    /* make a mutable copy so we can insert '\0' */
+    size_t mlen = strlen(mnemonic);
+    char* buf = malloc(mlen + 1);
+    if (!buf) {
+        fprintf(stderr, "ERROR: malloc failed for mnemonic copy\n");
+        return -1;
+    }
+    memcpy(buf, mnemonic, mlen + 1);
+
+    size_t delim_len = strlen(space);
+    if (delim_len == 0) {
+        fprintf(stderr, "ERROR: empty separator\n");
+        dogecoin_free(buf);
+        return -1;
+    }
+
+    /* count words by scanning for full 'space' substring */
+    size_t word_count = 1;
+    for (char* p = buf; (p = strstr(p, space)); p += delim_len) {
+        word_count++;
+    }
+
+    /* valid word counts are 12,15,18,21,24 */
+    if (word_count < 12 || word_count > 24 || (word_count % 3) != 0) {
+        fprintf(stderr, "ERROR: invalid mnemonic word count: %zu\n", word_count);
+        dogecoin_free(buf);
+        return -1;
+    }
+
+    /* compute bit lengths */
+    int total_bits    = word_count * BITS_PER_WORD;
+    int checksum_bits = total_bits / 33;
+    int entropy_bits  = total_bits - checksum_bits;
+    int entropy_bytes = entropy_bits / 8;
+
+    /* prepare bit buffer */
+    char* bitstr = dogecoin_string_vla(total_bits);
+    if (!bitstr) {
+        fprintf(stderr, "ERROR: allocation failed for bit buffer\n");
+        dogecoin_free(buf);
+        return -1;
+    }
+    size_t bit_pos = 0;
+
+    /* iterate tokens by null-terminating at each delimiter */
+    char* start = buf;
+    while (1) {
+        char* next = strstr(start, space);
+        size_t toklen = next ? (size_t)(next - start) : strlen(start);
+
+        /* find index of this token in wordlist */
+        int idx = -1;
+        for (int i = 0; i < LANG_WORD_CNT; i++) {
+            /* exact match: length and content */
+            if (strncmp(start, wordlist[i], toklen) == 0 && wordlist[i][toklen] == '\0') {
+                idx = i;
+                break;
+            }
+        }
+        if (idx < 0) {
+            fprintf(stderr, "ERROR: invalid mnemonic word: '%.*s'\n", (int)toklen, start);
+            dogecoin_free(bitstr);
+            dogecoin_free(buf);
+            return -1;
+        }
+
+        /* append its 11 bits */
+        for (int b = BITS_PER_WORD - 1; b >= 0; b--) {
+            bitstr[bit_pos++] = ((idx >> b) & 1) ? '1' : '0';
+        }
+
+        if (!next) break;
+        start = next + delim_len;
+    }
+    bitstr[bit_pos] = '\0';
+
+    /* reconstruct entropy from first entropy_bits */
+    unsigned char* entropy = dogecoin_uchar_vla(entropy_bytes);
+    if (!entropy) {
+        fprintf(stderr, "ERROR: allocation failed for entropy buffer\n");
+        dogecoin_free(bitstr);
+        dogecoin_free(buf);
+        return -1;
+    }
+    dogecoin_mem_zero(entropy, entropy_bytes);
+    for (int i = 0; i < entropy_bytes; i++) {
+        unsigned char byte = 0;
+        for (int b = 0; b < 8; b++) {
+            if (bitstr[i * 8 + b] == '1') {
+                byte |= (1 << (7 - b));
+            }
+        }
+        entropy[i] = byte;
+    }
+
+    /* SHA-256 and compare checksum bits */
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    sha256_raw(entropy, entropy_bytes, hash);
+
+    for (int i = 0; i < checksum_bits; i++) {
+        char expected = ((hash[0] >> (7 - i)) & 1) ? '1' : '0';
+        if (bitstr[entropy_bits + i] != expected) {
+            fprintf(stderr, "ERROR: checksum verification failed\n");
+            utils_clear_buffers();
+            dogecoin_free(bitstr);
+            dogecoin_free(entropy);
+            dogecoin_free(buf);
+            return -1;
+        }
+    }
+
+    /* clean up */
+    utils_clear_buffers();
+    dogecoin_mem_zero(entropy, entropy_bytes);
+    dogecoin_mem_zero(bitstr, total_bits);
+    dogecoin_mem_zero(buf, mlen + 1);
+    dogecoin_free(bitstr);
+    dogecoin_free(entropy);
+    free(buf);
+    return 0;
+}
+
+/**
  * @brief This function generates a mnemonic for a given entropy size and language.
  *
  * @param entropy_size The "128", "160", "192", "224", or "256" bits of entropy.
@@ -722,7 +864,7 @@ int dogecoin_generate_mnemonic (const ENTROPY_SIZE entropy_size, const char* lan
     if (entropy_size != NULL) {
 
         /* load custom word file into memory if path is valid */
-	if (filepath != NULL) {
+	    if (filepath != NULL) {
             if (get_custom_words (filepath, (char **) wordlist) == -1) {
 
                 /* Free memory for custom words */
@@ -790,6 +932,52 @@ int dogecoin_generate_mnemonic (const ENTROPY_SIZE entropy_size, const char* lan
     }
 
     return 0;
+}
+
+/**
+ * @brief This function verifies the mnemonic sentence.
+ *
+ * @param mnemonic The mnemonic sentence to verify.
+ * @param language The ISO 639-2 code for the mnemonic language.
+ * @param space The character to separate mnemonic words.
+ * @param filename The path to a custom word file (optional).
+ *
+ * @return 0 (success), -1 (fail)
+*/
+int dogecoin_verify_mnemonic (const char* mnemonic, const char* language, const char* space, const char* filename)
+{
+    char *wordlist[LANG_WORD_CNT] = {0};
+
+    /* Check if the input arguments are valid */
+    if (!mnemonic || !space || (!language && !filename)) {
+        fprintf(stderr, "ERROR: invalid input arguments\n");
+        return -1;
+    }
+
+    /* load custom word file into memory if path is valid */
+    if (filename != NULL) {
+        if (get_custom_words (filename, (char **) wordlist) == -1) {
+            return -1;
+        }
+    }
+    /* otherwise, load language word list into memory */
+    else {
+        if (get_words(language, wordlist) == -1) {
+            return -1;
+        }
+    }
+
+    /* Verify the mnemonic sentence */
+    int ret = verify_mnemonic_sentence(mnemonic, (const char **) wordlist, space);
+
+    /* Free memory for custom words */
+    if (filename != NULL) {
+        for (int i = 0; i < LANG_WORD_CNT; i++) {
+            dogecoin_free(wordlist[i]);
+        }
+    }
+
+    return ret;
 }
 
 /**

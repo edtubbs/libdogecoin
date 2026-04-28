@@ -4,7 +4,7 @@
 
  Copyright (c) 2017 Jonas Schnelli
  Copyright (c) 2023 bluezr
- Copyright (c) 2023 The Dogecoin Foundation
+ Copyright (c) 2023-2024 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -23,29 +23,31 @@
  OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  OTHER DEALINGS IN THE SOFTWARE.
- 
+
 */
 
 #include <sys/stat.h>
 
 #include <dogecoin/headersdb_file.h>
-#include <dogecoin/block.h>
+#include <dogecoin/blockchain.h>
 #include <dogecoin/common.h>
+#include <dogecoin/pow.h>
 #include <dogecoin/serialize.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/validation.h>
 
 static const unsigned char file_hdr_magic[4] = {0xA8, 0xF0, 0x11, 0xC5}; /* header magic */
-static const uint32_t current_version = 2;
+static const uint32_t current_version = 3; /* 3: added chainwork */
 
 /**
  * "Compare two block headers by their hashes."
- * 
+ *
  * The function takes two block headers as arguments, and returns 0 if the two headers are identical,
  * and -1 if the first header is less than the second header
- * 
+ *
  * @param l the first pointer
  * @param r The right-hand side of the comparison.
- * 
+ *
  * @return Nothing.
  */
 int dogecoin_header_compare(const void *l, const void *r)
@@ -55,9 +57,9 @@ int dogecoin_header_compare(const void *l, const void *r)
 
     uint8_t *hashA = (uint8_t *)lm->hash;
     uint8_t *hashB = (uint8_t *)lr->hash;
-    
+
     unsigned int i;
-    for (i = 0; i < sizeof(uint256); i++) {
+    for (i = 0; i < sizeof(uint256_t); i++) {
         uint8_t iA = hashA[i];
         uint8_t iB = hashB[i];
         if (iA > iB)
@@ -71,23 +73,23 @@ int dogecoin_header_compare(const void *l, const void *r)
 
 /**
  * The function creates a new dogecoin_headers_db object and initializes it
- * 
+ *
  * @param chainparams The chainparams struct that contains the genesis block hash.
  * @param inmem_only If true, the database will be in-memory only. If false, it will be on disk.
- * 
+ *
  * @return Nothing.
  */
 dogecoin_headers_db* dogecoin_headers_db_new(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only) {
     dogecoin_headers_db* db;
     db = dogecoin_calloc(1, sizeof(*db));
-
     db->read_write_file = !inmem_only;
     db->use_binary_tree = true;
     db->max_hdr_in_mem = 1440;
-
+    db->params = chainparams;
     db->genesis.height = 0;
     db->genesis.prev = NULL;
     memcpy_safe(db->genesis.hash, chainparams->genesisblockhash, DOGECOIN_HASH_LENGTH);
+    memcpy_safe(db->genesis.chainwork, chainparams->genesisblockchainwork, DOGECOIN_HASH_LENGTH);
     db->chaintip = &db->genesis;
     db->chainbottom = &db->genesis;
 
@@ -100,7 +102,7 @@ dogecoin_headers_db* dogecoin_headers_db_new(const dogecoin_chainparams* chainpa
 
 /**
  * @param db The database object.
- * 
+ *
  * @return Nothing
  */
 void dogecoin_headers_db_free(dogecoin_headers_db* db) {
@@ -119,19 +121,23 @@ void dogecoin_headers_db_free(dogecoin_headers_db* db) {
         db->tree_root = NULL;
     }
 
+    db->chaintip = NULL;
+    db->chainbottom = NULL;
+
     dogecoin_free(db);
 }
 
 /**
  * Loads the headers database from disk
- * 
+ *
  * @param db the headers database object
  * @param file_path The path to the headers database file. If NULL, the default path is used.
- * 
+ * @param prompt If true, the user will be prompted to confirm loading the database.
+ *
  * @return The return value is a boolean value that indicates whether the database was successfully
  * opened.
  */
-dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file_path) {
+dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file_path, dogecoin_bool prompt) {
 
     if (!db->read_write_file) {
         return 1;
@@ -150,8 +156,30 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
 
     struct stat buffer;
     dogecoin_bool create = true;
-    if (stat(file_path_local, &buffer) == 0)
-        create = false;
+    if (stat(file_path_local, &buffer) == 0) {
+        create = false; // Set create to false as file already exists
+
+        if (prompt) {
+            printf("\nLoad %s? (Enter) or (o)verwrite:", file_path_local);
+            char response[MAX_LEN];
+            if (!fgets(response, MAX_LEN, stdin)) {
+                printf("Error reading input.\n");
+                return false;
+            }
+            if (response[0] == 'o' || response[0] == 'O') {
+                printf("Are you sure? (y/n): \n");
+                char confirm[MAX_LEN];
+                if (!fgets(confirm, MAX_LEN, stdin)) {
+                    printf("Error reading input.\n");
+                    return false;
+                }
+                if (confirm[0] == 'y' || confirm[0] == 'Y') {
+                    remove(file_path_local); // remove the existing file
+                    create = true; // Set create to true as a new file will be created
+                }
+            }
+        }
+    }
 
     db->headers_tree_file = fopen(file_path_local, create ? "a+b" : "r+b");
     cstr_free(path_ret, true);
@@ -179,62 +207,78 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
     size_t connected_headers_count = 0;
     if (db->headers_tree_file && !create)
     {
+        printf("Loading headers from disk, this may take several minutes...\n");
         while (!feof(db->headers_tree_file))
         {
-            uint8_t buf_all[32+4+80];
+            // print progress
+            if (connected_headers_count % 1000 == 0)
+            {
+                printf("\r%ld headers loaded", connected_headers_count);
+                fflush(stdout);
+            }
+
+            uint8_t buf_all[SPV_HEADERS_FILE_REC_LEN];
             if (fread(buf_all, sizeof(buf_all), 1, db->headers_tree_file) == 1) {
                 struct const_buffer cbuf_all = {buf_all, sizeof(buf_all)};
 
                 //load all
 
-                uint256 hash;
+                uint256_t hash;
                 uint32_t height;
+                uint256_t chainwork;
                 deser_u256(hash, &cbuf_all);
                 deser_u32(&height, &cbuf_all);
+                deser_u256(chainwork, &cbuf_all);
                 dogecoin_bool connected;
                 if (firstblock)
                 {
                     dogecoin_blockindex *chainheader = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
                     chainheader->height = height;
-                    if (!dogecoin_block_header_deserialize(&chainheader->header, &cbuf_all)) {
+                    if (!dogecoin_block_header_deserialize(&chainheader->header, &cbuf_all, db->params, &chainheader->chainwork)) {
                         dogecoin_block_header_free(&chainheader->header);
                         dogecoin_free(chainheader);
-                        fprintf(stderr, "Error: Invalid data found.\n");
+                        fprintf(stderr, "\nError: Invalid data found.\n");
                         return -1;
                     }
                     dogecoin_block_header_hash(&chainheader->header, (uint8_t *)&chainheader->hash);
                     chainheader->prev = NULL;
                     db->chaintip = chainheader;
+                    if (db->use_binary_tree) {
+                        dogecoin_btree_tsearch(chainheader, &db->tree_root, dogecoin_header_compare);
+                    }
                     firstblock = false;
                 } else {
-                    dogecoin_headers_db_connect_hdr(db, &cbuf_all, true, &connected);
+                    dogecoin_blockindex *pindex = dogecoin_headers_db_connect_hdr(db, &cbuf_all, true, &connected);
                     if (!connected)
                     {
-                        printf("Connecting header failed (at height: %d)\n", db->chaintip->height);
+                        printf("\nConnecting header %s failed (at height: %d) read_write: %d\n", hash_to_string(hash), db->chaintip->height, db->read_write_file);
+                        dogecoin_free(pindex);
                     }
                     else {
                         connected_headers_count++;
                     }
                 }
+                memcpy(db->chaintip->chainwork, chainwork, sizeof(uint256_t));
             }
         }
     }
-    printf("Connected %ld headers, now at height: %d\n",  connected_headers_count, db->chaintip->height);
+    printf("\nConnected %ld headers, now at height: %d\n",  connected_headers_count, db->chaintip->height);
     return (db->headers_tree_file != NULL);
 }
 
 /**
  * The function takes a block index and writes it to the headers database
- * 
+ *
  * @param db the headers database
  * @param blockindex The block index to write to the database.
- * 
+ *
  * @return Nothing.
  */
 dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db* db, dogecoin_blockindex *blockindex) {
-    cstring *rec = cstr_new_sz(100);
+    cstring *rec = cstr_new_sz(SPV_HEADERS_FILE_REC_LEN); // hash + height + chainwork + header
     ser_u256(rec, blockindex->hash);
     ser_u32(rec, blockindex->height);
+    ser_u256(rec, blockindex->chainwork);
     dogecoin_block_header_serialize(rec, &blockindex->header);
     size_t res = fwrite(rec->str, rec->len, 1, db->headers_tree_file);
     dogecoin_file_commit(db->headers_tree_file);
@@ -245,23 +289,34 @@ dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db* db, dogecoin_blocki
 /**
  * The function takes a pointer to a blockindex and checks if the block is in the blockchain. If it is,
  * it returns the pointer to the block. If it isn't, it returns a null pointer
- * 
+ *
  * @param db the database object
  * @param buf The buffer containing the block header.
  * @param load_process If true, the header will be loaded into the database. If false, it will only be
  * added to the tree.
  * @param connected A pointer to a boolean that will be set to true if the block was successfully
  * connected to the chain.
- * 
+ *
  * @return A pointer to the blockindex.
  */
 dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, struct const_buffer *buf, dogecoin_bool load_process, dogecoin_bool *connected) {
     *connected = false;
 
     dogecoin_blockindex *blockindex = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
-    if (!dogecoin_block_header_deserialize(&blockindex->header, buf)) return NULL;
+    if (!dogecoin_block_header_deserialize(&blockindex->header, buf, db->params, &blockindex->chainwork))
+    {
+        fprintf(stderr, "Error deserializing block header\n");
+        return blockindex;
+    }
 
     dogecoin_block_header_hash(&blockindex->header, (uint8_t *)&blockindex->hash);
+
+    // Check if the block header is already in the database
+    dogecoin_blockindex *block = dogecoin_headersdb_find(db, blockindex->hash);
+    if (block) {
+        // Block header already in database, return blockindex
+        return blockindex;
+    }
 
     dogecoin_blockindex *connect_at = NULL;
     dogecoin_blockindex *fork_from_block = NULL;
@@ -274,24 +329,111 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
         // check if we know the prevblock
         fork_from_block = dogecoin_headersdb_find(db, blockindex->header.prev_block);
         if (fork_from_block) {
-            printf("Block found on a fork...\n");
             connect_at = fork_from_block;
         }
     }
 
     if (connect_at != NULL) {
-        /* TODO: check claimed PoW */
+        // Check the proof of work
+        if (!is_auxpow(blockindex->header.version)) {
+            uint256_t hash = {0};
+            cstring* s = cstr_new_sz(64);
+            dogecoin_block_header_serialize(s, (const dogecoin_block_header*) &blockindex->header);
+            dogecoin_block_header_scrypt_hash(s, &hash);
+            cstr_free(s, true);
+            if (!check_pow(&hash, blockindex->header.bits, db->params, &blockindex->chainwork)) {
+                printf("%s:%d:%s : non-AUX proof of work failed : %s\n", __FILE__, __LINE__, __func__, strerror(errno));
+                return blockindex;
+            }
+        }
+
         blockindex->prev = connect_at;
         blockindex->height = connect_at->height+1;
 
-        /* TODO: check if we should switch to the fork with most work (instead of height) */
-        if (blockindex->height > db->chaintip->height) {
-            if (fork_from_block) {
-                /* TODO: walk back to the fork point and call reorg callback */
-                printf("Switch to the fork!\n");
+        arith_uint256* connect_at_chainwork = init_arith_uint256();
+        memcpy(connect_at_chainwork, connect_at->chainwork, sizeof(connect_at->chainwork));
+        arith_uint256* blockindex_chainwork = init_arith_uint256();
+        memcpy(blockindex_chainwork, blockindex->chainwork, sizeof(blockindex->chainwork));
+        arith_uint256* chaintip_chainwork = init_arith_uint256();
+        memcpy(chaintip_chainwork, db->chaintip->chainwork, sizeof(db->chaintip->chainwork));
+
+        arith_uint256* added_chainwork = add_arith_uint256(connect_at_chainwork, blockindex_chainwork);
+        memcpy(blockindex->chainwork, (const arith_uint256*) added_chainwork, sizeof(blockindex->chainwork));
+
+        // Free the dynamically allocated memory
+        dogecoin_free(connect_at_chainwork);
+        dogecoin_free(blockindex_chainwork);
+
+        // Chain reorganization if necessary
+        if (fork_from_block && blockindex->height > db->chaintip->height &&
+            (arith_uint256_greater_than(added_chainwork, chaintip_chainwork) ||
+             (arith_uint256_equal(added_chainwork, chaintip_chainwork) && blockindex->header.timestamp > db->chaintip->header.timestamp))) {
+
+            // Identify the common ancestor
+            dogecoin_blockindex* common_ancestor = db->chaintip;
+            dogecoin_blockindex* fork_chain = blockindex;
+
+            // Find the common ancestor by comparing hashes
+            while (common_ancestor && fork_chain && memcmp(common_ancestor->hash, fork_chain->hash, DOGECOIN_HASH_LENGTH) != 0) {
+                if (common_ancestor->height > fork_chain->height) {
+                    common_ancestor = common_ancestor->prev;
+                } else {
+                    fork_chain = fork_chain->prev;
+                }
+
+                // Break the loop if either reaches the start of the chain
+                if (!common_ancestor || !fork_chain) {
+                    fprintf(stderr, "Unable to find common ancestor.\n");
+                    dogecoin_free(chaintip_chainwork);
+                    dogecoin_free(added_chainwork);
+                    return blockindex;
+                }
             }
+
+            // Disconnect blocks from the current chain
+            while (memcmp(db->chaintip->hash, common_ancestor->hash, DOGECOIN_HASH_LENGTH) != 0) {
+                dogecoin_headersdb_disconnect_tip(db);
+            }
+
+            // Connect blocks from the new chain
+            dogecoin_blockindex* current_block = blockindex;
+            while (current_block && memcmp(current_block->hash, common_ancestor->hash, DOGECOIN_HASH_LENGTH) != 0) {
+                // current_block->prev points to the previous block in the chain
+                dogecoin_blockindex* prev_block = current_block->prev;
+
+                if (!prev_block) {
+                    fprintf(stderr, "Previous block in the chain not found.\n");
+
+                    // Add the current_block to the tree if it's not already part of the main chain
+                    if (db->use_binary_tree && current_block != blockindex) {
+                        fprintf(stderr, "Adding block to tree.\n");
+                        dogecoin_btree_tsearch(current_block, &db->tree_root, dogecoin_header_compare);
+                    }
+
+                    // Free the dynamically allocated memory
+                    dogecoin_free(chaintip_chainwork);
+                    dogecoin_free(added_chainwork);
+                    return blockindex;
+                }
+
+                // Update the chain tip to the previous block
+                db->chaintip = prev_block;
+                current_block = prev_block;
+            }
+
+            printf("\nChain reorganization: %d blocks disconnected, %d blocks connected\n", blockindex->height - common_ancestor->height, blockindex->height - db->chaintip->height);
+
+            // Set the new block as the new chain tip
             db->chaintip = blockindex;
         }
+        else if (blockindex->height > db->chaintip->height) {
+            db->chaintip = blockindex;
+        }
+
+        // Free the dynamically allocated memory
+        dogecoin_free(chaintip_chainwork);
+        dogecoin_free(added_chainwork);
+
         if (!load_process && db->read_write_file)
         {
             if (!dogecoin_headers_db_write(db, blockindex)) {
@@ -299,10 +441,10 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
             }
         }
         if (db->use_binary_tree) {
-            dogecoin_btree_tfind(blockindex, &db->tree_root, dogecoin_header_compare);
+            dogecoin_btree_tsearch(blockindex, &db->tree_root, dogecoin_header_compare);
         }
 
-        if (db->max_hdr_in_mem > 0) {
+        if (!load_process && db->max_hdr_in_mem > 0) {
             // de-allocate no longer required headers
             // keep them only on-disk
             dogecoin_blockindex *scan_tip = db->chaintip;
@@ -326,24 +468,19 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
             }
         }
         *connected = true;
+        return blockindex;
     }
-    else {
-        //TODO, add to orphans
-        char hex[65] = {0};
-        utils_bin_to_hex(blockindex->hash, DOGECOIN_HASH_LENGTH, hex);
-    }
-
     return blockindex;
 }
 
 /**
  * The function iterates through the chain tip and adds the hash of each block to the blocklocators
- * vector
- * 
+ * vector_t
+ *
  * @param db the database object
- * @param blocklocators a vector of block hashes
+ * @param blocklocators a vector_t of block hashes
  */
-void dogecoin_headers_db_fill_block_locator(dogecoin_headers_db* db, vector *blocklocators)
+void dogecoin_headers_db_fill_block_locator(dogecoin_headers_db* db, vector_t *blocklocators)
 {
     dogecoin_blockindex *scan_tip = db->chaintip;
     if (scan_tip->height > 0)
@@ -352,8 +489,8 @@ void dogecoin_headers_db_fill_block_locator(dogecoin_headers_db* db, vector *blo
         for(; i<10;i++)
         {
             //TODO: try to share memory and avoid heap allocation
-            uint256 *hash = dogecoin_calloc(1, sizeof(uint256));
-            memcpy_safe(hash, scan_tip->hash, sizeof(uint256));
+            uint256_t *hash = dogecoin_calloc(1, sizeof(uint256_t));
+            memcpy_safe(hash, scan_tip->hash, sizeof(uint256_t));
             vector_add(blocklocators, (void *)hash);
 
             if (scan_tip->prev)
@@ -366,17 +503,17 @@ void dogecoin_headers_db_fill_block_locator(dogecoin_headers_db* db, vector *blo
 
 /**
  * The function takes a hash and returns the blockindex with that hash
- * 
+ *
  * @param db The headers database.
  * @param hash The hash of the block header to find.
- * 
+ *
  * @return A pointer to the blockindex.
  */
-dogecoin_blockindex * dogecoin_headersdb_find(dogecoin_headers_db* db, uint256 hash) {
+dogecoin_blockindex * dogecoin_headersdb_find(dogecoin_headers_db* db, uint256_t hash) {
     if (db->use_binary_tree)
     {
         dogecoin_blockindex *blockindex = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
-        memcpy_safe(blockindex->hash, hash, sizeof(uint256));
+        memcpy_safe(blockindex->hash, hash, sizeof(uint256_t));
         dogecoin_blockindex *blockindex_f = dogecoin_btree_tfind(blockindex, &db->tree_root, dogecoin_header_compare); /* read */
         if (blockindex_f) {
             blockindex_f = *(dogecoin_blockindex **)blockindex_f;
@@ -389,9 +526,9 @@ dogecoin_blockindex * dogecoin_headersdb_find(dogecoin_headers_db* db, uint256 h
 
 /**
  * Get the block index of the current tip of the main chain
- * 
+ *
  * @param db The headers database.
- * 
+ *
  * @return The current tip of the blockchain.
  */
 dogecoin_blockindex * dogecoin_headersdb_getchaintip(dogecoin_headers_db* db) {
@@ -401,9 +538,9 @@ dogecoin_blockindex * dogecoin_headersdb_getchaintip(dogecoin_headers_db* db) {
 /**
  * If the chaintip is not null, then set the chaintip to the previous block and return true. Otherwise
  * return false
- * 
+ *
  * @param db The headers database.
- * 
+ *
  * @return A boolean value.
  */
 dogecoin_bool dogecoin_headersdb_disconnect_tip(dogecoin_headers_db* db) {
@@ -420,11 +557,11 @@ dogecoin_bool dogecoin_headersdb_disconnect_tip(dogecoin_headers_db* db) {
 
 /**
  * "Check if the headers database has a checkpoint start."
- * 
+ *
  * The function returns a bool value
- * 
+ *
  * @param db The headers database.
- * 
+ *
  * @return A boolean value.
  */
 dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db) {
@@ -433,14 +570,16 @@ dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db) {
 
 /**
  * Set the checkpoint block to the given hash and height
- * 
+ *
  * @param db The headers database.
  * @param hash The hash of the block that is the checkpoint.
  * @param height The height of the block that this is a checkpoint for.
+ * @param chainwork The chainwork of the block that this is a checkpoint for.
  */
-void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256 hash, uint32_t height) {
+void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t hash, uint32_t height, uint256_t chainwork) {
     db->chainbottom = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
     db->chainbottom->height = height;
-    memcpy_safe(db->chainbottom->hash, hash, sizeof(uint256));
+    memcpy_safe(db->chainbottom->hash, hash, sizeof(uint256_t));
+    memcpy_safe(db->chainbottom->chainwork, chainwork, sizeof(uint256_t));
     db->chaintip = db->chainbottom;
 }

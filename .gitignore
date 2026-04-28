@@ -45,6 +45,8 @@
 
 # Kernel Module Compile Results
 *.mod*
+# But allow Swift module maps
+!module.modulemap
 *.cmd
 .tmp_versions/
 modules.order
@@ -57,6 +59,7 @@ Makefile
 Makefile.in
 aclocal.m4
 autom4te.cache/
+bench
 build-aux/config.guess
 build-aux/config.sub
 build-aux/depcomp
@@ -115,9 +118,11 @@ test-suite.log
 **/__pycache__/
 *.py[cod]
 dist/
+gitian/
 contrib/gitian/
 contrib/gitian/*
 example
+dummy
 
 # CMake files
 build/*
@@ -140,8 +145,6 @@ Testing/
 /src/libevent/out/build/x64-Debug
 /src/libevent/build
 *.tcl
-include/uni*.h
-include/unistring/
 include/ev*.h
 include/event2/*
 include/include.am
@@ -149,3 +152,13 @@ include/include.am
 # QR
 qrtest.png
 qrtest.jpg
+
+# Store
+store/*
+.store/*
+
+# OPTEE
+!/src/optee/Makefile
+!/src/optee/host/Makefile
+!/src/optee/ta/Makefile
+/src/optee/build

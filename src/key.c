@@ -4,7 +4,7 @@
 
  Copyright (c) 2015 Jonas Schnelli
  Copyright (c) 2023 bluezr, edtubbs
- Copyright (c) 2023 The Dogecoin Foundation
+ Copyright (c) 2023-2024 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,7 @@
  OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  OTHER DEALINGS IN THE SOFTWARE.
- 
+
 */
 
 
@@ -75,7 +75,7 @@ dogecoin_bool dogecoin_privkey_gen(dogecoin_key* privkey)
 
 dogecoin_bool dogecoin_privkey_verify_pubkey(dogecoin_key* privkey, dogecoin_pubkey* pubkey)
 {
-    uint256 rnddata, hash;
+    uint256_t rnddata, hash;
     const dogecoin_bool res = dogecoin_random_bytes(rnddata, DOGECOIN_HASH_LENGTH, 0);
     if (!res)
         return false;
@@ -93,7 +93,8 @@ void dogecoin_privkey_encode_wif(const dogecoin_key* privkey, const dogecoin_cha
     pkeybase58c[0] = chain->b58prefix_secret_address;
     pkeybase58c[33] = 1; /* always use compressed keys */
     memcpy_safe(&pkeybase58c[1], privkey->privkey, DOGECOIN_ECKEY_PKEY_LENGTH);
-    assert(dogecoin_base58_encode_check(pkeybase58c, 34, privkey_wif, *strsize_inout) != 0);
+    if (dogecoin_base58_encode_check(pkeybase58c, 34, privkey_wif, *strsize_inout) == 0)
+        *strsize_inout = 0;
     dogecoin_mem_zero(&pkeybase58c, 34);
 }
 
@@ -149,9 +150,9 @@ void dogecoin_pubkey_cleanse(dogecoin_pubkey* pubkey)
     dogecoin_mem_zero(pubkey->pubkey, DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH);
 }
 
-void dogecoin_pubkey_get_hash160(const dogecoin_pubkey* pubkey, uint160 hash160)
+void dogecoin_pubkey_get_hash160(const dogecoin_pubkey* pubkey, uint160_t hash160)
 {
-    uint256 hashout;
+    uint256_t hashout;
     dogecoin_hash_sngl_sha256(pubkey->pubkey, pubkey->compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH, hashout);
     rmd160(hashout, sizeof(hashout), hash160);
 }
@@ -174,27 +175,27 @@ void dogecoin_pubkey_from_key(const dogecoin_key* privkey, dogecoin_pubkey* pubk
     pubkey_inout->compressed = true;
 }
 
-dogecoin_bool dogecoin_key_sign_hash(const dogecoin_key* privkey, const uint256 hash, unsigned char* sigout, size_t* outlen)
+dogecoin_bool dogecoin_key_sign_hash(const dogecoin_key* privkey, const uint256_t hash, unsigned char* sigout, size_t* outlen)
 {
     return dogecoin_ecc_sign(privkey->privkey, hash, sigout, outlen);
 }
 
-dogecoin_bool dogecoin_key_sign_hash_compact(const dogecoin_key* privkey, const uint256 hash, unsigned char* sigout, size_t* outlen)
+dogecoin_bool dogecoin_key_sign_hash_compact(const dogecoin_key* privkey, const uint256_t hash, unsigned char* sigout, size_t* outlen)
 {
     return dogecoin_ecc_sign_compact(privkey->privkey, hash, sigout, outlen);
 }
 
-dogecoin_bool dogecoin_key_sign_hash_compact_recoverable(const dogecoin_key* privkey, const uint256 hash, unsigned char* sigout, size_t* outlen, int* recid)
+dogecoin_bool dogecoin_key_sign_hash_compact_recoverable(const dogecoin_key* privkey, const uint256_t hash, unsigned char* sigout, size_t* outlen, int* recid)
 {
     return dogecoin_ecc_sign_compact_recoverable(privkey->privkey, hash, sigout, outlen, recid);
 }
 
-dogecoin_bool dogecoin_key_sign_hash_compact_recoverable_fcomp(const dogecoin_key* privkey, const uint256 hash, unsigned char* sigout, size_t* outlen, int* recid)
+dogecoin_bool dogecoin_key_sign_hash_compact_recoverable_fcomp(const dogecoin_key* privkey, const uint256_t hash, unsigned char* sigout, size_t* outlen, int* recid)
 {
     return dogecoin_ecc_sign_compact_recoverable_fcomp(privkey->privkey, hash, sigout, outlen, recid, true);
 }
 
-dogecoin_bool dogecoin_key_recover_pubkey(const unsigned char* sig, const uint256 hash, int recid, dogecoin_pubkey* pubkey)
+dogecoin_bool dogecoin_key_recover_pubkey(const unsigned char* sig, const uint256_t hash, int recid, dogecoin_pubkey* pubkey)
 {
     uint8_t pubkeybuf[128];
     size_t outlen = 128;
@@ -207,7 +208,7 @@ dogecoin_bool dogecoin_key_recover_pubkey(const unsigned char* sig, const uint25
     return 1;
 }
 
-dogecoin_bool dogecoin_key_sign_recover_pubkey(const unsigned char* sig, const uint256 hash, int recid, dogecoin_pubkey* pubkey)
+dogecoin_bool dogecoin_key_sign_recover_pubkey(const unsigned char* sig, const uint256_t hash, int recid, dogecoin_pubkey* pubkey)
 {
     uint8_t pubkeybuf[128];
     size_t outlen = 128;
@@ -220,12 +221,12 @@ dogecoin_bool dogecoin_key_sign_recover_pubkey(const unsigned char* sig, const u
     return 1;
 }
 
-dogecoin_bool dogecoin_pubkey_verify_sig(const dogecoin_pubkey* pubkey, const uint256 hash, unsigned char* sigder, size_t len)
+dogecoin_bool dogecoin_pubkey_verify_sig(const dogecoin_pubkey* pubkey, const uint256_t hash, unsigned char* sigder, size_t len)
 {
     return dogecoin_ecc_verify_sig(pubkey->pubkey, pubkey->compressed, hash, sigder, len);
 }
 
-dogecoin_bool dogecoin_pubkey_verify_sigcmp(const dogecoin_pubkey* pubkey, const uint256 hash, unsigned char* sigcmp)
+dogecoin_bool dogecoin_pubkey_verify_sigcmp(const dogecoin_pubkey* pubkey, const uint256_t hash, unsigned char* sigcmp)
 {
     return dogecoin_ecc_verify_sigcmp(pubkey->pubkey, pubkey->compressed, hash, sigcmp);
 }
@@ -250,9 +251,26 @@ dogecoin_bool init_keypair(char* privkeywif, dogecoin_key* key, dogecoin_pubkey*
 
 dogecoin_bool dogecoin_pubkey_getaddr_p2pkh(const dogecoin_pubkey* pubkey, const dogecoin_chainparams* chain, char* addrout)
 {
-    uint8_t hash160[sizeof(uint160) + 1];
+    uint8_t hash160[sizeof(uint160_t) + 1];
     hash160[0] = chain->b58prefix_pubkey_address;
     dogecoin_pubkey_get_hash160(pubkey, hash160 + 1);
     dogecoin_base58_encode_check(hash160, sizeof(hash160), addrout, 100);
     return true;
+}
+
+void getWifEncodedPrivKey(const uint8_t privkey[DOGECOIN_ECKEY_PKEY_LENGTH], const dogecoin_bool is_testnet, char privkey_wif[PRIVKEYWIFLEN], size_t* strsize_wif) {
+    const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
+    dogecoin_key key;
+    memcpy_safe(key.privkey, privkey, DOGECOIN_ECKEY_PKEY_LENGTH);
+    dogecoin_privkey_encode_wif(&key, chain, privkey_wif, strsize_wif);
+}
+
+int getDecodedPrivKeyWif(const char privkey_wif[PRIVKEYWIFLEN], const dogecoin_bool is_testnet, uint8_t privkey[DOGECOIN_ECKEY_PKEY_LENGTH]) {
+    const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
+    dogecoin_key key;
+    if (!dogecoin_privkey_decode_wif(privkey_wif, chain, &key)) {
+        return 0;
+    }
+    memcpy_safe(privkey, key.privkey, DOGECOIN_ECKEY_PKEY_LENGTH);
+    return 1;
 }

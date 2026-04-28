@@ -4,7 +4,7 @@
 
  Copyright (c) 2015 Jonas Schnelli
  Copyright (c) 2023 bluezr
- Copyright (c) 2023 The Dogecoin Foundation
+ Copyright (c) 2023-2024 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -39,6 +39,9 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+#define SPV_HEADERS_FILE_HDR_LEN 8 /* magic(4) + version(4) */
+#define SPV_HEADERS_FILE_REC_LEN (32 + 4 + 32 + 80) /* hash + height + chainwork + header */
+
 /* filebased headers database (including binary tree option for fast access)
 */
 typedef struct dogecoin_headers_db_
@@ -48,6 +51,7 @@ typedef struct dogecoin_headers_db_
     void *tree_root;
     dogecoin_bool use_binary_tree;
     unsigned int max_hdr_in_mem;
+    const dogecoin_chainparams *params;
     dogecoin_blockindex genesis;
     dogecoin_blockindex *chaintip;
     dogecoin_blockindex *chainbottom;
@@ -55,25 +59,24 @@ typedef struct dogecoin_headers_db_
 
 dogecoin_headers_db *dogecoin_headers_db_new(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only);
 void dogecoin_headers_db_free(dogecoin_headers_db *db);
-dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *filename);
+dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *filename, dogecoin_bool prompt);
 dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, struct const_buffer *buf, dogecoin_bool load_process, dogecoin_bool *connected);
-void dogecoin_headers_db_fill_block_locator(dogecoin_headers_db* db, vector *blocklocators);
-dogecoin_blockindex * dogecoin_headersdb_find(dogecoin_headers_db* db, uint256 hash);
+void dogecoin_headers_db_fill_block_locator(dogecoin_headers_db* db, vector_t *blocklocators);
+dogecoin_blockindex * dogecoin_headersdb_find(dogecoin_headers_db* db, uint256_t hash);
 dogecoin_blockindex * dogecoin_headersdb_getchaintip(dogecoin_headers_db* db);
 dogecoin_bool dogecoin_headersdb_disconnect_tip(dogecoin_headers_db* db);
 dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db);
-void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256 hash, uint32_t height);
-
+void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t hash, uint32_t height, uint256_t chainwork);
 static const dogecoin_headers_db_interface dogecoin_headers_db_interface_file = {
     (void* (*)(const dogecoin_chainparams*, dogecoin_bool))dogecoin_headers_db_new,
     (void (*)(void *))dogecoin_headers_db_free,
-    (dogecoin_bool (*)(void *, const char *))dogecoin_headers_db_load,
-    (void (*)(void* , vector *))dogecoin_headers_db_fill_block_locator,
+    (dogecoin_bool (*)(void *, const char *, dogecoin_bool))dogecoin_headers_db_load,
+    (void (*)(void* , vector_t *))dogecoin_headers_db_fill_block_locator,
     (dogecoin_blockindex *(*)(void* , struct const_buffer *, dogecoin_bool , dogecoin_bool *))dogecoin_headers_db_connect_hdr,
     (dogecoin_blockindex* (*)(void *))dogecoin_headersdb_getchaintip,
     (dogecoin_bool (*)(void *))dogecoin_headersdb_disconnect_tip,
     (dogecoin_bool (*)(void *))dogecoin_headersdb_has_checkpoint_start,
-    (void (*)(void *, uint256, uint32_t))dogecoin_headersdb_set_checkpoint_start
+    (void (*)(void *, uint256_t, uint32_t, uint256_t))dogecoin_headersdb_set_checkpoint_start
 };
 
 LIBDOGECOIN_END_DECL

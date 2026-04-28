@@ -15,14 +15,13 @@ For Ubuntu and Debian Linux, you will need to install the following dependencies
 - automake
 - libtool
 - libevent-dev
-- libunistring-dev
 - build-essential
 
 This can be done in the following commands using Linux CLI:
 
 ```c
 sudo apt-get update
-sudo apt-get install autoconf automake libtool libevent-dev libunistring-dev build-essential
+sudo apt-get install autoconf automake libtool libevent-dev build-essential
 ```
 
 For Windows, you will need to install the following dependencies before building:
@@ -53,7 +52,21 @@ At this step there are plenty of flags that can be specified, the two most perti
 ./configure CFLAGS='-Ipath/to/additional/include/files'
 ./configure --enable-debug --enable-tss2 --enable-test-passwd
 ```
+If you're building on Windows, you'll need to use `cmake` instead of `./configure`:
 
+```c
+mkdir build
+cd build
+cmake ..
+```
+Another useful flag is `--enable-test-passwd`, which will generate a random password for testing software encryption/decryption. This flag disables the need for a password to be entered when testing TPM encryption/decryption. _Note: this flag is for testing purposes only._ This flag is disabled by default, but can be enabled with the `./configure` command or by using `cmake`:
+```c
+./configure --enable-test-passwd
+```
+```c
+cmake -DTEST_PASSWD=TRUE ..
+```
+## _`--enable-test-passwd` is for **testing purposes only**._
 For a complete list of all different configuration options, you can run the command `./configure --help`.
 
 Finally, once you have configured the library to your liking, it is ready to be built. This can be done with the simple `make` command:
@@ -151,8 +164,8 @@ int main() {
     char* amt_total = "2.0";
 
     // generate new key pair to send to
-    char newPrivKey[53];
-    char newPubKey[35];
+    char newPrivKey[PRIVKEYWIFLEN];
+    char newPubKey[P2PKHLEN];
     generatePrivPubKeypair(newPrivKey, newPubKey, false);
 
     // build and sign the transaction
@@ -172,13 +185,12 @@ int main() {
 The last step is to specify the libraries you will need to link into your project, done by using the `-l` flag. The libraries that are required to use Libdogecoin in your project are:
 
 - libdogecoin (of course!)
-- libevent
-- libunistring
+- libevent_core
 
 On the command line, your final compilation will look something like the command below, factoring in all of the steps previously mentioned. _Note: the prefix "lib" is excluded when specifying libraries to link._
 
 ```
-gcc main.c -L./path/to/library/file -I./path/to/header/file -ldogecoin -levent -lunistring -o myprojectname
+gcc main.c -L./path/to/library/file -I./path/to/header/file -ldogecoin -levent_core -o myprojectname
 ```
 
 Congratulations, you have just built an executable program that implements Libdogecoin!
@@ -198,12 +210,12 @@ There may be times when you would like to build the library for a different oper
 - i686-w64-mingw32
 - i686-pc-linux-gnu
 
-The build steps for cross compilation are very similar to the native build steps listed above. Specify the desired architecture from the list above under by using the `host` flag, and include any necessary configuration flags on the `./configure` command:
+The build steps for cross compilation are very similar to the native build steps listed above. Specify the desired architecture from the list above under by using the `HOST` flag, and include any necessary configuration flags on the `./configure` command:
 
 ```c
-make -C depends host=<target_architecture>
+make -C depends HOST=<target_architecture>
 ./autogen.sh
-./configure
+./configure --prefix=`pwd`/depends/<target_architecture>
 make check
 ```
 

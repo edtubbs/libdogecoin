@@ -35,7 +35,7 @@ It is intended that connecting the bits together into an engine be done at the l
 
 ### Advantages of Libdogecoin
 
-- No dependencies in case no p2p network client is required (only dependencies are [libsecp256k1](https://github.com/bitcoin-core/secp256k1) added as git subtree and optionally (enabled by default) [libunistring](https://www.gnu.org/software/libunistring/) for mnemonics)
+- No dependencies in case no p2p network client is required (only dependency is [libsecp256k1](https://github.com/bitcoin-core/secp256k1) added as git subtree)
 - The only dependency for the p2p network client is [libevent](https://github.com/libevent/libevent) (very portable)
 - optimized for MCU and low mem environments
 - ~full test coverage
@@ -121,7 +121,7 @@ Before attempting to build, make sure all the necessary dependencies for your ar
 _Debian/Ubuntu_
 
 ```_Debian/Ubuntu_
-sudo apt-get install autoconf automake libtool build-essential libevent-dev libunistring-dev
+sudo apt-get install autoconf automake libtool build-essential libevent-dev
 ```
 
 _MacOS_
@@ -175,7 +175,7 @@ In addition to the following instructions we've created an [example file](/contr
 To compile that example with `gcc`, first build libdogecoin so the resulting `.a` file will be found in `/.libs` and execute:
 
 ```c
-gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include/dogecoin -L./.libs -ldogecoin -lunistring -o example
+gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include/dogecoin -L./.libs -ldogecoin -o example
 ```
 
 then run the example: `./example`. Otherwise continue with something like the folowing:
@@ -191,8 +191,8 @@ int main() {
 }
 ```
 
-Once you are ready to compile, the `libdogecoin.a` file must be linked to your source code, along with `libevent` and `libunistring`. The resulting compilation command will looks similar to this:
+Once you are ready to compile, the `libdogecoin.a` file must be linked to your source code, along with `libevent`. The resulting compilation command will looks similar to this:
 
 ```_Debian / Ubuntu_
-gcc main.c -ldogecoin -levent -lunistring -o myprojectname
+gcc main.c -ldogecoin -levent -o myprojectname
 ```

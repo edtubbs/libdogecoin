@@ -80,11 +80,9 @@ These steps can be very confusing, so Libdogecoin does all of them for you when 
 
 These functions implement the core functionality of Libdogecoin for address generation and validation, and are described in depth below. You can access them through a C program, by including the `libdogecoin.h` header in the source code and including the `libdogecoin.a` library at compile time.
 
-When using functions from either the Essential or Advanced Address API, include the -lunistring flag during the linking process. This is because the Advanced Address API uses the GNU libunistring library for Unicode string manipulation. To include the -lunistring flag during linking, simply add it to the linker command when building your project:
+When using functions from either the Essential or Advanced Address API, include the -ldogecoin flag during the linking process. To include the -ldogecoin flag during linking, simply add it to the linker command when building your project:
 
-`gcc -o example example.c -ldogecoin -lunistring`
-
-Ensure that the `libunistring` library is installed on your system before linking.
+`gcc -o example example.c -ldogecoin`
 
 ---
 
@@ -101,8 +99,8 @@ _C usage:_
 #include <stdio.h>
 
 int main() {
-  int privkeyLen = 53;
-  int pubkeyLen = 35;
+  int privkeyLen = PRIVKEYWIFLEN;
+  int pubkeyLen = P2PKHLEN;
 
   char privKey[privkeyLen];
   char pubKey[pubkeyLen];
@@ -120,7 +118,7 @@ int main() {
 
 ### **generateHDMasterPubKeypair:**
 
-`int generateHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_master, bool is_testnet)`
+`int generateHDMasterPubKeypair(char* hd_privkey_master, char* p2pkh_pubkey_master, bool is_testnet)`
 
 This function will populate provided string variables (privkey, pubkey) with freshly generated respective private and public keys for a hierarchical deterministic wallet, specifically for either mainnet or testnet as specified through the network flag (is_testnet). The function returns 1 on success and 0 on failure.
 
@@ -131,8 +129,8 @@ _C usage:_
 #include <stdio.h>
 
 int main() {
-  int masterPrivkeyLen = 200; // enough cushion
-  int pubkeyLen = 35;
+  int masterPrivkeyLen = HDKEYLEN; // enough cushion
+  int pubkeyLen = P2PKHLEN;
 
   char masterPrivKey[masterPrivkeyLen];
   char masterPubKey[pubkeyLen];
@@ -150,9 +148,9 @@ int main() {
 
 ### **generateDerivedHDPubKey:**
 
-`int generateDerivedHDPubkey(const char* wif_privkey_master, char* p2pkh_pubkey)`
+`int generateDerivedHDPubkey(const char* hd_privkey_master, char* p2pkh_pubkey)`
 
-This function takes a given HD master private key (wif_privkey_master) and loads it into the provided pointer for the resulting derived public key (p2pkh_pubkey). This private key input should come from the result of generateHDMasterPubKeypair(). The function returns 1 on success and 0 on failure.
+This function takes a given HD master private key (hd_privkey_master) and loads it into the provided pointer for the resulting derived public key (p2pkh_pubkey). This private key input should come from the result of generateHDMasterPubKeypair(). The function returns 1 on success and 0 on failure.
 
 _C usage:_
 
@@ -161,8 +159,8 @@ _C usage:_
 #include <stdio.h>
 
 int main() {
-  int masterPrivkeyLen = 200; // enough cushion
-  int pubkeyLen = 35;
+  int masterPrivkeyLen = HDKEYLEN; // enough cushion
+  int pubkeyLen = P2PKHLEN;
 
   char masterPrivKey[masterPrivkeyLen];
   char masterPubKey[pubkeyLen];
@@ -194,8 +192,8 @@ _C usage:_
 #include <stdio.h>
 
 int main() {
-  int privkeyLen = 53;
-  int pubkeyLen = 35;
+  int privkeyLen = PRIVKEYWIFLEN;
+  int pubkeyLen = P2PKHLEN;
 
   char privKey[privkeyLen];
   char pubKey[pubkeyLen];
@@ -217,9 +215,9 @@ int main() {
 
 ### **verifyHDMasterPubKeypair**
 
-`int verifyHDMasterPubKeypair(char* wif_privkey_master, char* p2pkh_pubkey_master, bool is_testnet)`
+`int verifyHDMasterPubKeypair(char* hd_privkey_master, char* p2pkh_pubkey_master, bool is_testnet)`
 
-This function validates that a given master private key matches a given master public key. This could be useful prior to signing, or in some kind of wallet recovery tool to match keys. This function requires a previously generated HD master key pair (wif_privkey_master, p2pkh_pubkey_master) and the network they were generated for (is_testnet). It then validates that the given public key was indeed derived from the given master private key, returning 1 if the keys are associated and 0 if they are not. This could be useful prior to signing, or in some kind of wallet recovery tool to match keys.
+This function validates that a given master private key matches a given master public key. This could be useful prior to signing, or in some kind of wallet recovery tool to match keys. This function requires a previously generated HD master key pair (hd_privkey_master, p2pkh_pubkey_master) and the network they were generated for (is_testnet). It then validates that the given public key was indeed derived from the given master private key, returning 1 if the keys are associated and 0 if they are not. This could be useful prior to signing, or in some kind of wallet recovery tool to match keys.
 
 _C usage:_
 
@@ -228,8 +226,8 @@ _C usage:_
 #include <stdio.h>
 
 int main() {
-  int masterPrivkeyLen = 200; // enough cushion
-  int pubkeyLen = 35;
+  int masterPrivkeyLen = HDKEYLEN; // enough cushion
+  int pubkeyLen = P2PKHLEN;
 
   char masterPrivKey[masterPrivkeyLen];
   char masterPubKey[pubkeyLen];
@@ -262,8 +260,8 @@ _C usage:_
 #include <stdio.h>
 
 int main() {
-  int privkeyLen = 200; // enough cushion
-  int pubkeyLen = 35;
+  int privkeyLen = HDKEYLEN; // enough cushion
+  int pubkeyLen = P2PKHLEN;
 
   char privKey[privkeyLen];
   char pubKey[pubkeyLen];
@@ -315,7 +313,7 @@ int main() {
 
 `dogecoin_hdnode* getHDNodeAndExtKeyByPath(const char* masterkey, const char* derived_path, char* outaddress, bool outprivkey)`
 
-This function derives a hierarchical deterministic child key by way of providing the extended master key, derived_path, outaddress and outprivkey.
+This function derives a hierarchical deterministic child key by way of providing the extended master key, derived_path, outaddress and outprivkey.  The masterkey can be either a private or public key, but if it is a public key, the outprivkey flag must be set to false and the derived_path must be a public derivation path.
 It will return the dogecoin_hdnode if successful and exits if the proper arguments are not provided.
 
 _C usage:_
@@ -338,6 +336,29 @@ int main() {
   dogecoin_ecc_stop();
   dogecoin_hdnode_free(hdnode);
   free(extout);
+}
+```
+
+```C
+#include "libdogecoin.h"
+#include <assert.h>
+#include <stdio.h>
+
+int main() {
+  char masterkey[HDKEYLEN] = {0};
+  char master_public_key[HDKEYLEN] = {0};
+  char extkeypath[KEYPATHMAXLEN] = "m/0/0/0/0/0";
+  char extpubkey[HDKEYLEN] = {0};
+  dogecoin_ecc_start();
+
+  // Generate a master key pair from the seed, and then get the master public key
+  getHDRootKeyFromSeed(utils_hex_to_uint8("5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4"), MAX_SEED_SIZE, false, masterkey);
+  getHDPubKey(masterkey, false, master_public_key);
+
+  // Derive an extended normal (non-hardened) public key from the master public key
+  getHDNodeAndExtKeyByPath(master_public_key, extkeypath, extpubkey, false);
+  dogecoin_ecc_stop();
+  printf("%s\n", extpubkey);
 }
 ```
 
@@ -489,7 +510,7 @@ _C usage:_
 #include <stdio.h>
 
 int main () {
-  int addressLen = 53;
+  int addressLen = P2PKHLEN;
 
   MNEMONIC seed_phrase;
   char address [addressLen];
@@ -514,7 +535,7 @@ extern "C" {
 using namespace std;
 
 int main () {
-  int addressLen = 53;
+  int addressLen = P2PKHLEN;
 
   MNEMONIC seed_phrase;
   char address [addressLen];
@@ -544,7 +565,7 @@ _C usage:_
 #include <stdio.h>
 
 int main() {
-    int addressLen = 35;
+    int addressLen = P2PKHLEN;
     char derived_address[addressLen];
 
     if (getDerivedHDAddressFromEncryptedSeed(0, 0, BIP44_CHANGE_EXTERNAL, derived_address, false, TEST_FILE) == 0) {
@@ -571,7 +592,7 @@ _C usage:_
 #include <stdio.h>
 
 int main() {
-    int addressLen = 35;
+    int addressLen = P2PKHLEN;
     char derived_address[addressLen];
 
     if (getDerivedHDAddressFromEncryptedMnemonic(0, 0, BIP44_CHANGE_EXTERNAL, NULL, derived_address, false, TEST_FILE) == 0) {
@@ -598,7 +619,7 @@ _C usage:_
 #include <stdio.h>
 
 int main() {
-    int addressLen = 35;
+    int addressLen = P2PKHLEN;
     char derived_address[addressLen];
 
     if (getDerivedHDAddressFromEncryptedHDNode(0, 0, BIP44_CHANGE_EXTERNAL, derived_address, false, TEST_FILE) == 0) {

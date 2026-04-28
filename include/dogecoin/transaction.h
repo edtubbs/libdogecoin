@@ -1,8 +1,8 @@
 /*
  The MIT License (MIT)
- 
+
  Copyright (c) 2022 bluezr
- Copyright (c) 2022 The Dogecoin Foundation
+ Copyright (c) 2022-2024 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -33,6 +33,10 @@
 #include <dogecoin/tx.h>
 
 LIBDOGECOIN_BEGIN_DECL
+
+// Maximum length of standard tx based on relay limit (100 000).
+// Internally this is cited as 200001 for strings that represent it because +stringterm.
+#define TXHEXMAXLEN 200001
 
 /* hashmap functions */
 typedef struct working_transaction {
@@ -68,7 +72,7 @@ LIBDOGECOIN_API const char *get_raw_tx(const char *prompt_tx);
 
 LIBDOGECOIN_API const char *get_private_key(const char *prompt_key);
 
-LIBDOGECOIN_API int start_transaction(); // #returns  an index of a transaction to build in memory.  (1, 2, etc) ..   
+LIBDOGECOIN_API int start_transaction(); // #returns  an index of a transaction to build in memory.  (1, 2, etc) ..
 
 LIBDOGECOIN_API int save_raw_transaction(int txindex, const char* hexadecimal_transaction);
 
@@ -96,6 +100,18 @@ LIBDOGECOIN_API int sign_transaction(int txindex, char* script_pubkey, char* pri
 LIBDOGECOIN_API int sign_transaction_w_privkey(int txindex, int vout_index, char* privkey);
 
 LIBDOGECOIN_API int store_raw_transaction(char* incomingrawtx);
+
+LIBDOGECOIN_API int get_raw_transaction_ex(int txindex, char* buf, size_t buf_cap);
+
+LIBDOGECOIN_API int sign_raw_transaction_ex(int inputindex, const char* incomingrawtx, char* signedrawtx, size_t* signed_size, const char* scripthex, int sighashtype, const char* privkey);
+
+LIBDOGECOIN_API int finalize_transaction_ex(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress, char* buf, size_t buf_cap);
+
+LIBDOGECOIN_API int sign_indexed_raw_transaction_ex(int txindex, int inputindex, const char* scripthex, int sighashtype, const char* privkey, char* buf, size_t buf_cap);
+
+LIBDOGECOIN_API int sign_transaction_ex(int txindex, const char* script_pubkey, const char* privkey, char* buf, size_t buf_cap);
+
+LIBDOGECOIN_API int sign_transaction_w_privkey_ex(int txindex, const char* privkey, char* buf, size_t buf_cap);
 
 LIBDOGECOIN_END_DECL
 

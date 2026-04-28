@@ -1,8 +1,8 @@
-package=libunistring
-$(package)_version=1.1
-$(package)_download_path=https://ftp.gnu.org/gnu/libunistring/
-$(package)_file_name=$(package)-$($(package)_version).tar.gz
-$(package)_sha256_hash=a2252beeec830ac444b9f68d6b38ad883db19919db35b52222cf827c385bdb6a
+package=libyubikey
+$(package)_version=1.13
+$(package)_download_path=https://developers.yubico.com/yubico-c/Releases
+$(package)_file_name=libyubikey-$($(package)_version).tar.gz
+$(package)_sha256_hash=04edd0eb09cb665a05d808c58e1985f25bb7c5254d2849f36a0658ffc51c3401
 
 define $(package)_set_vars
   $(package)_config_opts=--disable-shared --enable-static

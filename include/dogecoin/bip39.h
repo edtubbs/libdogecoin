@@ -39,8 +39,11 @@ LIBDOGECOIN_API
 /* Maximum number of bits supported for checksum */
 #define MAX_CHECKSUM_BITS 8
 
+/* Number of bits per word in a mnemonic phrase */
+#define BITS_PER_WORD 11
+
 /* Maximum number of words in a mnemonic phrase */
-#define MAX_WORDS_IN_MNEMONIC (MAX_ENTROPY_BITS + MAX_CHECKSUM_BITS) / 11
+#define MAX_WORDS_IN_MNEMONIC (MAX_ENTROPY_BITS + MAX_CHECKSUM_BITS) / BITS_PER_WORD
 
 /* Maximum number of characters in a single word of a mnemonic phrase */
 #define MAX_CHARS_IN_MNEMONIC_WORD 16
@@ -53,9 +56,6 @@ LIBDOGECOIN_API
 
 /* Maximum size of a passphrase string in bytes */
 #define MAX_PASSPHRASE_STRING_SIZE (MAX_CHARS_IN_PASSPHRASE * HEX_CHARS_PER_BYTE) + 1
-
-/* Maximum size of a seed in bytes */
-#define MAX_SEED_SIZE 64
 
 /* Specifies the number of decimal characters needed to represent entropy size */
 #define ENTROPY_SIZE_STRING_SIZE 3
@@ -136,10 +136,6 @@ typedef char PASSPHRASE[MAX_PASSPHRASE_STRING_SIZE];
 /* The mnemonic should be a space-separated string with a maximum size of MAX_MNEMONIC_STRING_SIZE */
 typedef char MNEMONIC[MAX_MNEMONIC_STRING_SIZE];
 
-/* A binary representation of the BIP39 seed, used to generate private and public keys */
-/* The seed should be an unsigned integer with a maximum size of MAX_SEED_SIZE */
-typedef uint8_t SEED[MAX_SEED_SIZE];
-
 /* A string representation of the entropy size to generate a BIP39 mnemonic */
 /* The entropy size should be a decimal string with a size of ENTROPY_SIZE_STRING_SIZE */
 typedef char ENTROPY_SIZE [ENTROPY_SIZE_STRING_SIZE];
@@ -163,6 +159,9 @@ int get_words(const char* lang, char* wordlist[]);
 /* Returns custom words from specified file as a parameter */
 int get_custom_words(const char* filepath, char* wordlist[]);
 
+/* Verifies the mnemonic sentence */
+int verify_mnemonic_sentence(const char* mnemonic, const char* wordlist[], const char* space);
+
 /* Generate a mnemonic for a given entropy size and language */
 /* "128", "160", "192", "224", or "256" bits of entropy */
 /* ISO 639-2 code for the mnemonic language */
@@ -175,6 +174,15 @@ int get_custom_words(const char* filepath, char* wordlist[]);
 /* generated mnemonic (output) */
 /* returns 0 (success), -1 (fail) */
 LIBDOGECOIN_API int dogecoin_generate_mnemonic (const ENTROPY_SIZE entropy_size, const char* language, const char* space, const char* entropy, const char* filename, char* entropy_out, size_t* size, char* words);
+
+/* Verifies the mnemonic phrase */
+/* mnemonic code words */
+/* ISO 639-2 code for the mnemonic language */
+/* space character to seperate mnemonic */
+/* en.wikipedia.org/wiki/List_of_ISO_639-2_codes */
+/* path to custom word list file (optional, language ignored) */
+/* returns 0 (success), -1 (fail) */
+LIBDOGECOIN_API int dogecoin_verify_mnemonic (const char* mnemonic, const char* language, const char* space, const char* filename);
 
 /* Derive the seed from the mnemonic and optional passphrase */
 /* mnemonic code words */

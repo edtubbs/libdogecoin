@@ -4,7 +4,7 @@
 
  Copyright (c) 2015 Jonas Schnelli
  Copyright (c) 2022 bluezr
- Copyright (c) 2022 The Dogecoin Foundation
+ Copyright (c) 2022-2024 The Dogecoin Foundation
 
  Permission is hereby granted, free of charge, to any person obtaining
  a copy of this software and associated documentation files (the "Software"),
@@ -46,9 +46,14 @@ typedef struct dogecoin_chainparams_ {
     uint32_t b58prefix_bip32_privkey;
     uint32_t b58prefix_bip32_pubkey;
     const unsigned char netmagic[4];
-    uint256 genesisblockhash;
+    uint256_t genesisblockhash;
+    uint256_t genesisblockchainwork;
     int default_port;
     dogecoin_dns_seed dnsseeds[8];
+    dogecoin_bool strict_id;
+    dogecoin_bool auxpow_id;
+    uint256_t pow_limit;
+    uint256_t minimumchainwork;
 } dogecoin_chainparams;
 
 typedef struct dogecoin_checkpoint_ {
@@ -63,11 +68,15 @@ extern const dogecoin_chainparams dogecoin_chainparams_test;
 extern const dogecoin_chainparams dogecoin_chainparams_regtest;
 
 // the mainnet checkpoints, needs a fix size
-extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[22];
-extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[18];
+extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[26];
+extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[20];
 
 LIBDOGECOIN_API const dogecoin_chainparams* chain_from_b58_prefix(const char* address);
 LIBDOGECOIN_API int chain_from_b58_prefix_bool(char* address);
+
+// check if the given prefix is a testnet or mainnet prefix
+LIBDOGECOIN_API dogecoin_bool isTestnetFromB58Prefix(const char address[P2PKHLEN]);
+LIBDOGECOIN_API dogecoin_bool isMainnetFromB58Prefix(const char address[P2PKHLEN]);
 
 LIBDOGECOIN_END_DECL
 
