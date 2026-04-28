@@ -36,11 +36,6 @@ static inline void libd_sha2_WriteLE32(unsigned char* p, uint32_t v) {
 #define ReadLE32  libd_sha2_ReadLE32
 #define WriteLE32 libd_sha2_WriteLE32
 
-
-
-
-
-
 static inline __m256i K(uint32_t x) { return _mm256_set1_epi32(x); }
 
 static inline __m256i Add2(__m256i x, __m256i y) { return _mm256_add_epi32(x, y); }
