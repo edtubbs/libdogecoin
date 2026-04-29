@@ -1,0 +1,6 @@
+legacy_w1  elapsed=90s connected=101871   rate=1131.9/s batches=5076  staged=0   invalid_rejects=5024  final_tip=5501871
+legacy_w4  elapsed=90s connected=105897   rate=1176.6/s batches=4872  staged=0   invalid_rejects=4818  final_tip=5505897
+ts_w1      elapsed=90s connected=58000    rate=644.4/s batches=310   staged=0   invalid_rejects=196   final_tip=5458000
+ts_w2      elapsed=90s connected=22000    rate=244.4/s batches=200   staged=0   invalid_rejects=157   final_tip=5422000
+ts_w4      elapsed=90s connected=58000    rate=644.4/s batches=675   staged=0   invalid_rejects=566   final_tip=5458000
+ts_w8      elapsed=90s connected=52000    rate=577.8/s batches=565   staged=0   invalid_rejects=456   final_tip=5452000

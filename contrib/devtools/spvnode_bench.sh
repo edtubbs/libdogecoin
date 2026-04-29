@@ -50,16 +50,24 @@ run_one() {
 
   local t0 t1
   t0=$(date +%s)
-  timeout "$DURATION" ./"$bin" -d -p -c -m 8 -o "$workers" \
+  # -l (--no_prompt) is required so spvnode/spvnode_ts run unattended (no
+  # password/wallet prompts). -p starts from the latest compiled checkpoint.
+  # stdbuf forces line-buffered stdio so log output is preserved when SIGTERM
+  # arrives at end-of-window (default fully-buffered stdio loses everything
+  # when the timeout signal hits).
+  timeout --foreground --signal=INT --kill-after=5 "$DURATION" \
+      stdbuf -oL -eL \
+      ./"$bin" -d -p -c -l -m 8 -o "$workers" \
         -h ./bench_main_headers.db -w ./bench_main_wallet.db scan \
         > "$log" 2>&1 || true
   t1=$(date +%s)
 
   local elapsed=$((t1 - t0))
 
-  # Sum of "Connected N headers" lines = headers committed to chain
+  # Sum of "DEBUG: Connected N headers" lines = headers committed to chain.
+  # Field layout is: "DEBUG: Connected N headers", so the count is $3.
   local connected
-  connected=$(awk '/Connected [0-9]+ headers/ {s+=$2} END {print s+0}' "$log")
+  connected=$(awk '/DEBUG: Connected [0-9]+ headers/ {s+=$3} END {print s+0}' "$log")
   # Number of "Got 2000 headers" deliveries (raw batch arrivals)
   local batches
   batches=$(grep -c "Got 2000 headers" "$log" || true)

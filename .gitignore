@@ -167,3 +167,4 @@ store/*
 /spvnode_ts
 /sendtx_ts
 /such_ts
+spvbench_out/
