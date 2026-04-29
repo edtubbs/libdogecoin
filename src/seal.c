@@ -62,6 +62,11 @@
 
 #ifdef USE_YUBIKEY
 #include <ykpiv/ykpiv.h>
+#ifdef USE_FIDO2
+#include <fido.h>
+#include <fido/param.h>
+#include <fido/err.h>
+#endif
 #endif
 
 /*
@@ -131,6 +136,17 @@
 #define YUBIKEY_FACTOR_METADATA_VERSION 1
 #define YUBIKEY_FACTOR_SECRET_MAX_LEN 256
 #define YUBIKEY_FACTOR_METADATA_SIZE (1 + 1 + SALT_SIZE + SHA512_DIGEST_LENGTH)
+#define YUBIKEY_FIDO2_WRAP_VERSION 1
+#define YUBIKEY_FIDO2_RP_ID_MAX_LEN 96
+#define YUBIKEY_FIDO2_CRED_ID_MAX_LEN 512
+#define YUBIKEY_FIDO2_HMAC_SECRET_LEN 32
+#define YUBIKEY_FIDO2_HMAC_SALT_LEN 32
+#define YUBIKEY_FIDO2_WRAP_MAGIC_0 'L'
+#define YUBIKEY_FIDO2_WRAP_MAGIC_1 'D'
+#define YUBIKEY_FIDO2_WRAP_MAGIC_2 'G'
+#define YUBIKEY_FIDO2_WRAP_MAGIC_3 '2'
+#define YUBIKEY_FIDO2_DEFAULT_RP_ID "libdogecoin"
+#define YUBIKEY_FIDO2_HKDF_INFO "libdogecoin/yubikey-fido2-kek/v1"
 
 /**
  * @brief Validates a file number
@@ -2654,6 +2670,527 @@ static dogecoin_bool secure_memeq(const uint8_t* lhs, const uint8_t* rhs, const 
     return diff == 0;
 }
 
+#ifdef USE_FIDO2
+static void hkdf_sha256_32(const uint8_t* ikm, const size_t ikm_len, const uint8_t* salt, const size_t salt_len, const uint8_t* info, const size_t info_len, uint8_t out32[32])
+{
+    uint8_t prk[SHA256_DIGEST_LENGTH];
+    uint8_t zero_salt[SHA256_DIGEST_LENGTH] = {0};
+    uint8_t t1[SHA256_DIGEST_LENGTH];
+    uint8_t buf[256];
+    size_t buf_len = 0;
+
+    if (salt != NULL && salt_len > 0)
+    {
+        hmac_sha256(salt, salt_len, ikm, ikm_len, prk);
+    }
+    else
+    {
+        hmac_sha256(zero_salt, sizeof(zero_salt), ikm, ikm_len, prk);
+    }
+
+    if (info != NULL && info_len > 0)
+    {
+        memcpy(buf, info, info_len);
+        buf_len = info_len;
+    }
+    buf[buf_len++] = 0x01;
+    hmac_sha256(prk, sizeof(prk), buf, buf_len, t1);
+    memcpy(out32, t1, 32);
+
+    dogecoin_mem_zero(prk, sizeof(prk));
+    dogecoin_mem_zero(zero_salt, sizeof(zero_salt));
+    dogecoin_mem_zero(t1, sizeof(t1));
+    dogecoin_mem_zero(buf, sizeof(buf));
+}
+
+static dogecoin_bool fido2_open_first_device(fido_dev_t** dev_out)
+{
+    if (dev_out == NULL)
+    {
+        return false;
+    }
+    *dev_out = NULL;
+
+    fido_dev_info_t* devlist = fido_dev_info_new(8);
+    if (devlist == NULL)
+    {
+        fprintf(stderr, "ERROR: Failed to allocate libfido2 device list.\n");
+        return false;
+    }
+
+    size_t ndevs = 0;
+    int rc = fido_dev_info_manifest(devlist, 8, &ndevs);
+    if (rc != FIDO_OK || ndevs == 0)
+    {
+        fprintf(stderr, "ERROR: No FIDO2 authenticator detected (%s).\n", fido_strerr(rc));
+        fido_dev_info_free(&devlist, 8);
+        return false;
+    }
+
+    const fido_dev_info_t* di = fido_dev_info_ptr(devlist, 0);
+    const char* path = fido_dev_info_path(di);
+    if (path == NULL)
+    {
+        fprintf(stderr, "ERROR: Failed to get FIDO2 device path.\n");
+        fido_dev_info_free(&devlist, 8);
+        return false;
+    }
+
+    fido_dev_t* dev = fido_dev_new();
+    if (dev == NULL)
+    {
+        fprintf(stderr, "ERROR: Failed to allocate FIDO2 device handle.\n");
+        fido_dev_info_free(&devlist, 8);
+        return false;
+    }
+
+    rc = fido_dev_open(dev, path);
+    fido_dev_info_free(&devlist, 8);
+    if (rc != FIDO_OK)
+    {
+        fprintf(stderr, "ERROR: Failed to open FIDO2 authenticator (%s).\n", fido_strerr(rc));
+        fido_dev_free(&dev);
+        return false;
+    }
+
+    *dev_out = dev;
+    return true;
+}
+
+static dogecoin_bool fido2_read_pin(char pin_buf[PASS_MAX_LEN], const char* prompt)
+{
+    char* pin = getpass(prompt);
+    if (pin == NULL)
+    {
+        fprintf(stderr, "ERROR: Failed to read FIDO2 PIN.\n");
+        return false;
+    }
+    if (strnlen(pin, PASS_MAX_LEN) >= PASS_MAX_LEN)
+    {
+        fprintf(stderr, "ERROR: FIDO2 PIN too long.\n");
+        return false;
+    }
+    strncpy(pin_buf, pin, PASS_MAX_LEN - 1);
+    pin_buf[PASS_MAX_LEN - 1] = '\0';
+    if (pin_buf[0] == '\0')
+    {
+        fprintf(stderr, "ERROR: FIDO2 PIN cannot be empty.\n");
+        return false;
+    }
+    return true;
+}
+
+static dogecoin_bool fido2_register_credential(fido_dev_t* dev, const char* pin, const char* rp_id, uint8_t cred_id[YUBIKEY_FIDO2_CRED_ID_MAX_LEN], size_t* cred_id_len)
+{
+    dogecoin_bool ok = false;
+    int rc = FIDO_ERR_INTERNAL;
+    fido_cred_t* cred = NULL;
+    uint8_t clientdata_hash[SHA256_DIGEST_LENGTH];
+    uint8_t user_id[32];
+
+    if (dev == NULL || pin == NULL || rp_id == NULL || cred_id == NULL || cred_id_len == NULL)
+    {
+        return false;
+    }
+
+    if (!dogecoin_random_bytes(clientdata_hash, sizeof(clientdata_hash), 1) ||
+        !dogecoin_random_bytes(user_id, sizeof(user_id), 1))
+    {
+        fprintf(stderr, "ERROR: Failed to generate random bytes for FIDO2 credential creation.\n");
+        return false;
+    }
+
+    cred = fido_cred_new();
+    if (cred == NULL)
+    {
+        fprintf(stderr, "ERROR: Failed to allocate FIDO2 credential object.\n");
+        goto cleanup;
+    }
+
+    if ((rc = fido_cred_set_type(cred, COSE_ES256)) != FIDO_OK ||
+        (rc = fido_cred_set_clientdata_hash(cred, clientdata_hash, sizeof(clientdata_hash))) != FIDO_OK ||
+        (rc = fido_cred_set_rp(cred, rp_id, "libdogecoin")) != FIDO_OK ||
+        (rc = fido_cred_set_user(cred, user_id, sizeof(user_id), "libdogecoin", "libdogecoin", NULL)) != FIDO_OK ||
+        (rc = fido_cred_set_rk(cred, FIDO_OPT_TRUE)) != FIDO_OK ||
+        (rc = fido_cred_set_uv(cred, FIDO_OPT_TRUE)) != FIDO_OK ||
+        (rc = fido_cred_set_extensions(cred, FIDO_EXT_HMAC_SECRET)) != FIDO_OK)
+    {
+        fprintf(stderr, "ERROR: Failed to prepare FIDO2 credential request (%s).\n", fido_strerr(rc));
+        goto cleanup;
+    }
+
+    rc = fido_dev_make_cred(dev, cred, pin);
+    if (rc != FIDO_OK)
+    {
+        fprintf(stderr, "ERROR: Failed to create FIDO2 credential (%s).\n", fido_strerr(rc));
+        goto cleanup;
+    }
+
+    const unsigned char* cred_ptr = fido_cred_id_ptr(cred);
+    size_t len = fido_cred_id_len(cred);
+    if (cred_ptr == NULL || len == 0 || len > YUBIKEY_FIDO2_CRED_ID_MAX_LEN)
+    {
+        fprintf(stderr, "ERROR: Invalid FIDO2 credential ID.\n");
+        goto cleanup;
+    }
+
+    memcpy(cred_id, cred_ptr, len);
+    *cred_id_len = len;
+    ok = true;
+
+cleanup:
+    dogecoin_mem_zero(clientdata_hash, sizeof(clientdata_hash));
+    dogecoin_mem_zero(user_id, sizeof(user_id));
+    if (cred != NULL)
+    {
+        fido_cred_free(&cred);
+    }
+    return ok;
+}
+
+static dogecoin_bool fido2_get_hmac_secret(fido_dev_t* dev, const char* pin, const char* rp_id, const uint8_t* cred_id, const size_t cred_id_len, const uint8_t salt[YUBIKEY_FIDO2_HMAC_SALT_LEN], uint8_t out_secret[YUBIKEY_FIDO2_HMAC_SECRET_LEN])
+{
+    dogecoin_bool ok = false;
+    int rc = FIDO_ERR_INTERNAL;
+    fido_assert_t* assert = NULL;
+    uint8_t clientdata_hash[SHA256_DIGEST_LENGTH];
+
+    if (dev == NULL || pin == NULL || rp_id == NULL || cred_id == NULL || cred_id_len == 0 || salt == NULL || out_secret == NULL)
+    {
+        return false;
+    }
+
+    if (!dogecoin_random_bytes(clientdata_hash, sizeof(clientdata_hash), 1))
+    {
+        fprintf(stderr, "ERROR: Failed to generate random bytes for FIDO2 assertion.\n");
+        return false;
+    }
+
+    assert = fido_assert_new();
+    if (assert == NULL)
+    {
+        fprintf(stderr, "ERROR: Failed to allocate FIDO2 assertion object.\n");
+        goto cleanup;
+    }
+
+    if ((rc = fido_assert_set_rp(assert, rp_id)) != FIDO_OK ||
+        (rc = fido_assert_set_clientdata_hash(assert, clientdata_hash, sizeof(clientdata_hash))) != FIDO_OK ||
+        (rc = fido_assert_allow_cred(assert, cred_id, cred_id_len)) != FIDO_OK ||
+        (rc = fido_assert_set_uv(assert, FIDO_OPT_TRUE)) != FIDO_OK ||
+        (rc = fido_assert_set_extensions(assert, FIDO_EXT_HMAC_SECRET)) != FIDO_OK ||
+        (rc = fido_assert_set_hmac_salt(assert, salt, YUBIKEY_FIDO2_HMAC_SALT_LEN)) != FIDO_OK)
+    {
+        fprintf(stderr, "ERROR: Failed to prepare FIDO2 assertion request (%s).\n", fido_strerr(rc));
+        goto cleanup;
+    }
+
+    rc = fido_dev_get_assert(dev, assert, pin);
+    if (rc != FIDO_OK)
+    {
+        fprintf(stderr, "ERROR: Failed to perform FIDO2 assertion (%s).\n", fido_strerr(rc));
+        goto cleanup;
+    }
+
+    const unsigned char* secret_ptr = fido_assert_hmac_secret_ptr(assert, 0);
+    size_t secret_len = fido_assert_hmac_secret_len(assert, 0);
+    if (secret_ptr == NULL || secret_len != YUBIKEY_FIDO2_HMAC_SECRET_LEN)
+    {
+        fprintf(stderr, "ERROR: Invalid FIDO2 hmac-secret output.\n");
+        goto cleanup;
+    }
+
+    memcpy(out_secret, secret_ptr, YUBIKEY_FIDO2_HMAC_SECRET_LEN);
+    ok = true;
+
+cleanup:
+    dogecoin_mem_zero(clientdata_hash, sizeof(clientdata_hash));
+    if (assert != NULL)
+    {
+        fido_assert_free(&assert);
+    }
+    return ok;
+}
+#endif
+
+static dogecoin_bool fido2_parse_test_secret(const char* test_factor_secret, uint8_t out_secret[YUBIKEY_FIDO2_HMAC_SECRET_LEN])
+{
+    size_t out_len = 0;
+    if (test_factor_secret == NULL || out_secret == NULL)
+    {
+        return false;
+    }
+    if (strlen(test_factor_secret) != (YUBIKEY_FIDO2_HMAC_SECRET_LEN * 2))
+    {
+        fprintf(stderr, "ERROR: test_factor_secret for FIDO2 must be 64 hex characters.\n");
+        return false;
+    }
+    utils_hex_to_bin(test_factor_secret, out_secret, strlen(test_factor_secret), &out_len);
+    if (out_len != YUBIKEY_FIDO2_HMAC_SECRET_LEN)
+    {
+        fprintf(stderr, "ERROR: Failed to parse FIDO2 test secret hex.\n");
+        return false;
+    }
+    return true;
+}
+
+static dogecoin_bool yubikey_fido2_wrap_blob(const ENCRYPTED_BLOB blob_in, const size_t blob_in_size, ENCRYPTED_BLOB blob_out, size_t* blob_out_size, const char* test_factor_secret)
+{
+#ifdef USE_FIDO2
+    dogecoin_bool ok = false;
+    uint8_t hmac_secret[YUBIKEY_FIDO2_HMAC_SECRET_LEN] = {0};
+    uint8_t hmac_salt[YUBIKEY_FIDO2_HMAC_SALT_LEN] = {0};
+    uint8_t kek[AES_KEY_SIZE] = {0};
+    uint8_t iv[AES_IV_SIZE] = {0};
+    uint8_t cred_id[YUBIKEY_FIDO2_CRED_ID_MAX_LEN] = {0};
+    size_t cred_id_len = 0;
+    const char* rp_id = YUBIKEY_FIDO2_DEFAULT_RP_ID;
+    size_t rp_id_len = strlen(rp_id);
+    fido_dev_t* dev = NULL;
+    char pin[PASS_MAX_LEN] = {0};
+    size_t wrapped_size = 0;
+    size_t offset = 0;
+
+    if (blob_in == NULL || blob_out == NULL || blob_out_size == NULL)
+    {
+        return false;
+    }
+    if (blob_in_size == 0 || (blob_in_size % AES_BLOCK_SIZE) != 0)
+    {
+        fprintf(stderr, "ERROR: Invalid blob size for FIDO2 KEK wrapping.\n");
+        return false;
+    }
+
+    if (!dogecoin_random_bytes(hmac_salt, sizeof(hmac_salt), 1) || !dogecoin_random_bytes(iv, sizeof(iv), 1))
+    {
+        fprintf(stderr, "ERROR: Failed to generate random bytes for FIDO2 wrapping.\n");
+        goto cleanup;
+    }
+
+    if (test_factor_secret != NULL)
+    {
+        if (!fido2_parse_test_secret(test_factor_secret, hmac_secret))
+        {
+            goto cleanup;
+        }
+        if (!dogecoin_random_bytes(cred_id, 32, 1))
+        {
+            fprintf(stderr, "ERROR: Failed to generate synthetic credential id.\n");
+            goto cleanup;
+        }
+        cred_id_len = 32;
+        rp_id = "test.libdogecoin";
+        rp_id_len = strlen(rp_id);
+    }
+    else
+    {
+        if (!fido2_open_first_device(&dev))
+        {
+            goto cleanup;
+        }
+        if (!fido2_read_pin(pin, "Enter FIDO2 PIN to create a passkey credential:\n"))
+        {
+            goto cleanup;
+        }
+        if (!fido2_register_credential(dev, pin, rp_id, cred_id, &cred_id_len))
+        {
+            goto cleanup;
+        }
+        if (!fido2_get_hmac_secret(dev, pin, rp_id, cred_id, cred_id_len, hmac_salt, hmac_secret))
+        {
+            goto cleanup;
+        }
+    }
+
+    hkdf_sha256_32(hmac_secret, sizeof(hmac_secret), NULL, 0, (const uint8_t*)YUBIKEY_FIDO2_HKDF_INFO, strlen(YUBIKEY_FIDO2_HKDF_INFO), kek);
+
+    wrapped_size = aes256_cbc_encrypt(kek, iv, blob_in, blob_in_size, false, blob_out + 0);
+    if (wrapped_size != blob_in_size)
+    {
+        fprintf(stderr, "ERROR: Failed to wrap blob with FIDO2 KEK.\n");
+        goto cleanup;
+    }
+    if (58 + rp_id_len + cred_id_len + wrapped_size > MAX_ENCRYPTED_BLOB_SIZE)
+    {
+        fprintf(stderr, "ERROR: FIDO2-wrapped blob exceeds max size.\n");
+        goto cleanup;
+    }
+
+    /* move ciphertext right to prepend metadata */
+    memmove(blob_out + 58 + rp_id_len + cred_id_len, blob_out, wrapped_size);
+    offset = 0;
+    blob_out[offset++] = YUBIKEY_FIDO2_WRAP_MAGIC_0;
+    blob_out[offset++] = YUBIKEY_FIDO2_WRAP_MAGIC_1;
+    blob_out[offset++] = YUBIKEY_FIDO2_WRAP_MAGIC_2;
+    blob_out[offset++] = YUBIKEY_FIDO2_WRAP_MAGIC_3;
+    blob_out[offset++] = YUBIKEY_FIDO2_WRAP_VERSION;
+    blob_out[offset++] = (uint8_t)rp_id_len;
+    blob_out[offset++] = (uint8_t)(cred_id_len & 0xFF);
+    blob_out[offset++] = (uint8_t)((cred_id_len >> 8) & 0xFF);
+    memcpy(blob_out + offset, hmac_salt, sizeof(hmac_salt));
+    offset += sizeof(hmac_salt);
+    memcpy(blob_out + offset, iv, sizeof(iv));
+    offset += sizeof(iv);
+    blob_out[offset++] = (uint8_t)(wrapped_size & 0xFF);
+    blob_out[offset++] = (uint8_t)((wrapped_size >> 8) & 0xFF);
+    memcpy(blob_out + offset, rp_id, rp_id_len);
+    offset += rp_id_len;
+    memcpy(blob_out + offset, cred_id, cred_id_len);
+    offset += cred_id_len;
+    *blob_out_size = offset + wrapped_size;
+
+    ok = true;
+
+cleanup:
+    if (!ok)
+    {
+        dogecoin_mem_zero(blob_out, MAX_ENCRYPTED_BLOB_SIZE);
+    }
+    if (dev != NULL)
+    {
+        fido_dev_cancel(dev);
+        fido_dev_close(dev);
+        fido_dev_free(&dev);
+    }
+    dogecoin_mem_zero(pin, sizeof(pin));
+    dogecoin_mem_zero(hmac_secret, sizeof(hmac_secret));
+    dogecoin_mem_zero(kek, sizeof(kek));
+    dogecoin_mem_zero(iv, sizeof(iv));
+    dogecoin_mem_zero(cred_id, sizeof(cred_id));
+    return ok;
+#else
+    (void)blob_in;
+    (void)blob_in_size;
+    (void)blob_out;
+    (void)blob_out_size;
+    (void)test_factor_secret;
+    fprintf(stderr, "ERROR: FIDO2 support not built. Rebuild with --enable-yubikey and libfido2 available.\n");
+    return false;
+#endif
+}
+
+static dogecoin_bool yubikey_fido2_unwrap_blob(const ENCRYPTED_BLOB blob_in, const size_t blob_in_size, ENCRYPTED_BLOB blob_out, size_t* blob_out_size, const char* test_factor_secret)
+{
+#ifdef USE_FIDO2
+    dogecoin_bool ok = false;
+    uint8_t hmac_secret[YUBIKEY_FIDO2_HMAC_SECRET_LEN] = {0};
+    uint8_t kek[AES_KEY_SIZE] = {0};
+    uint8_t hmac_salt[YUBIKEY_FIDO2_HMAC_SALT_LEN] = {0};
+    uint8_t iv[AES_IV_SIZE] = {0};
+    char rp_id[YUBIKEY_FIDO2_RP_ID_MAX_LEN + 1] = {0};
+    uint8_t cred_id[YUBIKEY_FIDO2_CRED_ID_MAX_LEN] = {0};
+    size_t rp_id_len = 0;
+    size_t cred_id_len = 0;
+    size_t wrapped_size = 0;
+    size_t offset = 0;
+    fido_dev_t* dev = NULL;
+    char pin[PASS_MAX_LEN] = {0};
+
+    if (blob_in == NULL || blob_out == NULL || blob_out_size == NULL)
+    {
+        return false;
+    }
+    if (blob_in_size < 58)
+    {
+        fprintf(stderr, "ERROR: Invalid FIDO2 wrapped blob size.\n");
+        return false;
+    }
+
+    if (blob_in[0] != YUBIKEY_FIDO2_WRAP_MAGIC_0 ||
+        blob_in[1] != YUBIKEY_FIDO2_WRAP_MAGIC_1 ||
+        blob_in[2] != YUBIKEY_FIDO2_WRAP_MAGIC_2 ||
+        blob_in[3] != YUBIKEY_FIDO2_WRAP_MAGIC_3 ||
+        blob_in[4] != YUBIKEY_FIDO2_WRAP_VERSION)
+    {
+        fprintf(stderr, "ERROR: Invalid FIDO2 wrap metadata header.\n");
+        return false;
+    }
+
+    rp_id_len = blob_in[5];
+    cred_id_len = (size_t)blob_in[6] | ((size_t)blob_in[7] << 8);
+    if (rp_id_len == 0 || rp_id_len > YUBIKEY_FIDO2_RP_ID_MAX_LEN || cred_id_len == 0 || cred_id_len > YUBIKEY_FIDO2_CRED_ID_MAX_LEN)
+    {
+        fprintf(stderr, "ERROR: Invalid FIDO2 metadata lengths.\n");
+        return false;
+    }
+
+    offset = 8;
+    memcpy(hmac_salt, blob_in + offset, sizeof(hmac_salt));
+    offset += sizeof(hmac_salt);
+    memcpy(iv, blob_in + offset, sizeof(iv));
+    offset += sizeof(iv);
+    wrapped_size = (size_t)blob_in[offset] | ((size_t)blob_in[offset + 1] << 8);
+    offset += 2;
+
+    if (offset + rp_id_len + cred_id_len + wrapped_size > blob_in_size || (wrapped_size % AES_BLOCK_SIZE) != 0)
+    {
+        fprintf(stderr, "ERROR: Invalid FIDO2 wrapped payload bounds.\n");
+        return false;
+    }
+
+    memcpy(rp_id, blob_in + offset, rp_id_len);
+    rp_id[rp_id_len] = '\0';
+    offset += rp_id_len;
+    memcpy(cred_id, blob_in + offset, cred_id_len);
+    offset += cred_id_len;
+
+    if (test_factor_secret != NULL)
+    {
+        if (!fido2_parse_test_secret(test_factor_secret, hmac_secret))
+        {
+            goto cleanup;
+        }
+    }
+    else
+    {
+        if (!fido2_open_first_device(&dev))
+        {
+            goto cleanup;
+        }
+        if (!fido2_read_pin(pin, "Enter FIDO2 PIN to decrypt YubiKey blob:\n"))
+        {
+            goto cleanup;
+        }
+        if (!fido2_get_hmac_secret(dev, pin, rp_id, cred_id, cred_id_len, hmac_salt, hmac_secret))
+        {
+            goto cleanup;
+        }
+    }
+
+    hkdf_sha256_32(hmac_secret, sizeof(hmac_secret), NULL, 0, (const uint8_t*)YUBIKEY_FIDO2_HKDF_INFO, strlen(YUBIKEY_FIDO2_HKDF_INFO), kek);
+
+    if (aes256_cbc_decrypt(kek, iv, blob_in + offset, wrapped_size, false, blob_out) != wrapped_size)
+    {
+        fprintf(stderr, "ERROR: Failed to unwrap blob with FIDO2 KEK.\n");
+        goto cleanup;
+    }
+    *blob_out_size = wrapped_size;
+    ok = true;
+
+cleanup:
+    if (dev != NULL)
+    {
+        fido_dev_cancel(dev);
+        fido_dev_close(dev);
+        fido_dev_free(&dev);
+    }
+    dogecoin_mem_zero(pin, sizeof(pin));
+    dogecoin_mem_zero(hmac_secret, sizeof(hmac_secret));
+    dogecoin_mem_zero(kek, sizeof(kek));
+    dogecoin_mem_zero(iv, sizeof(iv));
+    dogecoin_mem_zero(hmac_salt, sizeof(hmac_salt));
+    dogecoin_mem_zero(cred_id, sizeof(cred_id));
+    return ok;
+#else
+    (void)blob_in;
+    (void)blob_in_size;
+    (void)blob_out;
+    (void)blob_out_size;
+    (void)test_factor_secret;
+    fprintf(stderr, "ERROR: FIDO2 support not built. Rebuild with --enable-yubikey and libfido2 available.\n");
+    return false;
+#endif
+}
+
 static dogecoin_bool yubikey_read_factor_secret(const dogecoin_yubikey_factor_type factor_type, const char* test_factor_secret, char* factor_secret, const size_t factor_secret_size, const char* operation)
 {
     if (factor_type == DOGECOIN_YUBIKEY_FACTOR_NONE)
@@ -2669,6 +3206,11 @@ static dogecoin_bool yubikey_read_factor_secret(const dogecoin_yubikey_factor_ty
 
     if (test_factor_secret != NULL)
     {
+        if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
+        {
+            fprintf(stderr, "ERROR: Legacy string-based FIDO2 secret input has been removed.\n");
+            return false;
+        }
         if (strnlen(test_factor_secret, factor_secret_size) >= factor_secret_size)
         {
             fprintf(stderr, "ERROR: %s secret too long.\n", yubikey_factor_name(factor_type));
@@ -2682,7 +3224,8 @@ static dogecoin_bool yubikey_read_factor_secret(const dogecoin_yubikey_factor_ty
         const char* prompt = NULL;
         if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
         {
-            prompt = "Complete YubiKey FIDO2/passkey verification, then enter passkey assertion secret:\n";
+            fprintf(stderr, "ERROR: Legacy string-based FIDO2 secret input has been removed.\n");
+            return false;
         }
         else
         {
@@ -2728,6 +3271,11 @@ static dogecoin_bool yubikey_store_factor_metadata(ykpiv_state* state, const int
     {
         return true;
     }
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
+    {
+        fprintf(stderr, "ERROR: Legacy FIDO2 factor metadata flow has been removed.\n");
+        return false;
+    }
 
     uint8_t metadata[YUBIKEY_FACTOR_METADATA_SIZE];
     char factor_secret[YUBIKEY_FACTOR_SECRET_MAX_LEN] = {0};
@@ -2765,6 +3313,11 @@ static dogecoin_bool yubikey_verify_factor_metadata(ykpiv_state* state, const in
     if (factor_type == DOGECOIN_YUBIKEY_FACTOR_NONE)
     {
         return true;
+    }
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
+    {
+        fprintf(stderr, "ERROR: Legacy FIDO2 factor metadata flow has been removed.\n");
+        return false;
     }
 
     uint8_t metadata[YUBIKEY_FACTOR_METADATA_SIZE] = {0};
@@ -2840,6 +3393,18 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey_with_fact
     {
         return false;
     }
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
+    {
+        ENCRYPTED_BLOB wrapped_blob = {0};
+        size_t wrapped_blob_size = 0;
+        if (!yubikey_fido2_wrap_blob(encrypted_blob, encrypted_blob_size, wrapped_blob, &wrapped_blob_size, test_factor_secret))
+        {
+            return false;
+        }
+        memcpy(encrypted_blob, wrapped_blob, wrapped_blob_size);
+        encrypted_blob_size = wrapped_blob_size;
+        dogecoin_mem_zero(wrapped_blob, sizeof(wrapped_blob));
+    }
 
     ykpiv_state *state = NULL;
 
@@ -2899,7 +3464,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey_with_fact
         return false;
     }
 
-    if (!yubikey_store_factor_metadata(state, SEED_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    if (factor_type != DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY &&
+        !yubikey_store_factor_metadata(state, SEED_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
     {
         ykpiv_done(state);
         return false;
@@ -2971,7 +3537,19 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey_with_fa
         return false;
     }
 
-    if (!yubikey_verify_factor_metadata(state, SEED_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
+    {
+        ENCRYPTED_BLOB unwrapped_blob = {0};
+        size_t unwrapped_blob_size = 0;
+        if (!yubikey_fido2_unwrap_blob(encrypted_blob, encrypted_blob_size, unwrapped_blob, &unwrapped_blob_size, test_factor_secret))
+        {
+            ykpiv_done(state);
+            return false;
+        }
+        memcpy(encrypted_blob, unwrapped_blob, unwrapped_blob_size);
+        dogecoin_mem_zero(unwrapped_blob, sizeof(unwrapped_blob));
+    }
+    else if (!yubikey_verify_factor_metadata(state, SEED_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
     {
         ykpiv_done(state);
         return false;
@@ -3014,6 +3592,18 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubike
     if (!result)
     {
         return false;
+    }
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
+    {
+        ENCRYPTED_BLOB wrapped_blob = {0};
+        size_t wrapped_blob_size = 0;
+        if (!yubikey_fido2_wrap_blob(encrypted_blob, encrypted_blob_size, wrapped_blob, &wrapped_blob_size, test_factor_secret))
+        {
+            return false;
+        }
+        memcpy(encrypted_blob, wrapped_blob, wrapped_blob_size);
+        encrypted_blob_size = wrapped_blob_size;
+        dogecoin_mem_zero(wrapped_blob, sizeof(wrapped_blob));
     }
 
     ykpiv_state *state = NULL;
@@ -3074,7 +3664,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubike
         return false;
     }
 
-    if (!yubikey_store_factor_metadata(state, HDNODE_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    if (factor_type != DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY &&
+        !yubikey_store_factor_metadata(state, HDNODE_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
     {
         ykpiv_done(state);
         return false;
@@ -3146,7 +3737,19 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey_with_
         return false;
     }
 
-    if (!yubikey_verify_factor_metadata(state, HDNODE_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
+    {
+        ENCRYPTED_BLOB unwrapped_blob = {0};
+        size_t unwrapped_blob_size = 0;
+        if (!yubikey_fido2_unwrap_blob(encrypted_blob, encrypted_blob_size, unwrapped_blob, &unwrapped_blob_size, test_factor_secret))
+        {
+            ykpiv_done(state);
+            return false;
+        }
+        memcpy(encrypted_blob, unwrapped_blob, unwrapped_blob_size);
+        dogecoin_mem_zero(unwrapped_blob, sizeof(unwrapped_blob));
+    }
+    else if (!yubikey_verify_factor_metadata(state, HDNODE_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
     {
         ykpiv_done(state);
         return false;
@@ -3192,6 +3795,18 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubi
     if (!result)
     {
         return false;
+    }
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
+    {
+        ENCRYPTED_BLOB wrapped_blob = {0};
+        size_t wrapped_blob_size = 0;
+        if (!yubikey_fido2_wrap_blob(encrypted_blob, encrypted_blob_size, wrapped_blob, &wrapped_blob_size, test_factor_secret))
+        {
+            return false;
+        }
+        memcpy(encrypted_blob, wrapped_blob, wrapped_blob_size);
+        encrypted_blob_size = wrapped_blob_size;
+        dogecoin_mem_zero(wrapped_blob, sizeof(wrapped_blob));
     }
 
     ykpiv_state *state = NULL;
@@ -3252,7 +3867,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubi
         return false;
     }
 
-    if (!yubikey_store_factor_metadata(state, MNEMONIC_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    if (factor_type != DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY &&
+        !yubikey_store_factor_metadata(state, MNEMONIC_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
     {
         ykpiv_done(state);
         return false;
@@ -3324,7 +3940,19 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_decrypt_mnemonic_with_sw_from_yubikey_wit
         return false;
     }
 
-    if (!yubikey_verify_factor_metadata(state, MNEMONIC_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
+    {
+        ENCRYPTED_BLOB unwrapped_blob = {0};
+        size_t unwrapped_blob_size = 0;
+        if (!yubikey_fido2_unwrap_blob(encrypted_blob, encrypted_blob_size, unwrapped_blob, &unwrapped_blob_size, test_factor_secret))
+        {
+            ykpiv_done(state);
+            return false;
+        }
+        memcpy(encrypted_blob, unwrapped_blob, unwrapped_blob_size);
+        dogecoin_mem_zero(unwrapped_blob, sizeof(unwrapped_blob));
+    }
+    else if (!yubikey_verify_factor_metadata(state, MNEMONIC_FACTOR_DATA_TAG(file_num), factor_type, test_factor_secret))
     {
         ykpiv_done(state);
         return false;

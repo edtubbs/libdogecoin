@@ -294,8 +294,11 @@ fi
 
 if test "x$use_yubikey" = xyes; then
   AC_CHECK_LIB([ykpiv],[main],LIBYKPIV=-lykpiv,AC_MSG_ERROR(libpkpiv missing))
-  LIBS="$LIBS $LIBYKPIV"
+  AC_CHECK_HEADER([fido.h],, AC_MSG_ERROR(libfido2 headers missing),)
+  AC_CHECK_LIB([fido],[fido_init],LIBFIDO2=-lfido2,AC_MSG_ERROR(libfido2 missing))
+  LIBS="$LIBS $LIBYKPIV $LIBFIDO2"
   AC_DEFINE(USE_YUBIKEY, 1, [Define this symbol if Yubikey works])
+  AC_DEFINE(USE_FIDO2, 1, [Define this symbol if libfido2 is available for real FIDO2 passkey workflows])
 fi
 
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
@@ -307,6 +310,7 @@ AC_SUBST(EVENT_CORE_LIBS)
 AC_SUBST(EVENT_EXTRA_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(LIBYKPIV)
+AC_SUBST(LIBFIDO2)
 AC_SUBST(NASMFLAGS)
 AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
 AM_CONDITIONAL([WITH_BENCH], [test "x$with_bench" = "xyes"])
@@ -354,6 +358,9 @@ echo
 echo "  openenclave     = $use_openenclave"
 echo "  optee           = $use_optee"
 echo "  Yubikey         = $use_yubikey"
+if test "x$use_yubikey" = xyes; then
+echo "  FIDO2(libfido2) = enabled"
+fi
 echo
 echo "  host            = $host"
 echo "  target os       = $TARGET_OS"

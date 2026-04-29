@@ -8,9 +8,11 @@ We have integrated the YubiKey with the `seal` module, specifically for encrypte
 
 The process involves multi-factor authentication (PIN and YubiKey) to unlock the encrypted keys, followed by the decryption of BIP39 mnemonics. The seed, master key, or mnemonic is first encrypted with software and then stored on the YubiKey. During the storage process, the user enters a management password, and to retrieve the key, the user enters the YubiKey PIN.
 
-In addition to PIV-backed storage, libdogecoin now supports an optional second factor metadata check for YubiKey workflows:
-- `DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY` for passkey/FIDO2 assertion secret workflows.
+In addition to PIV-backed storage, libdogecoin supports an optional second-factor mode for YubiKey workflows:
+- `DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY` for real FIDO2 passkey workflows (CTAP2 `hmac-secret`).
 - `DOGECOIN_YUBIKEY_FACTOR_STATIC_PASSWORD` for static-password style workflows (for example, a BIP39 passphrase or another user-managed secret such as a 38-character key).
+
+For `DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY`, libdogecoin now derives a key-encryption-key (KEK) from the FIDO2 `hmac-secret` output and uses that KEK to wrap the software-encrypted seed/mnemonic/HD-node blob before storing it on the YubiKey PIV object. The old non-real "type a passkey assertion secret" fallback has been removed.
 
 These factor modes are available through the `_with_factor` APIs and can be used for encrypted seeds, mnemonics, and HD nodes.
 
@@ -21,12 +23,13 @@ It's recommended that the user download the YubiKey Manager to manage the YubiKe
 - `libykpiv-dev` - The development headers for the YubiKey C library.
 - `pcscd` - The PC/SC smart card daemon for managing smart card readers.
 - `libpcsclite-dev` - The development headers for the PC/SC smart card library.
+- `libfido2` / `libfido2-dev` - Required for real FIDO2 passkey/hmac-secret workflows.
 
 ### Installation
 #### Linux
 ```sh
 sudo apt-get update
-sudo apt-get install libykpiv libykpiv-dev pcscd libpcsclite-dev
+sudo apt-get install libykpiv libykpiv-dev pcscd libpcsclite-dev libfido2-1 libfido2-dev
 ```
 
 ### Example C Code
@@ -42,7 +45,7 @@ u_assert_true(dogecoin_decrypt_seed_with_sw_from_yubikey(decrypted_seed, TEST_FI
 debug_print("Decrypted seed: %s\n", utils_uint8_to_hex(decrypted_seed, decrypted_size));
 u_assert_true(memcmp(seed, decrypted_seed, sizeof(SEED)) == 0);
 
-// Encrypt/decrypt with optional FIDO2/passkey-style factor metadata
+// Encrypt/decrypt with real FIDO2 passkey KEK wrapping
 u_assert_true(dogecoin_encrypt_seed_with_sw_to_yubikey_with_factor(
     seed,
     sizeof(SEED),
@@ -50,11 +53,11 @@ u_assert_true(dogecoin_encrypt_seed_with_sw_to_yubikey_with_factor(
     true,
     test_password,
     DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY,
-    "passkey-assertion-secret"));
+    NULL));
 u_assert_true(dogecoin_decrypt_seed_with_sw_from_yubikey_with_factor(
     decrypted_seed,
     TEST_FILE,
     test_password,
     DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY,
-    "passkey-assertion-secret"));
+    NULL));
 ```
