@@ -295,7 +295,7 @@ fi
 if test "x$use_yubikey" = xyes; then
   AC_CHECK_LIB([ykpiv],[main],LIBYKPIV=-lykpiv,AC_MSG_ERROR(libpkpiv missing))
   AC_CHECK_HEADER([fido.h],, AC_MSG_ERROR(libfido2 headers missing),)
-  AC_CHECK_LIB([fido],[fido_init],LIBFIDO2=-lfido2,AC_MSG_ERROR(libfido2 missing))
+  AC_CHECK_LIB([fido2],[fido_init],LIBFIDO2=-lfido2,AC_MSG_ERROR(libfido2 missing))
   LIBS="$LIBS $LIBYKPIV $LIBFIDO2"
   AC_DEFINE(USE_YUBIKEY, 1, [Define this symbol if Yubikey works])
   AC_DEFINE(USE_FIDO2, 1, [Define this symbol if libfido2 is available for real FIDO2 passkey workflows])
