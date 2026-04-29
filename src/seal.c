@@ -147,6 +147,7 @@
 #define YUBIKEY_FIDO2_WRAP_MAGIC_3 '2'
 #define YUBIKEY_FIDO2_DEFAULT_RP_ID "libdogecoin"
 #define YUBIKEY_FIDO2_HKDF_INFO "libdogecoin/yubikey-fido2-kek/v1"
+#define HKDF_EXPAND_BUFFER_SIZE 256
 
 /**
  * @brief Validates a file number
@@ -2653,6 +2654,10 @@ static const char* yubikey_factor_name(const dogecoin_yubikey_factor_type factor
 
 static dogecoin_bool secure_memeq(const uint8_t* lhs, const uint8_t* rhs, const size_t size)
 {
+    if (size > 0 && (lhs == NULL || rhs == NULL))
+    {
+        return false;
+    }
     /* Use volatile reads/writes so the comparison loop is not optimized into a short-circuiting memcmp. */
     volatile const uint8_t* lhs_v = (volatile const uint8_t*)lhs;
     volatile const uint8_t* rhs_v = (volatile const uint8_t*)rhs;
@@ -2676,7 +2681,7 @@ static void hkdf_sha256_32(const uint8_t* ikm, const size_t ikm_len, const uint8
     uint8_t prk[SHA256_DIGEST_LENGTH];
     uint8_t zero_salt[SHA256_DIGEST_LENGTH] = {0};
     uint8_t t1[SHA256_DIGEST_LENGTH];
-    uint8_t buf[256];
+    uint8_t buf[HKDF_EXPAND_BUFFER_SIZE];
     size_t buf_len = 0;
 
     if (salt != NULL && salt_len > 0)
@@ -3003,7 +3008,7 @@ static dogecoin_bool yubikey_fido2_wrap_blob(const ENCRYPTED_BLOB blob_in, const
 
     hkdf_sha256_32(hmac_secret, sizeof(hmac_secret), NULL, 0, (const uint8_t*)YUBIKEY_FIDO2_HKDF_INFO, strlen(YUBIKEY_FIDO2_HKDF_INFO), kek);
 
-    wrapped_size = aes256_cbc_encrypt(kek, iv, blob_in, blob_in_size, false, blob_out + 0);
+    wrapped_size = aes256_cbc_encrypt(kek, iv, blob_in, blob_in_size, false, blob_out);
     if (wrapped_size != blob_in_size)
     {
         fprintf(stderr, "ERROR: Failed to wrap blob with FIDO2 KEK.\n");
@@ -3197,6 +3202,11 @@ static dogecoin_bool yubikey_read_factor_secret(const dogecoin_yubikey_factor_ty
     {
         return true;
     }
+    if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
+    {
+        fprintf(stderr, "ERROR: Legacy string-based FIDO2 secret input has been removed.\n");
+        return false;
+    }
 
     if (factor_secret == NULL || factor_secret_size == 0)
     {
@@ -3206,11 +3216,6 @@ static dogecoin_bool yubikey_read_factor_secret(const dogecoin_yubikey_factor_ty
 
     if (test_factor_secret != NULL)
     {
-        if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
-        {
-            fprintf(stderr, "ERROR: Legacy string-based FIDO2 secret input has been removed.\n");
-            return false;
-        }
         if (strnlen(test_factor_secret, factor_secret_size) >= factor_secret_size)
         {
             fprintf(stderr, "ERROR: %s secret too long.\n", yubikey_factor_name(factor_type));
@@ -3222,15 +3227,7 @@ static dogecoin_bool yubikey_read_factor_secret(const dogecoin_yubikey_factor_ty
     else
     {
         const char* prompt = NULL;
-        if (factor_type == DOGECOIN_YUBIKEY_FACTOR_FIDO2_PASSKEY)
-        {
-            fprintf(stderr, "ERROR: Legacy string-based FIDO2 secret input has been removed.\n");
-            return false;
-        }
-        else
-        {
-            prompt = "Enter YubiKey static password (for BIP39 passphrase/38-char key workflows):\n";
-        }
+        prompt = "Enter YubiKey static password (for BIP39 passphrase/38-char key workflows):\n";
 
         char* input = getpass(prompt);
         if (input == NULL)
