@@ -44,6 +44,7 @@
 #include <stdio.h>   /* printf */
 #include <stdlib.h>  /* atoi, malloc */
 #include <string.h>  /* strcpy */
+#include <wchar.h>   /* wprintf */
 
 #include <dogecoin/uthash.h>
 
