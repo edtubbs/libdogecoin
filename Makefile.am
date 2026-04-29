@@ -180,7 +180,8 @@ endif
 
 if USE_SSE
 libdogecoin_la_SOURCES += \
-    src/crypto/sha256_sse41.c
+    src/crypto/sha256_sse41.c \
+    src/crypto/sha256_sse4.c
 endif
 
 if USE_SSE2
