@@ -134,9 +134,13 @@
 // Persistent TPM2 handle ranges for the RSA wrapping keys created by libdogecoin.
 // Each slot's persistent handle is derived from its file number, mirroring the
 // per-name persistence the Windows NCrypt path provides via NCryptCreatePersistedKey.
-#define LINUX_TPM_PERSISTENT_BASE_SEED      0x81F10000u
-#define LINUX_TPM_PERSISTENT_BASE_MNEMONIC  0x81F20000u
-#define LINUX_TPM_PERSISTENT_BASE_HDNODE    0x81F30000u
+// These bases live in the owner-hierarchy persistent range (0x81000000-0x817FFFFF)
+// so EvictControl can install them with ESYS_TR_RH_OWNER authorization. The
+// platform range (0x81800000+) would require platform auth which user-mode
+// processes typically cannot obtain on a real TPM.
+#define LINUX_TPM_PERSISTENT_BASE_SEED      0x81710000u
+#define LINUX_TPM_PERSISTENT_BASE_MNEMONIC  0x81720000u
+#define LINUX_TPM_PERSISTENT_BASE_HDNODE    0x81730000u
 #define LINUX_TPM_PERSISTENT_RANGE_MASK     0xFFFF0000u
 #define LINUX_TPM_PERSISTENT_SLOT_MASK      0x0000FFFFu
 
@@ -350,28 +354,16 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
         return false;
     }
 
-    // Persist the freshly created RSA wrapping key under our deterministic
-    // 0x81xx_xxxx handle. After this call the transient keyHandle is consumed
-    // and persistentHandle becomes the live ESYS_TR for the persistent object.
-    result = Esys_EvictControl(context, ESYS_TR_RH_OWNER, keyHandle,
-                               ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE,
-                               persistent_addr, &persistentHandle);
-    if (result != TSS2_RC_SUCCESS || persistentHandle == ESYS_TR_NONE) {
-        Esys_FlushContext(context, keyHandle);
-        Esys_Finalize(&context);
-        return false;
-    }
-
-    result = Esys_TR_SetAuth(context, persistentHandle, &authValuePrimary);
-    if (result != TSS2_RC_SUCCESS) {
-        Esys_TR_Close(context, &persistentHandle);
-        Esys_Finalize(&context);
-        return false;
-    }
-
+    // Encrypt the plaintext against the freshly created transient RSA key
+    // before persisting it. Doing the encrypt while the key is transient (and
+    // already loaded in a TPM transient slot) avoids round-tripping back
+    // through the persistent slot, which on resource-constrained TPMs (e.g.
+    // swtpm/libtpms with the default object/context budget) can return
+    // TPM_RC_OBJECT_MEMORY when the persistent slot has not yet been re-loaded
+    // for use.
     TPM2B_PUBLIC_KEY_RSA plain = {0};
     if (in_size > sizeof(plain.buffer)) {
-        Esys_TR_Close(context, &persistentHandle);
+        Esys_FlushContext(context, keyHandle);
         Esys_Finalize(&context);
         return false;
     }
@@ -380,7 +372,7 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
 
     TPMT_RSA_DECRYPT scheme = {.scheme = TPM2_ALG_RSAES};
     result = Esys_RSA_Encrypt(context,
-                              persistentHandle,
+                              keyHandle,
                               ESYS_TR_NONE,
                               ESYS_TR_NONE,
                               ESYS_TR_NONE,
@@ -389,6 +381,27 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
                               NULL,
                               &cipher);
     if (result != TSS2_RC_SUCCESS) {
+        Esys_FlushContext(context, keyHandle);
+        Esys_Finalize(&context);
+        return false;
+    }
+
+    // Persist the wrapping key under our deterministic 0x81xx_xxxx handle.
+    // After this call the transient keyHandle is consumed and persistentHandle
+    // becomes the live ESYS_TR for the persistent object.
+    result = Esys_EvictControl(context, ESYS_TR_RH_OWNER, keyHandle,
+                               ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE,
+                               persistent_addr, &persistentHandle);
+    if (result != TSS2_RC_SUCCESS || persistentHandle == ESYS_TR_NONE) {
+        Esys_Free(cipher);
+        Esys_FlushContext(context, keyHandle);
+        Esys_Finalize(&context);
+        return false;
+    }
+
+    result = Esys_TR_SetAuth(context, persistentHandle, &authValuePrimary);
+    if (result != TSS2_RC_SUCCESS) {
+        Esys_Free(cipher);
         Esys_TR_Close(context, &persistentHandle);
         Esys_Finalize(&context);
         return false;
