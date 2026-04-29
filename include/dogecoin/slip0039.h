@@ -11,8 +11,15 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+/* SLIP-0039 mnemonic constants.
+ * Each share is a space-separated list of words drawn from the official
+ * 1024-word SLIP-0039 wordlist. A 256-bit secret produces 33 words per share
+ * (max 8 chars/word + space), so 320 chars is a comfortable upper bound
+ * including the terminating null. */
 #define SLIP0039_MAX_SHARES 16
-#define SLIP0039_MAX_SHARE_STR_SIZE 160
+#define SLIP0039_MAX_SHARE_STR_SIZE 320
+#define SLIP0039_MIN_SECRET_BYTES 16
+#define SLIP0039_MAX_SECRET_BYTES 32
 
 typedef char SLIP0039_SHARE[SLIP0039_MAX_SHARE_STR_SIZE];
 

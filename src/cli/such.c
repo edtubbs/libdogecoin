@@ -656,8 +656,8 @@ static void print_usage()
     printf("seed_to_master_key (-y <file_num>, -j (use_tpm) optional),\n");
     printf("mnemonic_to_key (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
     printf("mnemonic_to_addresses (requires -n <seed_phrase> or -y <file_num>, -j (use_tpm), -o <account_int>, -g <change_level>, -i <address_index> and -a, all optional),\n");
-    printf("slip39_split (requires -x <secret_hex>, -o <threshold>, -i <share_count>),\n");
-    printf("slip39_recover (requires -x <share1,share2,...>),\n");
+    printf("slip39_split (requires -x <secret_hex 16..32 bytes>, -o <threshold>, -i <share_count>),\n");
+    printf("slip39_recover (requires -x <\"share1 mnemonic\",\"share2 mnemonic\",...>),\n");
     printf("print_keys (requires -p <private key hex>),\n");
     printf("derive_child_keys (requires -m <custom path> -p <public or private key>),\n");
     printf("sign (-x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type> -p <private key>),\n");
