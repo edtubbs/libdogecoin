@@ -146,8 +146,10 @@
 #define YUBIKEY_FIDO2_WRAP_MAGIC_2 'G'
 #define YUBIKEY_FIDO2_WRAP_MAGIC_3 '2'
 #define YUBIKEY_FIDO2_DEFAULT_RP_ID "libdogecoin"
+#define YUBIKEY_FIDO2_DEFAULT_NAME "libdogecoin"
 #define YUBIKEY_FIDO2_HKDF_INFO "libdogecoin/yubikey-fido2-kek/v1"
-#define HKDF_EXPAND_BUFFER_SIZE 256
+#define HKDF_EXPAND_BUFFER_SIZE (sizeof(YUBIKEY_FIDO2_HKDF_INFO) + 1)
+#define YUBIKEY_FIDO2_WRAP_FIXED_HEADER_SIZE 58
 
 /**
  * @brief Validates a file number
@@ -2814,8 +2816,8 @@ static dogecoin_bool fido2_register_credential(fido_dev_t* dev, const char* pin,
 
     if ((rc = fido_cred_set_type(cred, COSE_ES256)) != FIDO_OK ||
         (rc = fido_cred_set_clientdata_hash(cred, clientdata_hash, sizeof(clientdata_hash))) != FIDO_OK ||
-        (rc = fido_cred_set_rp(cred, rp_id, "libdogecoin")) != FIDO_OK ||
-        (rc = fido_cred_set_user(cred, user_id, sizeof(user_id), "libdogecoin", "libdogecoin", NULL)) != FIDO_OK ||
+        (rc = fido_cred_set_rp(cred, rp_id, YUBIKEY_FIDO2_DEFAULT_NAME)) != FIDO_OK ||
+        (rc = fido_cred_set_user(cred, user_id, sizeof(user_id), YUBIKEY_FIDO2_DEFAULT_NAME, YUBIKEY_FIDO2_DEFAULT_NAME, NULL)) != FIDO_OK ||
         (rc = fido_cred_set_rk(cred, FIDO_OPT_TRUE)) != FIDO_OK ||
         (rc = fido_cred_set_uv(cred, FIDO_OPT_TRUE)) != FIDO_OK ||
         (rc = fido_cred_set_extensions(cred, FIDO_EXT_HMAC_SECRET)) != FIDO_OK)
@@ -3014,14 +3016,14 @@ static dogecoin_bool yubikey_fido2_wrap_blob(const ENCRYPTED_BLOB blob_in, const
         fprintf(stderr, "ERROR: Failed to wrap blob with FIDO2 KEK.\n");
         goto cleanup;
     }
-    if (58 + rp_id_len + cred_id_len + wrapped_size > MAX_ENCRYPTED_BLOB_SIZE)
+    if (YUBIKEY_FIDO2_WRAP_FIXED_HEADER_SIZE + rp_id_len + cred_id_len + wrapped_size > MAX_ENCRYPTED_BLOB_SIZE)
     {
         fprintf(stderr, "ERROR: FIDO2-wrapped blob exceeds max size.\n");
         goto cleanup;
     }
 
     /* move ciphertext right to prepend metadata */
-    memmove(blob_out + 58 + rp_id_len + cred_id_len, blob_out, wrapped_size);
+    memmove(blob_out + YUBIKEY_FIDO2_WRAP_FIXED_HEADER_SIZE + rp_id_len + cred_id_len, blob_out, wrapped_size);
     offset = 0;
     blob_out[offset++] = YUBIKEY_FIDO2_WRAP_MAGIC_0;
     blob_out[offset++] = YUBIKEY_FIDO2_WRAP_MAGIC_1;
@@ -3094,7 +3096,7 @@ static dogecoin_bool yubikey_fido2_unwrap_blob(const ENCRYPTED_BLOB blob_in, con
     {
         return false;
     }
-    if (blob_in_size < 58)
+    if (blob_in_size < YUBIKEY_FIDO2_WRAP_FIXED_HEADER_SIZE)
     {
         fprintf(stderr, "ERROR: Invalid FIDO2 wrapped blob size.\n");
         return false;
