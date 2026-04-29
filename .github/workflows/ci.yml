@@ -90,7 +90,7 @@ jobs:
             host: x86_64-pc-linux-gnu
             os: ubuntu-22.04
             run-tests: true
-            packages: python3-dev python3-dbg libtss2-dev
+            packages: python3-dev python3-dbg libtss2-dev swtpm
             dep-opts: "DEBUG=1 SPEED=slow V=1"
             config-opts: "--enable-debug --enable-tss2 --enable-test-passwd"
             goal: install
@@ -337,6 +337,31 @@ jobs:
           chmod +x ./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/*
           fi
         shell: bash
+
+      - name: start swtpm (Linux TSS2 coverage)
+        if: ${{ matrix.name == 'x86_64-linux-dbg' }}
+        run: |
+          # Spin up a software TPM 2.0 emulator on a TCP socket so that the
+          # test_tpm() suite (test/tpm_tests.c) exercises the TSS2 / Esys
+          # encrypt/decrypt path on Linux. tcti-swtpm's default TCTI string
+          # already points at 127.0.0.1:2321 (data) / :2322 (control), so no
+          # extra TCTI env var is needed for libtss2 to find this swtpm.
+          mkdir -p "$RUNNER_TEMP/swtpm-state"
+          swtpm socket \
+            --tpm2 \
+            --server type=tcp,port=2321 \
+            --ctrl type=tcp,port=2322 \
+            --flags not-need-init,startup-clear \
+            --tpmstate dir="$RUNNER_TEMP/swtpm-state" \
+            --daemon
+          # Give the daemon a moment to bind its sockets before the tests run.
+          for i in $(seq 1 10); do
+            if ss -ltn | grep -q '127.0.0.1:2321'; then
+              echo "swtpm is listening on 127.0.0.1:2321"
+              break
+            fi
+            sleep 1
+          done
 
       - name: test libdogecoin
         if: ${{ matrix.run-tests }}
