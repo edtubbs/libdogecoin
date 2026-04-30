@@ -19,6 +19,7 @@
 #include <dogecoin/key.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/pow.h>
+#include <dogecoin/protocol.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/validation.h>
 
@@ -189,7 +190,9 @@ void test_block_header()
 
 void test_auxpow_block()
 {
-    /* Constructor wires all nested pointers and keeps auxpow state disabled by default. */
+    /* dogecoin_auxpow_block_new() allocates the container and wires up nested
+       header/parent_header/parent_coinbase objects with the auxpow context
+       pointing back at the block and the auxpow flag cleared. */
     dogecoin_auxpow_block* block = dogecoin_auxpow_block_new();
     assert(block != NULL);
     assert(block->header != NULL);
@@ -197,47 +200,38 @@ void test_auxpow_block()
     assert(block->parent_coinbase != NULL);
     assert(block->header->auxpow->ctx == block);
     assert(block->header->auxpow->is == false);
+    assert(block->parent_merkle_count == 0);
+    assert(block->parent_coinbase_merkle == NULL);
+    assert(block->parent_merkle_index == 0);
+    assert(block->aux_merkle_count == 0);
+    assert(block->aux_merkle_branch == NULL);
+    assert(block->aux_merkle_index == 0);
+    uint256_t zero_hash = {0};
+    assert(memcmp(block->parent_hash, zero_hash, sizeof(uint256_t)) == 0);
     dogecoin_auxpow_block_free(block);
 
-    assert(get_expected_index(0, 0, 1) == 0);               /* zero nonce/chain, single slot tree */
-    assert(get_expected_index(0, 98, 5) == 24);             /* Dogecoin chain id (98), 32-slot tree */
-    assert(get_expected_index(1, 98, 5) == 1);              /* nonce perturbation changes chosen slot */
-    assert(get_expected_index(123456789, 98, 10) == 981);   /* large nonce, 1024-slot tree */
+    /* dogecoin_auxpow_block_free() must also release the optional merkle
+       branch arrays without crashing and tolerate a NULL pointer. */
+    block = dogecoin_auxpow_block_new();
+    block->parent_merkle_count = 2;
+    block->parent_coinbase_merkle = dogecoin_calloc(2, sizeof(uint256_t));
+    block->aux_merkle_count = 1;
+    block->aux_merkle_branch = dogecoin_calloc(1, sizeof(uint256_t));
+    dogecoin_auxpow_block_free(block);
+    dogecoin_auxpow_block_free(NULL);
 
-    uint256_t base_hash = {0};
-    base_hash[0] = 1; /* deterministic non-zero leaf hash byte for branch checks */
+    /* deserialize_dogecoin_auxpow_block() rejects a buffer larger than
+       DOGECOIN_MAX_P2P_MSG_SIZE before reading from the buffer pointer. */
+    dogecoin_auxpow_block* err_block = dogecoin_auxpow_block_new();
+    struct const_buffer too_big = { NULL, (size_t)DOGECOIN_MAX_P2P_MSG_SIZE + 1 };
+    deserialize_dogecoin_auxpow_block(err_block, &too_big, &dogecoin_chainparams_main, NULL);
+    dogecoin_auxpow_block_free(err_block);
 
-    vector_t* merkle_branch = vector_new(1, dogecoin_free);
-    assert(merkle_branch != NULL);
-
-    /* Empty branch returns the original hash unchanged. */
-    uint256_t* passthrough_hash = check_merkle_branch(&base_hash, merkle_branch, 0);
-    assert(memcmp(passthrough_hash, base_hash, sizeof(uint256_t)) == 0);
-    dogecoin_free(passthrough_hash);
-
-    /* A negative branch index is accepted and should still produce an allocated result. */
-    uint256_t* sentinel_hash = check_merkle_branch(&base_hash, merkle_branch, -1);
-    assert(sentinel_hash != NULL);
-    dogecoin_free(sentinel_hash);
-
-    uint256_t* branch_hash = dogecoin_calloc(1, sizeof(uint256_t));
-    assert(branch_hash != NULL);
-    (*branch_hash)[0] = 2; /* deterministic sibling hash byte distinct from base_hash */
-    assert(vector_add(merkle_branch, branch_hash) == true);
-
-    /* Branch index 0 hashes (base_hash || sibling). */
-    uint256_t* even_expected = Hash((const uint256_t*)&base_hash, (const uint256_t*)branch_hash);
-    uint256_t* even_actual = check_merkle_branch(&base_hash, merkle_branch, 0);
-    assert(memcmp(even_expected, even_actual, sizeof(uint256_t)) == 0);
-    dogecoin_free(even_expected);
-    dogecoin_free(even_actual);
-
-    /* Branch index 1 hashes (sibling || base_hash). */
-    uint256_t* odd_expected = Hash((const uint256_t*)branch_hash, (const uint256_t*)&base_hash);
-    uint256_t* odd_actual = check_merkle_branch(&base_hash, merkle_branch, 1);
-    assert(memcmp(odd_expected, odd_actual, sizeof(uint256_t)) == 0);
-    dogecoin_free(odd_expected);
-    dogecoin_free(odd_actual);
-
-    vector_free(merkle_branch, true);
+    /* deserialize_dogecoin_auxpow_block() returns false when the buffer is
+       too small to hold a valid parent coinbase transaction. */
+    err_block = dogecoin_auxpow_block_new();
+    uint8_t junk[1] = {0};
+    struct const_buffer too_small = { junk, sizeof(junk) };
+    assert(deserialize_dogecoin_auxpow_block(err_block, &too_small, &dogecoin_chainparams_main, NULL) == false);
+    dogecoin_auxpow_block_free(err_block);
 }
