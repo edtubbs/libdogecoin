@@ -582,4 +582,11 @@ void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t 
     memcpy_safe(db->chainbottom->hash, hash, sizeof(uint256_t));
     memcpy_safe(db->chainbottom->chainwork, chainwork, sizeof(uint256_t));
     db->chaintip = db->chainbottom;
+    /* Track the standalone checkpoint anchor in the binary tree so it shares
+       the same ownership/lifetime as every other connected blockindex: it
+       will be released either by the prune path's tdelete + dogecoin_free,
+       or by tdestroy(dogecoin_free) in dogecoin_headers_db_free. */
+    if (db->use_binary_tree) {
+        dogecoin_btree_tsearch(db->chainbottom, &db->tree_root, dogecoin_header_compare);
+    }
 }
