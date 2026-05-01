@@ -1,7 +1,7 @@
-tag,bin,workers,elapsed_s,connected_headers,headers_per_s,batches_2000,staged,invalid_rejects,final_tip
-legacy_w1,spvnode,1,90,101871,1131.9,5076,0,5024,5501871
-legacy_w4,spvnode,4,90,105897,1176.6,4872,0,4818,5505897
-ts_w1,spvnode_ts,1,90,58000,644.4,310,0,196,5458000
-ts_w2,spvnode_ts,2,90,22000,244.4,200,0,157,5422000
-ts_w4,spvnode_ts,4,90,58000,644.4,675,0,566,5458000
-ts_w8,spvnode_ts,8,90,52000,577.8,565,0,456,5452000
+tag,bin,workers,elapsed_s,connected_headers,headers_per_s,batches_2000,staged,invalid_rejects
+legacy_w1,spvnode,1,120,65952,549.6,2844,0,2810
+legacy_w4,spvnode,4,121,65941,545.0,1507,0,1472
+ts_w1,spvnode_ts,1,120,42000,350.0,841,0,0
+ts_w2,spvnode_ts,2,120,52000,433.3,1329,0,0
+ts_w4,spvnode_ts,4,120,64000,533.3,2323,0,0
+ts_w8,spvnode_ts,8,120,78000,650.0,3839,0,0

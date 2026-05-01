@@ -464,8 +464,20 @@ static void spv_commit_parsed_headers_batch(dogecoin_spv_client* client, int nod
             dogecoin_blockindex* tip = client->headers_db ? client->headers_db->getchaintip(client->headers_db_ctx) : NULL;
             if (tip && memcmp(prev_block, tip->hash, 32) != 0) {
                 dogecoin_blockindex* prev_block_index = dogecoin_headersdb_find((dogecoin_headers_db*)client->headers_db_ctx, prev_block);
-                if (prev_block_index) {
+                /* Stage if prev_block is in the headers DB OR if we have a connected
+                 * headers_stage_ctx (TS mode): in TS mode advance-peer batches whose
+                 * prev_block is *not yet* known are still worth keeping bounded in the
+                 * stage ring; spv_stage_batch caps at SPV_HEADERS_STAGE_CAPACITY and
+                 * drops the oldest if full. This avoids the per-peer invalid streak
+                 * penalty for valid out-of-sequence advance deliveries. */
+                if (prev_block_index || client->thread_safe_mode) {
                     if (spv_stage_batch(client, nodeid, amount_of_headers, payload, payload_len, prev_block)) {
+                        /* Keep the request pump alive: this peer just delivered a valid-but-
+                         * out-of-order batch. Without this kick, the in-flight count drains and
+                         * other peers go idle waiting for the next dispatch cycle. */
+                        spv_reset_invalid_header_streak(node);
+                        node->state &= ~NODE_HEADERSYNC;
+                        dogecoin_net_spv_request_headers(client);
                         return;
                     }
                     /* staging failed (e.g. alloc) -> fall through to legacy commit */
