@@ -188,6 +188,18 @@ if test "x$use_liboqs_raccoon" = xyes; then
   use_liboqs=yes
 fi
 
+AC_ARG_ENABLE([zk-carrier],
+  [AS_HELP_STRING([--enable-zk-carrier],
+  [Build with ZK carrier (Groth16/PLONK/STARK on top of PQ carrier) (default is yes)])],
+  [use_zk_carrier=$enableval],
+  [use_zk_carrier=yes])
+
+AC_ARG_WITH([rapidsnark],
+  [AS_HELP_STRING([--with-rapidsnark],
+  [Link the rapidsnark Groth16 verifier into libdogecoin (default is no; verification falls back to delegated mode without it)])],
+  [use_rapidsnark=$withval],
+  [use_rapidsnark=no])
+
 
 AC_ARG_ENABLE(tests,
   AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
@@ -324,6 +336,19 @@ if test "x$use_liboqs" = xyes; then
   fi
 fi
 
+if test "x$use_zk_carrier" = xyes; then
+  AC_DEFINE(USE_ZK_CARRIER, 1, [Define this symbol to enable the ZK carrier module])
+fi
+
+if test "x$use_rapidsnark" != xno -a "x$use_rapidsnark" != x; then
+  AC_CHECK_LIB([rapidsnark],[groth16_verify],[
+    LIBS="$LIBS -lrapidsnark"
+    AC_DEFINE([HAVE_RAPIDSNARK], [1], [Define if rapidsnark is available for in-process Groth16 verification])
+  ],[
+    AC_MSG_WARN([--with-rapidsnark requested but librapidsnark not found; falling back to delegated verification])
+  ])
+fi
+
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
@@ -348,6 +373,8 @@ AM_CONDITIONAL([USE_OPTEE], [test "x$use_optee" = "xyes"])
 AM_CONDITIONAL([USE_YUBIKEY], [test "x$use_yubikey" = "xyes"])
 AM_CONDITIONAL([USE_LIBOQS], [test "x$use_liboqs" = "xyes"])
 AM_CONDITIONAL([USE_LIBOQS_RACCOON], [test "x$use_liboqs_raccoon" = "xyes"])
+AM_CONDITIONAL([USE_ZK_CARRIER], [test "x$use_zk_carrier" = "xyes"])
+AM_CONDITIONAL([USE_PQC_CARRIER_HELPERS], [test "x$use_liboqs" = "xyes" -o "x$use_zk_carrier" = "xyes"])
 AM_CONDITIONAL([USE_ARMV8], [test "x$armv8_crypto" = "xyes"])
 AM_CONDITIONAL([USE_ARMV82], [test "x$armv82_crypto" = "xyes"])
 AC_SUBST(LIB_VERSION_CURRENT, _LIB_VERSION_CURRENT)
@@ -384,6 +411,8 @@ echo "  optee           = $use_optee"
 echo "  Yubikey         = $use_yubikey"
 echo "  liboqs          = $use_liboqs"
 echo "  liboqs-raccoon  = $use_liboqs_raccoon"
+echo "  zk-carrier      = $use_zk_carrier"
+echo "  rapidsnark      = $use_rapidsnark"
 echo
 echo "  host            = $host"
 echo "  target os       = $TARGET_OS"

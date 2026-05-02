@@ -82,6 +82,10 @@ extern void test_utils();
 extern void test_vector();
 extern void test_qr();
 
+#ifdef USE_ZK_CARRIER
+extern void test_zk_carrier();
+#endif
+
 #ifdef WITH_LOGDB
 extern void test_red_black_tree();
 extern void test_logdb_memdb();
@@ -168,6 +172,10 @@ int main()
     u_run_test(test_utils);
     u_run_test(test_vector);
     u_run_test(test_qr);
+
+#ifdef USE_ZK_CARRIER
+    u_run_test(test_zk_carrier);
+#endif
 
 #ifdef WITH_LOGDB
     u_run_test(test_red_black_tree);

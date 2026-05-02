@@ -35,6 +35,8 @@ SET(USE_OPENENCLAVE FALSE CACHE BOOL "enable openenclave")
 SET(USE_YUBIKEY FALSE CACHE BOOL "enable yubikey")
 SET(USE_LIBOQS FALSE CACHE BOOL "enable liboqs")
 SET(USE_LIBOQS_RACCOON FALSE CACHE BOOL "enable liboqs raccoon fork")
+SET(USE_ZK_CARRIER TRUE CACHE BOOL "enable ZK carrier (Groth16/PLONK/STARK)")
+SET(USE_RAPIDSNARK FALSE CACHE BOOL "link rapidsnark Groth16 verifier")
 SET(TEST_PASSWD FALSE CACHE BOOL "enable test password")
 string(RANDOM LENGTH 12 ALPHABET abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 PASSWD_STR)
 SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random data from")
@@ -222,6 +224,12 @@ ENDIF()
 IF(USE_LIBOQS_RACCOON)
     ADD_DEFINITIONS(-DUSE_LIBOQS_RACCOON=1)
 ENDIF()
+IF(USE_ZK_CARRIER)
+    ADD_DEFINITIONS(-DUSE_ZK_CARRIER=1)
+ENDIF()
+IF(USE_RAPIDSNARK)
+    ADD_DEFINITIONS(-DHAVE_RAPIDSNARK=1)
+ENDIF()
 IF(TEST_PASSWD)
     ADD_DEFINITIONS(-DTEST_PASSWD=1)
     ADD_DEFINITIONS(-DPASSWD_STR="${PASSWD_STR}")
@@ -251,6 +259,8 @@ MESSAGE(STATUS "  openenclave    = ${USE_OPENENCLAVE}")
 MESSAGE(STATUS "  yubikey        = ${USE_YUBIKEY}")
 MESSAGE(STATUS "  liboqs         = ${USE_LIBOQS}")
 MESSAGE(STATUS "  liboqs_raccoon = ${USE_LIBOQS_RACCOON}")
+MESSAGE(STATUS "  zk_carrier     = ${USE_ZK_CARRIER}")
+MESSAGE(STATUS "  rapidsnark     = ${USE_RAPIDSNARK}")
 MESSAGE(STATUS "")
 message(STATUS "  library type   = ${library_type}")
 MESSAGE(STATUS "")
@@ -317,15 +327,31 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
 )
 IF(USE_LIBOQS)
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
-    src/pqc_carrier.c
     src/pqc_dilithium.c
     src/pqc_falcon.c
+)
+ENDIF()
+IF(USE_LIBOQS OR USE_ZK_CARRIER)
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
+    src/pqc_carrier.c
 )
 ENDIF()
 IF(USE_LIBOQS_RACCOON)
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/pqc_raccoon.c
 )
+ENDIF()
+IF(USE_ZK_CARRIER)
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
+    src/zk_carrier/zk_carrier.c
+    src/zk_carrier/zk_commit.c
+    src/zk_carrier/zk_groth16.c
+    src/zk_carrier/zk_plonk.c
+    src/zk_carrier/zk_stark.c
+)
+IF(USE_RAPIDSNARK)
+    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} PRIVATE rapidsnark)
+ENDIF()
 ENDIF()
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PUBLIC
     src/chainparams.c
@@ -418,6 +444,11 @@ IF(USE_TESTS)
         test/utils_tests.c
         test/vector_tests.c
 )
+IF(USE_ZK_CARRIER)
+TARGET_SOURCES(tests ${visibility}
+        test/zk_carrier_tests.c
+)
+ENDIF()
 IF (USE_YUBIKEY)
     SET(LIBS ${LIBDOGECOIN_NAME} ${LIBYKPIV})
 ELSE()

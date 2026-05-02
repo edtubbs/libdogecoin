@@ -78,7 +78,8 @@ noinst_HEADERS = \
     include/dogecoin/validation.h \
     include/dogecoin/vector.h \
     include/dogecoin/version.h \
-    include/dogecoin/wow.h
+    include/dogecoin/wow.h \
+    include/dogecoin/zk_carrier.h
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libdogecoin.pc
@@ -129,7 +130,6 @@ libdogecoin_la_SOURCES = \
 
 if USE_LIBOQS
 libdogecoin_la_SOURCES += \
-    src/pqc_carrier.c \
     src/pqc_dilithium.c \
     src/pqc_falcon.c
 endif
@@ -137,6 +137,25 @@ endif
 if USE_LIBOQS_RACCOON
 libdogecoin_la_SOURCES += \
     src/pqc_raccoon.c
+endif
+
+# pqc_carrier.c provides shared P2SH carrier helpers (redeem script, scriptSig
+# chunking, scriptPubKey hashing).  These are reused by both the PQ carrier
+# (USE_LIBOQS) and the ZK carrier (USE_ZK_CARRIER), so build the file whenever
+# either is enabled.  Algorithm-specific extract code inside this TU is
+# itself guarded by #ifdef USE_LIBOQS.
+if USE_PQC_CARRIER_HELPERS
+libdogecoin_la_SOURCES += \
+    src/pqc_carrier.c
+endif
+
+if USE_ZK_CARRIER
+libdogecoin_la_SOURCES += \
+    src/zk_carrier/zk_carrier.c \
+    src/zk_carrier/zk_commit.c \
+    src/zk_carrier/zk_groth16.c \
+    src/zk_carrier/zk_plonk.c \
+    src/zk_carrier/zk_stark.c
 endif
 
 
@@ -238,6 +257,10 @@ tests_SOURCES = \
     test/unittester.c \
     test/utils_tests.c \
     test/vector_tests.c
+
+if USE_ZK_CARRIER
+tests_SOURCES += test/zk_carrier_tests.c
+endif
 
 tests_CFLAGS = $(libdogecoin_la_CFLAGS)
 tests_CPPFLAGS = -I$(top_srcdir)/src
