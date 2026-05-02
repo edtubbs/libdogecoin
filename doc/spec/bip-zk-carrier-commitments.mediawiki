@@ -391,6 +391,20 @@ For verifier-key trust, Phase 1 does not commit the verification key on-chain; d
 
 For DELEGATED verification, the <code>Reveal validated</code> line indicates only that <code>SHA256d(ZK_PAYLOAD)</code> matches the on-chain commitment — it does not assert proof validity. Auditors and high-assurance verifiers SHOULD run an in-process or off-box verification step before acting on a "DELEGATED" outcome.
 
+===External verifier hand-off (PLONK and other DELEGATED modes)===
+
+Because libdogecoin does not ship a native PLONK verifier (and does not ship a native Groth16 verifier unless built with rapidsnark), Phase 1's PLONK verification path is intentionally an external-verifier hand-off:
+
+# spvnode walks the chain, matches the TX_R reveal payload against a buffered TX_C commitment, and emits <code>[zk-commit] Reveal validated: TX_R=...</code> for the matched pair.
+# An end-to-end driver (e.g. <code>contrib/zk_carrier/scripts/broadcast_set.sh</code>) MUST then invoke the canonical external verifier — for PLONK that is <code>snarkjs plonk verify $VKEY public.json proof.json</code> against the same <code>verification_key.json</code> the operator distributed out of band — and tee the verifier's transcript into the curated mainnet log alongside the spvnode lines.
+# The external verifier MUST be invoked AFTER spvnode emits <code>Reveal validated</code> for the corresponding pair, so that an auditor reading the log can correlate the on-chain commitment match with the off-box cryptographic check.
+
+This split — commitment matching enforced by spvnode, proof validity attested by an external verifier — preserves libdogecoin's policy of keeping prover and verifier code paths out of consensus while still giving operators a single end-to-end log that demonstrates both halves of "<code>SHA256d(ZK_PAYLOAD)</code> matched the on-chain commit AND the proof verifies under the published vk".
+
+===Sequential broadcast of TX_C and TX_R===
+
+End-to-end ZK driver scripts SHOULD broadcast TX_C and TX_R sequentially, without waiting for explorer confirmation between them. Because TX_R spends TX_C's P2SH carrier outputs, peers accept it as a chained mempool descendant of TX_C and both transactions land in the mempool back-to-back. SPV scanners (including <code>spvnode</code>) then walk the resulting block(s) and emit the <code>[zk-commit] Pending</code> and <code>[zk-commit] Reveal validated</code> lines for the same pair without any per-tx human latency. This "send commitment and reveal sequentially so we can scan them simultaneously" flow is the one implemented by <code>contrib/zk_carrier/scripts/broadcast_set.sh</code>.
+
 ==Reference Implementation==
 
 Current reference behavior exists in libdogecoin components that:
@@ -488,6 +502,24 @@ SPV scanner output for Pair B with the new field-by-field reveal decode:
 [zk-commit] reveal_decoded.proof: len=804 hex_head=7b0a202270695f61223a205b0a2020223131383336333739373638373631383633313533343039353639343134313037353932353739363436303630343739363339303434323339373332373638303137 hex_tail=3138343237363131303538353430222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  \"pi_a\": [   \"11836379768761863153409569414107592579646060479639044239732768017834778963417\", "
 [zk-commit] ZK verification PASSED at height=6189987 txpos=8 mode=0 err=0
 [zk-commit] Reveal validated: TX_R=02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087 commit=a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57 payload_len=840 mode=0 height=6189987
+
+===Mainnet PLONK example with external verifier (mode = 1)===
+
+A PLONK end-to-end test was performed on Dogecoin mainnet using the same broadcast driver (<code>contrib/zk_carrier/scripts/broadcast_set.sh</code>) with <code>PROOF_SYSTEM=plonk</code>. TX_C and TX_R were broadcast sequentially (without waiting for confirmation between them) and were both accepted by mainnet:
+
+* TX_C: <code>fd48360fe39c11f769300cf4700482a1fbefe17df7a625fd571bdb869a809d36</code> → block 6190360
+* TX_R: <code>6308399a614a2163dad32d92e4fe3973f1897d28c4c6ca0c8ebf76a0b31f53d7</code> → block 6190369
+
+After confirmation, the canonical external verifier (<code>snarkjs plonk verify</code>) was invoked end-to-end against the same <code>verification_key_plonk.json</code> committed under <code>contrib/zk_carrier/circuits/build/</code> and the <code>proof.json</code> / <code>public.json</code> that were embedded as the on-chain ZKP1 reveal payload:
+
+<pre>
++ snarkjs plonk verify verification_key_plonk.json public.json proof.json
+[INFO]  snarkJS: PLONK VERIFIER STARTED
+[INFO]  snarkJS: OK!
+rc=0
+</pre>
+
+The full transcript (txids, vkey/proof/public sha256 fingerprints, block heights, and the verifier rc=0 line) is committed under <code>test-logs/mainnet_zk_carrier_e2e_set_PASSED_20260502_210027.txt</code>. This validates the documented split: spvnode enforces the on-chain commitment binding, and the external verifier — invoked AFTER the reveal lands and is matched — enforces the cryptographic proof check.
 </source>
 
 The full curated log lives in <code>test-logs/mainnet_zk_carrier_e2e_set_PASSED_20260502_142051.txt</code>; the trusted-setup ceremony stdout (circom compile, ptau new/contribute/phase2, groth16 setup, zkey contribute, vkey export) plus the generated <code>verification_key.json</code> content + sha256 fingerprints of vkey/zkey/wasm are preserved verbatim in <code>test-logs/zk_set_20260502_142051/run.log</code>.  An independent on-chain re-validation transcript (raw TX_C/TX_R fetched from BlockCypher → OP_RETURN parse → <code>such -c zk_extract_carrier</code> → SHA256d match → snarkjs <code>groth16 verify</code>) is recorded in <code>test-logs/mainnet_zk_carrier_e2e_set_20260502_142051_validation.txt</code>.

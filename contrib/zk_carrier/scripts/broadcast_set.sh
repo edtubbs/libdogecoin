@@ -533,11 +533,16 @@ for ((iter=1; iter<=N; iter++)); do
     echo "$TX_C_SIGNED" > "$ITER_DIR/tx_c.signed.hex"
     echo "$TX_C_TXID"   > "$ITER_DIR/tx_c.txid"
 
-    # 7. Wait for explorer visibility before TX_R.
-    wait_for_tx_visible "$TX_C_TXID" "$TX_POLL_TIMEOUT" \
-        || warn "iter $iter: TX_C not seen by explorer in ${TX_POLL_TIMEOUT}s (continuing)"
+    # 7. Send commitment + reveal sequentially without waiting for explorer
+    # visibility between them.  TX_R spends TX_C's carrier outputs, so peers
+    # accept it as a chained mempool descendant of TX_C and both land in the
+    # mempool back-to-back; spvnode then scans the resulting block(s)
+    # simultaneously and emits "[zk-commit] Pending" + "Reveal validated"
+    # for the same pair without any per-tx human latency.  This is the
+    # documented "send commitment and reveal sequentially so we can scan
+    # them simultaneously" flow (see doc/spec/bip-zk-carrier-commitments.mediawiki).
 
-    # 8. Build TX_R skeleton, patch per-part scriptSigs, broadcast.
+    # 8. Build TX_R skeleton, patch per-part scriptSigs, broadcast immediately.
     TX_R_UNSIGNED=$(build_tx_r_skeleton "$TX_C_TXID" "$FIRST_VOUT" "$PART_TOTAL" \
                                         "$CARRIER_VALUE_KOINU" "$TX_R_FEE_KOINU" "$PREV_SPK")
     TX_R_PATCHED="$TX_R_UNSIGNED"
@@ -553,9 +558,7 @@ for ((iter=1; iter<=N; iter++)); do
         TX_R_TXID=""
     else
         TX_R_TXID="$BROADCAST_TXID"
-        success "iter $iter: TX_R broadcast $TX_R_TXID"
-        wait_for_tx_visible "$TX_R_TXID" "$TX_POLL_TIMEOUT" \
-            || warn "iter $iter: TX_R not seen by explorer in ${TX_POLL_TIMEOUT}s"
+        success "iter $iter: TX_R broadcast $TX_R_TXID (chained off TX_C in same mempool window)"
     fi
     echo "$TX_R_PATCHED" > "$ITER_DIR/tx_r.signed.hex"
     echo "$TX_R_TXID"    > "$ITER_DIR/tx_r.txid"
