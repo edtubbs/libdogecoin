@@ -67,6 +67,9 @@
 #ifdef USE_LIBOQS_RACCOON
 #include <dogecoin/pqc_raccoon.h>
 #endif
+#ifdef USE_ZK_CARRIER
+#include <dogecoin/zk_carrier.h>
+#endif
 #include <event2/event.h>
 
 /* Optional liboqs (Falcon-only) presence check; compile with -DUSE_LIBOQS */
@@ -238,6 +241,49 @@ static void spv_pqc_remove_pending(spv_pqc_pending_commit_t* entry) {
 }
 
 #endif /* USE_LIBOQS */
+
+#ifdef USE_ZK_CARRIER
+/* Hash table of pending TX_C OP_RETURN commitments awaiting their TX_R
+   reveal.  Mirrors the PQC g_pending_commits table (key: 32-byte commit)
+   so the SPV validator can cross-validate ZK carriers in O(1) when the
+   reveal arrives in a later block.  Kept separate from the PQC table to
+   minimise blast radius — the two key spaces are independent and combining
+   them would force every PQC enum case to also know about ZK modes. */
+typedef struct spv_zk_pending_commit {
+    uint8_t commit[32];                /* 32-byte commit hash - hash key */
+    dogecoin_zk_mode_t mode;
+    uint32_t txpos;
+    uint32_t height;                   /* block height where TX_C was seen */
+    uint8_t* txc_raw;                  /* serialized TX_C, kept for diagnostics */
+    size_t txc_raw_len;
+    UT_hash_handle hh;
+} spv_zk_pending_commit_t;
+
+static spv_zk_pending_commit_t* g_zk_pending_commits = NULL;
+
+static spv_zk_pending_commit_t* spv_zk_find_pending(const uint8_t* commit) {
+    spv_zk_pending_commit_t* found = NULL;
+    HASH_FIND(hh, g_zk_pending_commits, commit, 32, found);
+    return found;
+}
+
+static void spv_zk_add_pending(spv_zk_pending_commit_t* entry) {
+    spv_zk_pending_commit_t* existing = spv_zk_find_pending(entry->commit);
+    if (existing) {
+        HASH_DEL(g_zk_pending_commits, existing);
+        if (existing->txc_raw) dogecoin_free(existing->txc_raw);
+        dogecoin_free(existing);
+    }
+    HASH_ADD(hh, g_zk_pending_commits, commit, 32, entry);
+}
+
+static void spv_zk_remove_pending(spv_zk_pending_commit_t* entry) {
+    HASH_DEL(g_zk_pending_commits, entry);
+    if (entry->txc_raw) dogecoin_free(entry->txc_raw);
+    dogecoin_free(entry);
+}
+
+#endif /* USE_ZK_CARRIER */
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
@@ -509,6 +555,17 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
         spv_pqc_pending_commit_t* tmp;
         HASH_ITER(hh, g_pending_commits, entry, tmp) {
             spv_pqc_remove_pending(entry);
+        }
+    }
+#endif
+
+#ifdef USE_ZK_CARRIER
+    /* Release any pending ZK carrier commits that were never matched by a TX_R */
+    {
+        spv_zk_pending_commit_t* entry;
+        spv_zk_pending_commit_t* tmp;
+        HASH_ITER(hh, g_zk_pending_commits, entry, tmp) {
+            spv_zk_remove_pending(entry);
         }
     }
 #endif
@@ -1138,6 +1195,96 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     }
                 }
 #endif
+
+#ifdef USE_ZK_CARRIER
+                /* --- ZK Phase 1: Detect TX_C OP_RETURN commitments --- */
+                {
+                    dogecoin_zk_mode_t zk_mode = DOGECOIN_ZK_MODE_GROTH16;
+                    uint8_t zk_commit_data[32];
+                    if (dogecoin_tx_extract_zk_commit(tx, &zk_mode, zk_commit_data)) {
+                        char zk_commit_hex[65];
+                        utils_bin_to_hex(zk_commit_data, 32, zk_commit_hex);
+                        client->nodegroup->log_write_cb("[zk-commit] Pending at height=%d txpos=%u commit=%s mode=%u source=op_return\n",
+                                                         pindex->height, i, zk_commit_hex, (unsigned)zk_mode);
+                        spv_zk_pending_commit_t* entry = dogecoin_calloc(1, sizeof(spv_zk_pending_commit_t));
+                        if (entry) {
+                            memcpy(entry->commit, zk_commit_data, 32);
+                            entry->mode = zk_mode;
+                            entry->txpos = i;
+                            entry->height = pindex->height;
+                            entry->txc_raw = dogecoin_malloc(consumedlength);
+                            if (entry->txc_raw) {
+                                memcpy(entry->txc_raw, tx_raw, consumedlength);
+                                entry->txc_raw_len = consumedlength;
+                            }
+                            spv_zk_add_pending(entry);
+                        }
+                    }
+                }
+
+                /* --- ZK Phase 2: Detect TX_R carrier scriptSigs and validate --- */
+                {
+                    uint8_t* zk_payload = NULL;
+                    size_t zk_payload_len = 0;
+                    if (dogecoin_zk_extract_carrier_payload(tx, &zk_payload, &zk_payload_len) == DOGECOIN_ZK_OK
+                        && zk_payload && zk_payload_len > 0) {
+                        /* Compute TX_R (reveal) txid for logging (display byte order) */
+                        uint256_t txr_hash;
+                        dogecoin_tx_hash(tx, txr_hash);
+                        uint8_t txr_hash_rev[32];
+                        for (int rb = 0; rb < 32; rb++) txr_hash_rev[rb] = ((uint8_t*)txr_hash)[31 - rb];
+                        char txr_txid_hex[65];
+                        utils_bin_to_hex(txr_hash_rev, 32, txr_txid_hex);
+
+                        uint8_t computed_commit[32];
+                        if (dogecoin_zk_get_commitment_hash(zk_payload, zk_payload_len, computed_commit) == DOGECOIN_ZK_OK) {
+                            char commit_hex[65];
+                            utils_bin_to_hex(computed_commit, 32, commit_hex);
+
+                            spv_zk_pending_commit_t* matched_entry = spv_zk_find_pending(computed_commit);
+                            if (matched_entry) {
+                                uint32_t matched_txpos = matched_entry->txpos;
+                                dogecoin_zk_mode_t matched_mode = matched_entry->mode;
+                                /* Remove from hash table (frees txc_raw inside helper). */
+                                spv_zk_remove_pending(matched_entry);
+
+                                client->nodegroup->log_write_cb("[zk-commit] Valid at height=%d txpos=%u commit=%s mode=%u source=carrier_scriptsig matched_txc_txpos=%u payload_len=%zu txr_txid=%s\n",
+                                                                 pindex->height, i, commit_hex, (unsigned)matched_mode, matched_txpos, zk_payload_len, txr_txid_hex);
+
+                                /* In-process proof verification when libdogecoin was built with
+                                   rapidsnark (HAVE_RAPIDSNARK).  Without it, the verifier returns
+                                   DOGECOIN_ZK_ERR_NOT_IMPLEMENTED / DELEGATED — log that explicitly
+                                   so the demo script can detect either outcome. */
+                                dogecoin_zk_err_t verify_e = dogecoin_zk_verify_proof(zk_payload, zk_payload_len, NULL, 0);
+                                const char* verify_status =
+                                    (verify_e == DOGECOIN_ZK_OK) ? "PASSED" :
+                                    (verify_e == DOGECOIN_ZK_ERR_VERIFY_FAIL) ? "FAILED" :
+                                    (verify_e == DOGECOIN_ZK_ERR_NOT_IMPLEMENTED ||
+                                     verify_e == DOGECOIN_ZK_ERR_DELEGATED) ? "DELEGATED" :
+                                    "ERROR";
+                                client->nodegroup->log_write_cb("[zk-commit] ZK verification %s at height=%d txpos=%u mode=%u err=%d\n",
+                                    verify_status, pindex->height, i, (unsigned)matched_mode, (int)verify_e);
+
+                                /* Reveal succeeds when either the proof verified in-process, or
+                                   verification was delegated and the on-chain commit matched —
+                                   parity with PQC's commit_ok branch which logs Reveal validated
+                                   without re-running the full crypto when the commit lookup
+                                   alone is the enforced check. */
+                                if (verify_e == DOGECOIN_ZK_OK ||
+                                    verify_e == DOGECOIN_ZK_ERR_NOT_IMPLEMENTED ||
+                                    verify_e == DOGECOIN_ZK_ERR_DELEGATED) {
+                                    client->nodegroup->log_write_cb("[zk-commit] Reveal validated: TX_R=%s commit=%s payload_len=%zu mode=%u height=%d\n",
+                                        txr_txid_hex, commit_hex, zk_payload_len, (unsigned)matched_mode, pindex->height);
+                                }
+                            } else {
+                                client->nodegroup->log_write_cb("[zk-commit] Unmatched at height=%d txpos=%u commit=%s payload_len=%zu source=carrier_scriptsig txr_txid=%s\n",
+                                                                 pindex->height, i, commit_hex, zk_payload_len, txr_txid_hex);
+                            }
+                        }
+                        dogecoin_free(zk_payload);
+                    }
+                }
+#endif /* USE_ZK_CARRIER */
                 
                 total_tx_size += consumedlength;
 

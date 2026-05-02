@@ -329,3 +329,55 @@ dogecoin_zk_err_t dogecoin_zk_extract_carrier_payload(
     *out_payload_len = off;
     return DOGECOIN_ZK_OK;
 }
+
+/*
+ * Walk a tx's vouts looking for the canonical TX_C OP_RETURN commitment:
+ *      0x6a 0x25 "DZKC" <mode-byte> <commitment32>
+ * (39-byte scriptPubKey total).  Returns true on the first match and writes
+ * the mode + 32-byte commit; false otherwise.  No allocation.
+ */
+dogecoin_bool dogecoin_tx_extract_zk_commit(
+    const dogecoin_tx* tx,
+    dogecoin_zk_mode_t* out_mode,
+    uint8_t out_commit32[32])
+{
+    if (!tx || !out_mode || !out_commit32 || !tx->vout) {
+        return false;
+    }
+
+    /* Total scriptPubKey length is 1 (OP_RETURN) + 1 (push len) + 4 (tag) +
+       1 (mode) + 32 (commit) = 39 bytes.  The push length byte equals
+       DOGECOIN_ZK_OPRETURN_DATA_LEN (37). */
+    const size_t expected_len = 1 + 1 + (size_t)DOGECOIN_ZK_OPRETURN_DATA_LEN;
+
+    for (unsigned i = 0; i < tx->vout->len; ++i) {
+        const dogecoin_tx_out* o = (const dogecoin_tx_out*)vector_idx(tx->vout, i);
+        if (!o || !o->script_pubkey || o->script_pubkey->len != expected_len) {
+            continue;
+        }
+
+        const unsigned char* p = (const unsigned char*)o->script_pubkey->str;
+        if (p[0] != 0x6a /* OP_RETURN */ ||
+            p[1] != (uint8_t)DOGECOIN_ZK_OPRETURN_DATA_LEN ||
+            memcmp(p + 2, DOGECOIN_ZK_OPRETURN_TAG, DOGECOIN_ZK_OPRETURN_TAG_LEN) != 0) {
+            continue;
+        }
+
+        /* Reject unknown modes so a tampered/garbage byte cannot pose as a
+         * valid ZK commitment.  Match the same allow-list used by the
+         * encoder/decoder (zk_mode_is_known in zk_carrier.c). */
+        uint8_t mode_byte = p[2 + DOGECOIN_ZK_OPRETURN_TAG_LEN];
+        switch (mode_byte) {
+        case DOGECOIN_ZK_MODE_GROTH16:
+        case DOGECOIN_ZK_MODE_PLONK:
+        case DOGECOIN_ZK_MODE_STARK_S2:
+            break;
+        default:
+            continue;
+        }
+        *out_mode = (dogecoin_zk_mode_t)mode_byte;
+        memcpy(out_commit32, p + 2 + DOGECOIN_ZK_OPRETURN_TAG_LEN + 1, 32);
+        return true;
+    }
+    return false;
+}

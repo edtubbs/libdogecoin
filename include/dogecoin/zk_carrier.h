@@ -192,6 +192,20 @@ LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_extract_carrier_payload(
     size_t* out_payload_len);
 
 /*
+ * Walk a transaction's outputs looking for the canonical TX_C OP_RETURN
+ * commitment script:
+ *      OP_RETURN <push 37> "DZKC" <mode-byte> <commitment32>
+ * On the first match, write the mode and 32-byte commitment to the out
+ * parameters and return true.  Mirrors dogecoin_tx_extract_falcon512_commit
+ * (src/pqc_falcon.c) so the SPV layer can detect ZK commitments alongside
+ * Falcon/Dilithium/Raccoon ones.
+ */
+LIBDOGECOIN_API dogecoin_bool dogecoin_tx_extract_zk_commit(
+    const dogecoin_tx* tx,
+    dogecoin_zk_mode_t* out_mode,
+    uint8_t out_commit32[32]);
+
+/*
  * Verify a Groth16 proof.  If libdogecoin was built with --with-rapidsnark
  * (HAVE_RAPIDSNARK is defined) this calls into the rapidsnark verifier.
  * Otherwise it returns DOGECOIN_ZK_ERR_NOT_IMPLEMENTED so callers can fall
