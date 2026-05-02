@@ -196,7 +196,20 @@ if [ "${RUN_CEREMONY:-0}" = "1" ] || [ ! -f "$WASM" ] || [ ! -f "$ZKEY" ] || [ !
     info "================================================================="
 
     info "[ceremony] circom compile (r1cs + wasm)"
-    ( cd "$CEREMONY_DIR" && circom "$CIRCUIT_SRC" --r1cs --wasm --sym -p bn128 -o "$CEREMONY_DIR" ) 2>&1 \
+    # circomlib is installed globally via npm at <node_modules>/circomlib/circuits/.
+    # The circuit's `include "circomlib/comparators.circom"` requires a search
+    # path containing a directory literally named `circomlib` whose entries are
+    # the .circom files (not nested under .../circuits/).  Construct that
+    # synthetic include root via a symlink so it is robust across npm layouts.
+    CIRCOMLIB_PARENT="${CIRCOMLIB_PARENT:-$(npm root -g 2>/dev/null)}"
+    CIRCOM_INC_ROOT="$CEREMONY_DIR/circ_inc"
+    mkdir -p "$CIRCOM_INC_ROOT"
+    if [ -n "$CIRCOMLIB_PARENT" ] && [ -d "$CIRCOMLIB_PARENT/circomlib/circuits" ]; then
+        ln -sfn "$CIRCOMLIB_PARENT/circomlib/circuits" "$CIRCOM_INC_ROOT/circomlib"
+    fi
+    CIRCOM_L_FLAG=""
+    [ -L "$CIRCOM_INC_ROOT/circomlib" ] && CIRCOM_L_FLAG="-l $CIRCOM_INC_ROOT"
+    ( cd "$CEREMONY_DIR" && circom "$CIRCUIT_SRC" --r1cs --wasm --sym -p bn128 $CIRCOM_L_FLAG -o "$CEREMONY_DIR" ) 2>&1 \
         | sed 's/^/  [circom] /'
 
     info "[ceremony] snarkjs r1cs info"
@@ -261,7 +274,7 @@ if [ -z "$FUNDED_UTXO_TXID" ] || [ -z "$FUNDED_UTXO_VALUE_KOINU" ]; then
     info "Auto-discovering a spendable UTXO at $FUNDED_ADDR via block explorers"
     info "================================================================="
     DISC_JSON=$(curl -fsSL --max-time 30 \
-        "$EXPLORER_BASE_MAIN/addrs/${FUNDED_ADDR}?unspentOnly=true&limit=50" 2>/dev/null || true)
+        "${EXPLORER_BASE_MAIN}/addrs/${FUNDED_ADDR}?unspentOnly=true&limit=50" 2>/dev/null || true)
     if [ -z "$DISC_JSON" ]; then
         DISC_JSON=$(curl -fsSL --max-time 30 \
             "https://api.blockchair.com/dogecoin/dashboards/address/${FUNDED_ADDR}?limit=50" 2>/dev/null || true)
@@ -269,17 +282,21 @@ if [ -z "$FUNDED_UTXO_TXID" ] || [ -z "$FUNDED_UTXO_VALUE_KOINU" ]; then
     if [ -z "$DISC_JSON" ]; then
         die "FUNDED_UTXO_TXID/FUNDED_UTXO_VALUE_KOINU not set and explorer auto-discovery failed"
     fi
-    # Parse the BlockCypher response (txrefs[].tx_hash / tx_output_n / value).
-    # Prefer a UTXO with at least 1 confirmation and value >= 5 DOGE so a
-    # 1-DOGE carrier output + sane fee fits comfortably.
-    PARSED=$(echo "$DISC_JSON" | python3 - "$FUNDED_ADDR" <<'PY'
-import sys, json
-addr = sys.argv[1]
-d = json.load(sys.stdin)
+    # Parse the explorer response (BlockCypher: txrefs[].tx_hash/tx_output_n/value;
+    # Blockchair: data.<addr>.utxo[]).  Prefer a UTXO with at least 1 confirmation
+    # and value >= 5 DOGE so a 1-DOGE carrier output + sane fee fits.
+    DISC_JSON_FILE="$WORK/utxo_discovery.json"
+    printf '%s' "$DISC_JSON" > "$DISC_JSON_FILE"
+    PARSED=$(FUNDED_ADDR_ARG="$FUNDED_ADDR" python3 - "$DISC_JSON_FILE" <<'PY'
+import sys, os, json
+addr = os.environ['FUNDED_ADDR_ARG']
+with open(sys.argv[1]) as f:
+    d = json.load(f)
 candidates = []
 # BlockCypher shape
 for ref in (d.get('txrefs') or []) + (d.get('unconfirmed_txrefs') or []):
     if ref.get('spent'): continue
+    if ref.get('tx_input_n', -1) >= 0: continue  # this txref describes an input, not an unspent output
     candidates.append(( int(ref.get('confirmations',0)),
                         int(ref.get('value',0)),
                         ref.get('tx_hash'),
@@ -422,7 +439,7 @@ for ((iter=1; iter<=N; iter++)); do
 
     # 2. Compute commit + sanity-check off-box.
     COMMIT=$("$SUCH" $NETWORK_FLAG -c zk_commit -x "$PAYLOAD_HEX" 2>&1 \
-             | awk -F': ' '/^zk_commit_hex:/ {print $2; exit}' | tr -d ' ')
+             | awk -F':[[:space:]]+' '/^commitment:/ {print $2; exit}' | tr -d ' ')
     [ -n "$COMMIT" ] || die "iter $iter: failed to derive commitment"
     info "commit: $COMMIT"
 
@@ -528,7 +545,8 @@ echo "$SPV_PID" > "$WORK/spvnode.pid"
 # Wait until we have collected one PASSED line per pair, or the timeout fires.
 SPV_DEADLINE=$(( $(date +%s) + ${SPV_TIMEOUT:-3600} ))
 while true; do
-    PASSED_LINES=$(grep -c "ZK verification PASSED" "$SPV_LOG" 2>/dev/null || echo 0)
+    PASSED_LINES=$(grep -c "ZK verification PASSED" "$SPV_LOG" 2>/dev/null | head -n1 | tr -d '[:space:]')
+    [ -z "$PASSED_LINES" ] && PASSED_LINES=0
     if [ "$PASSED_LINES" -ge "$N" ]; then
         success "spvnode emitted $PASSED_LINES PASSED lines (>= N=$N)"
         break

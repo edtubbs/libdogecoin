@@ -418,9 +418,9 @@ Current end-to-end script behavior is aligned with the parallel PQC mainnet flow
 
 ==Mainnet Examples==
 
-The following example is from confirmed mainnet transactions demonstrating Phase 1 ZK carrier commitment publication, P2SH carrier reveal, and full in-process Groth16 verification by <code>spvnode --zk-vkey</code>.  The format mirrors the Falcon-512 / Dilithium2 / Raccoon-G mainnet examples in the parallel PQC BIP.
+The following examples are from confirmed mainnet transactions demonstrating Phase 1 ZK carrier commitment publication, P2SH carrier reveal, and full in-process Groth16 verification by <code>spvnode --zk-vkey</code>.  The format mirrors the Falcon-512 / Dilithium2 / Raccoon-G mainnet examples in the parallel PQC BIP.
 
-===Groth16 BN254 Range-Proof Carrier Mode (TX_C + TX_R)===
+===Groth16 BN254 Range-Proof Carrier Mode (TX_C + TX_R, Pair A)===
 
 Range proof for the inclusive interval <code>[0, 1000000]</code> over secret amount <code>44321</code>, generated with the <code>contrib/zk_carrier/circuits/range_proof.circom</code> reference circuit, snarkjs Groth16 ceremony (BN128 powers-of-tau 2^12), and <code>contrib/zk_carrier/witness_helper.py</code> (which emits the 837-byte canonical ZKP1 payload).
 
@@ -447,7 +447,7 @@ mode:        0 (Groth16 BN254)
 Explorer:    https://chain.so/tx/DOGE/d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269
 </pre>
 
-SPV scanner output (<code>spvnode --zk-vkey verification_key.json -d -p -b</code>, libdogecoin built with <code>--with-mcl=…</code>; full log in <code>test-logs/mainnet_zk_carrier_spvnode_PASSED_20260502_133736.txt</code>):
+SPV scanner output for Pair A (<code>spvnode --zk-vkey verification_key.json -d -p -b</code>, libdogecoin built with <code>--with-mcl=…</code>; full log in <code>test-logs/mainnet_zk_carrier_spvnode_PASSED_20260502_133736.txt</code>):
 
 <source>
 [zk-vkey] loaded 3108 bytes from verification_key.json
@@ -457,9 +457,44 @@ SPV scanner output (<code>spvnode --zk-vkey verification_key.json -d -p -b</code
 [zk-commit] Reveal validated: TX_R=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 payload_len=837 mode=0 height=6189927
 </source>
 
-The <code>PASSED</code> line is emitted by <code>dogecoin_zk_verify_proof</code> dispatching to <code>groth16_verify_mcl</code> (herumi/mcl, BN254, statically linked).  In the same scan, two earlier on-chain ZKP1 pairs published with verification keys that have since been rotated (TX_R <code>0ec81283…9208</code> at 6189399 and <code>5f43977d…a8bb</code> at 6189465) correctly produced <code>ZK verification FAILED err=-8</code>, demonstrating that the verifier is binding the proof to the supplied <code>vk</code> rather than acting as a stub.
+===Groth16 BN254 Range-Proof Carrier Mode (TX_C + TX_R, Pair B — fully decoded reveal log)===
 
-A recent mainnet checkpoint is baked in at height 6189700 (hash <code>a6ed6d6b03668d0bb9baddfbc52565b2514d02f118d6d0298a6ca48d511d7804</code>, 2026-05-02T09:18:05Z) so <code>spvnode -p</code> rescans of this and subsequent ZK carrier pairs only need to sync the final ~200–300 blocks of headers before reaching the published commitment.
+Pair B was generated end-to-end by a single invocation of <code>contrib/zk_carrier/scripts/broadcast_set.sh</code> (which auto-bootstraps libdogecoin, runs the circom + snarkjs ceremony, broadcasts TX_C and TX_R, and rescans them via <code>spvnode --zk-vkey</code>).  It exercises the new fully-decoded <code>reveal_decoded</code> log lines that surface every ZKP1 field in the spvnode log:
+
+<pre>
+TX_C txid:   6d28abf41f7e21854923096006650b2289e5df35ce9b1f9a926f3153d8bfab3c
+Block:       6189986 (mainnet, confirmed 2026-05-02, txpos=3)
+OP_RETURN:   6a25445a4b4300a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57
+             (DZKC || mode=0 || commit32)
+commit32:    a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57
+Explorer:    https://chain.so/tx/DOGE/6d28abf41f7e21854923096006650b2289e5df35ce9b1f9a926f3153d8bfab3c
+
+TX_R txid:   02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087
+Block:       6189987 (mainnet, confirmed 2026-05-02, txpos=8)
+payload_len: 840 bytes (ZKP1 magic || mode=0 || reserved || circuit_id=0x00000001 || pub_len=20 || public.json || proof_len=804 || proof.json)
+public.json: ["0", "1000000"]
+proof.curve: bn128 (snarkjs-format Groth16)
+Explorer:    https://chain.so/tx/DOGE/02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087
+</pre>
+
+SPV scanner output for Pair B with the new field-by-field reveal decode:
+
+<source>
+[zk-vkey] loaded 3108 bytes from verification_key.json
+[zk-commit] Pending at height=6189986 txpos=3 commit=a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57 mode=0 source=op_return
+[zk-commit] Valid at height=6189987 txpos=8 commit=a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57 mode=0 source=carrier_scriptsig matched_txc_txpos=3 payload_len=840 txr_txid=02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087
+[zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) reserved=0x00 circuit_id=0x00000001 public_len=20 proof_len=804 total_payload_len=840 txr_txid=02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087
+[zk-commit] reveal_decoded.public_inputs: len=20 hex=5b0a202230222c0a202231303030303030220a5d ascii="[  \"0\",  \"1000000\" ]"
+[zk-commit] reveal_decoded.proof: len=804 hex_head=7b0a202270695f61223a205b0a2020223131383336333739373638373631383633313533343039353639343134313037353932353739363436303630343739363339303434323339373332373638303137 hex_tail=3138343237363131303538353430222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  \"pi_a\": [   \"11836379768761863153409569414107592579646060479639044239732768017834778963417\", "
+[zk-commit] ZK verification PASSED at height=6189987 txpos=8 mode=0 err=0
+[zk-commit] Reveal validated: TX_R=02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087 commit=a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57 payload_len=840 mode=0 height=6189987
+</source>
+
+The full curated log lives in <code>test-logs/mainnet_zk_carrier_e2e_set_PASSED_20260502_142051.txt</code>; the trusted-setup ceremony stdout (circom compile, ptau new/contribute/phase2, groth16 setup, zkey contribute, vkey export) plus the generated <code>verification_key.json</code> content + sha256 fingerprints of vkey/zkey/wasm are preserved verbatim in <code>test-logs/zk_set_20260502_142051/run.log</code>.  An independent on-chain re-validation transcript (raw TX_C/TX_R fetched from BlockCypher → OP_RETURN parse → <code>such -c zk_extract_carrier</code> → SHA256d match → snarkjs <code>groth16 verify</code>) is recorded in <code>test-logs/mainnet_zk_carrier_e2e_set_20260502_142051_validation.txt</code>.
+
+The <code>PASSED</code> line is emitted by <code>dogecoin_zk_verify_proof</code> dispatching to <code>groth16_verify_mcl</code> (herumi/mcl, BN254, statically linked).  In the Pair-A scan, two earlier on-chain ZKP1 pairs published with verification keys that have since been rotated (TX_R <code>0ec81283…9208</code> at 6189399 and <code>5f43977d…a8bb</code> at 6189465) correctly produced <code>ZK verification FAILED err=-8</code>, demonstrating that the verifier is binding the proof to the supplied <code>vk</code> rather than acting as a stub.
+
+A recent mainnet checkpoint is baked in at height 6189700 (hash <code>a6ed6d6b03668d0bb9baddfbc52565b2514d02f118d6d0298a6ca48d511d7804</code>, 2026-05-02T09:18:05Z) so <code>spvnode -p</code> rescans of these and subsequent ZK carrier pairs only need to sync the final ~200–300 blocks of headers before reaching the published commitments.
 
 ==Deployment==
 

@@ -1,0 +1,36 @@
+===============================================================================
+ZK carrier mainnet e2e — multi-pair set (N=1) — Sat May  2 14:23:24 UTC 2026
+Funded address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+Manifest:
+iter	tx_c_txid	tx_r_txid	commit	payload_bytes	utc_iso
+1	6d28abf41f7e21854923096006650b2289e5df35ce9b1f9a926f3153d8bfab3c	02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087	a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57	840	2026-05-02T14:22:22Z
+
+===============================================================================
+spvnode [zk-commit] / [zk-vkey] lines:
+===============================================================================
+[zk-vkey] loaded 3108 bytes from /home/runner/work/libdogecoin/libdogecoin/contrib/zk_carrier/circuits/build/verification_key.json
+DEBUG: [zk-commit] Pending at height=6189394 txpos=9 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 mode=0 source=op_return
+DEBUG: [zk-commit] Valid at height=6189399 txpos=24 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 mode=0 source=carrier_scriptsig matched_txc_txpos=9 payload_len=842 txr_txid=0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) reserved=0x00 circuit_id=0x00000001 public_len=20 proof_len=806 total_payload_len=842 txr_txid=0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=20 hex=5b0a202230222c0a202231303030303030220a5d ascii="[  "0",  "1000000" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=806 hex_head=7b0a202270695f61223a205b0a202022323233313136383034373930373231303532303233353136313731323739303334373633303639353632303336323037 hex_tail=3131313134333036222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "pi_a": [   "2231168047907210520235161712790347630695620362073546345859935535500499806461",  "
+DEBUG: [zk-commit] ZK verification FAILED at height=6189399 txpos=24 mode=0 err=-8
+DEBUG: [zk-commit] Pending at height=6189450 txpos=20 commit=c4113c4b78c8822fa1b656a61490d43828e63f6a8d637901a3367967873ba58f mode=0 source=op_return
+DEBUG: [zk-commit] Valid at height=6189465 txpos=45 commit=c4113c4b78c8822fa1b656a61490d43828e63f6a8d637901a3367967873ba58f mode=0 source=carrier_scriptsig matched_txc_txpos=20 payload_len=843 txr_txid=5f43977db6cf1066fb8f4d3e2b16748f35106f68482561e3023d860bfd1fa8bb
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) reserved=0x00 circuit_id=0x00000001 public_len=20 proof_len=807 total_payload_len=843 txr_txid=5f43977db6cf1066fb8f4d3e2b16748f35106f68482561e3023d860bfd1fa8bb
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=20 hex=5b0a202230222c0a202231303030303030220a5d ascii="[  "0",  "1000000" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=807 hex_head=7b0a202270695f61223a205b0a202022323034363838353832323834343334343136303732353438373037323931323439333832353238303037313236333037 hex_tail=3133373036383030222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "pi_a": [   "20468858228443441607254870729124938252800712630795153147236589277104754710442", "
+DEBUG: [zk-commit] ZK verification FAILED at height=6189465 txpos=45 mode=0 err=-8
+DEBUG: [zk-commit] Pending at height=6189927 txpos=28 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 mode=0 source=op_return
+DEBUG: [zk-commit] Valid at height=6189927 txpos=45 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 mode=0 source=carrier_scriptsig matched_txc_txpos=28 payload_len=837 txr_txid=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) reserved=0x00 circuit_id=0x00000001 public_len=20 proof_len=801 total_payload_len=837 txr_txid=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=20 hex=5b0a202230222c0a202231303030303030220a5d ascii="[  "0",  "1000000" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=801 hex_head=7b0a202270695f61223a205b0a202022323834393231303132303437343132323233393231333735313130393931343936343233333738303239383034393830 hex_tail=3934353635373035222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "pi_a": [   "2849210120474122239213751109914964233780298049806941662434257544733715424293",  "
+DEBUG: [zk-commit] ZK verification FAILED at height=6189927 txpos=45 mode=0 err=-8
+DEBUG: [zk-commit] Pending at height=6189986 txpos=3 commit=a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57 mode=0 source=op_return
+DEBUG: [zk-commit] Valid at height=6189987 txpos=8 commit=a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57 mode=0 source=carrier_scriptsig matched_txc_txpos=3 payload_len=840 txr_txid=02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) reserved=0x00 circuit_id=0x00000001 public_len=20 proof_len=804 total_payload_len=840 txr_txid=02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=20 hex=5b0a202230222c0a202231303030303030220a5d ascii="[  "0",  "1000000" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=804 hex_head=7b0a202270695f61223a205b0a202022313138333633373937363837363138363331353334303935363934313431303735393235373936343630363034373936 hex_tail=3638333135303339222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "pi_a": [   "11836379768761863153409569414107592579646060479639044239732768017834778963417", "
+DEBUG: [zk-commit] ZK verification PASSED at height=6189987 txpos=8 mode=0 err=0
+DEBUG: [zk-commit] Reveal validated: TX_R=02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087 commit=a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57 payload_len=840 mode=0 height=6189987
