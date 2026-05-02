@@ -1,0 +1,111 @@
+spvnode --zk-vkey rescan: filtered log (full mcl Groth16 BN254 validation)
+captured: Sat May  2 13:37:52 UTC 2026
+target on-chain pair: TX_C 9f7476f1…ff7c @ 6189927 / TX_R d02fe88f…fa269 @ 6189927
+vkey: 3108-byte snarkjs Groth16 verification_key.json
+spvnode build: statically linked libmcl.a (no LD_LIBRARY_PATH needed)
+command: ./spvnode --zk-vkey verification_key.json -d -p -b -l -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr -f headers.db scan
+
+===================== zk-vkey load =====================
+1:[zk-vkey] loaded 3108 bytes from /tmp/zk_build/zk/verification_key.json
+
+===================== all [zk-commit] events (in order) =====================
+64121:DEBUG: [zk-commit] Pending at height=6189394 txpos=9 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 mode=0 source=op_return
+64143:DEBUG: [zk-commit] Valid at height=6189399 txpos=24 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 mode=0 source=carrier_scriptsig matched_txc_txpos=9 payload_len=842 txr_txid=0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208
+64144:DEBUG: [zk-commit] ZK verification FAILED at height=6189399 txpos=24 mode=0 err=-8
+64350:DEBUG: [zk-commit] Pending at height=6189450 txpos=20 commit=c4113c4b78c8822fa1b656a61490d43828e63f6a8d637901a3367967873ba58f mode=0 source=op_return
+64412:DEBUG: [zk-commit] Valid at height=6189465 txpos=45 commit=c4113c4b78c8822fa1b656a61490d43828e63f6a8d637901a3367967873ba58f mode=0 source=carrier_scriptsig matched_txc_txpos=20 payload_len=843 txr_txid=5f43977db6cf1066fb8f4d3e2b16748f35106f68482561e3023d860bfd1fa8bb
+64413:DEBUG: [zk-commit] ZK verification FAILED at height=6189465 txpos=45 mode=0 err=-8
+66337:DEBUG: [zk-commit] Pending at height=6189927 txpos=28 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 mode=0 source=op_return
+66339:DEBUG: [zk-commit] Valid at height=6189927 txpos=45 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 mode=0 source=carrier_scriptsig matched_txc_txpos=28 payload_len=837 txr_txid=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269
+66340:DEBUG: [zk-commit] ZK verification PASSED at height=6189927 txpos=45 mode=0 err=0
+66341:DEBUG: [zk-commit] Reveal validated: TX_R=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 payload_len=837 mode=0 height=6189927
+
+===================== spvnode startup (first 30 lines) =====================
+[zk-vkey] loaded 3108 bytes from /tmp/zk_build/zk/verification_key.json
+Loading wallet transactions from disk...
+30 transactions loaded
+address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+----------------------
+txid:           200796e70c182e3b2b9fafba0ecb9fba7bc187c4841c0bfd126b30d9addcd6ab
+vout:           0
+address:        DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+script_pubkey:  76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+amount:         26.92500000
+height:         6173833
+confirmations:  0
+spendable:      0
+solvable:       0
+----------------------
+txid:           4385dc72645a060303b64c90d325324543a06347c40fffce9e511c1479305d66
+vout:           0
+address:        DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+script_pubkey:  76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+amount:         25.92400000
+height:         6173849
+confirmations:  0
+spendable:      0
+solvable:       0
+----------------------
+txid:           1d8b66c34bb2ae34c260c86ebbbdc862b7daaf8117dbe39da37b67cf8d75e372
+vout:           0
+address:        DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+script_pubkey:  76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+amount:         22.90400000
+
+===================== context around PASSED line (block 6189927) =====================
+c166e17a5df6a5e4230f7522797bfd090cb6f539b14c6c8d06d098fb6bc29282|6189921|2026-05-02 13:12:46|8014
+DEBUG: Start parsing 21 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 2: block
+066dd3d69ac7c8ba301b7a9669c4999fad5b80e3b9a9c90d7aa7a8e0839679a5|6189922|2026-05-02 13:13:34|24164
+DEBUG: Start parsing 51 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 2: block
+8ce52c895dd73f1b0d492a54bf6f14b83141d534d4f77504363918fc335fdf26|6189923|2026-05-02 13:13:56|1778
+DEBUG: Start parsing 4 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 2: block
+6a7220013bf0eb27a2fe26698d5929eaa206261aa34a2e856f1243bd9a336240|6189924|2026-05-02 13:15:07|12437
+DEBUG: Start parsing 39 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 2: block
+34039c7e284b713d4bed46840d4c274417ed560424121a250883ae1d7217b50a|6189925|2026-05-02 13:16:05|4118
+DEBUG: Start parsing 12 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 2: block
+035274797c1fe7800e28bd810b82ad2226eb5111ded238df9059a432358d6018|6189926|2026-05-02 13:20:14|12032
+DEBUG: Start parsing 27 transactions...
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 2: block
+f152be2c00ca1db97d6d3f9f8dcf0e8b15ec0ffbe64ce69efb8bdbd8ff6d33f2|6189927|2026-05-02 13:21:23|33197
+DEBUG: Start parsing 72 transactions...
+Found new relevant transaction: 9f7476f1d1f0ea2688bfe01df1eeef32e42752851cbda29a5c92084a2088ff7c (height: 6189927)
+DEBUG: [zk-commit] Pending at height=6189927 txpos=28 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 mode=0 source=op_return
+Found new relevant transaction: d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269 (height: 6189927)
+DEBUG: [zk-commit] Valid at height=6189927 txpos=45 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 mode=0 source=carrier_scriptsig matched_txc_txpos=28 payload_len=837 txr_txid=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269
+DEBUG: [zk-commit] ZK verification PASSED at height=6189927 txpos=45 mode=0 err=0
+DEBUG: [zk-commit] Reveal validated: TX_R=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 payload_len=837 mode=0 height=6189927
+DEBUG: done (took 0 secs)
+DEBUG: received command from node 2: block
+85f5949185d59e69a41dd724af2b0bd636379628902b28e6bf5ca905bac37f3b|6189928|2026-05-02 13:21:34|25115
+DEBUG: Start parsing 34 transactions...
+
+===================== last 10 lines of spvnode session =====================
+DEBUG: Disconnect node 14
+DEBUG: Disconnect node 15
+DEBUG: Disconnect node 16
+DEBUG: Disconnect node 17
+DEBUG: Disconnect node 19
+DEBUG: Disconnect node 20
+DEBUG: Disconnect node 23
+DEBUG: Disconnect node 24
+DEBUG: Disconnect node 25
+done
+
+===================== summary stats =====================
+total spvnode log lines: 66420
+blocks parsed:           16235
+zk-commit events:        10
+PASSED count:            1
+Reveal validated count:  1
+FAILED (negative ctrl):  2
