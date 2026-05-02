@@ -39,6 +39,8 @@ from typing import Sequence
 
 ZK_MAGIC = b"ZKP1"
 MODE_GROTH16 = 0
+MODE_PLONK = 1
+PROOF_SYSTEMS = {"groth16": MODE_GROTH16, "plonk": MODE_PLONK}
 
 
 def _require(tool: str) -> str:
@@ -73,14 +75,15 @@ def encode_payload(mode: int, circuit_id: int,
     return bytes(out)
 
 
-def run_fullprove(snarkjs: str, wasm: Path, zkey: Path, input_path: Path,
-                  proof_path: Path, public_path: Path) -> None:
-    _run([snarkjs, "groth16", "fullprove", str(input_path), str(wasm),
+def run_fullprove(snarkjs: str, system: str, wasm: Path, zkey: Path,
+                  input_path: Path, proof_path: Path, public_path: Path) -> None:
+    _run([snarkjs, system, "fullprove", str(input_path), str(wasm),
           str(zkey), str(proof_path), str(public_path)])
 
 
-def run_verify(snarkjs: str, vkey: Path, public_path: Path, proof_path: Path) -> bool:
-    res = subprocess.run([snarkjs, "groth16", "verify", str(vkey),
+def run_verify(snarkjs: str, system: str, vkey: Path,
+               public_path: Path, proof_path: Path) -> bool:
+    res = subprocess.run([snarkjs, system, "verify", str(vkey),
                           str(public_path), str(proof_path)])
     return res.returncode == 0
 
@@ -93,6 +96,11 @@ def build_payload(args: argparse.Namespace) -> bytes:
         sys.exit(f"error: wasm file not found: {wasm}")
     if not zkey.is_file():
         sys.exit(f"error: zkey file not found: {zkey}")
+
+    system = args.proof_system
+    if system not in PROOF_SYSTEMS:
+        sys.exit(f"error: unsupported --proof-system {system!r} (choose: {', '.join(PROOF_SYSTEMS)})")
+    mode = PROOF_SYSTEMS[system]
 
     with tempfile.TemporaryDirectory(prefix="zkc_") as td:
         td_p = Path(td)
@@ -111,20 +119,31 @@ def build_payload(args: argparse.Namespace) -> bytes:
                 "amount": str(args.amount),
             }))
 
-        run_fullprove(snarkjs, wasm, zkey, input_path, proof_path, public_path)
+        run_fullprove(snarkjs, system, wasm, zkey, input_path, proof_path, public_path)
 
         if args.vkey:
-            if not run_verify(snarkjs, Path(args.vkey).resolve(),
+            if not run_verify(snarkjs, system, Path(args.vkey).resolve(),
                               public_path, proof_path):
-                sys.exit("error: snarkjs groth16 verify failed — refusing to emit payload")
+                sys.exit(f"error: snarkjs {system} verify failed — refusing to emit payload")
 
         # snarkjs writes JSON; the ZKP1 payload carries it verbatim so
-        # that off-box verification ('snarkjs groth16 verify') and on-box
+        # that off-box verification ('snarkjs <system> verify') and on-box
         # verification (rapidsnark, when linked) can both consume it.
         public_bytes = public_path.read_bytes()
         proof_bytes = proof_path.read_bytes()
 
-    return encode_payload(MODE_GROTH16, args.circuit_id, public_bytes, proof_bytes)
+        # Persist the raw snarkjs proof.json / public.json next to the
+        # caller's --out-payload (when --save-proof/--save-public are
+        # provided) so the post-spvnode external verifier
+        # (`snarkjs <system> verify`) in broadcast_set.sh can be invoked
+        # end-to-end against the very same artefacts that were embedded
+        # in the on-chain ZKP1 payload.
+        if args.save_proof:
+            Path(args.save_proof).write_bytes(proof_bytes)
+        if args.save_public:
+            Path(args.save_public).write_bytes(public_bytes)
+
+    return encode_payload(mode, args.circuit_id, public_bytes, proof_bytes)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -140,6 +159,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--amount", type=int, help="private witness amount (range proof)")
     p.add_argument("--input-json", help="optional path to a circuit-specific input.json "
                                         "(overrides --low/--high/--amount)")
+    p.add_argument("--proof-system", default="groth16",
+                   choices=sorted(PROOF_SYSTEMS.keys()),
+                   help="proving system used by snarkjs fullprove/verify "
+                        "(default: groth16, also: plonk → ZKP1 mode byte 1)")
+    p.add_argument("--save-proof", help="optional path to copy the raw snarkjs proof.json "
+                                        "(used by broadcast_set.sh's post-spvnode "
+                                        "external verifier)")
+    p.add_argument("--save-public", help="optional path to copy the raw snarkjs public.json "
+                                         "(used by broadcast_set.sh's post-spvnode "
+                                         "external verifier)")
     p.add_argument("--out-payload", required=True,
                    help="where to write the hex-encoded ZKP1 payload")
     args = p.parse_args(argv)

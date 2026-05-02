@@ -107,11 +107,39 @@ RANGE_LOW="${RANGE_LOW:-0}"
 RANGE_HIGH="${RANGE_HIGH:-1000000}"
 CIRCUIT_ID="${CIRCUIT_ID:-1}"
 
+# Proof system: groth16 (default, ZKP1 mode=0) or plonk (ZKP1 mode=1).  When
+# set to plonk the script:
+#   * runs `snarkjs plonk setup` instead of the groth16 ceremony so the
+#     resulting .zkey/verification_key.json carry "protocol":"plonk";
+#   * passes --proof-system plonk to witness_helper.py, which switches
+#     snarkjs to `plonk fullprove` and stamps mode=1 in the ZKP1 payload;
+#   * after spvnode emits "[zk-commit] Reveal validated" for each pair, the
+#     post-spvnode block at the bottom of this script invokes
+#     `snarkjs plonk verify $VKEY public.json proof.json` end-to-end against
+#     the saved per-iteration proof artefacts and tees the verifier output
+#     into the curated mainnet log.  This implements the documented
+#     "external verifier invoked after spvnode validates the reveal" flow.
+PROOF_SYSTEM="${PROOF_SYSTEM:-groth16}"
+case "$PROOF_SYSTEM" in
+    groth16) ZK_MODE_BYTE=0 ;;
+    plonk)   ZK_MODE_BYTE=1 ;;
+    *) echo "[FAIL] unsupported PROOF_SYSTEM=$PROOF_SYSTEM (groth16|plonk)" >&2; exit 1 ;;
+esac
+
 # Circuit artefacts (built by contrib/zk_carrier/circuits/README.md steps).
 REPO_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
-WASM="${WASM:-$REPO_DIR/contrib/zk_carrier/circuits/build/range_proof_js/range_proof.wasm}"
-ZKEY="${ZKEY:-$REPO_DIR/contrib/zk_carrier/circuits/range_proof.zkey}"
-VKEY="${VKEY:-$REPO_DIR/contrib/zk_carrier/circuits/verification_key.json}"
+# When PROOF_SYSTEM=plonk, default the artefacts to a sibling tree so a
+# groth16 ceremony output is never silently reused as a PLONK key (the file
+# format is incompatible).  Operators can still pass explicit WASM/ZKEY/VKEY.
+if [ "$PROOF_SYSTEM" = "plonk" ]; then
+    WASM="${WASM:-$REPO_DIR/contrib/zk_carrier/circuits/build/range_proof_js/range_proof.wasm}"
+    ZKEY="${ZKEY:-$REPO_DIR/contrib/zk_carrier/circuits/build/range_proof_plonk.zkey}"
+    VKEY="${VKEY:-$REPO_DIR/contrib/zk_carrier/circuits/build/verification_key_plonk.json}"
+else
+    WASM="${WASM:-$REPO_DIR/contrib/zk_carrier/circuits/build/range_proof_js/range_proof.wasm}"
+    ZKEY="${ZKEY:-$REPO_DIR/contrib/zk_carrier/circuits/range_proof.zkey}"
+    VKEY="${VKEY:-$REPO_DIR/contrib/zk_carrier/circuits/verification_key.json}"
+fi
 
 SUCH="${SUCH:-$REPO_DIR/such}"
 SENDTX="${SENDTX:-$REPO_DIR/sendtx}"
@@ -147,7 +175,7 @@ if [ "${BOOTSTRAP:-1}" = "1" ]; then
         info "================================================================="
         ( cd "$REPO_DIR" && \
           if [ ! -f configure ]; then ./autogen.sh; fi && \
-          CONF_ARGS="--enable-test-passwd --disable-silent-rules" && \
+          CONF_ARGS="--enable-test-passwd --enable-zk-carrier --disable-silent-rules" && \
           if [ -n "${WITH_MCL:-}" ]; then CONF_ARGS="$CONF_ARGS --with-mcl=$WITH_MCL"; fi && \
           ./configure $CONF_ARGS && \
           make -j"$(nproc)" ) 2>&1 | sed 's/^/  [bootstrap build] /'
@@ -188,7 +216,7 @@ if [ "${RUN_CEREMONY:-0}" = "1" ] || [ ! -f "$WASM" ] || [ ! -f "$ZKEY" ] || [ !
     VKEY="$CEREMONY_DIR/verification_key.json"
 
     info "================================================================="
-    info "Groth16 trusted-setup ceremony — full output logged below"
+    info "$PROOF_SYSTEM trusted-setup ceremony — full output logged below"
     info "  circom:   $(circom --version 2>&1 | head -1)"
     info "  snarkjs:  $(snarkjs --version 2>&1 | head -1)"
     info "  circuit:  $CIRCUIT_SRC"
@@ -231,16 +259,25 @@ if [ "${RUN_CEREMONY:-0}" = "1" ] || [ ! -f "$WASM" ] || [ ! -f "$ZKEY" ] || [ !
         info "[ceremony] reusing $PTAU_FINAL"
     fi
 
-    info "[ceremony] snarkjs groth16 setup → $ZKEY"
-    snarkjs groth16 setup "$R1CS" "$PTAU_FINAL" "$ZKEY" 2>&1 \
-        | sed 's/^/  [snarkjs groth16 setup] /'
+    if [ "$PROOF_SYSTEM" = "plonk" ]; then
+        info "[ceremony] snarkjs plonk setup → $ZKEY"
+        snarkjs plonk setup "$R1CS" "$PTAU_FINAL" "$ZKEY" 2>&1 \
+            | sed 's/^/  [snarkjs plonk setup]   /'
+        # PLONK uses a universal/updateable trusted setup so there is no
+        # per-circuit trusted contribution step (unlike groth16 which needs
+        # `snarkjs zkey contribute`).
+    else
+        info "[ceremony] snarkjs groth16 setup → $ZKEY"
+        snarkjs groth16 setup "$R1CS" "$PTAU_FINAL" "$ZKEY" 2>&1 \
+            | sed 's/^/  [snarkjs groth16 setup] /'
 
-    info "[ceremony] snarkjs zkey contribute (final)"
-    ZKEY_FINAL="$CEREMONY_DIR/range_proof_final.zkey"
-    echo "broadcast_set zkey contribution $(date -u +%s%N) $$" \
-        | snarkjs zkey contribute "$ZKEY" "$ZKEY_FINAL" --name="auto" -v 2>&1 \
-        | sed 's/^/  [snarkjs zkey contrib]  /'
-    mv -f "$ZKEY_FINAL" "$ZKEY"
+        info "[ceremony] snarkjs zkey contribute (final)"
+        ZKEY_FINAL="$CEREMONY_DIR/range_proof_final.zkey"
+        echo "broadcast_set zkey contribution $(date -u +%s%N) $$" \
+            | snarkjs zkey contribute "$ZKEY" "$ZKEY_FINAL" --name="auto" -v 2>&1 \
+            | sed 's/^/  [snarkjs zkey contrib]  /'
+        mv -f "$ZKEY_FINAL" "$ZKEY"
+    fi
 
     info "[ceremony] snarkjs zkey export verificationkey → $VKEY"
     snarkjs zkey export verificationkey "$ZKEY" "$VKEY" 2>&1 \
@@ -427,15 +464,20 @@ for ((iter=1; iter<=N; iter++)); do
     # 1. Generate a fresh proof.  Vary --amount per iteration so each commit differs.
     AMT=$(( 42000 + iter * 1000 ))
     PAYLOAD_HEX_FILE="$ITER_DIR/payload.hex"
-    info "snarkjs prove low=$RANGE_LOW high=$RANGE_HIGH amount=$AMT"
+    PROOF_JSON_FILE="$ITER_DIR/proof.json"
+    PUBLIC_JSON_FILE="$ITER_DIR/public.json"
+    info "snarkjs $PROOF_SYSTEM prove low=$RANGE_LOW high=$RANGE_HIGH amount=$AMT"
     python3 "$WITNESS_HELPER" \
+        --proof-system "$PROOF_SYSTEM" \
         --wasm "$WASM" --zkey "$ZKEY" --vkey "$VKEY" \
         --circuit-id "$CIRCUIT_ID" \
         --low "$RANGE_LOW" --high "$RANGE_HIGH" --amount "$AMT" \
+        --save-proof  "$PROOF_JSON_FILE" \
+        --save-public "$PUBLIC_JSON_FILE" \
         --out-payload "$PAYLOAD_HEX_FILE"
     PAYLOAD_HEX=$(tr -d '[:space:]' < "$PAYLOAD_HEX_FILE")
     PAYLOAD_BYTES=$(( ${#PAYLOAD_HEX} / 2 ))
-    info "payload: $PAYLOAD_BYTES bytes"
+    info "payload: $PAYLOAD_BYTES bytes (mode=$ZK_MODE_BYTE/$PROOF_SYSTEM)"
 
     # 2. Compute commit + sanity-check off-box.
     COMMIT=$("$SUCH" $NETWORK_FLAG -c zk_commit -x "$PAYLOAD_HEX" 2>&1 \
@@ -443,8 +485,14 @@ for ((iter=1; iter<=N; iter++)); do
     [ -n "$COMMIT" ] || die "iter $iter: failed to derive commitment"
     info "commit: $COMMIT"
 
-    # 3. Compute carrier part_total from payload size (matches PQC chunk size).
-    PARTS=$(( (PAYLOAD_BYTES + 65279) / 65280 ))
+    # 3. Compute carrier part_total from payload size.  The C library splits
+    # the payload at ZK_PART_PAYLOAD_MAX bytes per part = MAX_CHUNKS(3) ×
+    # CHUNK_MAX(520) = 1560 bytes (see src/zk_carrier/zk_commit.c and
+    # include/dogecoin/pqc_carrier.h).  Using a smaller divisor here used to
+    # under-credit the carrier outputs and produce bad-txns-in-belowout txs
+    # for the bigger PLONK payloads (≈2.2 KB), so we mirror the C constant.
+    ZK_PART_PAYLOAD_MAX="${ZK_PART_PAYLOAD_MAX:-1560}"
+    PARTS=$(( (PAYLOAD_BYTES + ZK_PART_PAYLOAD_MAX - 1) / ZK_PART_PAYLOAD_MAX ))
     [ "$PARTS" -ge 1 ] || PARTS=1
     CHANGE_KOINU=$(( PREV_VAL - TX_FEE_KOINU - PARTS * CARRIER_VALUE_KOINU ))
     [ "$CHANGE_KOINU" -gt 0 ] || die "iter $iter: insufficient UTXO value (utxo=$PREV_VAL parts=$PARTS)"
@@ -456,7 +504,7 @@ for ((iter=1; iter<=N; iter++)); do
 
     # 5. Append commitment + carrier outputs.
     SUCH_OUT=$("$SUCH" $NETWORK_FLAG -c zk_add_commit_and_carrier_tx \
-        -x "$BASE_UNSIGNED" -m 0 -s "$PAYLOAD_HEX" -h "$CARRIER_VALUE_KOINU" 2>&1)
+        -x "$BASE_UNSIGNED" -m "$ZK_MODE_BYTE" -s "$PAYLOAD_HEX" -h "$CARRIER_VALUE_KOINU" 2>&1)
     echo "$SUCH_OUT" | sed 's/^/    /'
     TX_C_UNSIGNED=$(echo "$SUCH_OUT" | awk -F': ' '/^tx with commitment/ {print $2; exit}' | tr -d ' ')
     PART_TOTAL=$(echo "$SUCH_OUT" | awk -F': ' '/^zk_carrier_part_total:/ {print $2; exit}' | tr -d ' ')
@@ -542,17 +590,21 @@ info "Launching spvnode --zk-vkey $VKEY for full-set verification → $SPV_LOG"
 SPV_PID=$!
 echo "$SPV_PID" > "$WORK/spvnode.pid"
 
-# Wait until we have collected one PASSED line per pair, or the timeout fires.
+# Wait until we have collected one Reveal-validated line per pair, or the
+# timeout fires.  We use "Reveal validated" rather than "ZK verification
+# PASSED" because that line is emitted for both groth16 (PASSED) and plonk
+# (DELEGATED — verifier delegated to the external `snarkjs plonk verify`
+# step below) — exactly the post-spvnode hand-off this script implements.
 SPV_DEADLINE=$(( $(date +%s) + ${SPV_TIMEOUT:-3600} ))
 while true; do
-    PASSED_LINES=$(grep -c "ZK verification PASSED" "$SPV_LOG" 2>/dev/null | head -n1 | tr -d '[:space:]')
-    [ -z "$PASSED_LINES" ] && PASSED_LINES=0
-    if [ "$PASSED_LINES" -ge "$N" ]; then
-        success "spvnode emitted $PASSED_LINES PASSED lines (>= N=$N)"
+    VALIDATED_LINES=$(grep -c "Reveal validated" "$SPV_LOG" 2>/dev/null | head -n1 | tr -d '[:space:]')
+    [ -z "$VALIDATED_LINES" ] && VALIDATED_LINES=0
+    if [ "$VALIDATED_LINES" -ge "$N" ]; then
+        success "spvnode emitted $VALIDATED_LINES Reveal-validated lines (>= N=$N)"
         break
     fi
     if [ "$(date +%s)" -ge "$SPV_DEADLINE" ]; then
-        warn "spvnode rescan timeout: $PASSED_LINES/$N PASSED lines collected"
+        warn "spvnode rescan timeout: $VALIDATED_LINES/$N Reveal-validated lines collected"
         break
     fi
     sleep 30
@@ -561,12 +613,77 @@ kill "$SPV_PID" 2>/dev/null || true
 sleep 2
 kill -9 "$SPV_PID" 2>/dev/null || true
 
+# ----------------- Post-spvnode external verifier (PLONK / groth16) -----------
+# Per the documented flow, `snarkjs <system> verify` is the canonical
+# "external verifier".  For groth16 it is a sanity backstop (libdogecoin
+# may also have run an in-process verification when linked against
+# rapidsnark/mcl); for plonk it is the *primary* cryptographic check, and
+# it MUST be invoked end-to-end AFTER spvnode has emitted "Reveal
+# validated" for the corresponding pair.  We iterate over the manifest,
+# and for every iteration with a saved proof.json/public.json we re-run
+# the verifier against the committed verification_key.json and tee the
+# raw verifier output into the curated log so an auditor can replay it.
+EXT_VERIFY_LOG="$WORK/external_verifier.log"
+{
+    echo "==============================================================================="
+    echo "External verifier ($PROOF_SYSTEM) — invoked AFTER spvnode reveal validation"
+    echo "  vkey:  $VKEY"
+    echo "  vkey_sha256: $(sha256sum "$VKEY" | awk '{print $1}')"
+    echo "==============================================================================="
+} > "$EXT_VERIFY_LOG"
+EXT_PASS=0
+EXT_FAIL=0
+for ((iter=1; iter<=N; iter++)); do
+    ITER_DIR="$WORK/iter_${iter}"
+    PROOF_JSON="$ITER_DIR/proof.json"
+    PUBLIC_JSON="$ITER_DIR/public.json"
+    TX_R_TXID_FILE="$ITER_DIR/tx_r.txid"
+    if [ ! -f "$PROOF_JSON" ] || [ ! -f "$PUBLIC_JSON" ]; then
+        echo "[iter $iter] SKIP — saved proof/public artefacts missing" >> "$EXT_VERIFY_LOG"
+        continue
+    fi
+    TX_R_TXID=$(tr -d '[:space:]' < "$TX_R_TXID_FILE" 2>/dev/null || true)
+    SPV_REVEAL_LINE=$(grep -E "Reveal validated.*${TX_R_TXID:-DOES_NOT_MATCH}" "$SPV_LOG" 2>/dev/null | tail -n1 || true)
+    if [ -z "$SPV_REVEAL_LINE" ]; then
+        echo "[iter $iter] WARN — spvnode did not emit Reveal-validated for tx_r=$TX_R_TXID; running external verifier anyway" >> "$EXT_VERIFY_LOG"
+    else
+        echo "[iter $iter] spvnode-validated → $SPV_REVEAL_LINE" >> "$EXT_VERIFY_LOG"
+    fi
+    info "[ext-verify iter=$iter] snarkjs $PROOF_SYSTEM verify $VKEY $PUBLIC_JSON $PROOF_JSON"
+    EXT_OUT=$(snarkjs "$PROOF_SYSTEM" verify "$VKEY" "$PUBLIC_JSON" "$PROOF_JSON" 2>&1; echo "__rc=$?")
+    EXT_RC=$(echo "$EXT_OUT" | awk -F= '/^__rc=/{print $2; exit}')
+    EXT_BODY=$(echo "$EXT_OUT" | grep -v '^__rc=')
+    {
+        echo "-------------------------------------------------------------------------------"
+        echo "[iter $iter] external $PROOF_SYSTEM verify rc=$EXT_RC"
+        echo "  cmd: snarkjs $PROOF_SYSTEM verify $VKEY $PUBLIC_JSON $PROOF_JSON"
+        echo "  tx_r: $TX_R_TXID"
+        echo "  proof_sha256:  $(sha256sum "$PROOF_JSON"  | awk '{print $1}')"
+        echo "  public_sha256: $(sha256sum "$PUBLIC_JSON" | awk '{print $1}')"
+        echo "$EXT_BODY" | sed 's/^/    /'
+    } >> "$EXT_VERIFY_LOG"
+    if [ "$EXT_RC" = "0" ]; then
+        EXT_PASS=$(( EXT_PASS + 1 ))
+        success "[ext-verify iter=$iter] PASSED ($PROOF_SYSTEM)"
+    else
+        EXT_FAIL=$(( EXT_FAIL + 1 ))
+        warn "[ext-verify iter=$iter] FAILED rc=$EXT_RC ($PROOF_SYSTEM)"
+    fi
+done
+{
+    echo "==============================================================================="
+    echo "External verifier summary: PASS=$EXT_PASS FAIL=$EXT_FAIL N=$N system=$PROOF_SYSTEM"
+    echo "==============================================================================="
+} >> "$EXT_VERIFY_LOG"
+info "External verifier log: $EXT_VERIFY_LOG (PASS=$EXT_PASS FAIL=$EXT_FAIL)"
+
 # Save the curated multi-PASSED log.
 FINAL_LOG="$REPO_DIR/test-logs/mainnet_zk_carrier_e2e_set_PASSED_${TS}.txt"
 {
     echo "==============================================================================="
-    echo "ZK carrier mainnet e2e — multi-pair set (N=$N) — $(date -u)"
+    echo "ZK carrier mainnet e2e — multi-pair set (N=$N, $PROOF_SYSTEM) — $(date -u)"
     echo "Funded address: $FUNDED_ADDR"
+    echo "Proof system:   $PROOF_SYSTEM (ZKP1 mode byte = $ZK_MODE_BYTE)"
     echo "Manifest:"
     cat "$MANIFEST"
     echo
@@ -574,6 +691,11 @@ FINAL_LOG="$REPO_DIR/test-logs/mainnet_zk_carrier_e2e_set_PASSED_${TS}.txt"
     echo "spvnode [zk-commit] / [zk-vkey] lines:"
     echo "==============================================================================="
     grep -E "zk-vkey|zk-commit" "$SPV_LOG" || echo "(none captured)"
+    echo
+    echo "==============================================================================="
+    echo "Post-spvnode external verifier transcript (snarkjs $PROOF_SYSTEM verify):"
+    echo "==============================================================================="
+    cat "$EXT_VERIFY_LOG"
 } > "$FINAL_LOG"
 success "Final multi-PASSED log: $FINAL_LOG"
 info "Commit it with: git add -f \"$FINAL_LOG\" && git commit -m 'zk_carrier: mainnet e2e set log $TS'"
