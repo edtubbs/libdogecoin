@@ -67,6 +67,9 @@
 #ifdef USE_RACCOON_G
 #include <dogecoin/pqc_raccoon.h>
 #endif
+#ifdef USE_ZK_CARRIER
+#include <dogecoin/zk_carrier.h>
+#endif
 #include <event2/event.h>
 
 /* Optional liboqs (Falcon-only) presence check; compile with -DUSE_LIBOQS */
@@ -263,6 +266,49 @@ static void spv_pqc_add_pending(dogecoin_spv_client* client, spv_pqc_pending_com
 
 #endif /* USE_LIBOQS || USE_RACCOON_G (pqc pending) */
 
+#ifdef USE_ZK_CARRIER
+/* Hash table of pending TX_C OP_RETURN commitments awaiting their TX_R
+   reveal.  Mirrors the PQC g_pending_commits table (key: 32-byte commit)
+   so the SPV validator can cross-validate ZK carriers in O(1) when the
+   reveal arrives in a later block.  Kept separate from the PQC table to
+   minimise blast radius — the two key spaces are independent and combining
+   them would force every PQC enum case to also know about ZK modes. */
+typedef struct spv_zk_pending_commit {
+    uint8_t commit[32];                /* 32-byte commit hash - hash key */
+    dogecoin_zk_mode_t mode;
+    uint32_t txpos;
+    uint32_t height;                   /* block height where TX_C was seen */
+    uint8_t* txc_raw;                  /* serialized TX_C, kept for diagnostics */
+    size_t txc_raw_len;
+    UT_hash_handle hh;
+} spv_zk_pending_commit_t;
+
+static spv_zk_pending_commit_t* g_zk_pending_commits = NULL;
+
+static spv_zk_pending_commit_t* spv_zk_find_pending(const uint8_t* commit) {
+    spv_zk_pending_commit_t* found = NULL;
+    HASH_FIND(hh, g_zk_pending_commits, commit, 32, found);
+    return found;
+}
+
+static void spv_zk_add_pending(spv_zk_pending_commit_t* entry) {
+    spv_zk_pending_commit_t* existing = spv_zk_find_pending(entry->commit);
+    if (existing) {
+        HASH_DEL(g_zk_pending_commits, existing);
+        if (existing->txc_raw) dogecoin_free(existing->txc_raw);
+        dogecoin_free(existing);
+    }
+    HASH_ADD(hh, g_zk_pending_commits, commit, 32, entry);
+}
+
+static void spv_zk_remove_pending(spv_zk_pending_commit_t* entry) {
+    HASH_DEL(g_zk_pending_commits, entry);
+    if (entry->txc_raw) dogecoin_free(entry->txc_raw);
+    dogecoin_free(entry);
+}
+
+#endif /* USE_ZK_CARRIER */
+
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
 void dogecoin_net_spv_node_handshake_done(dogecoin_node *node);
@@ -431,6 +477,11 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->smpv_ctx = NULL;
     client->smpv_enabled = false;
 
+    // ZK carrier verification key (off by default; install via
+    // dogecoin_spv_client_set_zk_vkey or spvnode --zk-vkey)
+    client->zk_vkey_blob = NULL;
+    client->zk_vkey_blob_len = 0;
+
     return client;
 }
 
@@ -544,7 +595,50 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
     }
 #endif
 
+#ifdef USE_ZK_CARRIER
+    /* Release any pending ZK carrier commits that were never matched by a TX_R */
+    {
+        spv_zk_pending_commit_t* entry;
+        spv_zk_pending_commit_t* tmp;
+        HASH_ITER(hh, g_zk_pending_commits, entry, tmp) {
+            spv_zk_remove_pending(entry);
+        }
+    }
+#endif
+
+    if (client->zk_vkey_blob) {
+        dogecoin_mem_zero(client->zk_vkey_blob, client->zk_vkey_blob_len);
+        dogecoin_free(client->zk_vkey_blob);
+        client->zk_vkey_blob = NULL;
+    }
+    client->zk_vkey_blob_len = 0;
+
     dogecoin_free(client);
+}
+
+dogecoin_bool dogecoin_spv_client_set_zk_vkey(
+    dogecoin_spv_client* client,
+    const uint8_t* vkey_blob,
+    size_t vkey_blob_len)
+{
+    if (!client) return false;
+    /* Free any previous vkey before installing a new one. */
+    if (client->zk_vkey_blob) {
+        dogecoin_mem_zero(client->zk_vkey_blob, client->zk_vkey_blob_len);
+        dogecoin_free(client->zk_vkey_blob);
+        client->zk_vkey_blob = NULL;
+        client->zk_vkey_blob_len = 0;
+    }
+    if (!vkey_blob || vkey_blob_len == 0) {
+        /* Caller asked to clear. */
+        return true;
+    }
+    uint8_t* copy = (uint8_t*)dogecoin_malloc(vkey_blob_len);
+    if (!copy) return false;
+    memcpy(copy, vkey_blob, vkey_blob_len);
+    client->zk_vkey_blob = copy;
+    client->zk_vkey_blob_len = vkey_blob_len;
+    return true;
 }
 
 /**
@@ -1180,6 +1274,301 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     }
                 }
 #endif
+
+#ifdef USE_ZK_CARRIER
+                /* --- ZK Phase 1: Detect TX_C OP_RETURN commitments --- */
+                {
+                    dogecoin_zk_mode_t zk_mode = DOGECOIN_ZK_MODE_GROTH16;
+                    uint8_t zk_commit_data[32];
+                    if (dogecoin_tx_extract_zk_commit(tx, &zk_mode, zk_commit_data)) {
+                        char zk_commit_hex[65];
+                        utils_bin_to_hex(zk_commit_data, 32, zk_commit_hex);
+                        client->nodegroup->log_write_cb("[zk-commit] Pending at height=%d txpos=%u commit=%s mode=%u source=op_return\n",
+                                                         pindex->height, i, zk_commit_hex, (unsigned)zk_mode);
+                        spv_zk_pending_commit_t* entry = dogecoin_calloc(1, sizeof(spv_zk_pending_commit_t));
+                        if (entry) {
+                            memcpy(entry->commit, zk_commit_data, 32);
+                            entry->mode = zk_mode;
+                            entry->txpos = i;
+                            entry->height = pindex->height;
+                            entry->txc_raw = dogecoin_malloc(consumedlength);
+                            if (entry->txc_raw) {
+                                memcpy(entry->txc_raw, tx_raw, consumedlength);
+                                entry->txc_raw_len = consumedlength;
+                            }
+                            spv_zk_add_pending(entry);
+                        }
+                    }
+                }
+
+                /* --- ZK Phase 2: Detect TX_R carrier scriptSigs and validate --- */
+                {
+                    uint8_t* zk_payload = NULL;
+                    size_t zk_payload_len = 0;
+                    if (dogecoin_zk_extract_carrier_payload(tx, &zk_payload, &zk_payload_len) == DOGECOIN_ZK_OK
+                        && zk_payload && zk_payload_len > 0) {
+                        /* Compute TX_R (reveal) txid for logging (display byte order) */
+                        uint256_t txr_hash;
+                        dogecoin_tx_hash(tx, txr_hash);
+                        uint8_t txr_hash_rev[32];
+                        for (int rb = 0; rb < 32; rb++) txr_hash_rev[rb] = ((uint8_t*)txr_hash)[31 - rb];
+                        char txr_txid_hex[65];
+                        utils_bin_to_hex(txr_hash_rev, 32, txr_txid_hex);
+
+                        uint8_t computed_commit[32];
+                        if (dogecoin_zk_get_commitment_hash(zk_payload, zk_payload_len, computed_commit) == DOGECOIN_ZK_OK) {
+                            char commit_hex[65];
+                            utils_bin_to_hex(computed_commit, 32, commit_hex);
+
+                            spv_zk_pending_commit_t* matched_entry = spv_zk_find_pending(computed_commit);
+                            if (matched_entry) {
+                                uint32_t matched_txpos = matched_entry->txpos;
+                                dogecoin_zk_mode_t matched_mode = matched_entry->mode;
+                                /* Mirror the PQC path above: stash txc_raw / txc_raw_len
+                                 * locally, NULL them out on the entry so spv_zk_remove_pending
+                                 * doesn't free the buffer we still need for the tx_binding
+                                 * recompute below, then drop the hash-table entry. The
+                                 * stashed buffer is freed at the end of this branch. */
+                                uint8_t* matched_txc_raw     = matched_entry->txc_raw;
+                                size_t   matched_txc_raw_len = matched_entry->txc_raw_len;
+                                matched_entry->txc_raw = NULL;
+                                matched_entry->txc_raw_len = 0;
+                                spv_zk_remove_pending(matched_entry);
+                                matched_entry = NULL; /* poison: do NOT dereference past this point. */
+
+                                client->nodegroup->log_write_cb("[zk-commit] Valid at height=%d txpos=%u commit=%s mode=%u source=carrier_scriptsig matched_txc_txpos=%u payload_len=%zu txr_txid=%s\n",
+                                                                 pindex->height, i, commit_hex, (unsigned)matched_mode, matched_txpos, zk_payload_len, txr_txid_hex);
+
+                                /* Fully decode and log every ZKP1 field for log-level auditability.
+                                   The reveal payload format is:
+                                       magic(4) || mode(1) || reserved(1) || circuit_id(4 BE) ||
+                                       public_len(2 BE) || public_inputs[public_len] ||
+                                       proof_len(4 BE)  || proof[proof_len]
+                                   Each field is dumped as hex (with an ASCII preview when the
+                                   bytes are printable, e.g. snarkjs JSON proofs). */
+                                /* tx_binding outcome:
+                                 *   0 = not checked (decode failed, no cached TX_C, sighash
+                                 *       recompute failed, or fewer than 3 public inputs —
+                                 *       legacy / payload predates tx-base binding)
+                                 *   1 = matched
+                                 *  -1 = mismatch (proof was lifted from another funding tx and
+                                 *       replayed under this commit)
+                                 *
+                                 * Threaded out of the decode block so the gating below the
+                                 * verify_proof call can refuse to log "Reveal validated" on a
+                                 * mismatch.  Without this, a replayed historic proof with the
+                                 * right commit32 would still print Reveal validated whenever
+                                 * the verifier returned DELEGATED — negating the BIP's only
+                                 * replay-protection mechanism for the no-in-process-verifier
+                                 * (mobile / spv-only) build configuration. */
+                                int zk_binding_state = 0;
+                                {
+                                    dogecoin_zk_mode_t dec_mode = (dogecoin_zk_mode_t)0;
+                                    uint32_t dec_circuit_id = 0;
+                                    const uint8_t* dec_pub = NULL; size_t dec_pub_len = 0;
+                                    const uint8_t* dec_proof = NULL; size_t dec_proof_len = 0;
+                                    const uint8_t* dec_vk = NULL; size_t dec_vk_len = 0;
+                                    if (dogecoin_zk_decode_payload(zk_payload, zk_payload_len,
+                                                                   &dec_mode, &dec_circuit_id,
+                                                                   &dec_pub, &dec_pub_len,
+                                                                   &dec_proof, &dec_proof_len,
+                                                                   &dec_vk, &dec_vk_len) == DOGECOIN_ZK_OK) {
+                                        uint8_t reserved_byte = zk_payload[DOGECOIN_ZK_CARRIER_MAGIC_LEN + 1];
+                                        const char* mode_label =
+                                            (dec_mode == DOGECOIN_ZK_MODE_GROTH16) ? "groth16-bn254" :
+                                            (dec_mode == DOGECOIN_ZK_MODE_PLONK) ? "plonk" :
+                                            (dec_mode == DOGECOIN_ZK_MODE_STARK_S2) ? "stark-s2" : "unknown";
+                                        client->nodegroup->log_write_cb(
+                                            "[zk-commit] reveal_decoded: magic=\"ZKP1\" mode=%u(%s) version=0x%02x circuit_id=0x%08x public_len=%zu proof_len=%zu vk_len=%zu total_payload_len=%zu txr_txid=%s\n",
+                                            (unsigned)dec_mode, mode_label, (unsigned)reserved_byte,
+                                            (unsigned)dec_circuit_id, dec_pub_len, dec_proof_len,
+                                            dec_vk_len, zk_payload_len, txr_txid_hex);
+
+                                        /* Helper: dump up to N bytes as hex + ASCII preview onto the log. */
+                                        #define ZK_LOG_DUMP_FIELD(label, ptr, len) do { \
+                                            const uint8_t* _p = (const uint8_t*)(ptr); size_t _l = (size_t)(len); \
+                                            size_t _hex_max = 256; /* full dump up to 256 bytes; head+tail beyond */ \
+                                            if (_l == 0) { \
+                                                client->nodegroup->log_write_cb("[zk-commit] reveal_decoded.%s: len=0 (empty)\n", (label)); \
+                                            } else if (_l <= _hex_max) { \
+                                                char* _hex = (char*)dogecoin_calloc(1, _l * 2 + 1); \
+                                                char* _asc = (char*)dogecoin_calloc(1, _l + 1); \
+                                                if (_hex && _asc) { \
+                                                    utils_bin_to_hex((unsigned char*)_p, _l, _hex); \
+                                                    int _printable = 1; \
+                                                    for (size_t _ai = 0; _ai < _l; _ai++) { \
+                                                        unsigned char _c = _p[_ai]; \
+                                                        if (_c == '\n' || _c == '\t' || _c == '\r') _asc[_ai] = ' '; \
+                                                        else if (_c >= 0x20 && _c < 0x7f) _asc[_ai] = (char)_c; \
+                                                        else { _asc[_ai] = '.'; _printable = 0; } \
+                                                    } \
+                                                    if (_printable) { \
+                                                        client->nodegroup->log_write_cb("[zk-commit] reveal_decoded.%s: len=%zu hex=%s ascii=\"%s\"\n", (label), _l, _hex, _asc); \
+                                                    } else { \
+                                                        client->nodegroup->log_write_cb("[zk-commit] reveal_decoded.%s: len=%zu hex=%s\n", (label), _l, _hex); \
+                                                    } \
+                                                } \
+                                                dogecoin_free(_hex); dogecoin_free(_asc); \
+                                            } else { \
+                                                /* Long field: emit head+tail hex (64 bytes each) plus ASCII head. */ \
+                                                size_t _head = 64, _tail = 64; \
+                                                char _hh[129] = {0}; char _tt[129] = {0}; \
+                                                utils_bin_to_hex((unsigned char*)_p, _head, _hh); \
+                                                utils_bin_to_hex((unsigned char*)(_p + _l - _tail), _tail, _tt); \
+                                                size_t _ascii_n = _l < 96 ? _l : 96; \
+                                                char _asc[97] = {0}; int _printable = 1; \
+                                                for (size_t _ai = 0; _ai < _ascii_n; _ai++) { \
+                                                    unsigned char _c = _p[_ai]; \
+                                                    if (_c == '\n' || _c == '\t' || _c == '\r') _asc[_ai] = ' '; \
+                                                    else if (_c >= 0x20 && _c < 0x7f) _asc[_ai] = (char)_c; \
+                                                    else { _asc[_ai] = '.'; _printable = 0; } \
+                                                } \
+                                                if (_printable) { \
+                                                    client->nodegroup->log_write_cb("[zk-commit] reveal_decoded.%s: len=%zu hex_head=%s hex_tail=%s ascii_head=\"%s\"\n", (label), _l, _hh, _tt, _asc); \
+                                                } else { \
+                                                    client->nodegroup->log_write_cb("[zk-commit] reveal_decoded.%s: len=%zu hex_head=%s hex_tail=%s\n", (label), _l, _hh, _tt); \
+                                                } \
+                                            } \
+                                        } while (0)
+
+                                        ZK_LOG_DUMP_FIELD("public_inputs", dec_pub, dec_pub_len);
+                                        ZK_LOG_DUMP_FIELD("proof", dec_proof, dec_proof_len);
+                                        if (dec_vk_len > 0) {
+                                            ZK_LOG_DUMP_FIELD("vk", dec_vk, dec_vk_len);
+                                        }
+
+                                        /* tx_binding replay-protection check.
+                                         * Mirroring the PQC carrier model where the signature is
+                                         * over a tx_base sighash, the ZK proof's third snarkjs
+                                         * public input is the same tx_base sighash (zero-top-byte
+                                         * 248-bit BN254 field element).  Recompute it from the
+                                         * matched TX_C bytes the SPV node cached during phase-1
+                                         * pending-commit detection, parse the third element of the
+                                         * snarkjs public.json array out of `dec_pub`, and compare.
+                                         * A mismatch means the proof was lifted from another
+                                         * funding tx and replayed under this commit — we log it
+                                         * loudly so the operator (and any external auditor) can
+                                         * see the binding match independent of the snarkjs verify
+                                         * step. */
+                                        if (matched_txc_raw && matched_txc_raw_len > 0) {
+                                            dogecoin_tx* txc = dogecoin_tx_new();
+                                            size_t txc_consumed = 0;
+                                            if (txc && dogecoin_tx_deserialize(matched_txc_raw, matched_txc_raw_len, txc, &txc_consumed)) {
+                                                cstring* signer_spk = dogecoin_zk_extract_signer_p2pkh_spk(txc);
+                                                cstring* carrier_spk = NULL;
+                                                /* Re-derive the canonical 23-byte P2SH carrier spk for
+                                                 * the matched payload.  The carrier scriptPubKey is
+                                                 * payload-independent — it only depends on the fixed
+                                                 * carrier redeem script — so build it directly via the
+                                                 * PQC helpers instead of allocating a throwaway tx and
+                                                 * appending OP_RETURN + 0-value P2SH outputs to it. */
+                                                cstring* carrier_redeem = NULL;
+                                                if (dogecoin_pqc_carrier_build_redeemscript(&carrier_redeem) && carrier_redeem) {
+                                                    if (!dogecoin_pqc_carrier_build_p2sh_scriptpubkey(carrier_redeem, &carrier_spk)) {
+                                                        carrier_spk = NULL;
+                                                    }
+                                                    cstr_free(carrier_redeem, true);
+                                                }
+                                                if (signer_spk && carrier_spk) {
+                                                    uint8_t recomputed[32];
+                                                    if (dogecoin_zk_compute_tx_base_sighash(txc, signer_spk, carrier_spk, recomputed) == DOGECOIN_ZK_OK) {
+                                                        char recomputed_hex[65] = {0};
+                                                        utils_bin_to_hex(recomputed, 32, recomputed_hex);
+                                                        /* Parse the snarkjs public-inputs array and pick out the
+                                                         * 3rd quoted string (index 2) — the canonical tx_binding
+                                                         * field element, see the BIP §"Phase 1: Base Transaction
+                                                         * Binding".  Layout: ["...","...","<decimal>"]. */
+                                                        uint8_t parsed[32] = {0};
+                                                        size_t binding_token_count = 0;
+                                                        dogecoin_zk_err_t bind_e = dogecoin_zk_parse_public_input_be32(
+                                                            dec_pub, dec_pub_len, 2, parsed, &binding_token_count);
+                                                        if (bind_e == DOGECOIN_ZK_OK) {
+                                                            char parsed_hex[65] = {0};
+                                                            utils_bin_to_hex(parsed, 32, parsed_hex);
+                                                            int match = (memcmp(parsed, recomputed, 32) == 0);
+                                                            zk_binding_state = match ? 1 : -1;
+                                                            client->nodegroup->log_write_cb(
+                                                                "[zk-commit] tx_binding %s txr_txid=%s recomputed=%s public_input[2]=%s\n",
+                                                                match ? "match" : "mismatch",
+                                                                txr_txid_hex, recomputed_hex, parsed_hex);
+                                                        } else {
+                                                            client->nodegroup->log_write_cb(
+                                                                "[zk-commit] tx_binding skipped: expected >=3 public inputs (got %zu) — payload predates tx-base binding\n",
+                                                                binding_token_count);
+                                                        }
+                                                    } else {
+                                                        client->nodegroup->log_write_cb(
+                                                            "[zk-commit] tx_binding skipped: tx_base sighash recompute failed for txr_txid=%s\n",
+                                                            txr_txid_hex);
+                                                    }
+                                                } else {
+                                                    client->nodegroup->log_write_cb(
+                                                        "[zk-commit] tx_binding skipped: cannot extract signer/carrier spk from cached TX_C (txr_txid=%s)\n",
+                                                        txr_txid_hex);
+                                                }
+                                                if (signer_spk) cstr_free(signer_spk, true);
+                                                if (carrier_spk) cstr_free(carrier_spk, true);
+                                            }
+                                            if (txc) dogecoin_tx_free(txc);
+                                        }
+
+                                        #undef ZK_LOG_DUMP_FIELD
+                                    } else {
+                                        client->nodegroup->log_write_cb(
+                                            "[zk-commit] reveal_decoded: decode_failed payload_len=%zu txr_txid=%s\n",
+                                            zk_payload_len, txr_txid_hex);
+                                    }
+                                }
+
+                                /* In-process proof verification when libdogecoin was built with
+                                   rapidsnark (HAVE_RAPIDSNARK).  Without it, the verifier returns
+                                   DOGECOIN_ZK_ERR_NOT_IMPLEMENTED / DELEGATED — log that explicitly
+                                   so the demo script can detect either outcome. */
+                                dogecoin_zk_err_t verify_e = dogecoin_zk_verify_proof(
+                                    zk_payload, zk_payload_len,
+                                    client->zk_vkey_blob, client->zk_vkey_blob_len);
+                                const char* verify_status =
+                                    (verify_e == DOGECOIN_ZK_OK) ? "PASSED" :
+                                    (verify_e == DOGECOIN_ZK_ERR_VERIFY_FAIL) ? "FAILED" :
+                                    (verify_e == DOGECOIN_ZK_ERR_NOT_IMPLEMENTED ||
+                                     verify_e == DOGECOIN_ZK_ERR_DELEGATED) ? "DELEGATED" :
+                                    "ERROR";
+                                client->nodegroup->log_write_cb("[zk-commit] ZK verification %s at height=%d txpos=%u mode=%u err=%d\n",
+                                    verify_status, pindex->height, i, (unsigned)matched_mode, (int)verify_e);
+
+                                /* Reveal succeeds when the proof verified in-process, OR
+                                   verification was delegated and the on-chain commit matched.
+                                   When the binding check ran AND came back as a mismatch we
+                                   refuse to log Reveal validated regardless of verify_e — a
+                                   binding mismatch means the proof was lifted from another
+                                   funding tx and replayed under this commit, which is the one
+                                   thing this SPV-side check exists to catch.  When the binding
+                                   check was skipped (legacy payload, decode failure, or the
+                                   cached TX_C wasn't available) we fall back to the previous
+                                   behaviour so v0 / pre-binding payloads still validate. */
+                                if ((verify_e == DOGECOIN_ZK_OK ||
+                                     verify_e == DOGECOIN_ZK_ERR_NOT_IMPLEMENTED ||
+                                     verify_e == DOGECOIN_ZK_ERR_DELEGATED) &&
+                                    zk_binding_state >= 0) {
+                                    client->nodegroup->log_write_cb("[zk-commit] Reveal validated: TX_R=%s commit=%s payload_len=%zu mode=%u height=%d\n",
+                                        txr_txid_hex, commit_hex, zk_payload_len, (unsigned)matched_mode, pindex->height);
+                                } else if (zk_binding_state < 0) {
+                                    client->nodegroup->log_write_cb("[zk-commit] Reveal REJECTED (tx_binding mismatch): TX_R=%s commit=%s payload_len=%zu mode=%u height=%d\n",
+                                        txr_txid_hex, commit_hex, zk_payload_len, (unsigned)matched_mode, pindex->height);
+                                }
+
+                                /* Release the cached TX_C buffer we stashed before
+                                 * spv_zk_remove_pending freed the hash-table entry. */
+                                if (matched_txc_raw) dogecoin_free(matched_txc_raw);
+                            } else {
+                                client->nodegroup->log_write_cb("[zk-commit] Unmatched at height=%d txpos=%u commit=%s payload_len=%zu source=carrier_scriptsig txr_txid=%s\n",
+                                                                 pindex->height, i, commit_hex, zk_payload_len, txr_txid_hex);
+                            }
+                        }
+                        dogecoin_free(zk_payload);
+                    }
+                }
+#endif /* USE_ZK_CARRIER */
                 
                 total_tx_size += consumedlength;
 
