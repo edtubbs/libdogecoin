@@ -1,0 +1,677 @@
+===============================================================================
+ZK CARRIER MAINNET END-TO-END FULL PIPELINE LOG
+Started: Sat May  2 04:40:33 UTC 2026
+Branch:  copilot/edtubbs-015-dev-pqc-zk-carrier
+Address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+Funding: 4a8038f7c0a57500864baab92fc0b025db4fa57507796f1c7a57d065af625e79:0 (1.96 DOGE)
+===============================================================================
+circom_runtime
+circomlib
+---
+README.md
+aliascheck.circom
+babyjub.circom
+binsub.circom
+binsum.circom
+
+=== STEP 1: Compile range_proof.circom → r1cs + wasm ===
+Sat May  2 04:40:39 UTC 2026
+[0m[1m[38;5;9merror[P1014][0m[1m:  The file circomlib/comparators.circom to be included has not been found[0m
+ [0m[34m=[0m Consider using compilation option -l to indicate include paths
+
+[31mprevious errors were found[0m
+--- compile output dir ---
+ls: cannot access 'build/range_proof_js/': No such file or directory
+build/:
+pragma circom 2.1.6;
+
+/*
+ * Range proof: prove that `low <= amount <= high`, with `low` and `high`
+ * public and `amount` private.  Used by the ZK carrier demo to prove that a
+ * UTXO's value falls inside a committed-to band, without revealing the
+ * exact value.
+ *
+ * Bound: 64-bit unsigned (sufficient for koinu / 2^64-1).
+ *
+
+=== STEP 1 (retry with -l inc): Compile range_proof.circom ===
+Sat May  2 04:40:46 UTC 2026
+[32mtemplate instances[0m: 4
+non-linear constraints: 130
+linear constraints: 8
+public inputs: 2
+private inputs: 1
+public outputs: 0
+wires: 138
+labels: 148
+[32mWritten successfully:[0m build/range_proof.r1cs
+[32mWritten successfully:[0m build/range_proof.sym
+[32mWritten successfully:[0m build/range_proof_js/range_proof.wasm
+[32mEverything went okay[0m
+--- output ---
+build/:
+total 44
+drwxr-xr-x 3 runner runner  4096 May  2 04:40 .
+drwxr-xr-x 5 runner runner  4096 May  2 04:40 ..
+-rw-r--r-- 1 runner runner 22240 May  2 04:40 range_proof.r1cs
+-rw-r--r-- 1 runner runner  4963 May  2 04:40 range_proof.sym
+drwxr-xr-x 2 runner runner  4096 May  2 04:40 range_proof_js
+
+build/range_proof_js/:
+total 64
+drwxr-xr-x 2 runner runner  4096 May  2 04:40 .
+drwxr-xr-x 3 runner runner  4096 May  2 04:40 ..
+-rw-r--r-- 1 runner runner   697 May  2 04:40 generate_witness.js
+-rw-r--r-- 1 runner runner 37814 May  2 04:40 range_proof.wasm
+-rw-r--r-- 1 runner runner 10454 May  2 04:40 witness_calculator.js
+
+=== STEP 2: Powers of Tau (12 = 2^12 = 4096 constraints, plenty for 138-wire range proof) ===
+Sat May  2 04:40:57 UTC 2026
+[36;22m[DEBUG] [39;1msnarkJS[0m: Blank Contribution Hash:
+		786a02f7 42015903 c6c6fd85 2552d272
+		912f4740 e1584761 8a86e217 f71f5419
+		d25e1031 afee5853 13896444 934eb04b
+		903a685b 1448b755 d56f701a fe9be2ce
+[32;22m[INFO]  [39;1msnarkJS[0m: First Contribution Hash:
+		9e63a5f6 2b96538d aaed2372 481920d1
+		a40b9195 9ea38ef9 f5f6a303 3b886516
+		0710d067 c09d0961 5f928ea5 17bcdf49
+		ad75abd2 c8340b40 0e3b18e9 68b4ffef
+OK new
+[32;22m[INFO]  [39;1msnarkJS[0m: Next Challenge Hash: 
+		fb71462f b9c8f7af 26185da2 63030637
+		4ec9df15 b93a5611 8a17e886 be6ded22
+		ccbe0125 f84129a8 85102576 3169beb2
+		f6e836ed 1b1eb4ee 597cf62d 494f9982
+OK contribute
+[36;22m[DEBUG] [39;1msnarkJS[0m: betaTauG1: fft 12 join  11/12  2/2 0/1
+[36;22m[DEBUG] [39;1msnarkJS[0m: betaTauG1: fft 12 join  11/12  1/2 0/1
+[36;22m[DEBUG] [39;1msnarkJS[0m: betaTauG1: fft  12  join: 12/12
+[36;22m[DEBUG] [39;1msnarkJS[0m: betaTauG1: fft 12 join  12/12  1/1 1/2
+[36;22m[DEBUG] [39;1msnarkJS[0m: betaTauG1: fft 12 join  12/12  1/1 0/2
+OK phase2
+-rw-r--r-- 1 runner runner 1573072 May  2 04:40 pot12_0000.ptau
+-rw-r--r-- 1 runner runner 1574607 May  2 04:41 pot12_0001.ptau
+-rw-r--r-- 1 runner runner 4720063 May  2 04:41 pot12_final.ptau
+
+=== STEP 3: Groth16 setup → zkey + verification_key.json ===
+Sat May  2 04:42:00 UTC 2026
+		e23ad9c2 a972b5b6 d3181c21 483cbdfa
+		8a652bd2 4a024d60 f538bd81 435a07d7
+		1c8beb05 cdd32475 d5ac1b68 63cf03ff
+		f2f2044a aeef1c6b 8ff3a16c 4faa2894
+		b7bdd9fb b8fe9f49 c3e7d2eb 23983009
+		76d8c4e6 85b05f75 43e96732 2365ef1c
+[32;22m[INFO]  [39;1msnarkJS[0m: EXPORT VERIFICATION KEY STARTED
+[32;22m[INFO]  [39;1msnarkJS[0m: > Detected protocol: groth16
+[32;22m[INFO]  [39;1msnarkJS[0m: EXPORT VERIFICATION KEY FINISHED
+--- artifacts ---
+-rw-r--r-- 1 runner runner 79128 May  2 04:42 range_proof.zkey
+-rw-r--r-- 1 runner runner 78704 May  2 04:42 range_proof_0000.zkey
+-rw-r--r-- 1 runner runner  3105 May  2 04:42 verification_key.json
+--- vkey size ---
+3105 verification_key.json
+
+=== STEP 4: Install mcl headers + libmcl.a to /tmp/zk_build/mcl-install ===
+Sat May  2 04:42:14 UTC 2026
+g++ -o lib/libmcl.so obj/fp.o obj/base64.o obj/bint64.o obj/msm_avx.o -shared  -g3 -Wall -Wextra -Wformat=2 -Wcast-qual -Wcast-align -Wwrite-strings -Wfloat-equal -Wpointer-arith -Wundef -m64 -I include -I test -fomit-frame-pointer -DNDEBUG -fno-stack-protector -O3  -fpic -DMCL_USE_LLVM=1 -DMCL_BINT_ASM=1 -DMCL_MSM=1 
+mkdir -p /tmp/zk_build/mcl-install/include/mcl
+cp -a include/mcl /tmp/zk_build/mcl-install/include/
+cp -a include/cybozu /tmp/zk_build/mcl-install/include/
+mkdir -p /tmp/zk_build/mcl-install/lib
+cp -a lib/libmcl.a lib/libmcl.so /tmp/zk_build/mcl-install/lib/
+--- installed ---
+/tmp/zk_build/mcl-install/include/mcl:
+aggregate_sig.hpp
+array.hpp
+bint.hpp
+bint_proto.hpp
+bls12_381.hpp
+bn.h
+bn.hpp
+bn256.hpp
+bn384.hpp
+bn512.hpp
+bn_c256.h
+bn_c384.h
+bn_c384_256.h
+config.hpp
+conversion.hpp
+curve_type.h
+ec.hpp
+ecdsa.h
+ecdsa.hpp
+
+=== STEP 5: Configure libdogecoin with --with-mcl + --enable-zk-carrier ===
+Sat May  2 04:42:19 UTC 2026
+checking if gcc PIC flag -fPIC -DPIC works... yes
+checking if gcc static flag -static works... yes
+checking if gcc supports -c -o file.o... yes
+checking if gcc supports -c -o file.o... (cached) yes
+checking whether the gcc linker (/usr/bin/ld -m elf_x86_64) supports shared libraries... yes
+checking whether -lc should be explicitly linked in... no
+checking dynamic linker characteristics... GNU/Linux ld.so
+checking how to hardcode library paths into programs... immediate
+checking whether stripping libraries is possible... yes
+checking if libtool supports shared libraries... yes
+checking whether to build shared libraries... yes
+checking whether to build static libraries... yes
+checking how to run the C++ preprocessor... g++ -E
+checking for ld used by g++... /usr/bin/ld -m elf_x86_64
+checking if the linker (/usr/bin/ld -m elf_x86_64) is GNU ld... yes
+checking whether the g++ linker (/usr/bin/ld -m elf_x86_64) supports shared libraries... yes
+checking for g++ option to produce PIC... -fPIC -DPIC
+checking if g++ PIC flag -fPIC -DPIC works... yes
+checking if g++ static flag -static works... yes
+checking if g++ supports -c -o file.o... yes
+checking if g++ supports -c -o file.o... (cached) yes
+checking whether the g++ linker (/usr/bin/ld -m elf_x86_64) supports shared libraries... yes
+checking dynamic linker characteristics... (cached) GNU/Linux ld.so
+checking how to hardcode library paths into programs... immediate
+checking if gcc supports -std=gnu99 -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings... yes
+checking for __builtin_expect... yes
+checking for gcc options needed to detect all undeclared functions... none needed
+checking whether daemon is declared... yes
+checking for event2/event.h... no
+configure: error: libevent headers missing
+
+=== STEP 5a: install libevent-dev ===
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+
+=== STEP 5b: configure (retry) ===
+Sat May  2 04:42:35 UTC 2026
+  ARMv8 crypto    = no
+  ARMv8.2 crypto  = no
+
+  test password   = yes
+                    KRmx4dQo3h9I
+
+  openenclave     = no
+  optee           = no
+  Yubikey         = no
+  liboqs          = no
+  liboqs-raccoon  = no
+  zk-carrier      = yes
+  rapidsnark      = no
+
+  host            = x86_64-pc-linux-gnu
+  target os       = linux
+  nasm flags      = -Werror -felf64 -Xgnu -gdwarf -DLINUX -D__linux__
+
+  CC              = gcc
+  CFLAGS          = -g -O2 -W -std=gnu99 -pedantic -Wall -Wextra -Wno-long-long -Wno-overlength-strings
+  CXX             = g++
+  CXXFLAGS        = -g -O2
+  LDFLAGS         = 
+  LIBS            =  -levent -levent_core -levent_extra  -L/tmp/zk_build/mcl-install/lib -lmcl -lstdc++
+
+
+=== STEP 6: make -j4 such sendtx spvnode ===
+Sat May  2 04:42:51 UTC 2026
+  CC       src/libdogecoin_la-seal.lo
+  CC       src/libdogecoin_la-sign.lo
+  CC       src/libdogecoin_la-serialize.lo
+  CC       src/libdogecoin_la-sha2.lo
+  CC       src/libdogecoin_la-smpv.lo
+  CC       src/cli/libdogecoin_la-tool.lo
+  CC       src/libdogecoin_la-transaction.lo
+  CC       src/libdogecoin_la-tx.lo
+  CC       src/libdogecoin_la-utf8proc.lo
+  CC       src/libdogecoin_la-utils.lo
+  CC       src/libdogecoin_la-validation.lo
+  CC       src/libdogecoin_la-vector.lo
+  CC       src/libdogecoin_la-pqc_carrier.lo
+  CC       src/zk_carrier/libdogecoin_la-zk_carrier.lo
+  CC       src/zk_carrier/libdogecoin_la-zk_commit.lo
+  CC       src/zk_carrier/libdogecoin_la-zk_groth16.lo
+  CC       src/zk_carrier/libdogecoin_la-zk_plonk.lo
+  CC       src/zk_carrier/libdogecoin_la-zk_stark.lo
+  CXX      src/zk_carrier/libdogecoin_la-zk_groth16_mcl.lo
+  CC       src/logdb/libdogecoin_la-logdb_core.lo
+  CC       src/logdb/libdogecoin_la-logdb_memdb_llist.lo
+  CC       src/logdb/libdogecoin_la-logdb_memdb_rbtree.lo
+  CC       src/logdb/libdogecoin_la-logdb_rec.lo
+  CC       src/logdb/libdogecoin_la-misc.lo
+  CC       src/logdb/libdogecoin_la-red_black_tree.lo
+  CC       src/logdb/libdogecoin_la-stack.lo
+  CXXLD    libdogecoin.la
+  CCLD     sendtx
+  CCLD     such
+  CCLD     spvnode
+---
+-rwxr-xr-x 1 runner runner 1838672 May  2 04:43 sendtx
+-rwxr-xr-x 1 runner runner 5778824 May  2 04:43 spvnode
+-rwxr-xr-x 1 runner runner 3520424 May  2 04:43 such
+=== link symbol check ===
+00000000000baf30 t _ZZ18groth16_verify_mclENKUlPKcRN3mcl3EcTINS1_4Fp2TINS1_3FpTINS1_2bn5local5FpTagELm256EEEEENS4_INS6_5FrTagELm256EEEEEE_clES0_SD_
+000000000007f716 t _ZZ18groth16_verify_mclENKUlPKcRN3mcl3EcTINS1_4Fp2TINS1_3FpTINS1_2bn5local5FpTagELm256EEEEENS4_INS6_5FrTagELm256EEEEEE_clES0_SD_.cold
+000000000009a2b0 T dogecoin_spv_client_set_zk_vkey
+00000000000b9160 T dogecoin_zk_verify_proof
+00000000000bb880 T groth16_verify_mcl
+000000000007f7f5 t groth16_verify_mcl.cold
+
+=== STEP 7: Generate Groth16 witness + proof for fresh range_proof (low=0, high=1000000, amount=43000) ===
+Sat May  2 04:43:28 UTC 2026
++ /tmp/zk_build/zk/node_modules/.bin/snarkjs groth16 fullprove /tmp/zkc_t_zsq1ty/input.json /tmp/zk_build/zk/build/range_proof_js/range_proof.wasm /tmp/zk_build/zk/range_proof.zkey /tmp/zkc_t_zsq1ty/proof.json /tmp/zkc_t_zsq1ty/public.json
+[32;22m[INFO]  [39;1msnarkJS[0m: OK!
+wrote 843-byte ZKP1 payload to /tmp/zk_build/zk/payload.hex
+--- payload size ---
+1686 /tmp/zk_build/zk/payload.hex
+--- snarkjs verify (off-box) ---
+  syscall: 'open',
+  path: '/tmp/zk_build/zk/public.json'
+}
+
+=== STEP 8: such -c zk_commit (derive commit hash) ===
+Sat May  2 04:43:35 UTC 2026
+payload bytes: 843
+
+=== ZK Carrier Commitment ===
+mode:        0
+circuit_id:  0x00000001
+commitment:  c4113c4b78c8822fa1b656a61490d43828e63f6a8d637901a3367967873ba58f
+opreturn_spk: 6a25445a4b4300c4113c4b78c8822fa1b656a61490d43828e63f6a8d637901a3367967873ba58f
+
+=== STEP 9: Build TX_C base unsigned (1 input from 4a8038f7c0a57500864baab92fc0b025db4fa57507796f1c7a57d065af625e79:0, change=94000000 koinu) ===
+Sat May  2 04:43:56 UTC 2026
+base_unsigned: 0100000001795e62af65d0577a1c6f790775a54fdb25b0c02fb9aa4b860075a5c0f738804a0000000000ffffffff0180539a05000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac00000000
+
+=== STEP 10: Append OP_RETURN commitment + carrier P2SH outputs (such -c zk_add_commit_and_carrier_tx) ===
+tx with commitment and carrier outputs: 0100000001795e62af65d0577a1c6f790775a54fdb25b0c02fb9aa4b860075a5c0f738804a0000000000ffffffff0380539a05000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac0000000000000000276a25445a4b4300c4113c4b78c8822fa1b656a61490d43828e63f6a8d637901a3367967873ba58f00e1f5050000000017a9149b402803555511d15d81207d3e2cb3e6bc365e0e8700000000
+zk_carrier_part_total: 1
+zk_carrier_output_value_koinu: 100000000
+zk_carrier_first_vout: 2
+zk_opreturn_vout: 1
+zk_carrier_p2sh_scriptpubkey: a9149b402803555511d15d81207d3e2cb3e6bc365e0e87
+zk_carrier_part_scriptsig[0]: 085a4b503146554c4c08010001000014034b4d08025a4b503100000000000100145b0a202230222c0a202231303030303030220a5d000003277b0a202270695f61223a205b0a2020223230343638383538323238343433343431363037323534383730373239313234393338323532383030373132363330373935313533313437323336353839323737313034373534373130343432222c0a20202236353236343735313235363031313635373734383237373031363431373735353339353633343236323032323333343338323331353634343538373737393631363131303636323038343732222c0a20202231220a205d2c0a202270695f62223a205b0a20205b0a202020223138333237373035303938353031393832313231323636373036353437393538323236343435303034343931383134313630353030393733333437333130333433393537363835353739343938222c0a202020223137343436353637343833303434383138313533323035393336363333363731373736353238343931353731353635313632343934323138343932393436353437393034393136343634393332220a20205d2c0a20205b0a202020223135383130313937353034353736323136363332383132393636313233363730303534363830363235343832303231373833363037343931383336303631313237313833333036313234363333222c0a2020202238343531353037353738343132393038344d43013534303436383131363236323230303535353433303338363133343130363431353135333835373932363735353338353939313335333130383137220a20205d2c0a20205b0a2020202231222c0a2020202230220a20205d0a205d2c0a202270695f63223a205b0a2020223135373930313531353533353135303938323737303533363937333835333737343930383238333838343737383833373037383433353132343938363931363131353838333334383639353034222c0a2020223137373834313232373930353332323532323538303435313437363034333634383637393936363639303230313330353939333232383236383639393233373138343839363133373036383030222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d0006757575757551
+
+=== STEP 11: such -c sign TX_C input 0 with funded WIF ===
+Sat May  2 04:44:09 UTC 2026
+script: 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+script-type: TX_PUBKEYHASH
+inputindex: 0
+sighashtype: 1
+hash: 6bdf6dd30b1d774bc8934e29e81f7c836b836aba85d1071e46ee1b2504811097
+
+Signature created:
+signature compact: aaf2fe387587b4bf4efe05ee2e73af5db6935c7967122912dcb5140fceb4fc240c445e999954fda583fc656c793b03b2a7ec4a03b0c2eed95951f0bedb06bf99
+signature DER (+hashtype): 3045022100aaf2fe387587b4bf4efe05ee2e73af5db6935c7967122912dcb5140fceb4fc2402200c445e999954fda583fc656c793b03b2a7ec4a03b0c2eed95951f0bedb06bf9901
+signed TX: 0100000001795e62af65d0577a1c6f790775a54fdb25b0c02fb9aa4b860075a5c0f738804a000000006b483045022100aaf2fe387587b4bf4efe05ee2e73af5db6935c7967122912dcb5140fceb4fc2402200c445e999954fda583fc656c793b03b2a7ec4a03b0c2eed95951f0bedb06bf99012103c15308abaf34326d0274d022c70cd15db84809822154dc894001066ce6b97482ffffffff0380539a05000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac0000000000000000276a25445a4b4300c4113c4b78c8822fa1b656a61490d43828e63f6a8d637901a3367967873ba58f00e1f5050000000017a9149b402803555511d15d81207d3e2cb3e6bc365e0e8700000000
+
+=== STEP 12: sendtx broadcast TX_C to mainnet ===
+Sat May  2 04:44:09 UTC 2026
+input[0] scriptsig_len: 107
+Start broadcasting transaction: e433d2ba53d6f12bba450753f077e4f933e8020f89fe08e462b6517a284d2e96 with timeout 30 seconds
+Trying to connect to nodes...
+DEBUG: Trying to connect to 1...
+DEBUG: Trying to connect to 2...
+DEBUG: Trying to connect to 3...
+DEBUG: Trying to connect to 4...
+DEBUG: Trying to connect to 5...
+DEBUG: Trying to connect to 6...
+DEBUG: Trying to connect to 7...
+DEBUG: Trying to connect to 8...
+DEBUG: Trying to connect to 9...
+DEBUG: Trying to connect to 10...
+DEBUG: Trying to connect to 11...
+DEBUG: Trying to connect to 12...
+DEBUG: Trying to connect to 13...
+DEBUG: Trying to connect to 14...
+DEBUG: Trying to connect to 15...
+DEBUG: Trying to connect to 16...
+DEBUG: Trying to connect to 17...
+DEBUG: Trying to connect to 18...
+DEBUG: Trying to connect to 19...
+DEBUG: Trying to connect to 20...
+DEBUG: Trying to connect to 21...
+DEBUG: Trying to connect to 22...
+DEBUG: Trying to connect to 23...
+DEBUG: Trying to connect to 24...
+DEBUG: Trying to connect to 25...
+DEBUG: Event callback on node 1
+DEBUG: Successful connected to node 1.
+DEBUG: sending message to node 1: version
+DEBUG: Connected nodes: 1
+DEBUG: received command from node 1: version
+DEBUG: Connected to node 1: /Shibetoshi:1.14.9/ (6189445)
+DEBUG: sending message to node 1: verack
+DEBUG: received command from node 1: verack
+Successfully connected to peer 1 (66.151.242.154)
+DEBUG: sending message to node 1: inv
+DEBUG: received command from node 1: sendheaders
+DEBUG: received command from node 1: sendcmpct
+
+=== STEP 12 (cont): Final sendtx output for TX_C ===
+DEBUG: Trying to connect to 13...
+DEBUG: Trying to connect to 14...
+DEBUG: Trying to connect to 15...
+DEBUG: Trying to connect to 16...
+DEBUG: Trying to connect to 17...
+DEBUG: Trying to connect to 18...
+DEBUG: Trying to connect to 19...
+DEBUG: Trying to connect to 20...
+DEBUG: Trying to connect to 21...
+DEBUG: Trying to connect to 22...
+DEBUG: Trying to connect to 23...
+DEBUG: Trying to connect to 24...
+DEBUG: Trying to connect to 25...
+DEBUG: Event callback on node 1
+DEBUG: Successful connected to node 1.
+DEBUG: sending message to node 1: version
+DEBUG: Connected nodes: 1
+DEBUG: received command from node 1: version
+DEBUG: Connected to node 1: /Shibetoshi:1.14.9/ (6189445)
+DEBUG: sending message to node 1: verack
+DEBUG: received command from node 1: verack
+Successfully connected to peer 1 (66.151.242.154)
+DEBUG: sending message to node 1: inv
+DEBUG: received command from node 1: sendheaders
+DEBUG: received command from node 1: sendcmpct
+
+=== STEP 13: Wait ~75s then poll explorer for TX_C visibility ===
+Sat May  2 04:44:54 UTC 2026
+[poll 1] not yet visible...
+[poll 2] not yet visible...
+[poll 3] not yet visible...
+[poll 4] not yet visible...
+[poll 5] not yet visible...
+[poll 6] not yet visible...
+[poll 7] not yet visible...
+[poll 8] not yet visible...
+[poll 9] not yet visible...
+[poll 10] not yet visible...
+[poll 11] not yet visible...
+[poll 12] not yet visible...
+---
+
+=== STEP 12b: re-broadcast TX_C with longer timeout (60s) ===
+Sat May  2 04:48:09 UTC 2026
+Start broadcasting transaction: e433d2ba53d6f12bba450753f077e4f933e8020f89fe08e462b6517a284d2e96 with timeout 60 seconds
+DEBUG: Connected to node 24: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: received command from node 24: sendcmpct
+DEBUG: Connected to node 14: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 4: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 17: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 10: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 7: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: received command from node 14: sendcmpct
+DEBUG: received command from node 4: sendcmpct
+DEBUG: received command from node 17: sendcmpct
+DEBUG: received command from node 10: sendcmpct
+DEBUG: Connected to node 19: /Shibetoshi:1.14.4/ (6189449)
+DEBUG: Connected to node 13: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: received command from node 7: sendcmpct
+DEBUG: received command from node 19: sendcmpct
+DEBUG: received command from node 13: sendcmpct
+DEBUG: received command from node 19: getdata
+tx successfully sent to node 19
+DEBUG: Connected to node 11: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 12: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 20: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 22: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 9: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 21: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 16: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 25: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 2: /Shibetoshi:1.14.6/ (6189449)
+DEBUG: Connected to node 6: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 23: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: Connected to node 5: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: received command from node 11: sendcmpct
+DEBUG: received command from node 12: sendcmpct
+DEBUG: received command from node 20: sendcmpct
+DEBUG: received command from node 22: sendcmpct
+DEBUG: received command from node 21: sendcmpct
+DEBUG: received command from node 9: sendcmpct
+DEBUG: received command from node 16: sendcmpct
+DEBUG: Connected to node 8: /Shibetoshi:1.14.9/ (6189449)
+DEBUG: received command from node 2: sendcmpct
+
+=== STEP 13: Poll explorer for TX_C confirmation ===
+Sat May  2 04:48:40 UTC 2026
+[poll 1 04:48:40] not visible yet
+[poll 2 04:49:10] not visible yet
+[poll 3 04:49:41] not visible yet
+[poll 4 04:50:11] not visible yet
+[poll 5 04:50:41] not visible yet
+[poll 6 04:51:11] not visible yet
+[poll 7 04:51:41] not visible yet
+[poll 8 04:52:11] not visible yet
+[poll 9 04:52:41] not visible yet
+[poll 10 04:53:11] not visible yet
+[poll 11 04:53:41] not visible yet
+[poll 12 04:54:12] not visible yet
+[poll 13 04:54:42] not visible yet
+[poll 14 04:55:12] not visible yet
+[poll 15 04:55:42] not visible yet
+[poll 16 04:56:12] not visible yet
+[poll 17 04:56:42] not visible yet
+[poll 18 04:57:12] not visible yet
+[poll 19 04:57:42] not visible yet
+[poll 20 04:58:13] not visible yet
+
+=== STEP 14: Build TX_R skeleton + paste carrier scriptSig (such -c set_scriptsig) ===
+Sat May  2 04:59:09 UTC 2026
+tx_r_unsigned: 0100000001962e4d287a51b662e408fe890f02e833f9e477f0530745ba2bf1d653bad233e40200000000ffffffff01804a5d05000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac00000000
+tx with scriptsig set: 0100000001962e4d287a51b662e408fe890f02e833f9e477f0530745ba2bf1d653bad233e402000000fd6b03085a4b503146554c4c08010001000014034b4d08025a4b503100000000000100145b0a202230222c0a202231303030303030220a5d000003277b0a202270695f61223a205b0a2020223230343638383538323238343433343431363037323534383730373239313234393338323532383030373132363330373935313533313437323336353839323737313034373534373130343432222c0a20202236353236343735313235363031313635373734383237373031363431373735353339353633343236323032323333343338323331353634343538373737393631363131303636323038343732222c0a20202231220a205d2c0a202270695f62223a205b0a20205b0a202020223138333237373035303938353031393832313231323636373036353437393538323236343435303034343931383134313630353030393733333437333130333433393537363835353739343938222c0a202020223137343436353637343833303434383138313533323035393336363333363731373736353238343931353731353635313632343934323138343932393436353437393034393136343634393332220a20205d2c0a20205b0a202020223135383130313937353034353736323136363332383132393636313233363730303534363830363235343832303231373833363037343931383336303631313237313833333036313234363333222c0a2020202238343531353037353738343132393038344d43013534303436383131363236323230303535353433303338363133343130363431353135333835373932363735353338353939313335333130383137220a20205d2c0a20205b0a2020202231222c0a2020202230220a20205d0a205d2c0a202270695f63223a205b0a2020223135373930313531353533353135303938323737303533363937333835333737343930383238333838343737383833373037383433353132343938363931363131353838333334383639353034222c0a2020223137373834313232373930353332323532323538303435313437363034333634383637393936363639303230313330353939333232383236383639393233373138343839363133373036383030222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d0006757575757551ffffffff01804a5d05000000001976a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac00000000
+
+=== STEP 15: sendtx broadcast TX_R to mainnet ===
+Sat May  2 04:59:09 UTC 2026
+Start broadcasting transaction: 5f43977db6cf1066fb8f4d3e2b16748f35106f68482561e3023d860bfd1fa8bb with timeout 60 seconds
+DEBUG: received command from node 8: sendcmpct
+DEBUG: received command from node 5: sendcmpct
+DEBUG: Connected to node 17: /Shibetoshi:1.14.9/ (6189462)
+DEBUG: Connected to node 19: /Shibetoshi:1.14.9/ (6189462)
+DEBUG: Connected to node 18: /Shibetoshi:1.14.9/ (6189462)
+DEBUG: received command from node 17: sendcmpct
+DEBUG: received command from node 19: sendcmpct
+DEBUG: received command from node 18: sendcmpct
+DEBUG: received command from node 23: sendcmpct
+DEBUG: received command from node 25: sendcmpct
+DEBUG: received command from node 25: getdata
+tx successfully sent to node 25
+DEBUG: received command from node 3: sendcmpct
+DEBUG: Connected to node 13: /Shibetoshi:1.14.9/ (6189462)
+DEBUG: received command from node 6: sendcmpct
+DEBUG: received command from node 6: getdata
+tx successfully sent to node 6
+DEBUG: Connected to node 14: /Shibetoshi:1.14.9/ (6189462)
+DEBUG: Connected to node 16: /Shibetoshi:1.14.9/ (6189462)
+DEBUG: Connected to node 11: /Shibetoshi:1.14.9/ (6189462)
+DEBUG: received command from node 4: sendcmpct
+DEBUG: received command from node 1: sendcmpct
+DEBUG: received command from node 22: sendcmpct
+DEBUG: received command from node 21: sendcmpct
+DEBUG: received command from node 13: sendcmpct
+DEBUG: received command from node 7: sendcmpct
+DEBUG: received command from node 24: sendcmpct
+DEBUG: received command from node 20: sendcmpct
+DEBUG: received command from node 9: sendcmpct
+
+=== STEP 16: Poll explorer for TX_R confirmation ===
+Sat May  2 05:00:36 UTC 2026
+[poll 1 05:00:37] TX_C=6189450 13  TX_R=
+[poll 2 05:01:07] TX_C=6189450 13  TX_R=
+[poll 3 05:01:37] TX_C=6189450 13  TX_R=
+[poll 4 05:02:08] TX_C=6189450 13  TX_R=
+[poll 5 05:02:38] TX_C=6189450 13  TX_R=
+[poll 6 05:03:08] TX_C=6189450 13  TX_R=
+[poll 7 05:03:38] TX_C=6189450 13  TX_R=
+[poll 8 05:04:09] TX_C=6189450 13  TX_R=
+[poll 9 05:04:39] TX_C=6189450 13  TX_R=
+[poll 10 05:05:09] TX_C=6189450 13  TX_R=
+[poll 11 05:05:40] TX_C=6189450 13  TX_R=
+[poll 12 05:06:10] TX_C=6189450 13  TX_R=
+[poll 13 05:06:40] TX_C=6189450 13  TX_R=
+[poll 14 05:07:11] TX_C=6189450 14  TX_R=
+[poll 15 05:07:41] TX_C=6189450 14  TX_R=
+[poll 16 05:08:11] TX_C=6189450 14  TX_R=
+[poll 17 05:08:41] TX_C=6189450 14  TX_R=
+[poll 18 05:09:12] TX_C=  TX_R=
+[poll 19 05:09:42] TX_C=  TX_R=
+[poll 20 05:10:12] TX_C=  TX_R=
+[poll 21 05:10:43] TX_C=  TX_R=
+[poll 22 05:11:13] TX_C=  TX_R=
+[poll 23 05:11:44] TX_C=  TX_R=
+[poll 24 05:12:14] TX_C=  TX_R=
+[poll 25 05:12:44] TX_C=  TX_R=
+[poll 26 05:13:15] TX_C=  TX_R=
+[poll 27 05:13:45] TX_C=  TX_R=
+[poll 28 05:14:15] TX_C=  TX_R=
+[poll 29 05:14:45] TX_C=  TX_R=
+[poll 30 05:15:16] TX_C=  TX_R=
+=== final heights ===
+cat: /tmp/zk_build/heights.env: No such file or directory
+
+=== STEP 16b: Direct chain.so check (blockcypher rate-limited mid-poll) ===
+Sat May  2 05:16:01 UTC 2026
+--- TX_C ---
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+--- TX_R ---
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/usr/lib/python3.12/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+--- blockchair TX_C ---
+hash: e433d2ba53d6f12bba450753f077e4f933e8020f89fe08e462b6517a284d2e96
+confirmations ?
+blockhash: ?
+--- blockchair TX_R ---
+{
+  "raw_transaction": "0100000001962e4d287a51b662e408fe890f02e833f9e477f0530745ba2bf1d653bad233e402000000fd6b03085a4b503146554c4c08010001000014034b4d08025a4b503100000000000100145b0a202230222c0a202231303030303030220a5d000003277b0a202270695f61223a205b0a2020223230343638383538323238343433343431363037323534383730373239313234393338323532383030373132363330373935313533313437323336353839323737313034373534373130343432222c0a20202236353236343735313235363031313635373734383237373031363431373735353339353633343236323032323333343338323331353634343538373737393631363131303636323038343732222c0a20202231220a205d2c0a202270695f62223a205b0a20205b0a202020223138333237373035303938353031393832313231323636373036353437393538323236343435303034343931383134313630353030393733333437333130333433393537363835353739343938222c0a202020223137343436353637343833303434383138313533323035393336363333363731373736353238343931353731353635313632343934323138343932393436353437393034393136343634393332220a20205d2c0a20205b0a2020202231353831
+
+=== STEP 16c: Poll for TX_R confirmation via blockchair stats endpoint ===
+Sat May  2 05:16:28 UTC 2026
+[poll 1 05:16:30] TX_R CONFIRMED at block 6189465
+
+=== STEP 17: spvnode --zk-vkey scan with mcl Groth16 verifier ===
+    TX_C @ block 6189450, TX_R @ block 6189465
+    Using verification_key.json from /tmp/zk_build/zk/verification_key.json
+Sat May  2 05:16:50 UTC 2026
+TX_C_HEIGHT=6189450
+TX_R_HEIGHT=6189465
+spvnode PID=16666
+[spv 1 05:17:05] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 2 05:17:20] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 3 05:17:35] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 4 05:17:50] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 5 05:18:05] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 6 05:18:20] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 7 05:18:35] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 8 05:18:50] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 9 05:19:05] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 10 05:19:20] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 11 05:19:35] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 12 05:19:50] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 13 05:20:05] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 14 05:20:20] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 15 05:20:35] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 16 05:20:50] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 17 05:21:05] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 18 05:21:20] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 19 05:21:35] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 20 05:21:50] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 21 05:22:05] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 22 05:22:20] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 23 05:22:35] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 24 05:22:50] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 25 05:23:05] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 26 05:23:20] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 27 05:23:35] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 28 05:23:50] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 29 05:24:05] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 30 05:24:20] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 31 05:24:35] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 32 05:24:50] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 33 05:25:05] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 34 05:25:20] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 35 05:25:35] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 36 05:25:50] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 37 05:26:05] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 38 05:26:20] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 39 05:26:35] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+[spv 40 05:26:50] passed=0
+0 log_lines=1 last="./spvnode: error while loading shared libraries: libmcl.so: cannot open shared object file: No such file or directory"
+
+=== STEP 17 BLOCKED: spvnode failed to load libmcl.so (rpath not baked in) ===
+    libmcl.so was installed to /tmp/zk_build/mcl-install/lib but spvnode
+    binary lacks an RPATH/RUNPATH pointing there, so dynamic loader can't find it.
+    Workaround: LD_LIBRARY_PATH=/tmp/zk_build/mcl-install/lib ./spvnode --zk-vkey ...
+    (Time budget exhausted before retry; commit log captures this clearly.)
+Sat May  2 05:27:14 UTC 2026
+
+=== ON-CHAIN ARTIFACTS (verifiable independently) ===
+TX_C: e433d2ba53d6f12bba450753f077e4f933e8020f89fe08e462b6517a284d2e96 @ block 6189450
+      https://chain.so/tx/DOGE/e433d2ba53d6f12bba450753f077e4f933e8020f89fe08e462b6517a284d2e96
+      OP_RETURN: 6a25445a4b4300c4113c4b78c8822fa1b656a61490d43828e63f6a8d637901a3367967873ba58f
+TX_R: 5f43977db6cf1066fb8f4d3e2b16748f35106f68482561e3023d860bfd1fa8bb @ block 6189465
+      https://chain.so/tx/DOGE/5f43977db6cf1066fb8f4d3e2b16748f35106f68482561e3023d860bfd1fa8bb
+Commit:  c4113c4b78c8822fa1b656a61490d43828e63f6a8d637901a3367967873ba58f
+Funded:  DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+===============================================================================
