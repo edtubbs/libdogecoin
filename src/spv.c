@@ -1288,6 +1288,91 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                 client->nodegroup->log_write_cb("[zk-commit] Valid at height=%d txpos=%u commit=%s mode=%u source=carrier_scriptsig matched_txc_txpos=%u payload_len=%zu txr_txid=%s\n",
                                                                  pindex->height, i, commit_hex, (unsigned)matched_mode, matched_txpos, zk_payload_len, txr_txid_hex);
 
+                                /* Fully decode and log every ZKP1 field for log-level auditability.
+                                   The reveal payload format is:
+                                       magic(4) || mode(1) || reserved(1) || circuit_id(4 BE) ||
+                                       public_len(2 BE) || public_inputs[public_len] ||
+                                       proof_len(4 BE)  || proof[proof_len]
+                                   Each field is dumped as hex (with an ASCII preview when the
+                                   bytes are printable, e.g. snarkjs JSON proofs). */
+                                {
+                                    dogecoin_zk_mode_t dec_mode = (dogecoin_zk_mode_t)0;
+                                    uint32_t dec_circuit_id = 0;
+                                    const uint8_t* dec_pub = NULL; size_t dec_pub_len = 0;
+                                    const uint8_t* dec_proof = NULL; size_t dec_proof_len = 0;
+                                    if (dogecoin_zk_decode_payload(zk_payload, zk_payload_len,
+                                                                   &dec_mode, &dec_circuit_id,
+                                                                   &dec_pub, &dec_pub_len,
+                                                                   &dec_proof, &dec_proof_len) == DOGECOIN_ZK_OK) {
+                                        uint8_t reserved_byte = zk_payload[DOGECOIN_ZK_CARRIER_MAGIC_LEN + 1];
+                                        const char* mode_label =
+                                            (dec_mode == DOGECOIN_ZK_MODE_GROTH16) ? "groth16-bn254" :
+                                            (dec_mode == DOGECOIN_ZK_MODE_PLONK) ? "plonk" :
+                                            (dec_mode == DOGECOIN_ZK_MODE_STARK_S2) ? "stark-s2" : "unknown";
+                                        client->nodegroup->log_write_cb(
+                                            "[zk-commit] reveal_decoded: magic=\"ZKP1\" mode=%u(%s) reserved=0x%02x circuit_id=0x%08x public_len=%zu proof_len=%zu total_payload_len=%zu txr_txid=%s\n",
+                                            (unsigned)dec_mode, mode_label, (unsigned)reserved_byte,
+                                            (unsigned)dec_circuit_id, dec_pub_len, dec_proof_len,
+                                            zk_payload_len, txr_txid_hex);
+
+                                        /* Helper: dump up to N bytes as hex + ASCII preview onto the log. */
+                                        #define ZK_LOG_DUMP_FIELD(label, ptr, len) do { \
+                                            const uint8_t* _p = (const uint8_t*)(ptr); size_t _l = (size_t)(len); \
+                                            size_t _hex_max = 256; /* full dump up to 256 bytes; head+tail beyond */ \
+                                            if (_l == 0) { \
+                                                client->nodegroup->log_write_cb("[zk-commit] reveal_decoded.%s: len=0 (empty)\n", (label)); \
+                                            } else if (_l <= _hex_max) { \
+                                                char* _hex = (char*)dogecoin_calloc(1, _l * 2 + 1); \
+                                                char* _asc = (char*)dogecoin_calloc(1, _l + 1); \
+                                                if (_hex && _asc) { \
+                                                    utils_bin_to_hex((unsigned char*)_p, _l, _hex); \
+                                                    int _printable = 1; \
+                                                    for (size_t _ai = 0; _ai < _l; _ai++) { \
+                                                        unsigned char _c = _p[_ai]; \
+                                                        if (_c == '\n' || _c == '\t' || _c == '\r') _asc[_ai] = ' '; \
+                                                        else if (_c >= 0x20 && _c < 0x7f) _asc[_ai] = (char)_c; \
+                                                        else { _asc[_ai] = '.'; _printable = 0; } \
+                                                    } \
+                                                    if (_printable) { \
+                                                        client->nodegroup->log_write_cb("[zk-commit] reveal_decoded.%s: len=%zu hex=%s ascii=\"%s\"\n", (label), _l, _hex, _asc); \
+                                                    } else { \
+                                                        client->nodegroup->log_write_cb("[zk-commit] reveal_decoded.%s: len=%zu hex=%s\n", (label), _l, _hex); \
+                                                    } \
+                                                } \
+                                                dogecoin_free(_hex); dogecoin_free(_asc); \
+                                            } else { \
+                                                /* Long field: emit head+tail hex (64 bytes each) plus ASCII head. */ \
+                                                size_t _head = 64, _tail = 64; \
+                                                char _hh[129] = {0}; char _tt[129] = {0}; \
+                                                utils_bin_to_hex((unsigned char*)_p, _head, _hh); \
+                                                utils_bin_to_hex((unsigned char*)(_p + _l - _tail), _tail, _tt); \
+                                                size_t _ascii_n = _l < 96 ? _l : 96; \
+                                                char _asc[97] = {0}; int _printable = 1; \
+                                                for (size_t _ai = 0; _ai < _ascii_n; _ai++) { \
+                                                    unsigned char _c = _p[_ai]; \
+                                                    if (_c == '\n' || _c == '\t' || _c == '\r') _asc[_ai] = ' '; \
+                                                    else if (_c >= 0x20 && _c < 0x7f) _asc[_ai] = (char)_c; \
+                                                    else { _asc[_ai] = '.'; _printable = 0; } \
+                                                } \
+                                                if (_printable) { \
+                                                    client->nodegroup->log_write_cb("[zk-commit] reveal_decoded.%s: len=%zu hex_head=%s hex_tail=%s ascii_head=\"%s\"\n", (label), _l, _hh, _tt, _asc); \
+                                                } else { \
+                                                    client->nodegroup->log_write_cb("[zk-commit] reveal_decoded.%s: len=%zu hex_head=%s hex_tail=%s\n", (label), _l, _hh, _tt); \
+                                                } \
+                                            } \
+                                        } while (0)
+
+                                        ZK_LOG_DUMP_FIELD("public_inputs", dec_pub, dec_pub_len);
+                                        ZK_LOG_DUMP_FIELD("proof", dec_proof, dec_proof_len);
+
+                                        #undef ZK_LOG_DUMP_FIELD
+                                    } else {
+                                        client->nodegroup->log_write_cb(
+                                            "[zk-commit] reveal_decoded: decode_failed payload_len=%zu txr_txid=%s\n",
+                                            zk_payload_len, txr_txid_hex);
+                                    }
+                                }
+
                                 /* In-process proof verification when libdogecoin was built with
                                    rapidsnark (HAVE_RAPIDSNARK).  Without it, the verifier returns
                                    DOGECOIN_ZK_ERR_NOT_IMPLEMENTED / DELEGATED — log that explicitly

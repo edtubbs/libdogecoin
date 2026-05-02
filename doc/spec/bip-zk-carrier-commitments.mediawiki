@@ -418,16 +418,48 @@ Current end-to-end script behavior is aligned with the parallel PQC mainnet flow
 
 ==Mainnet Examples==
 
-''(To be filled in once the first mainnet demo run completes; see <code>scripts/run_full_dogeos_carrier_demo.sh</code> output and the <code>[zk-commit] Reveal validated: TX_R=… commit=… payload_len=… mode=… height=…</code> line in the captured spvnode log. The format mirrors the PQC mainnet examples in the parallel BIP, e.g.:''
+The following example is from confirmed mainnet transactions demonstrating Phase 1 ZK carrier commitment publication, P2SH carrier reveal, and full in-process Groth16 verification by <code>spvnode --zk-vkey</code>.  The format mirrors the Falcon-512 / Dilithium2 / Raccoon-G mainnet examples in the parallel PQC BIP.
+
+===Groth16 BN254 Range-Proof Carrier Mode (TX_C + TX_R)===
+
+Range proof for the inclusive interval <code>[0, 1000000]</code> over secret amount <code>44321</code>, generated with the <code>contrib/zk_carrier/circuits/range_proof.circom</code> reference circuit, snarkjs Groth16 ceremony (BN128 powers-of-tau 2^12), and <code>contrib/zk_carrier/witness_helper.py</code> (which emits the 837-byte canonical ZKP1 payload).
+
+Commitment transaction (TX_C) with OP_RETURN commitment and one P2SH carrier output:
+
+<pre>
+TX_C txid:   9f7476f1d1f0ea2688bfe01df1eeef32e42752851cbda29a5c92084a2088ff7c
+Block:       6189927 (mainnet, confirmed 2026-05-02, txpos=28)
+OP_RETURN:   6a25445a4b430052f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925
+             (DZKC || mode=0 || commit32)
+commit32:    52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925
+P2SH out:    a9149b402803555511d15d81207d3e2cb3e6bc365e0e87  (1.0 DOGE carrier value)
+Explorer:    https://chain.so/tx/DOGE/9f7476f1d1f0ea2688bfe01df1eeef32e42752851cbda29a5c92084a2088ff7c
+</pre>
+
+Reveal transaction (TX_R) spending the P2SH carrier output, with the full ZKP1 payload (proof + public inputs + circuit-id) embedded in the carrier scriptSig:
+
+<pre>
+TX_R txid:   d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269
+Block:       6189927 (mainnet, confirmed 2026-05-02, txpos=45)
+scriptSig:   869 bytes (ZKP1 TLV: hdr || mode || flags || sig_alg || km || proof_json || pub || vk_id || OP_TRUE redeemScript)
+payload_len: 837 bytes (snarkjs JSON proof + public.json)
+mode:        0 (Groth16 BN254)
+Explorer:    https://chain.so/tx/DOGE/d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269
+</pre>
+
+SPV scanner output (<code>spvnode --zk-vkey verification_key.json -d -p -b</code>, libdogecoin built with <code>--with-mcl=…</code>; full log in <code>test-logs/mainnet_zk_carrier_spvnode_PASSED_20260502_133736.txt</code>):
 
 <source>
-[zk-commit] Pending at height=H txpos=P commit=C mode=0 source=op_return
-[zk-commit] Valid at height=H' txpos=P' commit=C mode=0 source=carrier_scriptsig matched_txc_txpos=P payload_len=L txr_txid=T
-[zk-commit] ZK verification PASSED at height=H' txpos=P' mode=0
-[zk-commit] Reveal validated: TX_R=T commit=C payload_len=L mode=0 height=H'
+[zk-vkey] loaded 3108 bytes from verification_key.json
+[zk-commit] Pending at height=6189927 txpos=28 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 mode=0 source=op_return
+[zk-commit] Valid at height=6189927 txpos=45 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 mode=0 source=carrier_scriptsig matched_txc_txpos=28 payload_len=837 txr_txid=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269
+[zk-commit] ZK verification PASSED at height=6189927 txpos=45 mode=0 err=0
+[zk-commit] Reveal validated: TX_R=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 payload_len=837 mode=0 height=6189927
 </source>
 
-''A recent mainnet tip used as a freshness reference for the demo run is height 6189368, hash <code>eb4575af0e1958d1f95dab0a35d5900a092093420565864a841b4f3b9887dcaf</code> (2026-05-02T03:27:26Z, BlockCypher).'')
+The <code>PASSED</code> line is emitted by <code>dogecoin_zk_verify_proof</code> dispatching to <code>groth16_verify_mcl</code> (herumi/mcl, BN254, statically linked).  In the same scan, two earlier on-chain ZKP1 pairs published with verification keys that have since been rotated (TX_R <code>0ec81283…9208</code> at 6189399 and <code>5f43977d…a8bb</code> at 6189465) correctly produced <code>ZK verification FAILED err=-8</code>, demonstrating that the verifier is binding the proof to the supplied <code>vk</code> rather than acting as a stub.
+
+A recent mainnet checkpoint is baked in at height 6189700 (hash <code>a6ed6d6b03668d0bb9baddfbc52565b2514d02f118d6d0298a6ca48d511d7804</code>, 2026-05-02T09:18:05Z) so <code>spvnode -p</code> rescans of this and subsequent ZK carrier pairs only need to sync the final ~200–300 blocks of headers before reaching the published commitment.
 
 ==Deployment==
 

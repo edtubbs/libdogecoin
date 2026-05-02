@@ -40,14 +40,34 @@
 #     $VKEY for in-process spvnode verification).
 #
 # Usage:
-#   N=3 \
+#   # fully repeatable single entry point (auto-bootstraps everything):
+#   ./contrib/zk_carrier/scripts/broadcast_set.sh
+#
+#   # or with explicit overrides:
+#   N=2 \
 #   FUNDED_UTXO_TXID=<initial-txid> FUNDED_UTXO_VOUT=0 \
 #   FUNDED_UTXO_VALUE_KOINU=<koinu> \
 #   FUNDED_UTXO_SCRIPT_PUBKEY=<spk-hex> \
-#   WASM=contrib/zk_carrier/circuits/build/range_proof_js/range_proof.wasm \
-#   ZKEY=contrib/zk_carrier/circuits/range_proof.zkey \
-#   VKEY=contrib/zk_carrier/circuits/verification_key.json \
+#   WITH_MCL=/tmp/zk_build/mcl \
 #   ./contrib/zk_carrier/scripts/broadcast_set.sh
+#
+# By default the script:
+#   * builds libdogecoin (such/sendtx/spvnode) when the binaries are missing
+#     (BOOTSTRAP=1, set BOOTSTRAP=0 to skip);
+#   * runs a Groth16 trusted-setup ceremony (circom + snarkjs) when the
+#     circuit artefacts (wasm/zkey/vkey) are missing or RUN_CEREMONY=1 — full
+#     stdout/stderr from circom and snarkjs is teed into the run log, and the
+#     freshly generated verification_key.json is dumped into the log + saved
+#     under contrib/zk_carrier/circuits/build/ alongside its sha256 (mirrors
+#     how the PQC mainnet scripts log the freshly generated public key);
+#   * auto-discovers a spendable UTXO at FUNDED_ADDR via block explorers when
+#     FUNDED_UTXO_TXID/FUNDED_UTXO_VALUE_KOINU are not provided;
+#   * loops N times over (witness → such → sendtx → wait → set_scriptsig →
+#     sendtx → wait), recording (iter, tx_c, tx_r, commit, payload_bytes, utc)
+#     into manifest.tsv;
+#   * launches one spvnode --zk-vkey rescan over the full height range, which
+#     emits the fully-decoded ZKP1 reveal fields and "ZK verification PASSED"
+#     / "Reveal validated" lines into the log.
 #
 # Honest deferred operations: the script never silently fakes confirmations —
 # if an explorer poll times out or sendtx returns a non-relay status, that
@@ -116,19 +136,176 @@ info "ZK carrier broadcast set: N=$N network=$NETWORK addr=$FUNDED_ADDR"
 info "Work dir: $WORK"
 info "Manifest: $MANIFEST"
 
+# --------------------------- bootstrap (build) -------------------------------
+# Make this script a single-entry-point repeatable end-to-end driver: when the
+# such/sendtx/spvnode binaries (and optionally libmcl.a for in-process Groth16
+# verification) are missing, build them in place.  Skip with BOOTSTRAP=0.
+if [ "${BOOTSTRAP:-1}" = "1" ]; then
+    if [ ! -x "$SUCH" ] || [ ! -x "$SENDTX" ] || [ ! -x "$SPVNODE" ]; then
+        info "================================================================="
+        info "[bootstrap] building libdogecoin + such/sendtx/spvnode"
+        info "================================================================="
+        ( cd "$REPO_DIR" && \
+          if [ ! -f configure ]; then ./autogen.sh; fi && \
+          CONF_ARGS="--enable-test-passwd --disable-silent-rules" && \
+          if [ -n "${WITH_MCL:-}" ]; then CONF_ARGS="$CONF_ARGS --with-mcl=$WITH_MCL"; fi && \
+          ./configure $CONF_ARGS && \
+          make -j"$(nproc)" ) 2>&1 | sed 's/^/  [bootstrap build] /'
+        [ -x "$SUCH" ] && [ -x "$SENDTX" ] && [ -x "$SPVNODE" ] || die "bootstrap build did not produce such/sendtx/spvnode"
+    fi
+    if [ -n "${WITH_MCL:-}" ] && ! ldd "$SPVNODE" 2>/dev/null | grep -q libmcl; then
+        info "[bootstrap] spvnode is statically linked against libmcl.a (or mcl not detected)"
+    fi
+fi
+
 # ------------------------------- preflight -----------------------------------
 [ -x "$SUCH" ]    || die "such not found at $SUCH (build first)"
 [ -x "$SENDTX" ]  || die "sendtx not found at $SENDTX"
-[ -f "$WASM" ]    || die "circuit wasm not found at $WASM (run circom first)"
-[ -f "$ZKEY" ]    || die "circuit zkey not found at $ZKEY (run snarkjs setup first)"
 [ -f "$WITNESS_HELPER" ] || die "witness_helper.py not found at $WITNESS_HELPER"
 command -v node    >/dev/null || die "node not found (snarkjs needs it)"
 command -v snarkjs >/dev/null || die "snarkjs not found in PATH"
 command -v curl    >/dev/null || die "curl not found"
 command -v python3 >/dev/null || die "python3 not found"
 
+# ------------------------ Groth16 trusted-setup ceremony ---------------------
+# When circuit artefacts are missing (or RUN_CEREMONY=1 forces it), run
+# circom + snarkjs end-to-end and log every stdout/stderr line into the
+# test-log so the verification key (and its sha256 fingerprint) is always
+# preserved alongside the on-chain TX_C/TX_R pair it validates.  This mirrors
+# how contrib/mainnet_falcon_test.sh tees the freshly generated PQC public
+# key into its log via run_and_log "such falcon_keygen".
+if [ "${RUN_CEREMONY:-0}" = "1" ] || [ ! -f "$WASM" ] || [ ! -f "$ZKEY" ] || [ ! -f "$VKEY" ]; then
+    command -v circom >/dev/null || die "circom not found (need iden3/circom 2.x for trusted-setup)"
+    CIRCUIT_SRC="${CIRCUIT_SRC:-$REPO_DIR/contrib/zk_carrier/circuits/range_proof.circom}"
+    [ -f "$CIRCUIT_SRC" ] || die "circuit source $CIRCUIT_SRC missing"
+
+    CEREMONY_DIR="${CEREMONY_DIR:-$REPO_DIR/contrib/zk_carrier/circuits/build}"
+    mkdir -p "$CEREMONY_DIR"
+    PTAU_FINAL="$CEREMONY_DIR/pot12_final.ptau"
+    R1CS="$CEREMONY_DIR/range_proof.r1cs"
+    WASM="$CEREMONY_DIR/range_proof_js/range_proof.wasm"
+    ZKEY="$CEREMONY_DIR/range_proof.zkey"
+    VKEY="$CEREMONY_DIR/verification_key.json"
+
+    info "================================================================="
+    info "Groth16 trusted-setup ceremony — full output logged below"
+    info "  circom:   $(circom --version 2>&1 | head -1)"
+    info "  snarkjs:  $(snarkjs --version 2>&1 | head -1)"
+    info "  circuit:  $CIRCUIT_SRC"
+    info "  artefacts→ $CEREMONY_DIR"
+    info "================================================================="
+
+    info "[ceremony] circom compile (r1cs + wasm)"
+    ( cd "$CEREMONY_DIR" && circom "$CIRCUIT_SRC" --r1cs --wasm --sym -p bn128 -o "$CEREMONY_DIR" ) 2>&1 \
+        | sed 's/^/  [circom] /'
+
+    info "[ceremony] snarkjs r1cs info"
+    snarkjs r1cs info "$R1CS" 2>&1 | sed 's/^/  [snarkjs r1cs info] /'
+
+    if [ ! -f "$PTAU_FINAL" ]; then
+        PTAU0="$CEREMONY_DIR/pot12_0000.ptau"
+        PTAU1="$CEREMONY_DIR/pot12_0001.ptau"
+        info "[ceremony] powers-of-tau new (BN128, 2^12)"
+        snarkjs powersoftau new bn128 12 "$PTAU0" -v 2>&1 | sed 's/^/  [snarkjs ptau new]      /'
+        info "[ceremony] powers-of-tau contribute"
+        echo "broadcast_set ceremony entropy $(date -u +%s%N) $$" \
+            | snarkjs powersoftau contribute "$PTAU0" "$PTAU1" --name="auto" -v 2>&1 \
+            | sed 's/^/  [snarkjs ptau contrib]  /'
+        info "[ceremony] powers-of-tau prepare phase2"
+        snarkjs powersoftau prepare phase2 "$PTAU1" "$PTAU_FINAL" -v 2>&1 \
+            | sed 's/^/  [snarkjs ptau phase2]   /'
+    else
+        info "[ceremony] reusing $PTAU_FINAL"
+    fi
+
+    info "[ceremony] snarkjs groth16 setup → $ZKEY"
+    snarkjs groth16 setup "$R1CS" "$PTAU_FINAL" "$ZKEY" 2>&1 \
+        | sed 's/^/  [snarkjs groth16 setup] /'
+
+    info "[ceremony] snarkjs zkey contribute (final)"
+    ZKEY_FINAL="$CEREMONY_DIR/range_proof_final.zkey"
+    echo "broadcast_set zkey contribution $(date -u +%s%N) $$" \
+        | snarkjs zkey contribute "$ZKEY" "$ZKEY_FINAL" --name="auto" -v 2>&1 \
+        | sed 's/^/  [snarkjs zkey contrib]  /'
+    mv -f "$ZKEY_FINAL" "$ZKEY"
+
+    info "[ceremony] snarkjs zkey export verificationkey → $VKEY"
+    snarkjs zkey export verificationkey "$ZKEY" "$VKEY" 2>&1 \
+        | sed 's/^/  [snarkjs vkey export]   /'
+
+    # Persist the full verification_key.json content + sha256 fingerprints into
+    # the run log AND into the per-run work dir, so this exact vkey can be
+    # recovered later just by reading the test-log (mirrors how the PQC
+    # mainnet scripts log the freshly generated public key).
+    VKEY_SHA256=$(sha256sum "$VKEY" | awk '{print $1}')
+    ZKEY_SHA256=$(sha256sum "$ZKEY" | awk '{print $1}')
+    WASM_SHA256=$(sha256sum "$WASM" | awk '{print $1}')
+    info "================================================================="
+    info "[ceremony] artefact fingerprints (committed alongside TX_C/TX_R log)"
+    info "  vkey  $VKEY_SHA256  $VKEY"
+    info "  zkey  $ZKEY_SHA256  $ZKEY"
+    info "  wasm  $WASM_SHA256  $WASM"
+    info "================================================================="
+    info "[ceremony] full verification_key.json (begin) ↓"
+    sed 's/^/    /' "$VKEY"
+    info "[ceremony] full verification_key.json (end) ↑"
+    info "================================================================="
+fi
+
+[ -f "$WASM" ]    || die "circuit wasm not found at $WASM (ceremony failed?)"
+[ -f "$ZKEY" ]    || die "circuit zkey not found at $ZKEY (ceremony failed?)"
+[ -f "$VKEY" ]    || die "circuit vkey not found at $VKEY (ceremony failed?)"
+
 if [ -z "$FUNDED_UTXO_TXID" ] || [ -z "$FUNDED_UTXO_VALUE_KOINU" ]; then
-    die "FUNDED_UTXO_TXID and FUNDED_UTXO_VALUE_KOINU must be set for the initial iteration"
+    info "================================================================="
+    info "Auto-discovering a spendable UTXO at $FUNDED_ADDR via block explorers"
+    info "================================================================="
+    DISC_JSON=$(curl -fsSL --max-time 30 \
+        "$EXPLORER_BASE_MAIN/addrs/${FUNDED_ADDR}?unspentOnly=true&limit=50" 2>/dev/null || true)
+    if [ -z "$DISC_JSON" ]; then
+        DISC_JSON=$(curl -fsSL --max-time 30 \
+            "https://api.blockchair.com/dogecoin/dashboards/address/${FUNDED_ADDR}?limit=50" 2>/dev/null || true)
+    fi
+    if [ -z "$DISC_JSON" ]; then
+        die "FUNDED_UTXO_TXID/FUNDED_UTXO_VALUE_KOINU not set and explorer auto-discovery failed"
+    fi
+    # Parse the BlockCypher response (txrefs[].tx_hash / tx_output_n / value).
+    # Prefer a UTXO with at least 1 confirmation and value >= 5 DOGE so a
+    # 1-DOGE carrier output + sane fee fits comfortably.
+    PARSED=$(echo "$DISC_JSON" | python3 - "$FUNDED_ADDR" <<'PY'
+import sys, json
+addr = sys.argv[1]
+d = json.load(sys.stdin)
+candidates = []
+# BlockCypher shape
+for ref in (d.get('txrefs') or []) + (d.get('unconfirmed_txrefs') or []):
+    if ref.get('spent'): continue
+    candidates.append(( int(ref.get('confirmations',0)),
+                        int(ref.get('value',0)),
+                        ref.get('tx_hash'),
+                        int(ref.get('tx_output_n',0)) ))
+# Blockchair shape (data.<addr>.utxo[])
+data = d.get('data') or {}
+ent  = data.get(addr) if isinstance(data, dict) else None
+if isinstance(ent, dict):
+    for ref in (ent.get('utxo') or []):
+        candidates.append(( 1, int(ref.get('value',0)),
+                            ref.get('transaction_hash'),
+                            int(ref.get('index',0)) ))
+candidates.sort(key=lambda x: (-x[1], -x[0]))
+for conf,val,h,n in candidates:
+    if val >= 500_000_000 and h:
+        print(f"{h} {n} {val}")
+        break
+PY
+)
+    if [ -z "$PARSED" ]; then
+        die "no spendable UTXO >= 5 DOGE found at $FUNDED_ADDR"
+    fi
+    FUNDED_UTXO_TXID=$(echo "$PARSED" | awk '{print $1}')
+    FUNDED_UTXO_VOUT=$(echo "$PARSED" | awk '{print $2}')
+    FUNDED_UTXO_VALUE_KOINU=$(echo "$PARSED" | awk '{print $3}')
+    success "auto-discovered UTXO: ${FUNDED_UTXO_TXID}:${FUNDED_UTXO_VOUT} value=${FUNDED_UTXO_VALUE_KOINU} koinu"
 fi
 
 # ------------------------------- helpers -------------------------------------
@@ -382,3 +559,23 @@ FINAL_LOG="$REPO_DIR/test-logs/mainnet_zk_carrier_e2e_set_PASSED_${TS}.txt"
 } > "$FINAL_LOG"
 success "Final multi-PASSED log: $FINAL_LOG"
 info "Commit it with: git add -f \"$FINAL_LOG\" && git commit -m 'zk_carrier: mainnet e2e set log $TS'"
+
+# Final summary block — mirrors the artifact-listing tail of
+# contrib/mainnet_falcon_test.sh so an operator can find every artefact
+# produced by a single run from a single screenful at the bottom of the log.
+echo ""
+echo "================================================================="
+echo "  ZK CARRIER MAINNET E2E — TEST COMPLETE"
+echo "================================================================="
+success "All test data saved in: $WORK"
+echo ""
+echo "Files:"
+echo "  - $LOG (full run log: ceremony stdout, every such/sendtx call, decoded reveal lines)"
+echo "  - $MANIFEST (iter,tx_c,tx_r,commit,payload_bytes,utc per pair)"
+echo "  - $WORK/iter_*/payload.hex (per-iteration ZKP1 payload hex)"
+echo "  - $SPV_LOG (raw spvnode stdout/stderr with full [zk-commit] event stream)"
+echo "  - $FINAL_LOG (curated log: manifest + filtered [zk-commit]/[zk-vkey] lines)"
+echo "  - $VKEY  (sha256 logged above; full JSON dumped earlier in this log)"
+echo "  - $ZKEY  (Groth16 proving key; sha256 logged above)"
+echo "  - $WASM  (circuit witness wasm; sha256 logged above)"
+echo ""
