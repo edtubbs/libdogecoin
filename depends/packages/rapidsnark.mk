@@ -23,6 +23,11 @@ $(package)_version=4b21f7a
 $(package)_download_path=https://github.com/iden3/rapidsnark/archive
 $(package)_file_name=$($(package)_version).tar.gz
 $(package)_sha256_hash=0000000000000000000000000000000000000000000000000000000000000000
+# !!! TODO before enabling in CI: replace the all-zero placeholder above with
+# the real sha256 of the pinned tarball.  The package is gated behind
+# ZK_CARRIER=1 (default OFF) precisely because this hash is unset; do NOT
+# flip ZK_CARRIER on in CI until both the commit/tag and the sha256 are
+# pinned to verified upstream values.
 
 # Refuse unsupported targets explicitly.
 ifneq (,$(findstring mingw,$(host)))

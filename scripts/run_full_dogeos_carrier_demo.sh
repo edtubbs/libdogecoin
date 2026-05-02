@@ -100,6 +100,18 @@ fi
 # --------------------------- WIF / address (mainnet defaults match
 #                              contrib/mainnet_falcon_test.sh, contrib/
 #                              mainnet_dilithium2_test.sh, etc.) --------------
+#
+# WARNING: the FUNDED_WIF default below is the SAME publicly-known demo WIF
+# already shipped in this branch's contrib/mainnet_*_test.sh scripts.  It
+# is *not* secret.  Any real DOGE you send to its address is immediately
+# spendable by anyone who has cloned this branch.  Override via:
+#
+#   export DOGEOS_CARRIER_WIF=<your-WIF>
+#   export DOGEOS_CARRIER_ADDR=<your-address>
+#
+# before running.  This script intentionally inherits the public demo WIF
+# only so the same funded UTXO chain can be exercised across the PQ + ZK
+# demos in this branch family.
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 
@@ -119,6 +131,27 @@ EXPLORER_BASE="${EXPLORER_BASE:-$EXPLORER_DEFAULT}"
 if [[ -z "$WIF" ]]; then
     echo "ERROR: no WIF available — set DOGEOS_CARRIER_WIF or FUNDED_WIF" >&2
     exit 2
+fi
+
+if [[ "$NETWORK" == "mainnet" ]]; then
+    if [[ -z "${DOGEOS_CARRIER_WIF:-}" && -z "${FUNDED_WIF_OVERRIDE:-}" ]]; then
+        cat >&2 <<'WARNBANNER'
+================================================================================
+WARNING: about to broadcast on MAINNET using the PUBLIC demo WIF inherited from
+contrib/mainnet_falcon_test.sh (QP1tqHYu... / DDMpdcTr...).  This key is
+ALREADY PUBLIC; coins sent to its address are spendable by anyone.
+
+If you do not want to use the public demo WIF, abort now (Ctrl-C) and re-run
+with:
+
+    export DOGEOS_CARRIER_WIF=<your-WIF>
+    export DOGEOS_CARRIER_ADDR=<your-address>
+
+Pausing 10 seconds so you can abort if this is unintended...
+================================================================================
+WARNBANNER
+        sleep 10
+    fi
 fi
 
 # --------------------------- Tooling -----------------------------------------
