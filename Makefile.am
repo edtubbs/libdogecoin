@@ -156,6 +156,14 @@ libdogecoin_la_SOURCES += \
     src/zk_carrier/zk_groth16.c \
     src/zk_carrier/zk_plonk.c \
     src/zk_carrier/zk_stark.c
+
+if HAVE_MCL
+# In-process Groth16 BN254 verifier, linked when --with-mcl=DIR succeeds.
+# Built as C++; flags come from configure.ac via @MCL_CFLAGS@/@MCL_LIBS@.
+# CFLAGS/LIBADD additions happen further down where the base vars are
+# defined; here we only add the source file.
+libdogecoin_la_SOURCES += src/zk_carrier/zk_groth16_mcl.cpp
+endif
 endif
 
 
@@ -217,6 +225,15 @@ endif
 
 libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include -fPIC
 libdogecoin_la_LIBADD = $(LIBSECP256K1) $(ASM_LIB_FILES)
+
+if HAVE_MCL
+# Append MCL include/link flags after the base CFLAGS/LIBADD definitions.
+# CXXFLAGS for the C++ verifier file: AM_CXXFLAGS picks them up.
+libdogecoin_la_CFLAGS    += @MCL_CFLAGS@
+libdogecoin_la_CXXFLAGS   = -I$(top_srcdir)/include -fPIC @MCL_CFLAGS@ -std=c++14
+libdogecoin_la_LIBADD    += @MCL_LIBS@
+endif
+
 noinst_PROGRAMS =
 
 if USE_TESTS

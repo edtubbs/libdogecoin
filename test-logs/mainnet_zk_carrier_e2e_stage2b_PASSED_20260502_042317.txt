@@ -1,0 +1,47 @@
+===============================================================================
+ZK carrier mainnet e2e — Stage 2b (in-process Groth16 verification PASSED)
+Date (UTC): Sat May  2 04:23:17 UTC 2026
+
+On-chain artefacts (same TX_C/TX_R as stage 1 & 2a — already mined):
+  TX_C: 4a8038f7c0a57500864baab92fc0b025db4fa57507796f1c7a57d065af625e79 at block 6189394 (commitment + carrier P2SH)
+  TX_R: 0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208 at block 6189399 (reveal — payload in scriptSig)
+  commit: 4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2
+  payload: 842-byte ZKP1 envelope (snarkjs Groth16 proof + 2 public inputs)
+  curve:  bn128 (a.k.a. BN254 / mcl::BN_SNARK1)
+
+Build:
+  ./configure --enable-zk-carrier --enable-test-passwd \
+              --with-mcl=/tmp/mcl_smoke/mcl-2.10
+  HAVE_MCL is defined; src/zk_carrier/zk_groth16_mcl.cpp is linked into
+  libdogecoin and provides the C-ABI symbol groth16_verify_mcl.
+  spvnode binary nm output:
+    00000000000bafe0 T groth16_verify_mcl
+
+spvnode invocation:
+  ./spvnode -l -c -d -p -b -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr \
+            --zk-vkey /tmp/zk/verification_key.json scan
+
+===============================================================================
+Result lines (verbatim from spvnode debug log):
+===============================================================================
+
+2:[zk-vkey] loaded 3106 bytes from /tmp/zk/verification_key.json
+63682:DEBUG: [zk-commit] Pending at height=6189394 txpos=9 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 mode=0 source=op_return
+63704:DEBUG: [zk-commit] Valid at height=6189399 txpos=24 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 mode=0 source=carrier_scriptsig matched_txc_txpos=9 payload_len=842 txr_txid=0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208
+63705:DEBUG: [zk-commit] ZK verification PASSED at height=6189399 txpos=24 mode=0 err=0
+63706:DEBUG: [zk-commit] Reveal validated: TX_R=0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 payload_len=842 mode=0 height=6189399
+
+===============================================================================
+Interpretation:
+  * vkey LOADED into spvnode at startup (3106 bytes verification_key.json)
+  * commitment PENDING when TX_C scanned at block 6189394 (op_return)
+  * commitment matched on TX_R at block 6189399 — VALID via carrier_scriptsig
+  * proof verification status: PASSED (err=0 = DOGECOIN_ZK_OK)
+    — in-process pairing check in libdogecoin via herumi/mcl on BN_SNARK1:
+         e(A, B) == e(alpha, beta) * e(L, gamma) * e(C, delta)
+      where L = IC[0] + sum public_i * IC[i+1]
+  * Reveal validated by both the commit-match and the cryptographic pairing
+    check — full PQC-parity behaviour for the ZK family.
+
+Cross-check with off-box snarkjs (sanity):
+  [32;22m[INFO]  [39;1msnarkJS[0m: OK!

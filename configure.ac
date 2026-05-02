@@ -39,6 +39,11 @@ AC_HEADER_STDBOOL
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_PROG_CC
+# AC_PROG_CXX must be unconditional so automake's am__fastdepCXX
+# conditional gets defined for both --with-mcl and the default config
+# (the C++ verifier in src/zk_carrier/zk_groth16_mcl.cpp is only compiled
+#  conditionally, but automake still needs to know we may use C++).
+AC_PROG_CXX
 AM_PROG_AS
 AM_PROG_AR
 
@@ -200,6 +205,12 @@ AC_ARG_WITH([rapidsnark],
   [use_rapidsnark=$withval],
   [use_rapidsnark=no])
 
+AC_ARG_WITH([mcl],
+  [AS_HELP_STRING([--with-mcl@<:@=DIR@:>@],
+  [Link the herumi/mcl BN254 pairing library + the libdogecoin Groth16 mcl verifier into libdogecoin (default is no; verification falls back to delegated mode without it).  DIR may point to a manual mcl install (uses DIR/include and DIR/lib); when omitted, the standard search path / depends-staged mcl is used.])],
+  [use_mcl=$withval],
+  [use_mcl=no])
+
 
 AC_ARG_ENABLE(tests,
   AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
@@ -349,6 +360,51 @@ if test "x$use_rapidsnark" != xno -a "x$use_rapidsnark" != x; then
   ])
 fi
 
+# --with-mcl[=DIR]: link herumi/mcl BN254 pairing library + the libdogecoin
+# mcl Groth16 verifier (src/zk_carrier/zk_groth16_mcl.cpp).  DIR is optional
+# and points at a manual install (uses DIR/include and DIR/lib).  We do a
+# light header / link probe and only define HAVE_MCL when both succeed.
+have_mcl=no
+if test "x$use_mcl" != xno -a "x$use_mcl" != x; then
+  case "x$use_mcl" in
+    xyes)
+      MCL_CFLAGS=""
+      MCL_LIBS="-lmcl -lstdc++"
+      ;;
+    *)
+      MCL_CFLAGS="-I$use_mcl/include"
+      MCL_LIBS="-L$use_mcl/lib -lmcl -lstdc++"
+      ;;
+  esac
+  saved_CPPFLAGS="$CPPFLAGS"
+  saved_LIBS="$LIBS"
+  CPPFLAGS="$CPPFLAGS $MCL_CFLAGS"
+  LIBS="$LIBS $MCL_LIBS"
+  AC_LANG_PUSH([C++])
+  AC_MSG_CHECKING([for mcl/bn.hpp + BN_SNARK1 link])
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+    #include <mcl/bn.hpp>
+  ]], [[
+    using namespace mcl::bn;
+    initPairing(mcl::BN_SNARK1);
+    return 0;
+  ]])],[
+    AC_MSG_RESULT([yes])
+    have_mcl=yes
+    AC_DEFINE([HAVE_MCL], [1], [Define if herumi/mcl BN254 pairing is available for in-process Groth16 verification])
+    AC_SUBST([MCL_CFLAGS])
+    AC_SUBST([MCL_LIBS])
+  ],[
+    AC_MSG_RESULT([no])
+    AC_MSG_WARN([--with-mcl requested but mcl headers/libmcl link failed; falling back to delegated verification])
+    CPPFLAGS="$saved_CPPFLAGS"
+    LIBS="$saved_LIBS"
+    MCL_CFLAGS=""
+    MCL_LIBS=""
+  ])
+  AC_LANG_POP([C++])
+fi
+
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
@@ -374,6 +430,7 @@ AM_CONDITIONAL([USE_YUBIKEY], [test "x$use_yubikey" = "xyes"])
 AM_CONDITIONAL([USE_LIBOQS], [test "x$use_liboqs" = "xyes"])
 AM_CONDITIONAL([USE_LIBOQS_RACCOON], [test "x$use_liboqs_raccoon" = "xyes"])
 AM_CONDITIONAL([USE_ZK_CARRIER], [test "x$use_zk_carrier" = "xyes"])
+AM_CONDITIONAL([HAVE_MCL], [test "x$have_mcl" = "xyes"])
 AM_CONDITIONAL([USE_PQC_CARRIER_HELPERS], [test "x$use_liboqs" = "xyes" -o "x$use_zk_carrier" = "xyes"])
 AM_CONDITIONAL([USE_ARMV8], [test "x$armv8_crypto" = "xyes"])
 AM_CONDITIONAL([USE_ARMV82], [test "x$armv82_crypto" = "xyes"])

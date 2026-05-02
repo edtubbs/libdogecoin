@@ -1,0 +1,45 @@
+===============================================================================
+ZK carrier mainnet e2e — Stage 2a (vkey wiring + DELEGATED verify)
+Date (UTC): Sat May  2 04:16:33 UTC 2026
+
+Same TX_C/TX_R as stage 1 (already on chain):
+  TX_C: 4a8038f7c0a57500864baab92fc0b025db4fa57507796f1c7a57d065af625e79 at block 6189394
+  TX_R: 0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208 at block 6189399
+  commit:  4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2
+
+Build: ./configure --enable-zk-carrier --enable-test-passwd
+Spvnode invocation:
+  ./spvnode -l -c -d -p -b -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr \
+            --zk-vkey /tmp/zk/verification_key.json scan
+
+What changed vs stage 1:
+  * spvnode now accepts --zk-vkey <path> and loads verification_key.json
+  * dogecoin_spv_client gained zk_vkey_blob fields + setter API
+  * src/spv.c:1258 now passes the vkey to dogecoin_zk_verify_proof()
+    instead of NULL/0, so the verifier no longer returns INVALID_ARG
+  * dogecoin_zk_verify_groth16 returns DELEGATED (not INVALID_ARG) when
+    no in-process verifier is compiled in — caller-side semantic fix
+
+===============================================================================
+Result lines (verbatim from spvnode debug log):
+===============================================================================
+
+2:[zk-vkey] loaded 3106 bytes from /tmp/zk/verification_key.json
+63648:DEBUG: [zk-commit] Pending at height=6189394 txpos=9 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 mode=0 source=op_return
+63670:DEBUG: [zk-commit] Valid at height=6189399 txpos=24 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 mode=0 source=carrier_scriptsig matched_txc_txpos=9 payload_len=842 txr_txid=0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208
+63671:DEBUG: [zk-commit] ZK verification DELEGATED at height=6189399 txpos=24 mode=0 err=-7
+63672:DEBUG: [zk-commit] Reveal validated: TX_R=0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 payload_len=842 mode=0 height=6189399
+
+===============================================================================
+Interpretation:
+  * vkey LOADED into spvnode at startup (3106 bytes)
+  * commitment PENDING when TX_C was scanned (block 6189394)
+  * commitment matched on TX_R at block 6189399 → VALID
+  * proof verification status: DELEGATED (err=-7 = DOGECOIN_ZK_ERR_DELEGATED)
+    — this is the documented behaviour for builds without --with-mcl/
+    --with-rapidsnark, mirroring the mobile-friendly default
+  * Reveal VALIDATED via commit-match path (PQC-parity behaviour)
+
+Stage 2b in this same PR replaces DELEGATED with PASSED by linking the
+depends-vendored herumi/mcl BN254 pairing library and src/zk_carrier/
+zk_groth16_mcl.cpp into the build via --with-mcl.

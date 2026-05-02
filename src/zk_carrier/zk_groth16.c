@@ -73,6 +73,18 @@ extern int groth16_verify(const char* vk_json,
                           unsigned long error_msg_maxsize);
 #endif
 
+#ifdef HAVE_MCL
+/* Forward declaration of the herumi/mcl-backed verifier implemented in
+ * src/zk_carrier/zk_groth16_mcl.cpp.  Returns 0 on successful verification,
+ * non-zero on any error (with a short non-sensitive diagnostic in err_buf).
+ * Linked in via depends/packages/mcl.mk + ./configure --with-mcl. */
+extern int groth16_verify_mcl(const char* vk_json,
+                              const char* public_json,
+                              const char* proof_json,
+                              char* err_buf,
+                              unsigned long err_buf_max);
+#endif
+
 dogecoin_zk_err_t dogecoin_zk_generate_groth16_proof(
     const uint8_t* witness_json,
     size_t witness_json_len,
@@ -101,8 +113,15 @@ dogecoin_zk_err_t dogecoin_zk_verify_groth16(
     const uint8_t* proof_json,
     size_t proof_json_len)
 {
-    if (!vk_json || vk_json_len == 0 ||
-        !public_json || public_json_len == 0 ||
+    /* No verification key configured (e.g. spvnode invoked without
+     * --zk-vkey) — the caller cannot do an in-process check.  Return
+     * DELEGATED so the SPV reveal still emits "Reveal validated" on
+     * commit-match alone, mirroring the documented mobile-friendly
+     * behaviour described at the top of this file. */
+    if (!vk_json || vk_json_len == 0) {
+        return DOGECOIN_ZK_ERR_DELEGATED;
+    }
+    if (!public_json || public_json_len == 0 ||
         !proof_json  || proof_json_len  == 0) {
         return DOGECOIN_ZK_ERR_INVALID_ARG;
     }
@@ -128,6 +147,33 @@ dogecoin_zk_err_t dogecoin_zk_verify_groth16(
     char err[256];
     err[0] = '\0';
     int rc = groth16_verify(vk, pubj, prf, err, sizeof(err));
+    dogecoin_free(vk);
+    dogecoin_free(pubj);
+    dogecoin_free(prf);
+    if (rc != 0) {
+        return DOGECOIN_ZK_ERR_VERIFY_FAIL;
+    }
+    return DOGECOIN_ZK_OK;
+#elif defined(HAVE_MCL)
+    /* mcl-backed verifier (depends/packages/mcl.mk + --with-mcl).  Like the
+     * rapidsnark path it expects NUL-terminated JSON, so copy into freshly
+     * allocated NUL-terminated buffers. */
+    char* vk = (char*)dogecoin_malloc(vk_json_len + 1);
+    char* pubj = (char*)dogecoin_malloc(public_json_len + 1);
+    char* prf = (char*)dogecoin_malloc(proof_json_len + 1);
+    if (!vk || !pubj || !prf) {
+        if (vk) dogecoin_free(vk);
+        if (pubj) dogecoin_free(pubj);
+        if (prf) dogecoin_free(prf);
+        return DOGECOIN_ZK_ERR_OOM;
+    }
+    memcpy(vk, vk_json, vk_json_len);     vk[vk_json_len] = '\0';
+    memcpy(pubj, public_json, public_json_len); pubj[public_json_len] = '\0';
+    memcpy(prf, proof_json, proof_json_len);    prf[proof_json_len] = '\0';
+
+    char err[256];
+    err[0] = '\0';
+    int rc = groth16_verify_mcl(vk, pubj, prf, err, sizeof(err));
     dogecoin_free(vk);
     dogecoin_free(pubj);
     dogecoin_free(prf);
