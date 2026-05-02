@@ -1,0 +1,62 @@
+===============================================================================
+ZK carrier mainnet end-to-end demo log
+Date (UTC): Sat May  2 04:08:13 UTC 2026
+
+TX_C (commitment + carrier P2SH outputs):
+  txid:   4a8038f7c0a57500864baab92fc0b025db4fa57507796f1c7a57d065af625e79
+  block:  6189394
+  link:   https://dogechain.info/tx/4a8038f7c0a57500864baab92fc0b025db4fa57507796f1c7a57d065af625e79
+
+TX_R (reveal — spends the carrier outputs, scriptSig contains the ZKP1 payload):
+  txid:   0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208
+  block:  6189399
+  link:   https://dogechain.info/tx/0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208
+
+Commitment hash (SHA256d of the 842-byte ZKP1 payload):
+  4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2
+
+Off-box snarkjs verification of the SAME proof bytes:
+  [32;22m[INFO]  [39;1msnarkJS[0m: OK!
+
+===============================================================================
+spvnode mainnet scan (./spvnode -l -c -d -p -b -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr scan)
+Build: ./configure --enable-zk-carrier --enable-test-passwd  (no --with-rapidsnark/--with-mcl yet)
+Note: this run is STAGE 1.  The 'ZK verification ERROR err=-1' line below
+      surfaces the wiring bug fixed in this same PR (src/spv.c:1258 passed
+      vk_blob=NULL because spvnode had no --zk-vkey flag yet).  Stage 2 of
+      this PR vendors a depends ZK library and adds --zk-vkey, producing
+      'ZK verification PASSED' on the same TX_C/TX_R already on chain.
+===============================================================================
+
+All [zk-commit] lines from the scan:
+DEBUG: [zk-commit] Pending at height=6189394 txpos=9 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 mode=0 source=op_return
+DEBUG: [zk-commit] Valid at height=6189399 txpos=24 commit=4d2c041b73727ef654927b5eb9f02ccb00a66dcf7fb0d5e8405843fe0dc6b8c2 mode=0 source=carrier_scriptsig matched_txc_txpos=9 payload_len=842 txr_txid=0ec81283fa7fea53c15560ef0b8ae78a96395b59fb9111173308b9f72bf39208
+DEBUG: [zk-commit] ZK verification ERROR at height=6189399 txpos=24 mode=0 err=-1
+
+===============================================================================
+Surrounding context (initial sync + final activity):
+===============================================================================
+nohup: ignoring input
+address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+Filtered block mode disabled (use -g/--filtered_blocks to enable)
+
+Connected 0 headers, now at height: 0
+done
+Discover peers...
+Connecting to the p2p network...
+DEBUG: Trying to connect to 1...
+DEBUG: Trying to connect to 2...
+DEBUG: Trying to connect to 3...
+DEBUG: Trying to connect to 4...
+...
+(scan progressed from baked checkpoint 6173706 through tip; TX_C found at
+ block 6189394, TX_R reveal found at block 6189399.)
+...
+DEBUG: Disconnect node 18
+DEBUG: Disconnect node 19
+DEBUG: Disconnect node 20
+DEBUG: Disconnect node 21
+DEBUG: Disconnect node 22
+DEBUG: Disconnect node 24
+DEBUG: Disconnect node 25
+done
