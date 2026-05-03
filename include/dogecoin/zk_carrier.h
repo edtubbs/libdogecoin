@@ -89,11 +89,22 @@ LIBDOGECOIN_BEGIN_DECL
 #define DOGECOIN_ZK_OPRETURN_DATA_LEN  (DOGECOIN_ZK_OPRETURN_TAG_LEN + 1 + 32)
 
 /* Wire-format version byte (the 6th byte of the ZKP1 payload, immediately
- * after the mode byte).  v0 is the legacy "vk distributed out-of-band" layout;
- * v1 appends a 4-byte big-endian vk length and the vk bytes after the proof
- * section so the reveal is fully self-contained for on-chain verification. */
-#define DOGECOIN_ZK_PAYLOAD_VERSION_V0 0x00
-#define DOGECOIN_ZK_PAYLOAD_VERSION_V1 0x01
+ * after the mode byte).  Treated as a flag bitfield so additive features can
+ * be combined: bit 0 = vk-included, bit 1 = tx-bound (32-byte funding tx
+ * binding hash present).  v0 (0x00) is the legacy "vk distributed
+ * out-of-band, no replay protection" layout; v1 (0x01) appends the vk so the
+ * reveal is fully self-contained for on-chain verification; v2 (0x03 — vk +
+ * binding) additionally appends a 32-byte SHA256d hash of the funding tx
+ * (TX_C) input outpoints so a verifier can check the proof reveal is bound
+ * to the on-chain spend that published it, providing a cryptographic
+ * replay-protection layer on top of TX_R's UTXO single-shot semantics. */
+#define DOGECOIN_ZK_PAYLOAD_VERSION_V0     0x00
+#define DOGECOIN_ZK_PAYLOAD_VERSION_V1     0x01
+#define DOGECOIN_ZK_PAYLOAD_FLAG_VK        0x01  /* bit 0 */
+#define DOGECOIN_ZK_PAYLOAD_FLAG_TX_BIND   0x02  /* bit 1 */
+#define DOGECOIN_ZK_PAYLOAD_VERSION_V2     (DOGECOIN_ZK_PAYLOAD_FLAG_VK | DOGECOIN_ZK_PAYLOAD_FLAG_TX_BIND)
+#define DOGECOIN_ZK_PAYLOAD_VERSION_MASK   0x03  /* known flag bits */
+#define DOGECOIN_ZK_TX_BINDING_LEN         32
 
 /* Selectable proof systems.  Stable numeric values — these are what would be
  * pushed onto the script stack as the OP_CHECKZKP mode argument. */
@@ -165,9 +176,47 @@ LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_get_commitment_hash(
     uint8_t out_commitment[32]);
 
 /*
- * Build the OP_RETURN scriptPubKey for TX_C: OP_RETURN <DZKC><mode><commit32>.
- * Caller frees *out_spk with cstr_free(..., true).
+ * Compute the tx_base sighash for a candidate TX_C.  This is the value the
+ * ZK prover MUST commit to as the `tx_binding` public input — mirroring how
+ * the PQC carrier signs over the same tx_base — so the resulting proof is
+ * cryptographically bound to one specific funding (base) transaction and a
+ * replayed proof under a different TX_C will fail snarkjs verify.
+ *
+ * The reconstruction matches `dogecoin_pqc_carrier_verify_signature_with_tx`
+ * exactly: starting from `tx_c`, all OP_RETURN (nulldata) outputs are
+ * stripped, all outputs whose scriptPubKey equals `carrier_spk` are stripped
+ * with their values summed back into the first remaining output, and the
+ * sighash is computed via `dogecoin_tx_sighash32(tx_base, signer_p2pkh_spk,
+ * vin_index=0, SIGHASH_ALL)`.
+ *
+ * To eliminate any modular-reduction ambiguity when this 32-byte digest is
+ * fed into a BN254 R1CS circuit as a field element, the top byte of the
+ * returned value is zeroed (248-bit effective binding).  Field-element
+ * conversion (big-endian decimal string) is the caller's responsibility.
+ *
+ * `signer_p2pkh_spk` is the canonical P2PKH scriptPubKey of the funding
+ * input's signer; for the demo flow this is derived from the funded address
+ * (DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr → HASH160 → 25-byte P2PKH spk).
+ *
+ * Returns DOGECOIN_ZK_OK on success.
  */
+/*
+ * Extract the canonical 25-byte P2PKH scriptPubKey of the signer for input 0
+ * of `tx`, parsing the standard `<sig> <pubkey>` P2PKH scriptSig.  Returns
+ * NULL if the scriptSig isn't a recognisable P2PKH input.  The returned
+ * cstring is allocated; caller frees with cstr_free(..., true).
+ *
+ * Mirrors the same parser used by `dogecoin_pqc_carrier_verify_signature_with_tx`
+ * so the ZK carrier and the PQC carrier agree on which P2PKH spk goes into
+ * the tx_base sighash that the proof / signature is bound to.
+ */
+LIBDOGECOIN_API cstring* dogecoin_zk_extract_signer_p2pkh_spk(const dogecoin_tx* tx);
+
+LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_compute_tx_base_sighash(
+    const dogecoin_tx* tx_c,
+    const cstring* signer_p2pkh_spk,
+    const cstring* carrier_spk,
+    uint8_t out_sighash[32]);
 LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_build_opreturn_scriptpubkey(
     dogecoin_zk_mode_t mode,
     const uint8_t commitment[32],

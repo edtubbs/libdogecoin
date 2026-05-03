@@ -127,6 +127,23 @@ def build_payload(args: argparse.Namespace) -> bytes:
         # Range-proof witness format (matches range_proof.circom).
         # If you wire a different circuit, override --input-json with the
         # exact JSON that circuit expects.
+        #
+        # The 4th input `tx_binding` is the 32-byte SHA256d sighash of the
+        # funding (base) transaction — same value the PQC carrier signs over
+        # — interpreted big-endian as a BN254 field element after zeroing
+        # the top byte (see dogecoin_zk_compute_tx_base_sighash).  The
+        # operator passes the 32-byte hex through --tx-binding-hex; passing
+        # an all-zero binding (--tx-binding-hex 00*64) reproduces the
+        # historical, replay-vulnerable demos and is rejected by SPV when
+        # `[zk-commit] tx_binding mismatch` is enforced.
+        tx_binding_hex = (args.tx_binding_hex or "00" * 32).lower()
+        if len(tx_binding_hex) != 64 or any(c not in "0123456789abcdef" for c in tx_binding_hex):
+            sys.exit("error: --tx-binding-hex must be 64 hex chars (32 bytes)")
+        tx_binding_bytes = bytes.fromhex(tx_binding_hex)
+        # Mirror the C-side "zero top byte" rule so the field-element
+        # interpretation is unambiguous on BN254.
+        tx_binding_bytes = b"\x00" + tx_binding_bytes[1:]
+        tx_binding_field = int.from_bytes(tx_binding_bytes, "big")
         if args.input_json:
             input_path.write_text(Path(args.input_json).read_text())
         else:
@@ -134,6 +151,7 @@ def build_payload(args: argparse.Namespace) -> bytes:
                 "low": str(args.low),
                 "high": str(args.high),
                 "amount": str(args.amount),
+                "tx_binding": str(tx_binding_field),
             }))
 
         run_fullprove(snarkjs, system, wasm, zkey, input_path, proof_path, public_path)
@@ -199,6 +217,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--low", type=int, help="public lower bound (range proof)")
     p.add_argument("--high", type=int, help="public upper bound (range proof)")
     p.add_argument("--amount", type=int, help="private witness amount (range proof)")
+    p.add_argument("--tx-binding-hex",
+                   help="32-byte hex SHA256d sighash of the funding (base) tx — "
+                        "the prover commits to this value as the `tx_binding` "
+                        "public input, mirroring how the PQC carrier signs over "
+                        "the same tx_base sighash; defaults to all-zeros for "
+                        "replay-vulnerable legacy testing")
     p.add_argument("--input-json", help="optional path to a circuit-specific input.json "
                                         "(overrides --low/--high/--amount)")
     p.add_argument("--proof-system", default="groth16",

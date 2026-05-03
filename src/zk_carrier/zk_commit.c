@@ -43,7 +43,10 @@
 #include <dogecoin/cstr.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/pqc_carrier.h>
+#include <dogecoin/pqc_falcon.h>
+#include <dogecoin/rmd160.h>
 #include <dogecoin/script.h>
+#include <dogecoin/sha2.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/zk_carrier.h>
 
@@ -381,4 +384,132 @@ dogecoin_bool dogecoin_tx_extract_zk_commit(
         return true;
     }
     return false;
+}
+
+/*
+ * tx_base sighash for ZK proof binding — mirrors the PQC carrier's
+ * tx_base reconstruction in src/pqc_carrier.c.  Strips OP_RETURN (nulldata)
+ * outputs and outputs whose scriptPubKey exactly matches `carrier_spk`,
+ * re-adds the carrier value to the first remaining output, and computes
+ * dogecoin_tx_sighash32(tx_base, signer_p2pkh_spk, 0, SIGHASH_ALL).  The
+ * top byte of the resulting digest is then zeroed so the value is an
+ * unambiguous BN254 field element when fed into a circom circuit as the
+ * `tx_binding` public input.
+ */
+dogecoin_zk_err_t dogecoin_zk_compute_tx_base_sighash(
+    const dogecoin_tx* tx_c,
+    const cstring* signer_p2pkh_spk,
+    const cstring* carrier_spk,
+    uint8_t out_sighash[32])
+{
+    if (!tx_c || !signer_p2pkh_spk || !carrier_spk || !out_sighash) {
+        return DOGECOIN_ZK_ERR_INVALID_ARG;
+    }
+
+    dogecoin_tx* tx_base = dogecoin_tx_new();
+    if (!tx_base) return DOGECOIN_ZK_ERR_OOM;
+    tx_base->version = tx_c->version;
+    tx_base->locktime = tx_c->locktime;
+
+    for (size_t vi = 0; vi < tx_c->vin->len; vi++) {
+        dogecoin_tx_in* orig = vector_idx(tx_c->vin, vi);
+        dogecoin_tx_in* copy = dogecoin_tx_in_new();
+        if (!copy) { dogecoin_tx_free(tx_base); return DOGECOIN_ZK_ERR_OOM; }
+        memcpy(copy->prevout.hash, orig->prevout.hash, sizeof(copy->prevout.hash));
+        copy->prevout.n = orig->prevout.n;
+        copy->sequence  = orig->sequence;
+        if (orig->script_sig && orig->script_sig->len > 0) {
+            cstr_free(copy->script_sig, true);
+            copy->script_sig = cstr_new_buf(orig->script_sig->str, orig->script_sig->len);
+        } else if (!copy->script_sig) {
+            /* dogecoin_tx_sighash invokes cstr_resize on tx_in->script_sig
+             * unconditionally, so make sure we hand it a non-NULL cstring
+             * even when the source input has no scriptSig yet (TX_C is
+             * usually unsigned at this point). */
+            copy->script_sig = cstr_new_sz(0);
+        }
+        vector_add(tx_base->vin, copy);
+    }
+
+    uint64_t carrier_total = 0;
+    for (size_t vo = 0; vo < tx_c->vout->len; vo++) {
+        dogecoin_tx_out* orig = vector_idx(tx_c->vout, vo);
+        if (!orig || !orig->script_pubkey || orig->script_pubkey->len == 0) continue;
+        /* Skip OP_RETURN nulldata outputs (DZKC commitment lives there). */
+        if ((uint8_t)orig->script_pubkey->str[0] == 0x6a /* OP_RETURN */) continue;
+        /* Skip canonical P2SH carrier outputs (exact 23-byte match). */
+        if (orig->script_pubkey->len == carrier_spk->len &&
+            memcmp(orig->script_pubkey->str, carrier_spk->str, carrier_spk->len) == 0) {
+            carrier_total += orig->value;
+            continue;
+        }
+        dogecoin_tx_out* copy = dogecoin_tx_out_new();
+        if (!copy) { dogecoin_tx_free(tx_base); return DOGECOIN_ZK_ERR_OOM; }
+        copy->value = orig->value;
+        cstr_free(copy->script_pubkey, true);
+        copy->script_pubkey = cstr_new_buf(orig->script_pubkey->str, orig->script_pubkey->len);
+        vector_add(tx_base->vout, copy);
+    }
+
+    /* Restore carrier cost to the first remaining output, matching how the
+     * PQC carrier reverses the carrier-fee deduction performed during TX_C
+     * construction. */
+    if (carrier_total > 0 && tx_base->vout->len > 0) {
+        dogecoin_tx_out* first_out = vector_idx(tx_base->vout, 0);
+        first_out->value += carrier_total;
+    }
+
+    uint8_t sh[32];
+    dogecoin_bool ok = dogecoin_tx_sighash32(tx_base, signer_p2pkh_spk, 0, SIGHASH_ALL, sh);
+    dogecoin_tx_free(tx_base);
+    if (!ok) return DOGECOIN_ZK_ERR_VERIFY_FAIL;
+
+    /* Zero top byte → 248-bit unambiguous BN254 field element.  Cuts at most
+     * 8 bits from a 256-bit collision-resistant digest, leaving 2^248 work
+     * for any preimage attack — comfortably beyond what's relevant for a
+     * tx-binding tag. */
+    sh[0] = 0x00;
+    memcpy(out_sighash, sh, 32);
+    return DOGECOIN_ZK_OK;
+}
+
+/*
+ * Reproduces the P2PKH scriptSig parser from
+ * dogecoin_pqc_carrier_verify_signature_with_tx so the ZK carrier extracts
+ * the *same* signer scriptPubKey as the PQC carrier when computing the
+ * tx_base sighash a ZK proof is bound to.
+ */
+cstring* dogecoin_zk_extract_signer_p2pkh_spk(const dogecoin_tx* tx)
+{
+    if (!tx || !tx->vin || tx->vin->len == 0) return NULL;
+    dogecoin_tx_in* first_in = vector_idx(tx->vin, 0);
+    if (!first_in || !first_in->script_sig ||
+        first_in->script_sig->len < DOGECOIN_PQC_MIN_P2PKH_SCRIPTSIG_LEN ||
+        first_in->script_sig->len > DOGECOIN_PQC_MAX_P2PKH_SCRIPTSIG_LEN) return NULL;
+    const uint8_t* ss = (const uint8_t*)first_in->script_sig->str;
+    size_t sslen = first_in->script_sig->len;
+    if (sslen == 0) return NULL;
+    size_t pos = 0;
+    uint8_t sig_push_len = ss[pos++];
+    if (sig_push_len < DOGECOIN_PQC_MIN_DER_SIG_PUSH_LEN ||
+        sig_push_len > DOGECOIN_PQC_MAX_DER_SIG_PUSH_LEN ||
+        pos + sig_push_len > sslen ||
+        ss[pos] != 0x30 /* DER SEQUENCE */) return NULL;
+    pos += sig_push_len;
+    if (pos >= sslen) return NULL;
+    uint8_t pk_push_len = ss[pos++];
+    if (pk_push_len != 33 || pos + 33 > sslen) return NULL;
+    const uint8_t* ecdsa_pk = ss + pos;
+    uint8_t sha_out[32];
+    sha256_raw(ecdsa_pk, 33, sha_out);
+    uint8_t h160[20];
+    rmd160(sha_out, 32, h160);
+    cstring* spk = cstr_new_sz(25);
+    if (!spk) return NULL;
+    static const uint8_t p2pkh_prefix[] = {0x76, 0xa9, 0x14};
+    static const uint8_t p2pkh_suffix[] = {0x88, 0xac};
+    cstr_append_buf(spk, p2pkh_prefix, 3);
+    cstr_append_buf(spk, h160, 20);
+    cstr_append_buf(spk, p2pkh_suffix, 2);
+    return spk;
 }

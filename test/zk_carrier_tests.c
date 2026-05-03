@@ -13,6 +13,7 @@
 
 #include <dogecoin/cstr.h>
 #include <dogecoin/mem.h>
+#include <dogecoin/pqc_falcon.h>
 #include <dogecoin/script.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
@@ -343,6 +344,111 @@ static void test_zk_prover_is_delegated(void)
     u_assert_int_eq(e, DOGECOIN_ZK_ERR_NOT_IMPLEMENTED);
 }
 
+/* tx_base sighash binding: the ZK proof's `tx_binding` public input MUST
+ * equal the sighash of the TX_C with OP_RETURN + carrier outputs stripped,
+ * exactly mirroring the PQC carrier signing model.  This test asserts:
+ *  1. `dogecoin_zk_compute_tx_base_sighash` strips OP_RETURN + carriers and
+ *     re-adds the carrier value to the first remaining output, and
+ *  2. The resulting sighash matches the sighash of the carrier-free base
+ *     tx — so the SPV decoder's `[zk-commit] tx_binding match` check on a
+ *     replayed proof under a different funding tx will mismatch by design.
+ */
+static void test_zk_tx_base_sighash_binding(void)
+{
+    /* Build a synthetic carrier_spk and a "base" TX_C (single P2PKH vout). */
+    uint8_t carrier_h160[20];
+    memset(carrier_h160, 0xa5, sizeof carrier_h160);
+    cstring* carrier_spk = cstr_new_sz(23);
+    static const uint8_t hdr[] = {0xa9, 0x14};
+    static const uint8_t tail[] = {0x87};
+    cstr_append_buf(carrier_spk, hdr, 2);
+    cstr_append_buf(carrier_spk, carrier_h160, 20);
+    cstr_append_buf(carrier_spk, tail, 1);
+
+    cstring* signer_spk = cstr_new_sz(25);
+    static const uint8_t p2pkh_pre[] = {0x76, 0xa9, 0x14};
+    static const uint8_t p2pkh_post[] = {0x88, 0xac};
+    uint8_t signer_h160[20];
+    memset(signer_h160, 0x77, sizeof signer_h160);
+    cstr_append_buf(signer_spk, p2pkh_pre, 3);
+    cstr_append_buf(signer_spk, signer_h160, 20);
+    cstr_append_buf(signer_spk, p2pkh_post, 2);
+
+    /* tx_base: 1 vin, 1 P2PKH vout @ 100000000 koinu */
+    dogecoin_tx* tx_base = dogecoin_tx_new();
+    {
+        dogecoin_tx_in* in = dogecoin_tx_in_new();
+        memset(in->prevout.hash, 0, 32);
+        in->prevout.n = 0;
+        in->sequence = 0xffffffff;
+        in->script_sig = cstr_new_sz(0); /* dogecoin_tx_sighash requires non-NULL script_sig */
+        vector_add(tx_base->vin, in);
+        dogecoin_tx_out* out = dogecoin_tx_out_new();
+        out->value = 100000000;
+        cstr_free(out->script_pubkey, true);
+        out->script_pubkey = cstr_new_buf(signer_spk->str, signer_spk->len);
+        vector_add(tx_base->vout, out);
+    }
+    uint8_t base_sighash[32];
+    u_assert_int_eq(dogecoin_tx_sighash32(tx_base, signer_spk, 0, SIGHASH_ALL, base_sighash), true);
+
+    /* tx_c: same vin, P2PKH vout reduced by 100000 (carrier value), then
+     * an OP_RETURN nulldata output, then a P2SH carrier output of value
+     * 100000.  This is the canonical TX_C layout zk_add_commit_and_carrier_tx
+     * produces. */
+    dogecoin_tx* tx_c = dogecoin_tx_new();
+    {
+        dogecoin_tx_in* in = dogecoin_tx_in_new();
+        memset(in->prevout.hash, 0, 32);
+        in->prevout.n = 0;
+        in->sequence = 0xffffffff;
+        in->script_sig = cstr_new_sz(0);
+        vector_add(tx_c->vin, in);
+
+        dogecoin_tx_out* out = dogecoin_tx_out_new();
+        out->value = 100000000 - 100000; /* carrier deducted */
+        cstr_free(out->script_pubkey, true);
+        out->script_pubkey = cstr_new_buf(signer_spk->str, signer_spk->len);
+        vector_add(tx_c->vout, out);
+
+        dogecoin_tx_out* opret = dogecoin_tx_out_new();
+        opret->value = 0;
+        cstr_free(opret->script_pubkey, true);
+        opret->script_pubkey = cstr_new_sz(8);
+        static const uint8_t op_return_dummy[] = {0x6a, 0x06, 'D','Z','K','C', 0x00, 0x01};
+        cstr_append_buf(opret->script_pubkey, op_return_dummy, sizeof op_return_dummy);
+        vector_add(tx_c->vout, opret);
+
+        dogecoin_tx_out* carr = dogecoin_tx_out_new();
+        carr->value = 100000;
+        cstr_free(carr->script_pubkey, true);
+        carr->script_pubkey = cstr_new_buf(carrier_spk->str, carrier_spk->len);
+        vector_add(tx_c->vout, carr);
+    }
+
+    uint8_t recomputed[32];
+    u_assert_int_eq(dogecoin_zk_compute_tx_base_sighash(tx_c, signer_spk, carrier_spk, recomputed),
+                    DOGECOIN_ZK_OK);
+
+    /* Recomputed sighash matches the base sighash with the top byte zeroed. */
+    uint8_t expected[32];
+    memcpy(expected, base_sighash, 32);
+    expected[0] = 0x00;
+    u_assert_mem_eq(recomputed, expected, 32);
+
+    /* A different funding tx (alt_value) must produce a different sighash. */
+    dogecoin_tx_out* alt_out = vector_idx(tx_base->vout, 0);
+    alt_out->value = 99500000;
+    uint8_t alt_sighash[32];
+    u_assert_int_eq(dogecoin_tx_sighash32(tx_base, signer_spk, 0, SIGHASH_ALL, alt_sighash), true);
+    u_assert_int_eq(memcmp(alt_sighash, base_sighash, 32) != 0, 1);
+
+    dogecoin_tx_free(tx_c);
+    dogecoin_tx_free(tx_base);
+    cstr_free(carrier_spk, true);
+    cstr_free(signer_spk, true);
+}
+
 void test_zk_carrier(void)
 {
     test_zk_codec_roundtrip();
@@ -352,6 +458,7 @@ void test_zk_carrier(void)
     test_zk_decode_rejects_truncated();
     test_zk_opreturn_layout();
     test_zk_carrier_tx_roundtrip();
+    test_zk_tx_base_sighash_binding();
     test_zk_modes_dispatch();
     test_zk_prover_is_delegated();
 }

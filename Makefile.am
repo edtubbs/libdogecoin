@@ -130,7 +130,17 @@ libdogecoin_la_SOURCES = \
 
 if USE_LIBOQS
 libdogecoin_la_SOURCES += \
-    src/pqc_dilithium.c \
+    src/pqc_dilithium.c
+endif
+
+# pqc_falcon.c is built whenever the PQ carrier helpers are enabled (USE_LIBOQS
+# OR USE_ZK_CARRIER): the Falcon-specific entry points inside it are guarded
+# by #ifdef USE_LIBOQS, but the file also defines `dogecoin_tx_sighash32`
+# unconditionally — the ZK carrier needs that helper to compute the tx_base
+# sighash that the prover binds the proof to (mirroring how the PQC carrier
+# signs over the same value).
+if USE_PQC_CARRIER_HELPERS
+libdogecoin_la_SOURCES += \
     src/pqc_falcon.c
 endif
 

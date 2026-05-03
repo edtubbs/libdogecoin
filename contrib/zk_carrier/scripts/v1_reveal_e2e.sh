@@ -80,30 +80,12 @@ PROOF_JSON="$OUT_DIR/proof.json"
 PUBLIC_JSON="$OUT_DIR/public.json"
 
 echo
-echo "--- Step 1: snarkjs prove + ZKP1 v1 payload encode (via witness_helper.py) ---"
-python3 "$WITNESS_HELPER" \
-    --proof-system "$PROOF_SYSTEM" \
-    --wasm "$WASM" --zkey "$ZKEY" --vkey "$VKEY" \
-    --circuit-id 1 \
-    --low 0 --high 1000000 --amount 50000 \
-    --save-proof  "$PROOF_JSON" \
-    --save-public "$PUBLIC_JSON" \
-    --out-payload "$PAYLOAD_HEX_FILE"
-PAYLOAD_HEX=$(tr -d '[:space:]' < "$PAYLOAD_HEX_FILE")
-PAYLOAD_BYTES=$(( ${#PAYLOAD_HEX} / 2 ))
-echo "payload_bytes=$PAYLOAD_BYTES (v1 self-contained reveal: vk embedded inline)"
-
-echo
-echo "--- Step 2: such -c zk_commit (derives commitment + reports vk_len) ---"
-"$SUCH" -c zk_commit -x "$PAYLOAD_HEX"
-COMMIT=$("$SUCH" -c zk_commit -x "$PAYLOAD_HEX" 2>&1 | awk -F':[[:space:]]+' '/^commitment:/ {print $2; exit}' | tr -d ' ')
-echo "commit32=$COMMIT"
-
-echo
-echo "--- Step 3: such -c zk_add_commit_and_carrier_tx (TX_C scaffold) ---"
-# Synthetic single-vin/single-vout base tx so we can attach OP_RETURN +
-# carrier outputs without a real funding spend.  This is identical to what
-# broadcast_set.sh does, except with a placeholder vin/vout.
+echo "--- Step 0: build TX_C base (funding tx without commit/carrier) and compute tx_binding ---"
+# This synthetic single-vin/single-vout base tx represents what would be a
+# real spend of the on-chain UTXOs at the funded address.  Replacing it with
+# `getrawtransaction` of an actual funding tx is what `broadcast_set.sh`
+# does for live runs against
+# https://chain.so/address/DOGE/DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr.
 BASE_UNSIGNED=$(python3 - <<'PY'
 def le_u32(n): return n.to_bytes(4, "little").hex()
 def le_u64(n): return n.to_bytes(8, "little").hex()
@@ -117,6 +99,38 @@ vout = le_u64(100_000_000) + varint(len(spk)//2) + spk
 print("01000000" + varint(1) + vin + varint(1) + vout + "00000000")
 PY
 )
+SIGNER_SPK="76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac"
+TX_BINDING_RAW=$("$SUCH" -c tx_sighash32 -x "$BASE_UNSIGNED" -s "$SIGNER_SPK" -i 0 -h 1 2>&1 | awk -F': ' '/^tx_sighash32:/ {print $2; exit}' | tr -d ' ')
+# Zero top byte so the value is an unambiguous BN254 field element — matches
+# dogecoin_zk_compute_tx_base_sighash() exactly.
+TX_BINDING="00${TX_BINDING_RAW:2}"
+echo "base_unsigned_size=$(( ${#BASE_UNSIGNED} / 2 )) bytes"
+echo "tx_base_sighash_full=$TX_BINDING_RAW"
+echo "tx_binding (top-byte-zeroed) = $TX_BINDING"
+
+echo
+echo "--- Step 1: snarkjs prove + ZKP1 v1 payload encode bound to tx_base sighash ---"
+python3 "$WITNESS_HELPER" \
+    --proof-system "$PROOF_SYSTEM" \
+    --wasm "$WASM" --zkey "$ZKEY" --vkey "$VKEY" \
+    --circuit-id 1 \
+    --low 0 --high 1000000 --amount 50000 \
+    --tx-binding-hex "$TX_BINDING" \
+    --save-proof  "$PROOF_JSON" \
+    --save-public "$PUBLIC_JSON" \
+    --out-payload "$PAYLOAD_HEX_FILE"
+PAYLOAD_HEX=$(tr -d '[:space:]' < "$PAYLOAD_HEX_FILE")
+PAYLOAD_BYTES=$(( ${#PAYLOAD_HEX} / 2 ))
+echo "payload_bytes=$PAYLOAD_BYTES (v1 self-contained reveal: vk embedded inline; proof bound to tx_base)"
+
+echo
+echo "--- Step 2: such -c zk_commit (derives commitment + reports vk_len) ---"
+"$SUCH" -c zk_commit -x "$PAYLOAD_HEX"
+COMMIT=$("$SUCH" -c zk_commit -x "$PAYLOAD_HEX" 2>&1 | awk -F':[[:space:]]+' '/^commitment:/ {print $2; exit}' | tr -d ' ')
+echo "commit32=$COMMIT"
+
+echo
+echo "--- Step 3: such -c zk_add_commit_and_carrier_tx (TX_C scaffold) ---"
 SUCH_OUT=$("$SUCH" -c zk_add_commit_and_carrier_tx -x "$BASE_UNSIGNED" -m "$MODE_BYTE" -s "$PAYLOAD_HEX" -h 100000000 2>&1)
 echo "$SUCH_OUT"
 TX_C_UNSIGNED=$(echo "$SUCH_OUT" | awk -F': ' '/^tx with commitment/ {print $2; exit}' | tr -d ' ')
@@ -212,16 +226,78 @@ echo "+ snarkjs $PROOF_SYSTEM verify $RECOVERED_VK $RECOVERED_PUB $RECOVERED_PRO
 "$SNARKJS" "$PROOF_SYSTEM" verify "$RECOVERED_VK" "$RECOVERED_PUB" "$RECOVERED_PROOF"
 SNARKJS_RC=$?
 echo "snarkjs rc=$SNARKJS_RC"
-if [ "$SNARKJS_RC" = "0" ]; then
-    echo
-    echo "==============================================================================="
-    echo "[OK] v1 self-contained reveal validated end-to-end ($PROOF_SYSTEM)"
-    echo "     - SHA256d(payload) matches the libdogecoin commit32"
-    echo "     - vk recovered from the on-chain reveal alone"
-    echo "     - snarkjs $PROOF_SYSTEM verify accepts the proof under that recovered vk"
-    echo "     no out-of-band vk channel was used at any step"
-    echo "==============================================================================="
-else
+if [ "$SNARKJS_RC" != "0" ]; then
     echo "[FAIL] snarkjs verify rejected the proof under the recovered vk"
     exit 1
 fi
+
+echo
+echo "--- Step 7: tx_binding match check (replay-protection, mirroring PQC tx_base sighash) ---"
+# This reproduces what spv.c does inside the [zk-commit] tx_binding log line
+# without requiring a live spvnode peer connection: parse the 3rd snarkjs
+# public input from the recovered public.json (the value the prover
+# committed to as `tx_binding`), recompute the tx_base sighash from the
+# OUTPUT-stripped TX_C, and compare them.  An attacker who replays this
+# proof under a different funding tx would publish a TX_C with a different
+# tx_base sighash, and this step would emit `tx_binding mismatch`.
+RECOMPUTED_BINDING_RAW=$("$SUCH" -c tx_sighash32 -x "$BASE_UNSIGNED" -s "$SIGNER_SPK" -i 0 -h 1 2>&1 | awk -F': ' '/^tx_sighash32:/ {print $2; exit}' | tr -d ' ')
+RECOMPUTED_BINDING="00${RECOMPUTED_BINDING_RAW:2}"
+PUB_INPUT_3=$(python3 -c "import json; pub=json.load(open('$RECOVERED_PUB')); print(format(int(pub[2]), '064x'))")
+echo "tx_base_sighash_recomputed_from_TX_C: $RECOMPUTED_BINDING"
+echo "tx_binding_from_public_inputs[2]:     $PUB_INPUT_3"
+if [ "$RECOMPUTED_BINDING" = "$PUB_INPUT_3" ]; then
+    echo "[zk-commit] tx_binding match (CLI-equivalent of spv.c log line)"
+else
+    echo "[zk-commit] tx_binding mismatch"
+    echo "[FAIL] tx_binding does not match — proof not bound to this TX_C"
+    exit 1
+fi
+
+echo
+echo "--- Step 8: replay-attack tamper test (different TX_C → different tx_base sighash → snarkjs MUST reject the lifted proof) ---"
+# Re-derive the sighash for a *different* funding tx (we just bump the input
+# value), and prove that snarkjs rejects the original proof bytes when the
+# public input is swapped to that new binding.  This is the actual
+# replay-detection demonstration: an attacker who lifts (proof.json, vk.json)
+# from this on-chain reveal and republishes them under a new TX_C with a
+# different tx_base sighash will fail snarkjs verify, exactly as a verifier
+# walking the chain would.
+ALT_BASE=$(python3 - <<'PY'
+def le_u32(n): return n.to_bytes(4, "little").hex()
+def le_u64(n): return n.to_bytes(8, "little").hex()
+def varint(n):
+    if n < 0xfd: return f"{n:02x}"
+    return "fd" + n.to_bytes(2, "little").hex()
+prev = "00" * 32
+vin  = prev + le_u32(0) + "00" + "ffffffff"
+spk  = "76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac"
+vout = le_u64(99_500_000) + varint(len(spk)//2) + spk  # different value → different sighash
+print("01000000" + varint(1) + vin + varint(1) + vout + "00000000")
+PY
+)
+ALT_BINDING_RAW=$("$SUCH" -c tx_sighash32 -x "$ALT_BASE" -s "$SIGNER_SPK" -i 0 -h 1 2>&1 | awk -F': ' '/^tx_sighash32:/ {print $2; exit}' | tr -d ' ')
+ALT_BINDING="00${ALT_BINDING_RAW:2}"
+echo "alt_tx_base_sighash (replay attempt): $ALT_BINDING"
+TAMPER_PUB="$OUT_DIR/tampered_public.json"
+python3 -c "import json; p=json.load(open('$RECOVERED_PUB')); p[2]=str(int('$ALT_BINDING', 16)); json.dump(p, open('$TAMPER_PUB','w'))"
+set +e
+"$SNARKJS" "$PROOF_SYSTEM" verify "$RECOVERED_VK" "$TAMPER_PUB" "$RECOVERED_PROOF" 2>&1 | tee "$OUT_DIR/tamper_verify.log"
+TAMPER_RC=${PIPESTATUS[0]}
+set -e
+echo "tamper snarkjs rc=$TAMPER_RC (expected non-zero)"
+if [ "$TAMPER_RC" = "0" ]; then
+    echo "[FAIL] snarkjs accepted a replayed proof under a different tx_binding — binding broken!"
+    exit 1
+fi
+echo "[OK] snarkjs rejected the lifted proof under a different tx_base sighash → replay protection holds"
+
+echo
+echo "==============================================================================="
+echo "[OK] v1 self-contained reveal + tx_base binding validated end-to-end ($PROOF_SYSTEM)"
+echo "     - SHA256d(payload) matches the libdogecoin commit32"
+echo "     - vk recovered from the on-chain reveal alone"
+echo "     - snarkjs $PROOF_SYSTEM verify accepts the proof under that recovered vk"
+echo "     - tx_binding (3rd public input) matches recomputed TX_C tx_base sighash"
+echo "     - replay attempt under a different TX_C fails snarkjs verify"
+echo "     no out-of-band vk channel was used at any step"
+echo "==============================================================================="

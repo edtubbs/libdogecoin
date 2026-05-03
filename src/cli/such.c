@@ -1605,7 +1605,11 @@ int main(int argc, char* argv[])
         }
         vector_free(chunks, true);
     }
-#ifdef USE_LIBOQS
+    /* tx_sighash32 is built unconditionally because the underlying helper
+     * (dogecoin_tx_sighash32) is now compiled regardless of USE_LIBOQS — the
+     * ZK carrier needs it to compute the tx_base sighash that ZK proofs are
+     * bound to as their `tx_binding` public input, mirroring the PQC carrier
+     * signing model. */
     else if (strcmp(cmd, "tx_sighash32") == 0) {
         // ./such -c tx_sighash32 -x <raw hex tx> -s <script pubkey> -i <input index> -h <sighash type>
         if (!txhex || !scripthex) {
@@ -1650,7 +1654,6 @@ int main(int argc, char* argv[])
         cstr_free(script, true);
         dogecoin_tx_free(tx);
     }
-#endif
     else if (strcmp(cmd, "comp2der") == 0) {
         // ./such -c comp2der -s <compact signature>
         if (!scripthex || strlen(scripthex) != 128) {

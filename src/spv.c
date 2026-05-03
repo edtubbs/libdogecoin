@@ -1370,6 +1370,113 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                             ZK_LOG_DUMP_FIELD("vk", dec_vk, dec_vk_len);
                                         }
 
+                                        /* tx_binding replay-protection check.
+                                         * Mirroring the PQC carrier model where the signature is
+                                         * over a tx_base sighash, the ZK proof's third snarkjs
+                                         * public input is the same tx_base sighash (zero-top-byte
+                                         * 248-bit BN254 field element).  Recompute it from the
+                                         * matched TX_C bytes the SPV node cached during phase-1
+                                         * pending-commit detection, parse the third element of the
+                                         * snarkjs public.json array out of `dec_pub`, and compare.
+                                         * A mismatch means the proof was lifted from another
+                                         * funding tx and replayed under this commit — we log it
+                                         * loudly so the operator (and any external auditor) can
+                                         * see the binding match independent of the snarkjs verify
+                                         * step. */
+                                        if (matched_entry && matched_entry->txc_raw && matched_entry->txc_raw_len > 0) {
+                                            dogecoin_tx* txc = dogecoin_tx_new();
+                                            size_t txc_consumed = 0;
+                                            if (txc && dogecoin_tx_deserialize(matched_entry->txc_raw, matched_entry->txc_raw_len, txc, &txc_consumed)) {
+                                                cstring* signer_spk = dogecoin_zk_extract_signer_p2pkh_spk(txc);
+                                                cstring* carrier_spk = NULL;
+                                                /* Re-derive the canonical 23-byte P2SH carrier spk for the matched payload. */
+                                                {
+                                                    cstring** dummy_sigs = NULL;
+                                                    uint8_t dummy_pt = 0;
+                                                    /* Use the carrier-tx builder helper to obtain
+                                                     * the carrier scriptPubKey deterministically.
+                                                     * It only depends on the payload bytes. */
+                                                    dogecoin_tx* tmp_tx = dogecoin_tx_new();
+                                                    if (tmp_tx) {
+                                                        if (dogecoin_zk_build_carrier_tx_c(tmp_tx, zk_payload, zk_payload_len,
+                                                                                            matched_mode, 0, &carrier_spk, &dummy_pt) != DOGECOIN_ZK_OK) {
+                                                            carrier_spk = NULL;
+                                                        }
+                                                        dogecoin_tx_free(tmp_tx);
+                                                    }
+                                                    (void)dummy_sigs;
+                                                }
+                                                if (signer_spk && carrier_spk) {
+                                                    uint8_t recomputed[32];
+                                                    if (dogecoin_zk_compute_tx_base_sighash(txc, signer_spk, carrier_spk, recomputed) == DOGECOIN_ZK_OK) {
+                                                        char recomputed_hex[65] = {0};
+                                                        utils_bin_to_hex(recomputed, 32, recomputed_hex);
+                                                        /* Parse the 3rd quoted string out of dec_pub (snarkjs JSON).
+                                                         * Layout: ["...","...","<decimal>"]. We scan for quoted
+                                                         * tokens and pick index 2.  Reject if not exactly 3 tokens. */
+                                                        char binding_dec[80] = {0};
+                                                        int  binding_token_count = 0;
+                                                        const uint8_t* sp = dec_pub;
+                                                        size_t spn = dec_pub_len;
+                                                        size_t sj = 0;
+                                                        while (sj < spn) {
+                                                            if (sp[sj] != '"') { sj++; continue; }
+                                                            sj++;
+                                                            size_t start = sj;
+                                                            while (sj < spn && sp[sj] != '"') sj++;
+                                                            if (sj >= spn) break;
+                                                            size_t tok_len = sj - start;
+                                                            if (binding_token_count == 2 && tok_len < sizeof(binding_dec)) {
+                                                                memcpy(binding_dec, sp + start, tok_len);
+                                                                binding_dec[tok_len] = 0;
+                                                            }
+                                                            binding_token_count++;
+                                                            sj++;
+                                                        }
+                                                        if (binding_token_count >= 3 && binding_dec[0]) {
+                                                            /* Convert decimal string → 32-byte big-endian (top byte = 0). */
+                                                            uint8_t parsed[32] = {0};
+                                                            /* Schoolbook base-10 to base-256 conversion. */
+                                                            const char* dp = binding_dec;
+                                                            while (*dp) {
+                                                                if (*dp < '0' || *dp > '9') { parsed[0] = 0xff; break; }
+                                                                unsigned carry = (unsigned)(*dp - '0');
+                                                                for (int bi = 31; bi >= 0; bi--) {
+                                                                    unsigned v = (unsigned)parsed[bi] * 10u + carry;
+                                                                    parsed[bi] = (uint8_t)(v & 0xff);
+                                                                    carry = v >> 8;
+                                                                }
+                                                                if (carry) { parsed[0] = 0xff; break; }
+                                                                dp++;
+                                                            }
+                                                            char parsed_hex[65] = {0};
+                                                            utils_bin_to_hex(parsed, 32, parsed_hex);
+                                                            int match = (memcmp(parsed, recomputed, 32) == 0);
+                                                            client->nodegroup->log_write_cb(
+                                                                "[zk-commit] tx_binding %s txr_txid=%s recomputed=%s public_input[2]=%s\n",
+                                                                match ? "match" : "mismatch",
+                                                                txr_txid_hex, recomputed_hex, parsed_hex);
+                                                        } else {
+                                                            client->nodegroup->log_write_cb(
+                                                                "[zk-commit] tx_binding skipped: expected >=3 public inputs (got %d) — payload predates tx-base binding\n",
+                                                                binding_token_count);
+                                                        }
+                                                    } else {
+                                                        client->nodegroup->log_write_cb(
+                                                            "[zk-commit] tx_binding skipped: tx_base sighash recompute failed for txr_txid=%s\n",
+                                                            txr_txid_hex);
+                                                    }
+                                                } else {
+                                                    client->nodegroup->log_write_cb(
+                                                        "[zk-commit] tx_binding skipped: cannot extract signer/carrier spk from cached TX_C (txr_txid=%s)\n",
+                                                        txr_txid_hex);
+                                                }
+                                                if (signer_spk) cstr_free(signer_spk, true);
+                                                if (carrier_spk) cstr_free(carrier_spk, true);
+                                            }
+                                            if (txc) dogecoin_tx_free(txc);
+                                        }
+
                                         #undef ZK_LOG_DUMP_FIELD
                                     } else {
                                         client->nodegroup->log_write_cb(
