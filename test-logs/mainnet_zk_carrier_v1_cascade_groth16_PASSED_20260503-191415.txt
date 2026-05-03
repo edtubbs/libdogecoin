@@ -1,0 +1,53 @@
+===============================================================================
+ZK carrier mainnet v1 (vk-on-chain) cascade — Groth16 — 2026-05-03T19:37:38Z
+Funded address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+Proof system:   groth16 (ZKP1 mode=0, version=0x01 — self-contained reveal)
+===============================================================================
+Manifest:
+iter	tx_c_txid	tx_r_txid	commit	payload_bytes	utc_iso
+1	b70bc69f574b3044972d52a9a6eb33f00c2ed909b7346994aceec0c412e18354	68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7	80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e	4144	2026-05-03T19:16:00Z
+
+===============================================================================
+Iteration artefact fingerprints (groth16):
+===============================================================================
+  2f3da605387e8c941a3a1feeed1bca2c6abd479e7fed8040d283f7e0f87ce76c  test-logs/zk_set_20260503_191452/iter_1/payload.hex  (8288 bytes)
+  066a01ecce38fa84ca9013b257fd5c6e0b3cb6ee81ed3ac3da8fa7c7ae38ce75  test-logs/zk_set_20260503_191452/iter_1/proof.json  (805 bytes)
+  fc38e2275eb98330b347b04e3e5be25fbb7a8b6c0c2baa880360da4d230b1d39  test-logs/zk_set_20260503_191452/iter_1/public.json  (26 bytes)
+  e88503f2aebf52b74dfb53b93e03f04cf2b830a422daf13f65d3d8767abfd554  test-logs/zk_set_20260503_191452/iter_1/tx_c.signed.hex  (671 bytes)
+  07b373426574011cc9dbea946cfb1d3824ee57ef5dc0e76cb45146b194548d6a  test-logs/zk_set_20260503_191452/iter_1/tx_r.signed.hex  (8835 bytes)
+
+===============================================================================
+Verification key fingerprint (groth16, embedded inline in TX_R reveal):
+===============================================================================
+  vkey_sha256 1e8c04b470673517f2b72a335e78b5b5d19ab75b82ae6954dc671abc3d5de157  contrib/zk_carrier/circuits/build/verification_key.json
+
+===============================================================================
+Independent on-chain validator (validate_onchain_pairs.py) — Pair G1 excerpt:
+===============================================================================
+=== Pair G1 (groth16) ===
+  TX_C=b70bc69f574b3044972d52a9a6eb33f00c2ed909b7346994aceec0c412e18354
+  TX_R=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+  TX_C OP_RETURN: tag=DZKC mode=0 commit32=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e
+  TX_R reassembled: 3 part(s)  payload_len=4144 (spec: 4144)
+  SHA256d(payload) = 80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e
+  TX_C commit32    = 80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e  →  MATCH
+  ZKP1: magic=ZKP1 mode=0 version=0x01 circuit_id=0x00000001 public_len=26 proof_len=805 vk_len=3293
+  embedded public.json   = ['0', '1000000', '0']
+  embedded proof.protocol=groth16 curve=bn128 keys=['curve', 'pi_a', 'pi_b', 'pi_c', 'protocol']
+  snarkjs groth16 verify (vk=EMBEDDED reveal): OK  | [32;22m[INFO]  [39;1msnarkJS[0m: OK!
+
+
+===============================================================================
+Final summary: snarkjs groth16 verify accepted the on-chain reveal end-to-end,
+using ONLY the embedded vk recovered from TX_R bytes — no out-of-band channel.
+===============================================================================
+
+===============================================================================
+spvnode --zk-vkey rescan (libdogecoin in-process, mainnet, 2026-05-03T19:40:12Z)
+  baked-in checkpoint: 6191600 / a8eeeadc...  (added today)
+  full block scan:    -p -b -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+===============================================================================
+[zk-commit] Pending at height=6191613 txpos=25 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=op_return
+[zk-commit] Valid at height=6191613 txpos=27 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=carrier_scriptsig matched_txc_txpos=25 payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+[zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=805 vk_len=3293 total_payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+[zk-commit] Reveal validated: TX_R=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e payload_len=4144 mode=0 height=6191613

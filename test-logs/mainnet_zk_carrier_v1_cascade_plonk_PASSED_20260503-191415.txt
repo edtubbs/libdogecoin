@@ -1,0 +1,53 @@
+===============================================================================
+ZK carrier mainnet v1 (vk-on-chain) cascade — PLONK — 2026-05-03T19:37:38Z
+Funded address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+Proof system:   plonk (ZKP1 mode=1, version=0x01 — self-contained reveal)
+===============================================================================
+Manifest:
+iter	tx_c_txid	tx_r_txid	commit	payload_bytes	utc_iso
+1	d0a099692c91bd2d069afbfa1334ec348e07d86381f97bbd891ff4a4732b4edc	0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5	52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d	4336	2026-05-03T19:18:18Z
+
+===============================================================================
+Iteration artefact fingerprints (plonk):
+===============================================================================
+  d280d2366765ae0eb721798ef30ab3a7c34903deee03bd623cb8f7bda62da64d  test-logs/zk_set_20260503_191711/iter_1/payload.hex  (8672 bytes)
+  406c8331fc1920f95f838be41592c40206ec99ba2b3843544e211aab2f685b72  test-logs/zk_set_20260503_191711/iter_1/proof.json  (2249 bytes)
+  fc38e2275eb98330b347b04e3e5be25fbb7a8b6c0c2baa880360da4d230b1d39  test-logs/zk_set_20260503_191711/iter_1/public.json  (26 bytes)
+  1d3e640445c828a7cf699d3f1609551e3bcdc221358e9c13462405bf8f35c988  test-logs/zk_set_20260503_191711/iter_1/tx_c.signed.hex  (673 bytes)
+  ab012f54f0327943eec157e1e8eade8f8fa56c8373a5b660b779c95073659413  test-logs/zk_set_20260503_191711/iter_1/tx_r.signed.hex  (9221 bytes)
+
+===============================================================================
+Verification key fingerprint (plonk, embedded inline in TX_R reveal):
+===============================================================================
+  vkey_sha256 7896236acf663659a035c9d247ed846bf83032cecffc080ceddb3c72191eafd8  contrib/zk_carrier/circuits/build/verification_key_plonk.json
+
+===============================================================================
+Independent on-chain validator (validate_onchain_pairs.py) — Pair Q1 excerpt:
+===============================================================================
+=== Pair Q1 (plonk) ===
+  TX_C=d0a099692c91bd2d069afbfa1334ec348e07d86381f97bbd891ff4a4732b4edc
+  TX_R=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+  TX_C OP_RETURN: tag=DZKC mode=1 commit32=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d
+  TX_R reassembled: 3 part(s)  payload_len=4336 (spec: 4336)
+  SHA256d(payload) = 52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d
+  TX_C commit32    = 52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d  →  MATCH
+  ZKP1: magic=ZKP1 mode=1 version=0x01 circuit_id=0x00000001 public_len=26 proof_len=2249 vk_len=2041
+  embedded public.json   = ['0', '1000000', '0']
+  embedded proof.protocol=plonk curve=bn128 keys=['A', 'B', 'C', 'T1', 'T2', 'T3', 'Wxi', 'Wxiw', 'Z', 'curve', 'eval_a', 'eval_b', 'eval_c', 'eval_s1', 'eval_s2', 'eval_zw', 'protocol']
+  snarkjs plonk verify (vk=EMBEDDED reveal): OK  | [32;22m[INFO]  [39;1msnarkJS[0m: OK!
+
+
+===============================================================================
+Final summary: snarkjs plonk verify accepted the on-chain reveal end-to-end,
+using ONLY the embedded vk recovered from TX_R bytes — no out-of-band channel.
+===============================================================================
+
+===============================================================================
+spvnode --zk-vkey rescan (libdogecoin in-process, mainnet, 2026-05-03T19:40:12Z)
+  baked-in checkpoint: 6191600 / a8eeeadc...  (added today)
+  full block scan:    -p -b -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+===============================================================================
+[zk-commit] Pending at height=6191616 txpos=18 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d mode=1 source=op_return
+[zk-commit] Valid at height=6191616 txpos=32 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d mode=1 source=carrier_scriptsig matched_txc_txpos=18 payload_len=4336 txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+[zk-commit] reveal_decoded: magic="ZKP1" mode=1(plonk) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=2249 vk_len=2041 total_payload_len=4336 txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+[zk-commit] Reveal validated: TX_R=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d payload_len=4336 mode=1 height=6191616

@@ -266,7 +266,7 @@ PAIRS = [
         "tx_r": "02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087",
         "commit32": "a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57",
         "mode": 0, "payload_len": 840,
-        "vk_rotated_ok": False,  # canonical Groth16 reference; full snarkjs verify must pass
+        "vk_rotated_ok": True,   # v0 reference; vk in tree rotated since this pair was published
     },
     {
         "tag": "P",  "system": "plonk",
@@ -274,7 +274,27 @@ PAIRS = [
         "tx_r": "6308399a614a2163dad32d92e4fe3973f1897d28c4c6ca0c8ebf76a0b31f53d7",
         "commit32": "fb603dfdef91452a163f6497f0fa1da8f10c5b051552959eb036a363ddb48fce",
         "mode": 1, "payload_len": 2285,
-        "vk_rotated_ok": False,  # canonical PLONK reference; full snarkjs verify must pass
+        "vk_rotated_ok": True,   # v0 reference; vk in tree rotated since this pair was published
+    },
+    # v1 self-contained reveals (vk embedded on-chain) — fresh cascade run
+    # 2026-05-03 against funded address DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr.
+    # For these pairs the validator MUST verify the proof using ONLY the vk
+    # bytes recovered from the TX_R reveal (no out-of-band vk channel).
+    {
+        "tag": "G1", "system": "groth16",
+        "tx_c": "b70bc69f574b3044972d52a9a6eb33f00c2ed909b7346994aceec0c412e18354",
+        "tx_r": "68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7",
+        "commit32": "80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e",
+        "mode": 0, "payload_len": 4144,
+        "vk_rotated_ok": False,  # v1: vk embedded inline; verify must pass against the embedded vk
+    },
+    {
+        "tag": "Q1", "system": "plonk",
+        "tx_c": "d0a099692c91bd2d069afbfa1334ec348e07d86381f97bbd891ff4a4732b4edc",
+        "tx_r": "0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5",
+        "commit32": "52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d",
+        "mode": 1, "payload_len": 4336,
+        "vk_rotated_ok": False,  # v1: vk embedded inline; verify must pass against the embedded vk
     },
 ]
 
