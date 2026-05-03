@@ -76,18 +76,34 @@ dogecoin_zk_err_t dogecoin_zk_encode_payload(
     size_t public_inputs_len,
     const uint8_t* proof,
     size_t proof_len,
+    const uint8_t* vk_bytes,
+    size_t vk_len,
     uint8_t** out_payload,
     size_t* out_payload_len)
 {
     if (!out_payload || !out_payload_len) return DOGECOIN_ZK_ERR_INVALID_ARG;
     if (public_inputs_len > 0 && !public_inputs) return DOGECOIN_ZK_ERR_INVALID_ARG;
     if (proof_len > 0 && !proof) return DOGECOIN_ZK_ERR_INVALID_ARG;
+    if (vk_len > 0 && !vk_bytes) return DOGECOIN_ZK_ERR_INVALID_ARG;
     if (!zk_mode_is_known(mode)) return DOGECOIN_ZK_ERR_BAD_MODE;
     if (public_inputs_len > 0xFFFFu) return DOGECOIN_ZK_ERR_INVALID_ARG;
-    /* Cap proof bytes at 32 MiB to keep size fields sane and chunking bounded. */
+    /* Cap proof and vk bytes at 32 MiB each to keep size fields sane and
+     * chunking bounded.  vk JSON for Groth16/PLONK is typically a few KB. */
     if (proof_len > 0x02000000u) return DOGECOIN_ZK_ERR_INVALID_ARG;
+    if (vk_len    > 0x02000000u) return DOGECOIN_ZK_ERR_INVALID_ARG;
+
+    /* v1 (vk-included) when caller supplied a vk; v0 otherwise.  v0 is
+     * retained so legacy callers and existing on-chain pairs decode cleanly,
+     * but new payloads SHOULD always include the vk for self-contained
+     * on-chain validation. */
+    uint8_t version = (vk_bytes && vk_len > 0)
+                        ? (uint8_t)DOGECOIN_ZK_PAYLOAD_VERSION_V1
+                        : (uint8_t)DOGECOIN_ZK_PAYLOAD_VERSION_V0;
 
     size_t total = (size_t)DOGECOIN_ZK_CARRIER_HDR_FIXED + public_inputs_len + 4 + proof_len;
+    if (version == DOGECOIN_ZK_PAYLOAD_VERSION_V1) {
+        total += 4 + vk_len;
+    }
     uint8_t* buf = (uint8_t*)dogecoin_malloc(total);
     if (!buf) return DOGECOIN_ZK_ERR_OOM;
 
@@ -95,7 +111,7 @@ dogecoin_zk_err_t dogecoin_zk_encode_payload(
     memcpy(buf + off, DOGECOIN_ZK_CARRIER_MAGIC, DOGECOIN_ZK_CARRIER_MAGIC_LEN);
     off += DOGECOIN_ZK_CARRIER_MAGIC_LEN;
     buf[off++] = (uint8_t)mode;
-    buf[off++] = 0x00; /* reserved */
+    buf[off++] = version;
     buf[off++] = (uint8_t)((circuit_id >> 24) & 0xff);
     buf[off++] = (uint8_t)((circuit_id >> 16) & 0xff);
     buf[off++] = (uint8_t)((circuit_id >> 8) & 0xff);
@@ -114,6 +130,16 @@ dogecoin_zk_err_t dogecoin_zk_encode_payload(
         memcpy(buf + off, proof, proof_len);
         off += proof_len;
     }
+    if (version == DOGECOIN_ZK_PAYLOAD_VERSION_V1) {
+        buf[off++] = (uint8_t)((vk_len >> 24) & 0xff);
+        buf[off++] = (uint8_t)((vk_len >> 16) & 0xff);
+        buf[off++] = (uint8_t)((vk_len >> 8) & 0xff);
+        buf[off++] = (uint8_t)((vk_len) & 0xff);
+        if (vk_len > 0) {
+            memcpy(buf + off, vk_bytes, vk_len);
+            off += vk_len;
+        }
+    }
 
     *out_payload = buf;
     *out_payload_len = off;
@@ -128,7 +154,9 @@ dogecoin_zk_err_t dogecoin_zk_decode_payload(
     const uint8_t** out_public_inputs,
     size_t* out_public_inputs_len,
     const uint8_t** out_proof,
-    size_t* out_proof_len)
+    size_t* out_proof_len,
+    const uint8_t** out_vk,
+    size_t* out_vk_len)
 {
     if (!payload || !out_mode || !out_circuit_id ||
         !out_public_inputs || !out_public_inputs_len ||
@@ -142,8 +170,12 @@ dogecoin_zk_err_t dogecoin_zk_decode_payload(
 
     size_t off = DOGECOIN_ZK_CARRIER_MAGIC_LEN;
     uint8_t mode_byte = payload[off++];
-    uint8_t reserved = payload[off++];
-    if (reserved != 0x00) return DOGECOIN_ZK_ERR_TRUNCATED;
+    uint8_t version = payload[off++];
+    if (version != DOGECOIN_ZK_PAYLOAD_VERSION_V0 &&
+        version != DOGECOIN_ZK_PAYLOAD_VERSION_V1) {
+        /* Unknown version — refuse rather than silently accept. */
+        return DOGECOIN_ZK_ERR_TRUNCATED;
+    }
     dogecoin_zk_mode_t mode = (dogecoin_zk_mode_t)mode_byte;
     if (!zk_mode_is_known(mode)) return DOGECOIN_ZK_ERR_BAD_MODE;
 
@@ -169,6 +201,20 @@ dogecoin_zk_err_t dogecoin_zk_decode_payload(
     const uint8_t* proof_ptr = payload + off;
     off += xl;
 
+    const uint8_t* vk_ptr = NULL;
+    uint32_t kl = 0;
+    if (version == DOGECOIN_ZK_PAYLOAD_VERSION_V1) {
+        if (4 > payload_len - off) return DOGECOIN_ZK_ERR_TRUNCATED;
+        kl = ((uint32_t)payload[off] << 24) |
+             ((uint32_t)payload[off + 1] << 16) |
+             ((uint32_t)payload[off + 2] << 8) |
+             ((uint32_t)payload[off + 3]);
+        off += 4;
+        if (kl > payload_len - off) return DOGECOIN_ZK_ERR_TRUNCATED;
+        vk_ptr = (kl > 0) ? (payload + off) : NULL;
+        off += kl;
+    }
+
     if (off != payload_len) return DOGECOIN_ZK_ERR_TRUNCATED; /* trailing bytes */
 
     *out_mode = mode;
@@ -177,6 +223,8 @@ dogecoin_zk_err_t dogecoin_zk_decode_payload(
     *out_public_inputs_len = pl;
     *out_proof = xl > 0 ? proof_ptr : NULL;
     *out_proof_len = xl;
+    if (out_vk)     *out_vk     = vk_ptr;
+    if (out_vk_len) *out_vk_len = kl;
     return DOGECOIN_ZK_OK;
 }
 

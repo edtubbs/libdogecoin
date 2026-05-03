@@ -200,16 +200,26 @@ dogecoin_zk_err_t dogecoin_zk_verify_proof(
     size_t public_inputs_len;
     const uint8_t* proof;
     size_t proof_len;
+    const uint8_t* embedded_vk = NULL;
+    size_t embedded_vk_len = 0;
 
     dogecoin_zk_err_t e = dogecoin_zk_decode_payload(
         payload, payload_len, &mode, &circuit_id,
-        &public_inputs, &public_inputs_len, &proof, &proof_len);
+        &public_inputs, &public_inputs_len, &proof, &proof_len,
+        &embedded_vk, &embedded_vk_len);
     if (e != DOGECOIN_ZK_OK) return e;
     (void)circuit_id;
 
+    /* Prefer the vk embedded in the reveal payload — that's the whole point
+     * of the v1 self-contained-reveal layout: every byte needed to validate
+     * the proof on chain is in the reveal itself.  Fall back to the caller-
+     * supplied vk only when the payload didn't carry one (legacy v0).      */
+    const uint8_t* eff_vk    = (embedded_vk && embedded_vk_len > 0) ? embedded_vk    : vk_blob;
+    size_t         eff_vk_len = (embedded_vk && embedded_vk_len > 0) ? embedded_vk_len : vk_blob_len;
+
     switch (mode) {
     case DOGECOIN_ZK_MODE_GROTH16:
-        return dogecoin_zk_verify_groth16(vk_blob, vk_blob_len,
+        return dogecoin_zk_verify_groth16(eff_vk, eff_vk_len,
                                           public_inputs, public_inputs_len,
                                           proof, proof_len);
     case DOGECOIN_ZK_MODE_PLONK:

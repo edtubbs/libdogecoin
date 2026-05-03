@@ -45,20 +45,28 @@ LIBDOGECOIN_BEGIN_DECL
  *
  * On-wire payload (TX_R reveal) layout, big-endian where multi-byte:
  *
- *    +---------+----+----+--------+----+--------------+----+---------+
- *    | "ZKP1"  | mo | rs | circID | pl | public[pl]   | xl | proof[xl]|
- *    +---------+----+----+--------+----+--------------+----+---------+
- *      4 bytes  1B   1B    4B      2B    pl bytes       4B   xl bytes
+ *    +---------+----+----+--------+----+------------+----+---------+----+--------+
+ *    | "ZKP1"  | mo | vr | circID | pl | public[pl] | xl | proof[xl]| kl | vk[kl]|
+ *    +---------+----+----+--------+----+------------+----+---------+----+--------+
+ *      4 bytes  1B   1B    4B      2B    pl bytes     4B   xl bytes  4B   kl bytes
  *
  *   magic   : ASCII "ZKP1" (DOGECOIN_ZK_CARRIER_MAGIC)
  *   mode    : dogecoin_zk_mode_t selector (1B), aligned with the modular
  *             mode selector of the proposed OP_CHECKZKP opcode (185).
- *   reserved: 1B, must be 0 for v1.
+ *   version : 1B payload-format version.  0x00 = legacy (no embedded vk; vk
+ *             distributed out-of-band).  0x01 = vk-included; the verification
+ *             key bytes follow the proof so the reveal is fully self-contained
+ *             for on-chain verification (no external file required).
  *   circID  : 4B big-endian application-defined circuit identifier.
  *   pl      : 2B big-endian length of public-input blob.
  *   public  : public-input bytes (proof-system specific encoding).
  *   xl      : 4B big-endian length of the proof bytes.
  *   proof   : proof bytes (proof-system specific encoding).
+ *   kl      : 4B big-endian length of the embedded verification-key bytes.
+ *             Present only when version == 0x01.  When version == 0x00 the
+ *             trailing kl/vk fields are absent and the payload ends at proof.
+ *   vk      : verification-key bytes (proof-system specific encoding;
+ *             snarkjs verification_key.json for Groth16/PLONK).
  *
  * TX_C commits SHA256d(payload) inside an OP_RETURN of the form
  *      OP_RETURN <"DZKC"> <mode> <commitment32>
@@ -79,6 +87,13 @@ LIBDOGECOIN_BEGIN_DECL
 #define DOGECOIN_ZK_OPRETURN_TAG_LEN   4
 /* OP_RETURN <DZKC><mode><commit32> = 38 data bytes — fits in a single push. */
 #define DOGECOIN_ZK_OPRETURN_DATA_LEN  (DOGECOIN_ZK_OPRETURN_TAG_LEN + 1 + 32)
+
+/* Wire-format version byte (the 6th byte of the ZKP1 payload, immediately
+ * after the mode byte).  v0 is the legacy "vk distributed out-of-band" layout;
+ * v1 appends a 4-byte big-endian vk length and the vk bytes after the proof
+ * section so the reveal is fully self-contained for on-chain verification. */
+#define DOGECOIN_ZK_PAYLOAD_VERSION_V0 0x00
+#define DOGECOIN_ZK_PAYLOAD_VERSION_V1 0x01
 
 /* Selectable proof systems.  Stable numeric values — these are what would be
  * pushed onto the script stack as the OP_CHECKZKP mode argument. */
@@ -101,8 +116,12 @@ typedef enum {
 } dogecoin_zk_err_t;
 
 /*
- * Encode a proof + public inputs into the canonical ZK carrier payload above.
- * Caller frees *out_payload with dogecoin_free().
+ * Encode a proof + public inputs (and optional verification key) into the
+ * canonical ZK carrier payload above.  When `vk_bytes` is NULL or `vk_len`
+ * is zero the encoder emits a v0 (no-vk) payload; otherwise it emits a v1
+ * payload with the verification-key bytes appended after the proof so the
+ * reveal is fully self-contained for on-chain validation.  Caller frees
+ * *out_payload with dogecoin_free().
  */
 LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_encode_payload(
     dogecoin_zk_mode_t mode,
@@ -111,13 +130,18 @@ LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_encode_payload(
     size_t public_inputs_len,
     const uint8_t* proof,
     size_t proof_len,
+    const uint8_t* vk_bytes,
+    size_t vk_len,
     uint8_t** out_payload,
     size_t* out_payload_len);
 
 /*
  * Decode a canonical ZK carrier payload.  All out_* pointers are aliased into
  * the input buffer (no allocation).  The caller must keep `payload` alive
- * while using the decoded fields.
+ * while using the decoded fields.  When the payload is v0 (no embedded vk),
+ * *out_vk is set to NULL and *out_vk_len to 0.  When the payload is v1,
+ * *out_vk aliases the embedded vk bytes.  Pass NULL for out_vk / out_vk_len
+ * if the caller does not care about the vk slot (legacy callers).
  */
 LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_decode_payload(
     const uint8_t* payload,
@@ -127,7 +151,9 @@ LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_decode_payload(
     const uint8_t** out_public_inputs,
     size_t* out_public_inputs_len,
     const uint8_t** out_proof,
-    size_t* out_proof_len);
+    size_t* out_proof_len,
+    const uint8_t** out_vk,
+    size_t* out_vk_len);
 
 /*
  * Compute the TX_C commitment value: SHA256d(payload).  This is the 32-byte
@@ -224,7 +250,11 @@ LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_verify_groth16(
  * Verify any ZK payload by mode.  Dispatches to the proof-system specific
  * verifier above.  The payload's public inputs and proof bytes are passed
  * verbatim to the verifier (proof systems are responsible for their own
- * encoding — for snarkjs/Groth16 they are JSON).
+ * encoding — for snarkjs/Groth16 they are JSON).  When the payload itself
+ * carries an embedded verification key (v1 layout) it is preferred over the
+ * caller-supplied `vk_blob`; the externally-supplied vk is only used as a
+ * fallback for legacy v0 payloads.  `vk_blob` may be NULL/0 when the payload
+ * is v1, which is the recommended self-contained-reveal flow.
  */
 LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_verify_proof(
     const uint8_t* payload,
