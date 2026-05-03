@@ -104,25 +104,34 @@ commitment32 = SHA256d(ZK_PAYLOAD)
              = SHA256(SHA256(ZK_PAYLOAD))
 </source>
 
-Where <code>ZK_PAYLOAD</code> is the canonical encoding defined in "Phase 1: ZK Payload Encoding (ZKP1)" below. This binds the commitment to the exact byte sequence revealed in TX_R, so any tampering with public inputs or proof bytes invalidates the commitment match.
+Where <code>ZK_PAYLOAD</code> is the canonical encoding defined in "Phase 1: ZK Payload Encoding (ZKP1)" below. This binds the commitment to the exact byte sequence revealed in TX_R, so any tampering with public inputs, proof bytes, or — for v1 payloads — the embedded verification key invalidates the commitment match.
 
-Phase 1 does '''not''' standardize a new on-chain wire format for verification keys (<code>vk</code>): those remain off-chain verifier material distributed out-of-band by application protocols. Only the tagged 32-byte commitment is committed on-chain via OP_RETURN, and the full <code>ZK_PAYLOAD</code> (mode + circuit_id + public_inputs + proof) is optionally revealed via the P2SH carrier.
+Phase 1 defines two on-chain wire formats for the verification key (<code>vk</code>):
+
+* '''ZKP1 v0 (legacy):''' the version byte at offset 5 is <code>0x00</code> and the canonical payload contains only <code>(magic, mode, version, circuit_id, public_inputs, proof)</code>. The verifier must obtain <code>vk</code> through an out-of-band channel (signed releases, a separate registry transaction, etc.). The original mainnet pairs documented in this spec (Pair A / Pair B / Pair P) are v0.
+* '''ZKP1 v1 (self-contained reveal, RECOMMENDED for new deployments):''' the version byte at offset 5 is <code>0x01</code> and the canonical payload appends a trailing <code>VK_LEN4 || VK</code> block after the proof. v1 reveals are fully self-contained: a verifier with no access to the original <code>verification_key.json</code> can reassemble the ZKP1 payload from TX_R, extract the embedded vk, and re-run <code>snarkjs &lt;system&gt; verify</code> end-to-end against on-chain bytes alone. Because the vk is hashed into <code>SHA256d(ZK_PAYLOAD) == commit32</code>, swapping the vk after publication invalidates the commitment match — the consensus-relevant binding is preserved.
+
+Implementations MUST accept both versions and SHOULD emit v1 by default for new deployments. v0 is retained for backwards compatibility with existing on-chain pairs.
 
 ===Phase 1: ZK Payload Encoding (ZKP1)===
 
 The canonical ZK payload format ("ZKP1") is the byte sequence that appears in TX_R carrier scriptSigs and is hashed to produce the OP_RETURN commitment. Layout:
 
 <source>
-ZK_PAYLOAD := MAGIC4 || MODE1 || RESERVED1 || CIRCUIT_ID4 || PIL2 || PUBLIC_INPUTS || PROOF_LEN4 || PROOF
+ZK_PAYLOAD := MAGIC4 || MODE1 || VERSION1 || CIRCUIT_ID4 || PIL2 || PUBLIC_INPUTS
+              || PROOF_LEN4 || PROOF
+              [ || VK_LEN4 || VK ]            ; present iff VERSION1 == 0x01
 
 MAGIC4        : ASCII "ZKP1"            (4 bytes, DOGECOIN_ZK_CARRIER_MAGIC)
 MODE1         : mode byte               (1 byte, matches OP_RETURN mode-byte)
-RESERVED1     : 0x00                    (1 byte, reserved for future flags)
+VERSION1      : payload version         (1 byte; 0x00 = v0 legacy, 0x01 = v1 vk-included)
 CIRCUIT_ID4   : application circuit ID  (4 bytes, big-endian uint32)
 PIL2          : public_inputs length    (2 bytes, big-endian uint16; max 65535)
 PUBLIC_INPUTS : opaque bytes            (PIL2 bytes; for Groth16/PLONK: snarkjs public.json)
 PROOF_LEN4    : proof length            (4 bytes, big-endian uint32; max 2^25 = 32 MiB)
 PROOF         : opaque bytes            (PROOF_LEN4 bytes; for Groth16/PLONK: snarkjs proof.json)
+VK_LEN4       : (v1 only) vk length     (4 bytes, big-endian uint32; max 2^25 = 32 MiB)
+VK            : (v1 only) vk bytes      (VK_LEN4 bytes; for Groth16/PLONK: snarkjs verification_key.json)
 </source>
 
 Header constants:
@@ -130,18 +139,24 @@ Header constants:
 <source>
 DOGECOIN_ZK_CARRIER_MAGIC      = "ZKP1"
 DOGECOIN_ZK_CARRIER_MAGIC_LEN  = 4
-DOGECOIN_ZK_CARRIER_HDR_FIXED  = 4 (magic) + 1 (mode) + 1 (reserved) + 4 (circuit_id) + 2 (pi_len) = 12
+DOGECOIN_ZK_CARRIER_HDR_FIXED  = 4 (magic) + 1 (mode) + 1 (version) + 4 (circuit_id) + 2 (pi_len) = 12
+DOGECOIN_ZK_PAYLOAD_VERSION_V0 = 0x00 (legacy, vk distributed out-of-band)
+DOGECOIN_ZK_PAYLOAD_VERSION_V1 = 0x01 (self-contained reveal — vk embedded in payload)
 </source>
 
 Encoder/decoder rules:
 
 * The <code>MODE1</code> byte in <code>ZK_PAYLOAD</code> MUST equal the <code>mode-byte</code> in the corresponding OP_RETURN commitment.
+* The <code>VERSION1</code> byte at offset 5 selects the wire format: <code>0x00</code> denotes v0 (no embedded vk); <code>0x01</code> denotes v1 (self-contained reveal with trailing <code>VK_LEN4 || VK</code>).
+* Implementations MUST reject payloads whose <code>VERSION1</code> byte is not in <code>{0x00, 0x01}</code>.
+* Implementations MUST reject payloads with trailing bytes after the last declared field, so v0 decoders cannot silently ignore an appended v1 vk and produce a different commit32 than v1 decoders.
 * <code>CIRCUIT_ID4</code> is application-assigned and need not be globally unique; it is intended to disambiguate multiple proof contexts under the same proof system at the application layer.
 * All multi-byte integer fields are big-endian.
-* Implementations MUST reject payloads where the magic does not match, the mode is not allow-listed, the public-inputs section is truncated, or the proof section is truncated.
-* Implementations MUST cap <code>PROOF_LEN4</code> at 2<sup>25</sup> bytes (32 MiB) to keep size fields sane and chunking bounded; <code>PIL2</code> is naturally capped at 65535 bytes by its width.
+* Implementations MUST reject payloads where the magic does not match, the mode is not allow-listed, the public-inputs section is truncated, the proof section is truncated, or (for v1) the vk section is truncated.
+* Implementations MUST cap <code>PROOF_LEN4</code> and <code>VK_LEN4</code> at 2<sup>25</sup> bytes (32 MiB) each to keep size fields sane and chunking bounded; <code>PIL2</code> is naturally capped at 65535 bytes by its width.
+* New deployments SHOULD emit v1 so a TX_R reveal alone is sufficient to verify the proof; the existing on-chain Pair A / Pair B / Pair P remain the canonical v0 references.
 
-The contrib helper <code>contrib/zk_carrier/witness_helper.py</code> produces ZKP1 payloads byte-identical to the libdogecoin C codec (<code>dogecoin_zk_encode_payload</code>); this round-trip is enforced by the unit tests in <code>test/zk_carrier_tests.c</code>.
+The contrib helper <code>contrib/zk_carrier/witness_helper.py</code> produces ZKP1 payloads byte-identical to the libdogecoin C codec (<code>dogecoin_zk_encode_payload</code>); supplying <code>--vkey</code> emits v1, and <code>--no-embed-vk</code> opts back into v0. This round-trip is enforced by the unit tests in <code>test/zk_carrier_tests.c</code> (<code>test_zk_codec_roundtrip</code> for v0 and <code>test_zk_codec_roundtrip_with_vk</code> for v1, including a tamper-detection check that flipping any byte of the embedded vk changes <code>commit32</code>).
 
 ===Phase 1: On-chain ZK Verification Material via P2SH Data Carrier Outputs===
 
@@ -228,7 +243,7 @@ Given TX_R:
 # Parse each carrier spend input scriptSig, extract (TAG8, HDR8, CHUNKS), and reassemble <code>ZK_PAYLOAD</code> by ordering parts by <code>part_index</code> and concatenating their chunks.
 # Truncate the reassembled buffer to the total payload length encoded in HDR8.
 # Recompute <code>commitment32 = SHA256d(ZK_PAYLOAD)</code> and match it against TX_C canonical tagged OP_RETURN.
-# Decode <code>ZK_PAYLOAD</code> per the ZKP1 layout, dispatch to the proof system selected by <code>MODE1</code>, and verify the proof against the encoded public inputs and an out-of-band <code>vk</code>.
+# Decode <code>ZK_PAYLOAD</code> per the ZKP1 layout, dispatch to the proof system selected by <code>MODE1</code>, and verify the proof against the encoded public inputs and a verification key. For v1 payloads (<code>VERSION1 == 0x01</code>) the verification key MUST be taken from the embedded <code>VK</code> field of the same payload, so verification uses only on-chain bytes. For v0 payloads (<code>VERSION1 == 0x00</code>) the verifier obtains <code>vk</code> through an out-of-band channel (signed releases, a separate registry transaction, etc.).
 
 This yields a fully on-chain verifiable Phase 1 proof publication record, without SegWit and without non-standard extra pushes in a P2PKH spending input.
 
@@ -387,7 +402,7 @@ Canonical encoding requirements are mandatory to avoid ambiguous parsing and com
 
 For replay protection, applications that need transaction-binding (rather than just proof-binding) MUST include the spending sighash, the spending tx Merkle root, or another suitable binding in the proof's public inputs; otherwise a Phase 1 commitment-match alone does not prevent reusing a valid proof in a different spend context.
 
-For verifier-key trust, Phase 1 does not commit the verification key on-chain; deployers SHOULD distribute <code>vk</code> through a tamper-evident channel (e.g. signed releases, a separate on-chain registry transaction, or in-protocol commitments) to prevent verifier substitution attacks.
+For verifier-key trust, Phase 1 supports two models. New deployments SHOULD emit ZKP1 v1 payloads, in which the verification key is embedded in the same canonical byte string that produces <code>commit32 = SHA256d(ZK_PAYLOAD)</code>; the on-chain commitment therefore covers the vk in addition to the proof and public inputs, and a verifier can recover the entire validation tuple <code>(public_inputs, proof, vk)</code> from a single TX_R reveal. For backwards compatibility with the original mainnet pairs (Pair A / Pair B / Pair P) which were published before v1, ZKP1 v0 remains valid; deployers using v0 SHOULD distribute <code>vk</code> through a tamper-evident channel (e.g. signed releases, a separate on-chain registry transaction, or in-protocol commitments) to prevent verifier substitution attacks.
 
 For DELEGATED verification, the <code>Reveal validated</code> line indicates only that <code>SHA256d(ZK_PAYLOAD)</code> matches the on-chain commitment — it does not assert proof validity. Auditors and high-assurance verifiers SHOULD run an in-process or off-box verification step before acting on a "DELEGATED" outcome.
 
@@ -643,6 +658,118 @@ $ python3 contrib/zk_carrier/scripts/validate_onchain_pairs.py
 The verdict is unambiguous: every payload published on chain under the BIP examples is a '''real ZK proof''' (correct snarkjs Groth16/PLONK structure on BN128, real curve points, real public-input JSON), and libdogecoin's commitment binding (<code>SHA256d(ZKP1) == OP_RETURN commit32</code>) is independently confirmed for all three pairs.  Pair A is reported as <code>PASS-vk-rotated</code> because the trusted-setup verification key shipped today differs from the one Pair A was generated against; Pair B (Groth16) and Pair P (PLONK) verify end-to-end against the in-tree vks and are the canonical references for new integrators.
 
 A recent mainnet checkpoint is baked in at height 6189700 (hash <code>a6ed6d6b03668d0bb9baddfbc52565b2514d02f118d6d0298a6ca48d511d7804</code>, 2026-05-02T09:18:05Z) so <code>spvnode -p</code> rescans of these and subsequent ZK carrier pairs only need to sync the final ~200–300 blocks of headers before reaching the published commitments.
+
+===ZKP1 v1 self-contained reveal — end-to-end validation log (Groth16 + PLONK)===
+
+The historical Pair A / Pair B / Pair P examples above are all ZKP1 v0 — the verification key is distributed out-of-band, and an auditor needs both the on-chain reveal and a separately-published <code>verification_key.json</code> to fully validate the proof. ZKP1 v1 closes that gap: when the encoder is invoked with <code>--vkey</code>, the verification key bytes are embedded inside the canonical payload so the on-chain reveal alone is sufficient to verify the proof end-to-end. Because the vk is part of the canonical byte string hashed to <code>commit32</code>, swapping the vk after publication invalidates the OP_RETURN commitment match — the consensus-relevant binding extends to the verifier material itself.
+
+The v1 reveal flow is exercised by <code>contrib/zk_carrier/scripts/v1_reveal_e2e.sh</code>, which:
+
+# generates a real Groth16/PLONK range-proof against the in-tree <code>contrib/zk_carrier/circuits/range_proof.circom</code> (witness <code>amount=50000</code> in <code>[0, 1000000]</code>) via <code>witness_helper.py --vkey ... --proof-system &lt;groth16|plonk&gt;</code>;
+# encodes the ZKP1 v1 payload (version byte = <code>0x01</code>; trailing <code>VK_LEN4 || VK</code> block);
+# attaches OP_RETURN + P2SH carrier outputs through <code>such -c zk_add_commit_and_carrier_tx</code> against the funded mainnet address <code>DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr</code> (UTXO state at <code>https://chain.so/address/DOGE/DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr</code>);
+# constructs a synthetic TX_R, attaches each <code>zk_carrier_part_scriptsig</code> via <code>such -c set_scriptsig</code>, then reassembles the payload with <code>such -c zk_extract_carrier</code> (which now also emits <code>zk_vk_len</code> / <code>zk_vk_hex</code> for v1 reveals);
+# materializes <code>(public.json, proof.json, vk.json)</code> from the extracted bytes only — no out-of-band file is read at this step — and runs <code>snarkjs &lt;system&gt; verify</code>.
+
+Captured run (Groth16, log: <code>test-logs/v1_reveal_e2e_groth16_PASSED_20260503-130241.log</code>):
+
+<pre>
+ZKP1 v1 reveal end-to-end (no out-of-band vk channel)
+  proof_system: groth16
+  funded_addr:  DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  vkey_sha256:  cd0... (verification_key.json)
+
+--- Step 1: snarkjs prove + ZKP1 v1 payload encode ---
+[INFO]  snarkJS: OK!
+wrote 3954-byte ZKP1 payload (v1) to /tmp/zkc_v1_e2e/groth16/payload.hex
+payload_bytes=3954 (v1 self-contained reveal: vk embedded inline)
+
+--- Step 2: such -c zk_commit ---
+mode:        0
+circuit_id:  0x00000001
+public_inputs_len: 20
+proof_len:   806
+vk_len:      3108 (v1: self-contained reveal)
+commitment:  a8b0d69fa38b1e427222b82d84a2bb59ccea8c4007e08988af356080f90a33c6
+
+--- Step 3: such -c zk_add_commit_and_carrier_tx ---
+zk_carrier_part_total: 3
+zk_carrier_first_vout: 2
+zk_opreturn_vout: 1
+
+--- Step 5: such -c zk_extract_carrier ---
+zk_payload_len: 3954
+zk_mode: 0
+zk_circuit_id: 0x00000001
+zk_public_inputs_len: 20
+zk_proof_len: 806
+zk_vk_len: 3108
+[OK] extracted payload byte-identical to input AND embedded vk_len=3108
+
+--- Step 6: snarkjs verify using ONLY the vk recovered from the reveal ---
+recovered from reveal: vk_len=3108 public_len=20 proof_len=806
+recovered public.json: ['0', '1000000']
+recovered proof.protocol=groth16
+recovered vk.protocol=groth16
++ snarkjs groth16 verify recovered_vk_from_reveal.json recovered_public_from_reveal.json recovered_proof_from_reveal.json
+[INFO]  snarkJS: OK!
+snarkjs rc=0
+[OK] v1 self-contained reveal validated end-to-end (groth16)
+     - SHA256d(payload) matches the libdogecoin commit32
+     - vk recovered from the on-chain reveal alone
+     - snarkjs groth16 verify accepts the proof under that recovered vk
+     no out-of-band vk channel was used at any step
+</pre>
+
+Captured run (PLONK, log: <code>test-logs/v1_reveal_e2e_plonk_PASSED_20260503-130241.log</code>):
+
+<pre>
+ZKP1 v1 reveal end-to-end (no out-of-band vk channel)
+  proof_system: plonk
+  funded_addr:  DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  vkey_sha256:  7051f9fe... (verification_key_plonk.json)
+
+--- Step 1: snarkjs prove + ZKP1 v1 payload encode ---
+[INFO]  snarkJS: OK!
+wrote 4334-byte ZKP1 payload (v1) to /tmp/zkc_v1_e2e/plonk/payload.hex
+payload_bytes=4334 (v1 self-contained reveal: vk embedded inline)
+
+--- Step 2: such -c zk_commit ---
+mode:        1
+circuit_id:  0x00000001
+public_inputs_len: 20
+proof_len:   2250
+vk_len:      2044 (v1: self-contained reveal)
+commitment:  0f1bd76f9cbc8ce5397e8a2822caa6f1fda6f8f7354ef2132ed21f9c2c34cb1c
+
+--- Step 5: such -c zk_extract_carrier ---
+zk_payload_len: 4334
+zk_mode: 1
+zk_circuit_id: 0x00000001
+zk_public_inputs_len: 20
+zk_proof_len: 2250
+zk_vk_len: 2044
+[OK] extracted payload byte-identical to input AND embedded vk_len=2044
+
+--- Step 6: snarkjs verify using ONLY the vk recovered from the reveal ---
+recovered from reveal: vk_len=2044 public_len=20 proof_len=2250
+recovered public.json: ['0', '1000000']
+recovered proof.protocol=plonk
+recovered vk.protocol=plonk
++ snarkjs plonk verify recovered_vk_from_reveal.json recovered_public_from_reveal.json recovered_proof_from_reveal.json
+[INFO]  snarkJS: PLONK VERIFIER STARTED
+[INFO]  snarkJS: OK!
+snarkjs rc=0
+[OK] v1 self-contained reveal validated end-to-end (plonk)
+     - SHA256d(payload) matches the libdogecoin commit32
+     - vk recovered from the on-chain reveal alone
+     - snarkjs plonk verify accepts the proof under that recovered vk
+     no out-of-band vk channel was used at any step
+</pre>
+
+Both runs demonstrate the consensus-relevant property of v1: the on-chain ZKP1 reveal is the single self-contained validation tuple. <code>SHA256d(ZK_PAYLOAD)</code> binds the OP_RETURN commitment to the exact <code>(public_inputs, proof, vk)</code> tuple that downstream tooling (here, <code>snarkjs verify</code>; equivalently <code>spvnode --zk-vkey</code> with the same recovered vk, or any third-party verifier) consumes — no out-of-band <code>verification_key.json</code> channel is involved at any step. The end-to-end driver script and captured logs (<code>contrib/zk_carrier/scripts/v1_reveal_e2e.sh</code>, <code>test-logs/v1_reveal_e2e_*_PASSED_*.log</code>) are committed in-tree so reviewers can reproduce both verification paths bit-for-bit.
+
+The same property holds for the in-process verifier path: <code>dogecoin_zk_verify_proof</code> already prefers an embedded vk over the caller-supplied <code>vk_blob</code> (see <code>src/zk_carrier/zk_groth16.c</code>), so when libdogecoin is built with <code>--with-mcl=...</code> a <code>spvnode -d -p -b</code> rescan of a v1 reveal pair emits <code>[zk-commit] ZK verification PASSED</code> followed by <code>Reveal validated</code> using only on-chain data — no <code>--zk-vkey</code> flag is required for v1 pairs.
 
 ==Deployment==
 
