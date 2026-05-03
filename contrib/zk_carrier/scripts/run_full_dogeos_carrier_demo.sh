@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/run_full_dogeos_carrier_demo.sh
+# contrib/zk_carrier/scripts/run_full_dogeos_carrier_demo.sh
 #
 # End-to-end ZK carrier demo: snarkjs prove → encode payload → build TX_C →
 # build TX_R → sign → broadcast → poll explorer → local verify.

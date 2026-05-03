@@ -1,6 +1,23 @@
-# `src/zk_carrier/` — ZK proof carrier on top of the PQ carrier
+# ZK Proof Carrier — developer reference
 
-This module implements the on-chain side of the OP_CHECKZKP proposal: a
+This document is the developer/integrator reference for the ZK proof carrier
+module (`src/zk_carrier/`).  It covers the public C API, the on-wire ZKP1
+payload format, and the carrier transaction shape.
+
+For higher-level material:
+
+* The protocol spec lives in
+  [`doc/spec/bip-zk-carrier-commitments.mediawiki`](spec/bip-zk-carrier-commitments.mediawiki)
+  (canonical encoding, mode identifiers, deployment, mainnet examples).
+* The CLI surface (`such -c zk_*` commands and `spvnode --zk-vkey`) and
+  configure flags are documented in [`tools.md`](tools.md) under
+  *Zero-Knowledge Proof Carrier (ZK) Commands*.
+* End-to-end demo scripts live under
+  [`contrib/zk_carrier/scripts/`](../contrib/zk_carrier/scripts/).
+
+## Overview
+
+The module implements the on-chain side of the OP_CHECKZKP proposal: a
 canonical wire format for ZK proofs (Groth16 / PLONK / STARK) and a P2SH
 carrier transaction shape that lets full nodes and SPV clients consume those
 proofs without an `OP_CHECKZKP` interpreter (yet) on the network.
@@ -109,11 +126,18 @@ without invalidating any historical TX_R.
   `DOGECOIN_ZK_ERR_DELEGATED` and the demo script falls back to
   `snarkjs groth16 verify`.  This is the recommended mobile-friendly
   default — the C library never runs heavy crypto runtimes.
+* `--with-mcl[=DIR]` — links the herumi/mcl BN254 pairing library plus
+  the in-process Groth16 verifier in `src/zk_carrier/zk_groth16_mcl.cpp`.
+  This is what the published mainnet PASSED runs use for in-process
+  verification (`spvnode --zk-vkey verification_key.json`).
 * `depends/packages/rapidsnark.mk` plus `ZK_CARRIER=1` on the depends
   invocation vendor a verifier-only rapidsnark for x86_64-linux-gnu and
   x86_64/arm64-apple-darwin.  Mingw / Android / iOS hosts are
   intentionally guarded with a hard `$(error)` — we do not ship cross-
   compilation we cannot validate.
+
+These flags are also summarised in [`tools.md`](tools.md) alongside the CLI
+commands they unlock.
 
 ## Tests
 

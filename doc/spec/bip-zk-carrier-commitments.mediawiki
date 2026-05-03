@@ -427,7 +427,7 @@ Current CLI wiring reflects this implementation model:
 
 Current end-to-end script behavior is aligned with the parallel PQC mainnet flow (<code>contrib/mainnet_falcon_test.sh</code>):
 
-* the <code>scripts/run_full_dogeos_carrier_demo.sh</code> driver supports commitment-only and carrier modes; auto-discovers the funding UTXO from public block explorers (dogechain.info / blockcypher / blockchair fallbacks); inherits the public demo WIF/address from the PQC scripts; and watches the <code>spvnode -d</code> log for the <code>[zk-commit] Reveal validated</code> marker as the success criterion;
+* the <code>contrib/zk_carrier/scripts/run_full_dogeos_carrier_demo.sh</code> driver supports commitment-only and carrier modes; auto-discovers the funding UTXO from public block explorers (dogechain.info / blockcypher / blockchair fallbacks); inherits the public demo WIF/address from the PQC scripts; and watches the <code>spvnode -d</code> log for the <code>[zk-commit] Reveal validated</code> marker as the success criterion;
 * <code>spvnode</code>'s <code>-p</code> (checkpoint) flag uses the most recent baked-in mainnet checkpoint to skip the genesis-to-checkpoint header sync, keeping the validation roundtrip to minutes once fees are properly sized.
 
 ==Mainnet Examples==

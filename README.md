@@ -196,22 +196,3 @@ Once you are ready to compile, the `libdogecoin.a` file must be linked to your s
 ```_Debian / Ubuntu_
 gcc main.c -ldogecoin -levent -o myprojectname
 ```
-
-## Branch addendum: ZK carrier (Groth16 / PLONK / STARK)
-
-This branch (`0.1.5-dev-pqc-zk-carrier`) adds a ZK proof carrier on top of
-the existing PQ carrier (`src/pqc_carrier.c`).  The two carriers share one
-on-chain shape; only the 8-byte tag differs (`ZKP1FULL` vs `FLC1FULL` /
-`DIL2FULL` / `RCG4FULL`).
-
-* Module: `src/zk_carrier/` — see [`src/zk_carrier/README.md`](src/zk_carrier/README.md)
-  for the on-wire format, the OP_CHECKZKP mode-byte alignment, and the
-  build flags (`--enable-zk-carrier`, `--with-rapidsnark`).
-* Circuits + prover helper: [`contrib/zk_carrier/`](contrib/zk_carrier/).
-* End-to-end demo:
-  [`scripts/run_full_dogeos_carrier_demo.sh`](scripts/run_full_dogeos_carrier_demo.sh)
-  (and the importable Python wrapper `run_full_dogeos_carrier_demo.py`) —
-  defaults to testnet; mainnet broadcast requires
-  `--mainnet --i-understand-real-doge` plus `DOGEOS_CARRIER_WIF` (or the
-  `FUNDED_WIF` reused from the `contrib/mainnet_*_test.sh` scripts in this
-  branch family).  See [`scripts/README.md`](scripts/README.md).

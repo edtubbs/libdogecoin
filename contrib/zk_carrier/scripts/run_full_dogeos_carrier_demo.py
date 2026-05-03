@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Python entry point for the ZK carrier end-to-end demo.
 
-Wraps ``scripts/run_full_dogeos_carrier_demo.sh`` so the same flow is
-importable from tests / from the dogeOS / MyDoge bridge.  All real work
-happens in the shell script — this file exists so::
+Wraps ``contrib/zk_carrier/scripts/run_full_dogeos_carrier_demo.sh`` so the
+same flow is importable from tests / from the dogeOS / MyDoge bridge.  All
+real work happens in the shell script — this file exists so::
 
-    from scripts.run_full_dogeos_carrier_demo import run_demo
+    from contrib.zk_carrier.scripts.run_full_dogeos_carrier_demo import run_demo
 
 works exactly the same as the shell entry point.
 """
