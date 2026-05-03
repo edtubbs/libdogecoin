@@ -320,13 +320,22 @@ if [ -z "$FUNDED_UTXO_TXID" ] || [ -z "$FUNDED_UTXO_VALUE_KOINU" ]; then
         die "FUNDED_UTXO_TXID/FUNDED_UTXO_VALUE_KOINU not set and explorer auto-discovery failed"
     fi
     # Parse the explorer response (BlockCypher: txrefs[].tx_hash/tx_output_n/value;
-    # Blockchair: data.<addr>.utxo[]).  Prefer a UTXO with at least 1 confirmation
-    # and value >= 5 DOGE so a 1-DOGE carrier output + sane fee fits.
+    # Blockchair: data.<addr>.utxo[]).  Pick the largest unspent UTXO whose value
+    # covers a single carrier iteration (TX_FEE_KOINU + CARRIER_VALUE_KOINU + a
+    # small change buffer).  The funded demo address can carry many small UTXOs
+    # (e.g. ~0.9-4 DOGE each) that are each individually sufficient to fund one
+    # carrier iteration; a hardcoded 5 DOGE floor would reject all of them even
+    # though "plenty of UTXOs" exist on chain.  Operators can override the
+    # threshold via FUNDED_UTXO_MIN_KOINU if they want a stricter filter.
+    : "${FUNDED_UTXO_MIN_KOINU:=$(( TX_FEE_KOINU + CARRIER_VALUE_KOINU + 1000000 ))}"
     DISC_JSON_FILE="$WORK/utxo_discovery.json"
     printf '%s' "$DISC_JSON" > "$DISC_JSON_FILE"
-    PARSED=$(FUNDED_ADDR_ARG="$FUNDED_ADDR" python3 - "$DISC_JSON_FILE" <<'PY'
+    PARSED=$(FUNDED_ADDR_ARG="$FUNDED_ADDR" \
+             FUNDED_UTXO_MIN_KOINU="$FUNDED_UTXO_MIN_KOINU" \
+             python3 - "$DISC_JSON_FILE" <<'PY'
 import sys, os, json
 addr = os.environ['FUNDED_ADDR_ARG']
+min_val = int(os.environ.get('FUNDED_UTXO_MIN_KOINU', '0') or '0')
 with open(sys.argv[1]) as f:
     d = json.load(f)
 candidates = []
@@ -348,13 +357,13 @@ if isinstance(ent, dict):
                             int(ref.get('index',0)) ))
 candidates.sort(key=lambda x: (-x[1], -x[0]))
 for conf,val,h,n in candidates:
-    if val >= 500_000_000 and h:
+    if val >= min_val and h:
         print(f"{h} {n} {val}")
         break
 PY
 )
     if [ -z "$PARSED" ]; then
-        die "no spendable UTXO >= 5 DOGE found at $FUNDED_ADDR"
+        die "no spendable UTXO >= ${FUNDED_UTXO_MIN_KOINU} koinu found at $FUNDED_ADDR"
     fi
     FUNDED_UTXO_TXID=$(echo "$PARSED" | awk '{print $1}')
     FUNDED_UTXO_VOUT=$(echo "$PARSED" | awk '{print $2}')
