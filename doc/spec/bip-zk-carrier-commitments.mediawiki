@@ -671,7 +671,7 @@ The v1 reveal flow is exercised by <code>contrib/zk_carrier/scripts/v1_reveal_e2
 # constructs a synthetic TX_R, attaches each <code>zk_carrier_part_scriptsig</code> via <code>such -c set_scriptsig</code>, then reassembles the payload with <code>such -c zk_extract_carrier</code> (which now also emits <code>zk_vk_len</code> / <code>zk_vk_hex</code> for v1 reveals);
 # materializes <code>(public.json, proof.json, vk.json)</code> from the extracted bytes only — no out-of-band file is read at this step — and runs <code>snarkjs &lt;system&gt; verify</code>.
 
-Captured run (Groth16, log: <code>test-logs/v1_reveal_e2e_groth16_PASSED_20260503-130241.log</code>):
+Captured run (Groth16, log: <code>test-logs/v1_reveal_e2e_groth16_PASSED_20260503-130241.txt</code>):
 
 <pre>
 ZKP1 v1 reveal end-to-end (no out-of-band vk channel)
@@ -721,7 +721,7 @@ snarkjs rc=0
      no out-of-band vk channel was used at any step
 </pre>
 
-Captured run (PLONK, log: <code>test-logs/v1_reveal_e2e_plonk_PASSED_20260503-130241.log</code>):
+Captured run (PLONK, log: <code>test-logs/v1_reveal_e2e_plonk_PASSED_20260503-130241.txt</code>):
 
 <pre>
 ZKP1 v1 reveal end-to-end (no out-of-band vk channel)
@@ -767,7 +767,7 @@ snarkjs rc=0
      no out-of-band vk channel was used at any step
 </pre>
 
-Both runs demonstrate the consensus-relevant property of v1: the on-chain ZKP1 reveal is the single self-contained validation tuple. <code>SHA256d(ZK_PAYLOAD)</code> binds the OP_RETURN commitment to the exact <code>(public_inputs, proof, vk)</code> tuple that downstream tooling (here, <code>snarkjs verify</code>; equivalently <code>spvnode --zk-vkey</code> with the same recovered vk, or any third-party verifier) consumes — no out-of-band <code>verification_key.json</code> channel is involved at any step. The end-to-end driver script and captured logs (<code>contrib/zk_carrier/scripts/v1_reveal_e2e.sh</code>, <code>test-logs/v1_reveal_e2e_*_PASSED_*.log</code>) are committed in-tree so reviewers can reproduce both verification paths bit-for-bit.
+Both runs demonstrate the consensus-relevant property of v1: the on-chain ZKP1 reveal is the single self-contained validation tuple. <code>SHA256d(ZK_PAYLOAD)</code> binds the OP_RETURN commitment to the exact <code>(public_inputs, proof, vk)</code> tuple that downstream tooling (here, <code>snarkjs verify</code>; equivalently <code>spvnode --zk-vkey</code> with the same recovered vk, or any third-party verifier) consumes — no out-of-band <code>verification_key.json</code> channel is involved at any step. The end-to-end driver script and captured logs (<code>contrib/zk_carrier/scripts/v1_reveal_e2e.sh</code>, <code>test-logs/v1_reveal_e2e_*_PASSED_*.txt</code>) are committed in-tree so reviewers can reproduce both verification paths bit-for-bit.
 
 The same property holds for the in-process verifier path: <code>dogecoin_zk_verify_proof</code> already prefers an embedded vk over the caller-supplied <code>vk_blob</code> (see <code>src/zk_carrier/zk_groth16.c</code>), so when libdogecoin is built with <code>--with-mcl=...</code> a <code>spvnode -d -p -b</code> rescan of a v1 reveal pair emits <code>[zk-commit] ZK verification PASSED</code> followed by <code>Reveal validated</code> using only on-chain data — no <code>--zk-vkey</code> flag is required for v1 pairs.
 
