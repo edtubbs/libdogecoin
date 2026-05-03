@@ -1,0 +1,71 @@
+snarkjs   : /usr/local/bin/snarkjs
+explorer  : https://api.blockchair.com/dogecoin
+vk groth16: /home/runner/work/libdogecoin/libdogecoin/contrib/zk_carrier/circuits/build/verification_key.json
+vk plonk  : /home/runner/work/libdogecoin/libdogecoin/contrib/zk_carrier/circuits/build/verification_key_plonk.json
+
+=== Pair A (groth16) ===
+  TX_C=9f7476f1d1f0ea2688bfe01df1eeef32e42752851cbda29a5c92084a2088ff7c
+  TX_R=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269
+  TX_C OP_RETURN: tag=DZKC mode=0 commit32=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925
+  TX_R reassembled: 1 part(s)  payload_len=837 (spec: 837)
+  SHA256d(payload) = 52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925
+  TX_C commit32    = 52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925  →  MATCH
+  ZKP1: magic=ZKP1 mode=0 version=0x00 circuit_id=0x00000001 public_len=20 proof_len=801 vk_len=0
+  embedded public.json   = ['0', '1000000']
+  embedded proof.protocol=groth16 curve=bn128 keys=['curve', 'pi_a', 'pi_b', 'pi_c', 'protocol']
+  snarkjs groth16 verify (vk=verification_key.json): FAILED  | [31;22m[ERROR] [39;1msnarkJS[0m: Invalid proof
+
+=== Pair B (groth16) ===
+  TX_C=6d28abf41f7e21854923096006650b2289e5df35ce9b1f9a926f3153d8bfab3c
+  TX_R=02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087
+  TX_C OP_RETURN: tag=DZKC mode=0 commit32=a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57
+  TX_R reassembled: 1 part(s)  payload_len=840 (spec: 840)
+  SHA256d(payload) = a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57
+  TX_C commit32    = a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57  →  MATCH
+  ZKP1: magic=ZKP1 mode=0 version=0x00 circuit_id=0x00000001 public_len=20 proof_len=804 vk_len=0
+  embedded public.json   = ['0', '1000000']
+  embedded proof.protocol=groth16 curve=bn128 keys=['curve', 'pi_a', 'pi_b', 'pi_c', 'protocol']
+  snarkjs groth16 verify (vk=verification_key.json): FAILED  | [31;22m[ERROR] [39;1msnarkJS[0m: Invalid proof
+
+=== Pair P (plonk) ===
+  TX_C=fd48360fe39c11f769300cf4700482a1fbefe17df7a625fd571bdb869a809d36
+  TX_R=6308399a614a2163dad32d92e4fe3973f1897d28c4c6ca0c8ebf76a0b31f53d7
+  TX_C OP_RETURN: tag=DZKC mode=1 commit32=fb603dfdef91452a163f6497f0fa1da8f10c5b051552959eb036a363ddb48fce
+  TX_R reassembled: 2 part(s)  payload_len=2285 (spec: 2285)
+  SHA256d(payload) = fb603dfdef91452a163f6497f0fa1da8f10c5b051552959eb036a363ddb48fce
+  TX_C commit32    = fb603dfdef91452a163f6497f0fa1da8f10c5b051552959eb036a363ddb48fce  →  MATCH
+  ZKP1: magic=ZKP1 mode=1 version=0x00 circuit_id=0x00000001 public_len=20 proof_len=2249 vk_len=0
+  embedded public.json   = ['0', '1000000']
+  embedded proof.protocol=plonk curve=bn128 keys=['A', 'B', 'C', 'T1', 'T2', 'T3', 'Wxi', 'Wxiw', 'Z', 'curve', 'eval_a', 'eval_b', 'eval_c', 'eval_s1', 'eval_s2', 'eval_zw', 'protocol']
+  snarkjs plonk verify (vk=verification_key_plonk.json): FAILED  | [31;22m[ERROR] [39;1msnarkJS[0m: Invalid number of public inputs
+
+=== Pair G1 (groth16) ===
+  TX_C=b70bc69f574b3044972d52a9a6eb33f00c2ed909b7346994aceec0c412e18354
+  TX_R=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+  TX_C OP_RETURN: tag=DZKC mode=0 commit32=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e
+  TX_R reassembled: 3 part(s)  payload_len=4144 (spec: 4144)
+  SHA256d(payload) = 80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e
+  TX_C commit32    = 80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e  →  MATCH
+  ZKP1: magic=ZKP1 mode=0 version=0x01 circuit_id=0x00000001 public_len=26 proof_len=805 vk_len=3293
+  embedded public.json   = ['0', '1000000', '0']
+  embedded proof.protocol=groth16 curve=bn128 keys=['curve', 'pi_a', 'pi_b', 'pi_c', 'protocol']
+  snarkjs groth16 verify (vk=EMBEDDED reveal): OK  | [32;22m[INFO]  [39;1msnarkJS[0m: OK!
+
+=== Pair Q1 (plonk) ===
+  TX_C=d0a099692c91bd2d069afbfa1334ec348e07d86381f97bbd891ff4a4732b4edc
+  TX_R=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+  TX_C OP_RETURN: tag=DZKC mode=1 commit32=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d
+  TX_R reassembled: 3 part(s)  payload_len=4336 (spec: 4336)
+  SHA256d(payload) = 52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d
+  TX_C commit32    = 52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d  →  MATCH
+  ZKP1: magic=ZKP1 mode=1 version=0x01 circuit_id=0x00000001 public_len=26 proof_len=2249 vk_len=2041
+  embedded public.json   = ['0', '1000000', '0']
+  embedded proof.protocol=plonk curve=bn128 keys=['A', 'B', 'C', 'T1', 'T2', 'T3', 'Wxi', 'Wxiw', 'Z', 'curve', 'eval_a', 'eval_b', 'eval_c', 'eval_s1', 'eval_s2', 'eval_zw', 'protocol']
+  snarkjs plonk verify (vk=EMBEDDED reveal): OK  | [32;22m[INFO]  [39;1msnarkJS[0m: OK!
+
+========= INDEPENDENT ON-CHAIN VALIDATION SUMMARY =========
+  Pair A: PASS-vk-rotated    (commitment binding + real proof bytes; vk rotated since publication)
+  Pair B: PASS-vk-rotated    (commitment binding + real proof bytes; vk rotated since publication)
+  Pair P: PASS-vk-rotated    (commitment binding + real proof bytes; vk rotated since publication)
+  Pair G1: PASS               (full end-to-end verification (v1 self-contained reveal))
+  Pair Q1: PASS               (full end-to-end verification (v1 self-contained reveal))

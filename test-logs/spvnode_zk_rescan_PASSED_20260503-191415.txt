@@ -1,0 +1,93 @@
+===============================================================================
+spvnode --zk-vkey rescan — fresh mainnet run after broadcast of Pair G1 + Pair Q1
+  date:       2026-05-03T19:41:11Z
+  binary:     Version: libdogecoin 0.1.5-pre
+  flags:      -l -p -b -d -f /tmp/headers_spv.db -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+              --zk-vkey contrib/zk_carrier/circuits/build/verification_key.json
+  checkpoint: 6191600 / a8eeeadc81e8def69167f0d82c50c4d05fdb0c6ffd17a6af955f80d6925e0f0d
+              (added today in src/chainparams.c so spvnode -p syncs to tip in seconds)
+  tip:        Sync completed, at height 6191632
+===============================================================================
+
+All [zk-vkey] / [zk-commit] log lines emitted during the rescan:
+
+[zk-vkey] loaded 3293 bytes from contrib/zk_carrier/circuits/build/verification_key.json
+Found new relevant transaction: 9f7476f1d1f0ea2688bfe01df1eeef32e42752851cbda29a5c92084a2088ff7c (height: 6189927)
+DEBUG: [zk-commit] Pending at height=6189927 txpos=28 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 mode=0 source=op_return
+Found new relevant transaction: d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269 (height: 6189927)
+DEBUG: [zk-commit] Valid at height=6189927 txpos=45 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 mode=0 source=carrier_scriptsig matched_txc_txpos=28 payload_len=837 txr_txid=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x00 circuit_id=0x00000001 public_len=20 proof_len=801 vk_len=0 total_payload_len=837 txr_txid=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=20 hex=5b0a202230222c0a202231303030303030220a5d ascii="[  "0",  "1000000" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=801 hex_head=7b0a202270695f61223a205b0a202022323834393231303132303437343132323233393231333735313130393931343936343233333738303239383034393830 hex_tail=3934353635373035222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "pi_a": [   "2849210120474122239213751109914964233780298049806941662434257544733715424293",  "
+DEBUG: [zk-commit] ZK verification DELEGATED at height=6189927 txpos=45 mode=0 err=-7
+DEBUG: [zk-commit] Reveal validated: TX_R=d02fe88f26c69bceefa30f1fdf7b95d0516ee5404c67aca9d497bf0f62dfa269 commit=52f9d0d13257707cd7217c66bcfc2a057b6b80086f51a6544662a1ab85ef3925 payload_len=837 mode=0 height=6189927
+Found new relevant transaction: 6d28abf41f7e21854923096006650b2289e5df35ce9b1f9a926f3153d8bfab3c (height: 6189986)
+DEBUG: [zk-commit] Pending at height=6189986 txpos=3 commit=a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57 mode=0 source=op_return
+Found new relevant transaction: 02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087 (height: 6189987)
+DEBUG: [zk-commit] Valid at height=6189987 txpos=8 commit=a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57 mode=0 source=carrier_scriptsig matched_txc_txpos=3 payload_len=840 txr_txid=02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x00 circuit_id=0x00000001 public_len=20 proof_len=804 vk_len=0 total_payload_len=840 txr_txid=02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=20 hex=5b0a202230222c0a202231303030303030220a5d ascii="[  "0",  "1000000" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=804 hex_head=7b0a202270695f61223a205b0a202022313138333633373937363837363138363331353334303935363934313431303735393235373936343630363034373936 hex_tail=3638333135303339222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "pi_a": [   "11836379768761863153409569414107592579646060479639044239732768017834778963417", "
+DEBUG: [zk-commit] ZK verification DELEGATED at height=6189987 txpos=8 mode=0 err=-7
+DEBUG: [zk-commit] Reveal validated: TX_R=02eee7ae0b4f2a6011a417872bdaaea956f7c356aba53f8b8d01fb4cf7755087 commit=a2a0a0f2f273806763ff28a306316c7e557a90f161dc3f535cec88d2d8c56c57 payload_len=840 mode=0 height=6189987
+Found new relevant transaction: fd48360fe39c11f769300cf4700482a1fbefe17df7a625fd571bdb869a809d36 (height: 6190360)
+DEBUG: [zk-commit] Pending at height=6190360 txpos=14 commit=fb603dfdef91452a163f6497f0fa1da8f10c5b051552959eb036a363ddb48fce mode=1 source=op_return
+Found new relevant transaction: 6308399a614a2163dad32d92e4fe3973f1897d28c4c6ca0c8ebf76a0b31f53d7 (height: 6190369)
+DEBUG: [zk-commit] Valid at height=6190369 txpos=26 commit=fb603dfdef91452a163f6497f0fa1da8f10c5b051552959eb036a363ddb48fce mode=1 source=carrier_scriptsig matched_txc_txpos=14 payload_len=2285 txr_txid=6308399a614a2163dad32d92e4fe3973f1897d28c4c6ca0c8ebf76a0b31f53d7
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=1(plonk) version=0x00 circuit_id=0x00000001 public_len=20 proof_len=2249 vk_len=0 total_payload_len=2285 txr_txid=6308399a614a2163dad32d92e4fe3973f1897d28c4c6ca0c8ebf76a0b31f53d7
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=20 hex=5b0a202230222c0a202231303030303030220a5d ascii="[  "0",  "1000000" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=2249 hex_head=7b0a202241223a205b0a202022333237323037303332363036313138363734313539303936393538333531373830333938333735363332383937363039333338 hex_tail=3130393030333939333337393733393230313534222c0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "A": [   "3272070326061186741590969583517803983756328976093385321870352155384328327171",   "9"
+DEBUG: [zk-commit] ZK verification DELEGATED at height=6190369 txpos=26 mode=1 err=-6
+DEBUG: [zk-commit] Reveal validated: TX_R=6308399a614a2163dad32d92e4fe3973f1897d28c4c6ca0c8ebf76a0b31f53d7 commit=fb603dfdef91452a163f6497f0fa1da8f10c5b051552959eb036a363ddb48fce payload_len=2285 mode=1 height=6190369
+Found new relevant transaction: 556e929a55c5dae7c9e73220b13b4153ac574ba0b64a4d591a4fe853aa5682e6 (height: 6191339)
+DEBUG: [zk-commit] Pending at height=6191339 txpos=8 commit=d1ca9ab25fc1b79260fec96c809f1fc98d95362521eb03b60cad2d715c3ae2ed mode=0 source=op_return
+Found new relevant transaction: 0a53c0355eb696578e76181258595cce940fbaf2e14e896b81bf0d5f0fdd7a58 (height: 6191341)
+DEBUG: [zk-commit] Valid at height=6191341 txpos=3 commit=d1ca9ab25fc1b79260fec96c809f1fc98d95362521eb03b60cad2d715c3ae2ed mode=0 source=carrier_scriptsig matched_txc_txpos=8 payload_len=4145 txr_txid=0a53c0355eb696578e76181258595cce940fbaf2e14e896b81bf0d5f0fdd7a58
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=806 vk_len=3293 total_payload_len=4145 txr_txid=0a53c0355eb696578e76181258595cce940fbaf2e14e896b81bf0d5f0fdd7a58
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=26 hex=5b0a202230222c0a202231303030303030222c0a202230220a5d ascii="[  "0",  "1000000",  "0" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=806 hex_head=7b0a202270695f61223a205b0a202022313130363339363136363139373435343337313439343739363534373631323239353234323831363535333331343333 hex_tail=3834323835323335222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "pi_a": [   "11063961661974543714947965476122952428165533143348587524738262529753918443155", "
+DEBUG: [zk-commit] reveal_decoded.vk: len=3293 hex_head=7b0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022766b hex_tail=30333530373731383231373634333139393435363434373538363231333839343031333835343631313035363734222c0a2020202231220a20205d0a205d0a7d ascii_head="{  "protocol": "groth16",  "curve": "bn128",  "nPublic": 3,  "vk_alpha_1": [   "1564531949608914"
+DEBUG: [zk-commit] ZK verification DELEGATED at height=6191341 txpos=3 mode=0 err=-7
+DEBUG: [zk-commit] Reveal validated: TX_R=0a53c0355eb696578e76181258595cce940fbaf2e14e896b81bf0d5f0fdd7a58 commit=d1ca9ab25fc1b79260fec96c809f1fc98d95362521eb03b60cad2d715c3ae2ed payload_len=4145 mode=0 height=6191341
+Found new relevant transaction: 91ea2c05ad46a28cbb443dcba71783edaf606d3aa922f2bc555bf0078cda16e8 (height: 6191360)
+DEBUG: [zk-commit] Pending at height=6191360 txpos=29 commit=11648da8bcce4c68e3d39d6124eee619ac9bfe4d75b68300fb1768a02f0b8eeb mode=1 source=op_return
+Found new relevant transaction: 7cfc59292187a6bf25ac6b6136fc99d4e03a9dbb2f58bd7b8541c6d9a398fd59 (height: 6191360)
+DEBUG: [zk-commit] Valid at height=6191360 txpos=52 commit=11648da8bcce4c68e3d39d6124eee619ac9bfe4d75b68300fb1768a02f0b8eeb mode=1 source=carrier_scriptsig matched_txc_txpos=29 payload_len=4339 txr_txid=7cfc59292187a6bf25ac6b6136fc99d4e03a9dbb2f58bd7b8541c6d9a398fd59
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=1(plonk) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=2252 vk_len=2041 total_payload_len=4339 txr_txid=7cfc59292187a6bf25ac6b6136fc99d4e03a9dbb2f58bd7b8541c6d9a398fd59
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=26 hex=5b0a202230222c0a202231303030303030222c0a202230220a5d ascii="[  "0",  "1000000",  "0" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=2252 hex_head=7b0a202241223a205b0a202022383933333537373735303436393230373630373837393637323839353331303830373339333431343933363232333938323739 hex_tail=3532353231383836313731323734323931303036222c0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "A": [   "8933577750469207607879672895310807393414936223982796748585228195283870025111",   "1"
+DEBUG: [zk-commit] reveal_decoded.vk: len=2041 hex_head=7b0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022706f7765 hex_tail=36303931353230323837383134313831313735343330303837313639303237393734323436373531363130353036393432323134383432373031373734220a7d ascii_head="{  "protocol": "plonk",  "curve": "bn128",  "nPublic": 3,  "power": 9,  "k1": "2",  "k2": "3",  "
+DEBUG: [zk-commit] ZK verification DELEGATED at height=6191360 txpos=52 mode=1 err=-6
+DEBUG: [zk-commit] Reveal validated: TX_R=7cfc59292187a6bf25ac6b6136fc99d4e03a9dbb2f58bd7b8541c6d9a398fd59 commit=11648da8bcce4c68e3d39d6124eee619ac9bfe4d75b68300fb1768a02f0b8eeb payload_len=4339 mode=1 height=6191360
+Found new relevant transaction: b70bc69f574b3044972d52a9a6eb33f00c2ed909b7346994aceec0c412e18354 (height: 6191613)
+DEBUG: [zk-commit] Pending at height=6191613 txpos=25 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=op_return
+Found new relevant transaction: 68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7 (height: 6191613)
+DEBUG: [zk-commit] Valid at height=6191613 txpos=27 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=carrier_scriptsig matched_txc_txpos=25 payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=805 vk_len=3293 total_payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=26 hex=5b0a202230222c0a202231303030303030222c0a202230220a5d ascii="[  "0",  "1000000",  "0" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=805 hex_head=7b0a202270695f61223a205b0a202022313631323534383935323233353937323930323733383634333034373430363435393732343036393832363832343737 hex_tail=3936303635343532222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "pi_a": [   "16125489522359729027386430474064597240698268247786523731965471582666125052928", "
+DEBUG: [zk-commit] reveal_decoded.vk: len=3293 hex_head=7b0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022766b hex_tail=30333530373731383231373634333139393435363434373538363231333839343031333835343631313035363734222c0a2020202231220a20205d0a205d0a7d ascii_head="{  "protocol": "groth16",  "curve": "bn128",  "nPublic": 3,  "vk_alpha_1": [   "1564531949608914"
+DEBUG: [zk-commit] ZK verification DELEGATED at height=6191613 txpos=27 mode=0 err=-7
+DEBUG: [zk-commit] Reveal validated: TX_R=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e payload_len=4144 mode=0 height=6191613
+Found new relevant transaction: d0a099692c91bd2d069afbfa1334ec348e07d86381f97bbd891ff4a4732b4edc (height: 6191616)
+DEBUG: [zk-commit] Pending at height=6191616 txpos=18 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d mode=1 source=op_return
+Found new relevant transaction: 0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5 (height: 6191616)
+DEBUG: [zk-commit] Valid at height=6191616 txpos=32 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d mode=1 source=carrier_scriptsig matched_txc_txpos=18 payload_len=4336 txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=1(plonk) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=2249 vk_len=2041 total_payload_len=4336 txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=26 hex=5b0a202230222c0a202231303030303030222c0a202230220a5d ascii="[  "0",  "1000000",  "0" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=2249 hex_head=7b0a202241223a205b0a202022313736303839323935333433323339323338363834373635323433333332303430363937343833323831303130383531373430 hex_tail=3738323630323933313631323635373334323832222c0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "A": [   "17608929534323923868476524333204069748328101085174028579785990727169368000378",   ""
+DEBUG: [zk-commit] reveal_decoded.vk: len=2041 hex_head=7b0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022706f7765 hex_tail=36303931353230323837383134313831313735343330303837313639303237393734323436373531363130353036393432323134383432373031373734220a7d ascii_head="{  "protocol": "plonk",  "curve": "bn128",  "nPublic": 3,  "power": 9,  "k1": "2",  "k2": "3",  "
+DEBUG: [zk-commit] ZK verification DELEGATED at height=6191616 txpos=32 mode=1 err=-6
+DEBUG: [zk-commit] Reveal validated: TX_R=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d payload_len=4336 mode=1 height=6191616
+
+===============================================================================
+Summary: every confirmed ZK carrier pair on mainnet (Pair A, Pair B, Pair P,
+the older v1 references at h=6191341/6191360, AND today's freshly-broadcast
+Pair G1 [groth16 v1, h=6191613] and Pair Q1 [plonk v1, h=6191616]) reaches the
+[zk-commit] Reveal validated state.  reveal_decoded shows version=0x01 and
+vk_len=3293 (groth16) / vk_len=2041 (plonk) for the v1 pairs, confirming the
+verification key is included inline in the on-chain reveal.  In-process
+verification reports DELEGATED (libdogecoin built without HAVE_RAPIDSNARK),
+and full snarkjs verify against the embedded vk is performed independently
+by validate_onchain_pairs.py (PASS for G1 and Q1, see onchain_validation_PASSED_*.txt).
+===============================================================================
