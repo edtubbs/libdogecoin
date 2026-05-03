@@ -155,10 +155,17 @@ def reassemble_zkp1(tx_r):
     return b"".join(parts[i] for i in range(expected_total)), expected_total
 
 def decode_zkp1(p):
-    """Big-endian ZKP1 wire format (see src/zk_carrier/zk_carrier.c)."""
+    """Big-endian ZKP1 wire format (see src/zk_carrier/zk_carrier.c).
+
+    Supports both v0 (no embedded vk) and v1 (vk-included) payloads.  v1 is
+    distinguished by the version byte at offset 5 and adds a trailing
+    ``VK_LEN4 || VK`` block after the proof.
+    """
     if len(p) < 12 or p[:4] != b"ZKP1":
         return None
-    mode, reserved = p[4], p[5]
+    mode, version = p[4], p[5]
+    if version not in (0x00, 0x01):
+        return None
     cid     = struct.unpack_from(">I", p,  6)[0]
     pub_len = struct.unpack_from(">H", p, 10)[0]
     o = 12
@@ -169,9 +176,22 @@ def decode_zkp1(p):
     if o + proof_len > len(p):
         return None
     proof = p[o:o+proof_len]; o += proof_len
-    return {"mode": mode, "reserved": reserved, "circuit_id": cid,
-            "public_len": pub_len, "proof_len": proof_len, "total": len(p),
-            "public": pub, "proof": proof}
+    vk = b""
+    vk_len = 0
+    if version == 0x01:
+        if o + 4 > len(p):
+            return None
+        vk_len = struct.unpack_from(">I", p, o)[0]; o += 4
+        if o + vk_len > len(p):
+            return None
+        vk = p[o:o+vk_len]; o += vk_len
+    if o != len(p):
+        return None  # trailing bytes
+    return {"mode": mode, "version": version, "reserved": version,
+            "circuit_id": cid,
+            "public_len": pub_len, "proof_len": proof_len,
+            "vk_len": vk_len, "total": len(p),
+            "public": pub, "proof": proof, "vk": vk}
 
 # --------------------------------------------------------------------------
 # Explorer fetch
@@ -301,9 +321,10 @@ def validate(p):
     z = decode_zkp1(payload)
     if not z or z["mode"] != p["mode"]:
         return p["tag"], "FAIL", "ZKP1 header decode failed"
-    print(f"  ZKP1: magic=ZKP1 mode={z['mode']} reserved=0x{z['reserved']:02x} "
+    print(f"  ZKP1: magic=ZKP1 mode={z['mode']} version=0x{z['version']:02x} "
           f"circuit_id=0x{z['circuit_id']:08x} "
-          f"public_len={z['public_len']} proof_len={z['proof_len']}")
+          f"public_len={z['public_len']} proof_len={z['proof_len']} "
+          f"vk_len={z['vk_len']}")
 
     pub_j   = json.loads(z["public"].decode())
     proof_j = json.loads(z["proof"].decode())
@@ -313,7 +334,30 @@ def validate(p):
     if proof_j.get("protocol") != p["system"]:
         return p["tag"], "FAIL", "embedded proof.protocol mismatch"
 
-    # 5) snarkjs verify under the in-tree vk
+    # 5) snarkjs verify — when the reveal is v1 (vk-included) the canonical
+    # path is to validate ENTIRELY from on-chain bytes: write the embedded vk
+    # to a temp file and run `snarkjs verify` against it.  This is the
+    # "everything for full validation is in the Reveal" property the spec
+    # asserts for v1 payloads.  v0 payloads still rely on the in-tree vk
+    # distributed out-of-band.
+    if z["vk_len"] > 0:
+        try:
+            vk_obj_embedded = json.loads(z["vk"].decode())
+        except Exception:
+            return p["tag"], "FAIL", "embedded vk is not valid JSON"
+        vk_embedded_path = WORK / f"_vk_embedded_{p['tag'].replace(' ', '_')}.json"
+        vk_embedded_path.parent.mkdir(parents=True, exist_ok=True)
+        vk_embedded_path.write_text(json.dumps(vk_obj_embedded))
+        ok_e, log_e = snarkjs_verify(p["system"], vk_embedded_path, pub_j, proof_j)
+        last_e = next((l for l in reversed(log_e.splitlines())
+                       if "snarkJS" in l or "ERROR" in l),
+                      log_e.splitlines()[-1] if log_e else "")
+        print(f"  snarkjs {p['system']} verify (vk=EMBEDDED reveal): "
+              f"{'OK' if ok_e else 'FAILED'}  | {last_e}")
+        if ok_e:
+            return p["tag"], "PASS", \
+                "full end-to-end verification (v1 self-contained reveal)"
+        # fall through and try the in-tree vk for diagnostic parity
     vk = VK_G16 if p["system"] == "groth16" else VK_PLNK
     ok, log = snarkjs_verify(p["system"], vk, pub_j, proof_j)
     last = next((l for l in reversed(log.splitlines())

@@ -1300,20 +1300,22 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                     uint32_t dec_circuit_id = 0;
                                     const uint8_t* dec_pub = NULL; size_t dec_pub_len = 0;
                                     const uint8_t* dec_proof = NULL; size_t dec_proof_len = 0;
+                                    const uint8_t* dec_vk = NULL; size_t dec_vk_len = 0;
                                     if (dogecoin_zk_decode_payload(zk_payload, zk_payload_len,
                                                                    &dec_mode, &dec_circuit_id,
                                                                    &dec_pub, &dec_pub_len,
-                                                                   &dec_proof, &dec_proof_len) == DOGECOIN_ZK_OK) {
+                                                                   &dec_proof, &dec_proof_len,
+                                                                   &dec_vk, &dec_vk_len) == DOGECOIN_ZK_OK) {
                                         uint8_t reserved_byte = zk_payload[DOGECOIN_ZK_CARRIER_MAGIC_LEN + 1];
                                         const char* mode_label =
                                             (dec_mode == DOGECOIN_ZK_MODE_GROTH16) ? "groth16-bn254" :
                                             (dec_mode == DOGECOIN_ZK_MODE_PLONK) ? "plonk" :
                                             (dec_mode == DOGECOIN_ZK_MODE_STARK_S2) ? "stark-s2" : "unknown";
                                         client->nodegroup->log_write_cb(
-                                            "[zk-commit] reveal_decoded: magic=\"ZKP1\" mode=%u(%s) reserved=0x%02x circuit_id=0x%08x public_len=%zu proof_len=%zu total_payload_len=%zu txr_txid=%s\n",
+                                            "[zk-commit] reveal_decoded: magic=\"ZKP1\" mode=%u(%s) version=0x%02x circuit_id=0x%08x public_len=%zu proof_len=%zu vk_len=%zu total_payload_len=%zu txr_txid=%s\n",
                                             (unsigned)dec_mode, mode_label, (unsigned)reserved_byte,
                                             (unsigned)dec_circuit_id, dec_pub_len, dec_proof_len,
-                                            zk_payload_len, txr_txid_hex);
+                                            dec_vk_len, zk_payload_len, txr_txid_hex);
 
                                         /* Helper: dump up to N bytes as hex + ASCII preview onto the log. */
                                         #define ZK_LOG_DUMP_FIELD(label, ptr, len) do { \
@@ -1364,6 +1366,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
                                         ZK_LOG_DUMP_FIELD("public_inputs", dec_pub, dec_pub_len);
                                         ZK_LOG_DUMP_FIELD("proof", dec_proof, dec_proof_len);
+                                        if (dec_vk_len > 0) {
+                                            ZK_LOG_DUMP_FIELD("vk", dec_vk, dec_vk_len);
+                                        }
 
                                         #undef ZK_LOG_DUMP_FIELD
                                     } else {

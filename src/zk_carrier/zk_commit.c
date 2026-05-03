@@ -170,7 +170,8 @@ dogecoin_zk_err_t dogecoin_zk_build_carrier_tx_r_scriptsigs(
     size_t hdr_proof_len = 0;
     uint16_t advisory_pl = 0;
     if (dogecoin_zk_decode_payload(payload, payload_len, &hdr_mode, &hdr_circ,
-                                   &hdr_pi, &hdr_pi_len, &hdr_proof, &hdr_proof_len) == DOGECOIN_ZK_OK) {
+                                   &hdr_pi, &hdr_pi_len, &hdr_proof, &hdr_proof_len,
+                                   NULL, NULL) == DOGECOIN_ZK_OK) {
         advisory_pl = (uint16_t)(hdr_pi_len > 0xFFFFu ? 0xFFFFu : hdr_pi_len);
     }
     /* If full payload exceeds 16-bit "full_len" advisory field, fall back to

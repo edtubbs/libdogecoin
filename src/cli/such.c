@@ -2995,8 +2995,14 @@ int main(int argc, char* argv[])
 
         uint8_t* payload = NULL;
         size_t payload_len = 0;
+        /* such -c zk_encode_payload does not currently take a vk argument from
+         * the CLI; emit a v0 payload (no embedded vk).  The supported way to
+         * produce a v1 (vk-included, self-contained-reveal) payload is
+         * contrib/zk_carrier/witness_helper.py --vkey, which has the vk file
+         * already on hand. */
         dogecoin_zk_err_t e = dogecoin_zk_encode_payload(
             (dogecoin_zk_mode_t)mode_l, circuit_id, pi, pi_len, prf, prf_len,
+            NULL, 0,
             &payload, &payload_len);
         dogecoin_free(pi);
         dogecoin_free(prf);
@@ -3026,7 +3032,11 @@ int main(int argc, char* argv[])
         uint32_t cid;
         const uint8_t* pi; size_t pi_len;
         const uint8_t* prf; size_t prf_len;
-        dogecoin_zk_err_t e = dogecoin_zk_decode_payload(p, plen, &mode, &cid, &pi, &pi_len, &prf, &prf_len);
+        const uint8_t* vk_ptr = NULL; size_t vk_len = 0;
+        dogecoin_zk_err_t e = dogecoin_zk_decode_payload(p, plen, &mode, &cid,
+                                                         &pi, &pi_len,
+                                                         &prf, &prf_len,
+                                                         &vk_ptr, &vk_len);
         if (e != DOGECOIN_ZK_OK) { dogecoin_free(p); return showError(dogecoin_zk_strerror(e)); }
 
         uint8_t commit[32];
@@ -3043,6 +3053,10 @@ int main(int argc, char* argv[])
         printf("\n=== ZK Carrier Commitment ===\n");
         printf("mode:        %u\n", (unsigned)mode);
         printf("circuit_id:  0x%08x\n", (unsigned)cid);
+        printf("public_inputs_len: %zu\n", pi_len);
+        printf("proof_len:   %zu\n", prf_len);
+        printf("vk_len:      %zu%s\n", vk_len,
+               vk_len > 0 ? " (v1: self-contained reveal)" : " (v0: vk distributed out-of-band)");
         printf("commitment:  %s\n", commit_hex);
         printf("opreturn_spk: %s\n", spk_hex ? spk_hex : "");
         cstr_free(spk, true);
@@ -3162,7 +3176,10 @@ int main(int argc, char* argv[])
         uint32_t cid;
         const uint8_t* pi; size_t pi_len;
         const uint8_t* prf; size_t prf_len;
-        e = dogecoin_zk_decode_payload(payload, payload_len, &mode, &cid, &pi, &pi_len, &prf, &prf_len);
+        const uint8_t* vk_ptr = NULL; size_t vk_len = 0;
+        e = dogecoin_zk_decode_payload(payload, payload_len, &mode, &cid,
+                                       &pi, &pi_len, &prf, &prf_len,
+                                       &vk_ptr, &vk_len);
 
         printf("zk_payload: %s\n", hex);
         printf("zk_payload_len: %zu\n", payload_len);
@@ -3171,6 +3188,16 @@ int main(int argc, char* argv[])
             printf("zk_circuit_id: 0x%08x\n", (unsigned)cid);
             printf("zk_public_inputs_len: %zu\n", pi_len);
             printf("zk_proof_len: %zu\n", prf_len);
+            printf("zk_vk_len: %zu\n", vk_len);
+            if (vk_len > 0) {
+                /* v1 self-contained reveal: emit the vk bytes verbatim so
+                 * downstream tooling (snarkjs verify) can validate the proof
+                 * using only data extracted from the on-chain reveal. */
+                char* vk_hex = dogecoin_malloc(vk_len * 2 + 1);
+                utils_bin_to_hex((uint8_t*)vk_ptr, vk_len, vk_hex);
+                printf("zk_vk_hex: %s\n", vk_hex);
+                dogecoin_free(vk_hex);
+            }
         }
         dogecoin_free(hex);
         dogecoin_free(payload);

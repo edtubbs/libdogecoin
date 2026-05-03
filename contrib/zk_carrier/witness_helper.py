@@ -56,22 +56,39 @@ def _run(cmd: Sequence[str]) -> None:
 
 
 def encode_payload(mode: int, circuit_id: int,
-                   public_inputs: bytes, proof: bytes) -> bytes:
-    """Encode the canonical ZKP1 payload (matches dogecoin_zk_encode_payload)."""
+                   public_inputs: bytes, proof: bytes,
+                   vk: bytes | None = None) -> bytes:
+    """Encode the canonical ZKP1 payload (matches dogecoin_zk_encode_payload).
+
+    When ``vk`` is provided and non-empty the payload is emitted as v1
+    (vk-included): the version byte at offset 5 is 0x01 and the trailing
+    ``PROOF_LEN4 || PROOF`` block is followed by ``VK_LEN4 || VK`` so the
+    on-chain reveal alone is sufficient for full proof validation (no
+    out-of-band channel needed).  When ``vk`` is None / empty the payload is
+    emitted as v0, matching the earlier on-chain pairs (Pair A / Pair B / Pair P)
+    documented in the BIP.
+    """
     if mode < 0 or mode > 0xFF:
         raise ValueError("mode out of range")
     if len(public_inputs) > 0xFFFF:
         raise ValueError("public_inputs too large (>65535 bytes)")
     if len(proof) > 0x02000000:
         raise ValueError("proof too large (>32 MiB)")
+    vk = vk or b""
+    if len(vk) > 0x02000000:
+        raise ValueError("vk too large (>32 MiB)")
+    version = 0x01 if vk else 0x00
     out = bytearray()
     out += ZK_MAGIC
-    out += bytes([mode, 0x00])
+    out += bytes([mode, version])
     out += struct.pack(">I", circuit_id & 0xFFFFFFFF)
     out += struct.pack(">H", len(public_inputs))
     out += public_inputs
     out += struct.pack(">I", len(proof))
     out += proof
+    if vk:
+        out += struct.pack(">I", len(vk))
+        out += vk
     return bytes(out)
 
 
@@ -131,6 +148,21 @@ def build_payload(args: argparse.Namespace) -> bytes:
         # verification (rapidsnark, when linked) can both consume it.
         public_bytes = public_path.read_bytes()
         proof_bytes = proof_path.read_bytes()
+        # When --vkey is supplied, embed the verification key bytes verbatim
+        # so the on-chain reveal is fully self-contained: a verifier with no
+        # access to the original vkey file can still reassemble the ZKP1
+        # payload from TX_R, extract the embedded vk, and re-run
+        # `snarkjs <system> verify` end-to-end.  This is the canonical
+        # "everything for full validation is in the Reveal" mode (ZKP1 v1).
+        # Operators may opt out via --no-embed-vk to reproduce the historical
+        # v0 wire format that ships in Pair A / Pair B / Pair P on mainnet.
+        vk_bytes = b""
+        if args.vkey and not args.no_embed_vk:
+            vk_path = Path(args.vkey).resolve()
+            if vk_path.is_file():
+                vk_bytes = vk_path.read_bytes()
+            else:
+                sys.exit(f"error: --vkey {vk_path} not found (cannot embed for v1 reveal)")
 
         # Persist the raw snarkjs proof.json / public.json next to the
         # caller's --out-payload (when --save-proof/--save-public are
@@ -143,7 +175,8 @@ def build_payload(args: argparse.Namespace) -> bytes:
         if args.save_public:
             Path(args.save_public).write_bytes(public_bytes)
 
-    return encode_payload(mode, args.circuit_id, public_bytes, proof_bytes)
+    return encode_payload(mode, args.circuit_id, public_bytes, proof_bytes,
+                          vk=vk_bytes if vk_bytes else None)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -151,7 +184,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--wasm", required=True, help="path to circuit .wasm")
     p.add_argument("--zkey", required=True, help="path to circuit .zkey (Groth16 proving key)")
-    p.add_argument("--vkey", help="path to verification_key.json (optional sanity check)")
+    p.add_argument("--vkey", help="path to verification_key.json — when present "
+                                  "the vk bytes are EMBEDDED in the ZKP1 reveal "
+                                  "(v1 wire format) so the on-chain reveal is "
+                                  "fully self-contained for proof validation; "
+                                  "additionally used as a sanity-check vkey for "
+                                  "snarkjs verify before emitting the payload")
+    p.add_argument("--no-embed-vk", action="store_true",
+                   help="produce a v0 ZKP1 payload (no embedded vk) even when "
+                        "--vkey is supplied — used for reproducing pre-v1 "
+                        "on-chain pairs and round-tripping legacy fixtures")
     p.add_argument("--circuit-id", type=lambda x: int(x, 0), default=1,
                    help="application-defined 32-bit circuit identifier (default: 1)")
     p.add_argument("--low", type=int, help="public lower bound (range proof)")
@@ -178,7 +220,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     payload = build_payload(args)
     Path(args.out_payload).write_text(payload.hex())
-    print(f"wrote {len(payload)}-byte ZKP1 payload to {args.out_payload}", file=sys.stderr)
+    # Distinguish v0 vs v1 in the operator log so the demo scripts can
+    # advertise which wire format they actually committed.
+    version = payload[5] if len(payload) > 5 else 0
+    print(f"wrote {len(payload)}-byte ZKP1 payload (v{version}) to {args.out_payload}",
+          file=sys.stderr)
     return 0
 
 

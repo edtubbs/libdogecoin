@@ -18,6 +18,63 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/zk_carrier.h>
 
+static void test_zk_codec_roundtrip_with_vk(void)
+{
+    /* v1 self-contained reveal: the encoder embeds the verification key inline
+     * so the decoder (and the on-chain verifier) can validate the proof using
+     * only data extracted from the on-chain reveal — no out-of-band channel. */
+    const uint8_t pub[]   = {0x10, 0x20, 0x30};
+    const uint8_t proof[] = "{\"pi_a\":[],\"pi_b\":[],\"pi_c\":[]}";
+    const uint8_t vk[]    = "{\"protocol\":\"groth16\",\"curve\":\"bn128\","
+                            "\"nPublic\":1,\"vk_alpha_1\":[\"1\",\"2\",\"1\"]}";
+
+    uint8_t* payload = NULL;
+    size_t payload_len = 0;
+    dogecoin_zk_err_t e = dogecoin_zk_encode_payload(
+        DOGECOIN_ZK_MODE_GROTH16, 0x12345678,
+        pub, sizeof(pub),
+        proof, sizeof(proof),
+        vk, sizeof(vk),
+        &payload, &payload_len);
+    u_assert_int_eq(e, DOGECOIN_ZK_OK);
+    /* Version byte (offset 5 = "reserved"/version slot) MUST be v1 = 0x01 to
+     * signal that the trailing vk is part of the canonical payload. */
+    u_assert_int_eq(payload[5], 0x01);
+
+    dogecoin_zk_mode_t mode_out;
+    uint32_t cid_out;
+    const uint8_t* pub_out;  size_t pub_out_len;
+    const uint8_t* proof_out; size_t proof_out_len;
+    const uint8_t* vk_out = NULL; size_t vk_out_len = 0;
+    e = dogecoin_zk_decode_payload(payload, payload_len,
+                                   &mode_out, &cid_out,
+                                   &pub_out, &pub_out_len,
+                                   &proof_out, &proof_out_len,
+                                   &vk_out, &vk_out_len);
+    u_assert_int_eq(e, DOGECOIN_ZK_OK);
+    u_assert_int_eq(pub_out_len, sizeof(pub));
+    u_assert_int_eq(memcmp(pub_out, pub, sizeof(pub)), 0);
+    u_assert_int_eq(proof_out_len, sizeof(proof));
+    u_assert_int_eq(memcmp(proof_out, proof, sizeof(proof)), 0);
+    u_assert_int_eq(vk_out_len, sizeof(vk));
+    u_assert_int_eq(memcmp(vk_out, vk, sizeof(vk)), 0);
+
+    /* Tamper-detection on the embedded vk must invalidate the commitment, so
+     * a malicious carrier cannot swap the vk without changing the on-chain
+     * commit32 hash — this is the consensus-relevant property of v1. */
+    uint8_t commit_a[32], commit_b[32];
+    e = dogecoin_zk_get_commitment_hash(payload, payload_len, commit_a);
+    u_assert_int_eq(e, DOGECOIN_ZK_OK);
+    /* The vk bytes are at the very end of the payload; flip one. */
+    payload[payload_len - 1] ^= 0x80;
+    e = dogecoin_zk_get_commitment_hash(payload, payload_len, commit_b);
+    u_assert_int_eq(e, DOGECOIN_ZK_OK);
+    u_assert_int_eq(memcmp(commit_a, commit_b, 32) == 0 ? 1 : 0, 0);
+    payload[payload_len - 1] ^= 0x80; /* restore */
+
+    dogecoin_free(payload);
+}
+
 static void test_zk_codec_roundtrip(void)
 {
     const uint8_t pub[]   = {0x01, 0x02, 0x03, 0x04, 0x05};
@@ -30,6 +87,7 @@ static void test_zk_codec_roundtrip(void)
         DOGECOIN_ZK_MODE_GROTH16, 0xDEADBEEF,
         pub, sizeof(pub),
         proof, sizeof(proof),
+        NULL, 0,
         &payload, &payload_len);
     u_assert_int_eq(e, DOGECOIN_ZK_OK);
     u_assert_uint32_not_eq(payload != NULL, 0);
@@ -50,10 +108,13 @@ static void test_zk_codec_roundtrip(void)
     size_t pub_out_len;
     const uint8_t* proof_out;
     size_t proof_out_len;
+    const uint8_t* vk_out = (const uint8_t*)0xdead;
+    size_t vk_out_len = 99;
     e = dogecoin_zk_decode_payload(payload, payload_len,
                                    &mode_out, &cid_out,
                                    &pub_out, &pub_out_len,
-                                   &proof_out, &proof_out_len);
+                                   &proof_out, &proof_out_len,
+                                   &vk_out, &vk_out_len);
     u_assert_int_eq(e, DOGECOIN_ZK_OK);
     u_assert_int_eq(mode_out, DOGECOIN_ZK_MODE_GROTH16);
     u_assert_int_eq((int)cid_out, (int)0xDEADBEEF);
@@ -61,6 +122,12 @@ static void test_zk_codec_roundtrip(void)
     u_assert_int_eq(memcmp(pub_out, pub, sizeof(pub)), 0);
     u_assert_int_eq(proof_out_len, sizeof(proof));
     u_assert_int_eq(memcmp(proof_out, proof, sizeof(proof)), 0);
+    /* v0 payload (no vk supplied to encoder): decoder must report vk slot as
+     * empty so callers can detect "vk distributed out-of-band". */
+    u_assert_int_eq(vk_out == NULL ? 1 : 0, 1);
+    u_assert_int_eq((int)vk_out_len, 0);
+    /* Version byte = v0 since no vk was supplied. */
+    u_assert_int_eq(payload[5], 0x00);
 
     /* Tamper-detection: flip a byte in the payload, commitment must change. */
     uint8_t commit_a[32], commit_b[32];
@@ -98,7 +165,7 @@ static void test_zk_decode_rejects_bad_magic(void)
     dogecoin_zk_err_t e = dogecoin_zk_decode_payload(buf, sizeof(buf),
                                                      &mode_out, &cid_out,
                                                      &pub_out, &pub_out_len,
-                                                     &proof_out, &proof_out_len);
+                                                     &proof_out, &proof_out_len, NULL, NULL);
     u_assert_int_eq(e, DOGECOIN_ZK_ERR_BAD_MAGIC);
 }
 
@@ -118,7 +185,7 @@ static void test_zk_decode_rejects_bad_mode(void)
     dogecoin_zk_err_t e = dogecoin_zk_decode_payload(buf, sizeof(buf),
                                                      &mode_out, &cid_out,
                                                      &pub_out, &pub_out_len,
-                                                     &proof_out, &proof_out_len);
+                                                     &proof_out, &proof_out_len, NULL, NULL);
     u_assert_int_eq(e, DOGECOIN_ZK_ERR_BAD_MODE);
 }
 
@@ -136,7 +203,7 @@ static void test_zk_decode_rejects_truncated(void)
     dogecoin_zk_err_t e = dogecoin_zk_decode_payload(buf, sizeof(buf),
                                                      &mode_out, &cid_out,
                                                      &pub_out, &pub_out_len,
-                                                     &proof_out, &proof_out_len);
+                                                     &proof_out, &proof_out_len, NULL, NULL);
     u_assert_int_eq(e, DOGECOIN_ZK_ERR_TRUNCATED);
 }
 
@@ -174,6 +241,7 @@ static void test_zk_carrier_tx_roundtrip(void)
         DOGECOIN_ZK_MODE_GROTH16, 0x42,
         pub, sizeof(pub),
         proof, sizeof(proof),
+        NULL, 0,
         &payload, &payload_len);
     u_assert_int_eq(e, DOGECOIN_ZK_OK);
 
@@ -245,7 +313,7 @@ static void test_zk_modes_dispatch(void)
     size_t payload_len = 0;
     uint8_t one = 0x01;
     dogecoin_zk_err_t e = dogecoin_zk_encode_payload(
-        DOGECOIN_ZK_MODE_PLONK, 0, &one, 1, &one, 1, &payload, &payload_len);
+        DOGECOIN_ZK_MODE_PLONK, 0, &one, 1, &one, 1, NULL, 0, &payload, &payload_len);
     u_assert_int_eq(e, DOGECOIN_ZK_OK);
     e = dogecoin_zk_verify_proof(payload, payload_len, &one, 1);
     u_assert_int_eq(e, DOGECOIN_ZK_ERR_NOT_IMPLEMENTED);
@@ -253,7 +321,7 @@ static void test_zk_modes_dispatch(void)
 
     /* Same for STARK. */
     e = dogecoin_zk_encode_payload(
-        DOGECOIN_ZK_MODE_STARK_S2, 0, &one, 1, &one, 1, &payload, &payload_len);
+        DOGECOIN_ZK_MODE_STARK_S2, 0, &one, 1, &one, 1, NULL, 0, &payload, &payload_len);
     u_assert_int_eq(e, DOGECOIN_ZK_OK);
     e = dogecoin_zk_verify_proof(payload, payload_len, &one, 1);
     u_assert_int_eq(e, DOGECOIN_ZK_ERR_NOT_IMPLEMENTED);
@@ -278,6 +346,7 @@ static void test_zk_prover_is_delegated(void)
 void test_zk_carrier(void)
 {
     test_zk_codec_roundtrip();
+    test_zk_codec_roundtrip_with_vk();
     test_zk_decode_rejects_bad_magic();
     test_zk_decode_rejects_bad_mode();
     test_zk_decode_rejects_truncated();
