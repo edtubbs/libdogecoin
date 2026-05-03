@@ -41,8 +41,8 @@ Usage: $0 [options]
   --skip-broadcast           build everything but do not broadcast
   --payload-hex HEX          pre-built ZKP1 payload hex (with --skip-prove)
   --wasm PATH                path to circuit .wasm (default: contrib/zk_carrier/circuits/build/range_proof_js/range_proof.wasm)
-  --zkey PATH                path to circuit .zkey
-  --vkey PATH                path to verification_key.json (optional sanity check)
+  --zkey PATH                path to circuit .zkey   (default: contrib/zk_carrier/circuits/build/range_proof.zkey)
+  --vkey PATH                path to verification_key.json (default: contrib/zk_carrier/circuits/build/verification_key.json; used to snarkjs-verify the proof before broadcast)
   --low N --high N --amount N
                              range-proof witness values (defaults: 0/1e8/42000)
   --circuit-id N             32-bit circuit id (default: 1)
@@ -181,7 +181,10 @@ else
         ARGS_WASM="$REPO_DIR/contrib/zk_carrier/circuits/build/range_proof_js/range_proof.wasm"
     fi
     if [[ -z "$ARGS_ZKEY" ]]; then
-        ARGS_ZKEY="$REPO_DIR/contrib/zk_carrier/circuits/range_proof.zkey"
+        ARGS_ZKEY="$REPO_DIR/contrib/zk_carrier/circuits/build/range_proof.zkey"
+    fi
+    if [[ -z "$ARGS_VKEY" ]]; then
+        ARGS_VKEY="$REPO_DIR/contrib/zk_carrier/circuits/build/verification_key.json"
     fi
     echo "==> running snarkjs via $WITNESS_HELPER"
     extra=()

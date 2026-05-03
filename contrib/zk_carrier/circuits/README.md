@@ -32,10 +32,10 @@ circom range_proof.circom --r1cs --wasm --sym --output build \
 # 2. Trusted-setup phase 2 (Groth16 needs a per-circuit ceremony — for a
 #    demo, a single contributor is acceptable; production deployments
 #    should run a multi-party ceremony).
-snarkjs groth16 setup build/range_proof.r1cs pot12_final.ptau range_proof_0000.zkey
-snarkjs zkey contribute range_proof_0000.zkey range_proof.zkey \
+snarkjs groth16 setup build/range_proof.r1cs build/pot12_final.ptau build/range_proof_0000.zkey
+snarkjs zkey contribute build/range_proof_0000.zkey build/range_proof.zkey \
     --name="demo contributor" -e="$(head -c 32 /dev/urandom | xxd -p)"
-snarkjs zkey export verificationkey range_proof.zkey verification_key.json
+snarkjs zkey export verificationkey build/range_proof.zkey build/verification_key.json
 
 # 3. Generate a proof for a concrete witness.
 cat > input.json <<'EOF'
@@ -43,13 +43,13 @@ cat > input.json <<'EOF'
 EOF
 snarkjs groth16 fullprove input.json \
     build/range_proof_js/range_proof.wasm \
-    range_proof.zkey \
+    build/range_proof.zkey \
     proof.json public.json
 
 # 4. Verify off-box (libdogecoin will do the same on-chain via OP_CHECKZKP
 #    when that ships; today verification is delegated unless you build with
 #    --with-rapidsnark).
-snarkjs groth16 verify verification_key.json public.json proof.json
+snarkjs groth16 verify build/verification_key.json public.json proof.json
 ```
 
 ## Driving the carrier flow

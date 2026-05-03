@@ -137,8 +137,8 @@ if [ "$PROOF_SYSTEM" = "plonk" ]; then
     VKEY="${VKEY:-$REPO_DIR/contrib/zk_carrier/circuits/build/verification_key_plonk.json}"
 else
     WASM="${WASM:-$REPO_DIR/contrib/zk_carrier/circuits/build/range_proof_js/range_proof.wasm}"
-    ZKEY="${ZKEY:-$REPO_DIR/contrib/zk_carrier/circuits/range_proof.zkey}"
-    VKEY="${VKEY:-$REPO_DIR/contrib/zk_carrier/circuits/verification_key.json}"
+    ZKEY="${ZKEY:-$REPO_DIR/contrib/zk_carrier/circuits/build/range_proof.zkey}"
+    VKEY="${VKEY:-$REPO_DIR/contrib/zk_carrier/circuits/build/verification_key.json}"
 fi
 
 SUCH="${SUCH:-$REPO_DIR/such}"

@@ -14,8 +14,8 @@ Usage::
 
     python3 contrib/zk_carrier/witness_helper.py \\
         --wasm  contrib/zk_carrier/circuits/build/range_proof_js/range_proof.wasm \\
-        --zkey  contrib/zk_carrier/circuits/range_proof.zkey \\
-        --vkey  contrib/zk_carrier/circuits/verification_key.json \\
+        --zkey  contrib/zk_carrier/circuits/build/range_proof.zkey \\
+        --vkey  contrib/zk_carrier/circuits/build/verification_key.json \\
         --low   0 --high 1000000 --amount 42000 \\
         --circuit-id 1 \\
         --out-payload payload.hex
