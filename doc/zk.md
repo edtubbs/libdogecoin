@@ -407,7 +407,7 @@ These entry points are kept for surface-area completeness and to line up
 with the `OP_CHECKZKP` proposal terminology. **They always return
 `DOGECOIN_ZK_ERR_DELEGATED` (Groth16) or `DOGECOIN_ZK_ERR_NOT_IMPLEMENTED`
 (PLONK)** in this build because libdogecoin's policy is that proving lives
-in the wallet/UI (snarkjs in MyDoge) or on a host (rapidsnark CLI). The
+in the wallet/UI (snarkjs) or on a host (rapidsnark CLI). The
 contrib helper `contrib/zk_carrier/witness_helper.py` is the supported
 way to drive the off-library prover.
 

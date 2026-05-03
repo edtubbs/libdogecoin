@@ -7,15 +7,13 @@ circom circuit (`contrib/zk_carrier/circuits/`) and the snarkjs prover helper
 tree.
 
 > **Note**: this is a libdogecoin-only end-to-end demo.  It is **not**
-> integrated with any "DogeOS" / Dogecoin Core ZK proofs work.  The
-> `DOGEOS_CARRIER_*` environment-variable names are kept for back-compat with
-> earlier test branches; the demo runs entirely against this repo's own
-> `range_proof.circom` + snarkjs proving + libdogecoin's
-> rapidsnark/mcl/external-snarkjs verifier paths.
+> integrated with any external Dogecoin Core ZK proofs work.  The demo
+> runs entirely against this repo's own `range_proof.circom` + snarkjs
+> proving + libdogecoin's rapidsnark/mcl/external-snarkjs verifier paths.
 
 ## Scripts
 
-### `run_full_dogeos_carrier_demo.{sh,py}` — single-pair driver
+### `run_full_zk_carrier_demo.{sh,py}` — single-pair driver
 
 End-to-end demo of the ZK carrier flow.
 
@@ -47,7 +45,7 @@ Steps performed:
 
 The script never embeds a private key in source.  Resolution order:
 
-1. `DOGEOS_CARRIER_WIF` env var (operator-supplied).
+1. `ZK_CARRIER_WIF` env var (operator-supplied).
 2. `FUNDED_WIF` env var.
 3. The mainnet default reused from `contrib/mainnet_falcon_test.sh` and
    friends:
@@ -58,14 +56,14 @@ The script never embeds a private key in source.  Resolution order:
    this branch family — it is **already public there** and is reused only
    so a single funded UTXO chain can be exercised across PQ + ZK demos.
 
-If you don't want that, export `DOGEOS_CARRIER_WIF` to your own WIF (and
-`DOGEOS_CARRIER_ADDR` if it differs from the WIF's natural address) before
+If you don't want that, export `ZK_CARRIER_WIF` to your own WIF (and
+`ZK_CARRIER_ADDR` if it differs from the WIF's natural address) before
 running.
 
 #### Logging — commit the run log
 
 The script `tee`s every line of stdout/stderr to
-`dogeos_carrier_demo_<UTC>.log` in the working directory.
+`zk_carrier_demo_<UTC>.log` in the working directory.
 
 **You MUST commit that file alongside any mainnet run.**  The script
 finishes a mainnet run with a banner that prints the exact `git add -f` /
@@ -92,11 +90,11 @@ mandatory and gate review.
 
 #### Python entry point
 
-`run_full_dogeos_carrier_demo.py` is a thin importable wrapper around the
+`run_full_zk_carrier_demo.py` is a thin importable wrapper around the
 shell script:
 
 ```python
-from contrib.zk_carrier.scripts.run_full_dogeos_carrier_demo import run_demo
+from contrib.zk_carrier.scripts.run_full_zk_carrier_demo import run_demo
 run_demo(["--testnet", "--skip-broadcast", "--low", "0",
           "--high", "1000000", "--amount", "42000"])
 ```
@@ -112,7 +110,7 @@ run_demo(["--testnet", "--skip-broadcast", "--low", "0",
 
 ### `broadcast_set.sh` — multi-pair driver
 
-Multi-pair sibling of `run_full_dogeos_carrier_demo.sh` and the ZK analogue
+Multi-pair sibling of `run_full_zk_carrier_demo.sh` and the ZK analogue
 of `contrib/mainnet_dilithium2_test.sh` / `contrib/mainnet_raccoong_test.sh`.
 
 Loops `N` times.  For each iteration it:
@@ -140,7 +138,7 @@ whole height range and tees the resulting `[zk-commit] PASSED` lines (one
 triple per pair) to `test-logs/`.
 
 See the script's own header comment block for the full prerequisite and
-environment-variable reference; the same `DOGEOS_CARRIER_WIF` /
+environment-variable reference; the same `ZK_CARRIER_WIF` /
 `FUNDED_WIF` resolution rules apply.
 
 ## Run history

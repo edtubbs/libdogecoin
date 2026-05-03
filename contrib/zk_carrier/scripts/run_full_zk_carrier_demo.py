@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Python entry point for the ZK carrier end-to-end demo.
 
-Wraps ``contrib/zk_carrier/scripts/run_full_dogeos_carrier_demo.sh`` so the
-same flow is importable from tests / from the dogeOS / MyDoge bridge.  All
+Wraps ``contrib/zk_carrier/scripts/run_full_zk_carrier_demo.sh`` so the
+same flow is importable from tests or from a wallet/UI bridge.  All
 real work happens in the shell script — this file exists so::
 
-    from contrib.zk_carrier.scripts.run_full_dogeos_carrier_demo import run_demo
+    from contrib.zk_carrier.scripts.run_full_zk_carrier_demo import run_demo
 
 works exactly the same as the shell entry point.
 """
@@ -31,7 +31,7 @@ def run_demo(args: Iterable[str] = (),
               "--skip-broadcast"]``).  See the shell script's ``--help`` for
               the supported flags.
         env: Optional environment overrides; merged on top of ``os.environ``.
-              Recognised variables include ``DOGEOS_CARRIER_WIF``,
+              Recognised variables include ``ZK_CARRIER_WIF``,
               ``FUNDED_UTXO_TXID``, ``RPC_URL``, ``TX_R_HEX`` etc. — see
               the shell script header.
     """

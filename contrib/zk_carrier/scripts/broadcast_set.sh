@@ -24,7 +24,7 @@
 # whole height range and tees the resulting [zk-commit] PASSED lines (one
 # triple per pair) to test-logs/.
 #
-# This is the multi-pair sibling of run_full_dogeos_carrier_demo.sh
+# This is the multi-pair sibling of run_full_zk_carrier_demo.sh
 # (same directory) and the ZK analogue of contrib/mainnet_dilithium2_test.sh /
 # mainnet_raccoong_test.sh — see those for prior PQC mainnet logs.
 #

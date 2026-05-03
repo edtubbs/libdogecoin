@@ -52,7 +52,7 @@ LIBDOGECOIN_BEGIN_DECL
  *
  *   magic   : ASCII "ZKP1" (DOGECOIN_ZK_CARRIER_MAGIC)
  *   mode    : dogecoin_zk_mode_t selector (1B), aligned with the modular
- *             mode selector of DogeOS proposal OP_CHECKZKP (opcode 185).
+ *             mode selector of the proposed OP_CHECKZKP opcode (185).
  *   reserved: 1B, must be 0 for v1.
  *   circID  : 4B big-endian application-defined circuit identifier.
  *   pl      : 2B big-endian length of public-input blob.
@@ -236,8 +236,8 @@ LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_verify_proof(
  * Proof generation API — kept here for surface-area completeness and to
  * line up with the OP_CHECKZKP proposal terminology.  Always returns
  * DOGECOIN_ZK_ERR_DELEGATED in this build because libdogecoin's policy is
- * that proving lives in the wallet/UI (snarkjs in MyDoge or the rapidsnark
- * CLI on host).  The contrib helper `contrib/zk_carrier/witness_helper.py`
+ * that proving lives in the wallet/UI (snarkjs) or in a host-side rapidsnark
+ * CLI.  The contrib helper `contrib/zk_carrier/witness_helper.py`
  * is the supported way to drive it.
  */
 LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_generate_groth16_proof(

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# contrib/zk_carrier/scripts/run_full_dogeos_carrier_demo.sh
+# contrib/zk_carrier/scripts/run_full_zk_carrier_demo.sh
 #
 # End-to-end ZK carrier demo: snarkjs prove → encode payload → build TX_C →
 # build TX_R → sign → broadcast → poll explorer → local verify.
 #
 # Defaults to testnet.  Mainnet broadcast requires both `--mainnet` and the
-# `--i-understand-real-doge` flag, plus a `DOGEOS_CARRIER_WIF` env var (or
+# `--i-understand-real-doge` flag, plus a `ZK_CARRIER_WIF` env var (or
 # the WIF baked into the contrib/mainnet_*_test.sh family — passed via
 # FUNDED_WIF for parity with those scripts).  No private key is committed.
 #
 # Logging: every line of stdout/stderr is teed to
-#   dogeos_carrier_demo_<UTC>.log
+#   zk_carrier_demo_<UTC>.log
 # in the working directory.  Commit that log alongside any mainnet run, per
 # the OP_CHECKZKP demo guidance.
 
@@ -49,7 +49,7 @@ Usage: $0 [options]
   -h, --help                 show this help
 
 Environment variables (override defaults; same names as contrib/mainnet_falcon_test.sh):
-  DOGEOS_CARRIER_WIF    REQUIRED for mainnet; testnet falls back to FUNDED_WIF
+  ZK_CARRIER_WIF    REQUIRED for mainnet; testnet falls back to FUNDED_WIF
   FUNDED_WIF            mainnet WIF (default: reused from mainnet_falcon_test.sh)
   FUNDED_ADDR           mainnet address (default: reused from mainnet_falcon_test.sh)
   FUNDED_UTXO_TXID      previous TXID to spend
@@ -85,7 +85,7 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
-LOG_FILE="dogeos_carrier_demo_$(date -u +%Y%m%d_%H%M%S).log"
+LOG_FILE="zk_carrier_demo_$(date -u +%Y%m%d_%H%M%S).log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 echo "==> log file: $LOG_FILE"
 
@@ -106,8 +106,8 @@ fi
 # is *not* secret.  Any real DOGE you send to its address is immediately
 # spendable by anyone who has cloned this branch.  Override via:
 #
-#   export DOGEOS_CARRIER_WIF=<your-WIF>
-#   export DOGEOS_CARRIER_ADDR=<your-address>
+#   export ZK_CARRIER_WIF=<your-WIF>
+#   export ZK_CARRIER_ADDR=<your-address>
 #
 # before running.  This script intentionally inherits the public demo WIF
 # only so the same funded UTXO chain can be exercised across the PQ + ZK
@@ -116,25 +116,25 @@ FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 
 if [[ "$NETWORK" == "mainnet" ]]; then
-    WIF="${DOGEOS_CARRIER_WIF:-$FUNDED_WIF}"
-    ADDR="${DOGEOS_CARRIER_ADDR:-$FUNDED_ADDR}"
+    WIF="${ZK_CARRIER_WIF:-$FUNDED_WIF}"
+    ADDR="${ZK_CARRIER_ADDR:-$FUNDED_ADDR}"
     SUCH_NET=""           # such defaults to mainnet
     EXPLORER_DEFAULT="https://dogechain.info/api/v1"
 else
-    WIF="${DOGEOS_CARRIER_WIF:-${FUNDED_WIF}}"
-    ADDR="${DOGEOS_CARRIER_ADDR:-${FUNDED_ADDR}}"
+    WIF="${ZK_CARRIER_WIF:-${FUNDED_WIF}}"
+    ADDR="${ZK_CARRIER_ADDR:-${FUNDED_ADDR}}"
     SUCH_NET="-t"
     EXPLORER_DEFAULT=""   # testnet has no universal default; use --skip-broadcast or set RPC_URL
 fi
 EXPLORER_BASE="${EXPLORER_BASE:-$EXPLORER_DEFAULT}"
 
 if [[ -z "$WIF" ]]; then
-    echo "ERROR: no WIF available — set DOGEOS_CARRIER_WIF or FUNDED_WIF" >&2
+    echo "ERROR: no WIF available — set ZK_CARRIER_WIF or FUNDED_WIF" >&2
     exit 2
 fi
 
 if [[ "$NETWORK" == "mainnet" ]]; then
-    if [[ -z "${DOGEOS_CARRIER_WIF:-}" && -z "${FUNDED_WIF_OVERRIDE:-}" ]]; then
+    if [[ -z "${ZK_CARRIER_WIF:-}" && -z "${FUNDED_WIF_OVERRIDE:-}" ]]; then
         cat >&2 <<'WARNBANNER'
 ================================================================================
 WARNING: about to broadcast on MAINNET using the PUBLIC demo WIF inherited from
@@ -144,8 +144,8 @@ ALREADY PUBLIC; coins sent to its address are spendable by anyone.
 If you do not want to use the public demo WIF, abort now (Ctrl-C) and re-run
 with:
 
-    export DOGEOS_CARRIER_WIF=<your-WIF>
-    export DOGEOS_CARRIER_ADDR=<your-address>
+    export ZK_CARRIER_WIF=<your-WIF>
+    export ZK_CARRIER_ADDR=<your-address>
 
 Pausing 10 seconds so you can abort if this is unintended...
 ================================================================================

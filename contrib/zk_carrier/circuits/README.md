@@ -1,7 +1,7 @@
 # ZK carrier — circuits
 
 This directory contains the reference circom circuit used by the ZK carrier
-demo (`contrib/zk_carrier/scripts/run_full_dogeos_carrier_demo.sh`).
+demo (`contrib/zk_carrier/scripts/run_full_zk_carrier_demo.sh`).
 
 ## Versions
 

@@ -31,7 +31,7 @@
  * Policy:
  *
  *   * Proving NEVER runs inside libdogecoin.  The prover lives in a higher
- *     layer (snarkjs in MyDoge / DogeOS, or the rapidsnark CLI on a host).
+ *     layer (snarkjs in a wallet/UI, or the rapidsnark CLI on a host).
  *     `dogecoin_zk_generate_groth16_proof` therefore always returns
  *     DOGECOIN_ZK_ERR_DELEGATED — see contrib/zk_carrier/witness_helper.py
  *     for the supported way to drive snarkjs end-to-end.
@@ -41,7 +41,7 @@
  *     lets the demo script fall back to `snarkjs groth16 verify`.
  *
  * The "delegated" status is not a stub: it's the documented behaviour of the
- * mobile-friendly build, and callers (the demo script, MyDoge) handle it.
+ * mobile-friendly build, and callers (the demo script, the wallet/UI) handle it.
  *
  * Tying into the OP_CHECKZKP proposal (Opcode 185): when that opcode lands,
  * an interpreter implementation will pull the verification key from a
