@@ -1308,7 +1308,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                         const char* mode_label =
                                             (dec_mode == DOGECOIN_ZK_MODE_GROTH16) ? "groth16-bn254" :
                                             (dec_mode == DOGECOIN_ZK_MODE_PLONK) ? "plonk" :
-                                            (dec_mode == DOGECOIN_ZK_MODE_STARK_S2) ? "stark-s2" : "unknown";
+                                            (dec_mode == DOGECOIN_ZK_MODE_STARK_S2) ? "stark-s2" :
+                                            (dec_mode == DOGECOIN_ZK_MODE_GROTH16_BLS12_381) ? "groth16-bls12-381" :
+                                            (dec_mode == DOGECOIN_ZK_MODE_PLONK_HALO2_KZG_BN256) ? "plonk-halo2-kzg-bn256" : "unknown";
                                         client->nodegroup->log_write_cb(
                                             "[zk-commit] reveal_decoded: magic=\"ZKP1\" mode=%u(%s) reserved=0x%02x circuit_id=0x%08x public_len=%zu proof_len=%zu total_payload_len=%zu txr_txid=%s\n",
                                             (unsigned)dec_mode, mode_label, (unsigned)reserved_byte,

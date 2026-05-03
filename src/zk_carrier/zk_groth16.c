@@ -43,11 +43,14 @@
  * The "delegated" status is not a stub: it's the documented behaviour of the
  * mobile-friendly build, and callers (the demo script, MyDoge) handle it.
  *
- * Tying into the OP_CHECKZKP proposal (Opcode 185): when that opcode lands,
- * an interpreter implementation will pull the verification key from a
- * consensus-anchored registry, reuse `dogecoin_zk_extract_carrier_payload`
- * to get the public inputs and proof, and call `dogecoin_zk_verify_groth16`
- * (or PLONK / STARK equivalents) for the matching mode byte.
+ * Tying into a future ZK-verifying opcode (e.g. the DogeOS `OP_CHECKZKP`
+ * proposal at dogecoin/dogecoin#3869, or any libdogecoin successor): when
+ * such an opcode lands, an interpreter implementation will pull the
+ * verification key from a consensus-anchored registry, reuse
+ * `dogecoin_zk_extract_carrier_payload` to get the public inputs and
+ * proof, and call `dogecoin_zk_verify_groth16` (or PLONK / STARK
+ * equivalents) for the matching mode byte.  Until then, the carrier
+ * works without any soft fork.
  */
 
 #if defined(HAVE_CONFIG_H)
@@ -215,6 +218,16 @@ dogecoin_zk_err_t dogecoin_zk_verify_proof(
     case DOGECOIN_ZK_MODE_PLONK:
     case DOGECOIN_ZK_MODE_STARK_S2:
         return DOGECOIN_ZK_ERR_NOT_IMPLEMENTED;
+    case DOGECOIN_ZK_MODE_GROTH16_BLS12_381:
+    case DOGECOIN_ZK_MODE_PLONK_HALO2_KZG_BN256:
+        /* Canonical wire layouts for these proof systems live entirely in
+         * the carrier; their pairing engines (BLS12-381, BN256/Halo2-KZG)
+         * are not linked into libdogecoin.  Verification is delegated to
+         * an external verifier or to a future opcode-aware node that
+         * adopts the same byte order on the script stack. */
+        (void)vk_blob;
+        (void)vk_blob_len;
+        return DOGECOIN_ZK_ERR_DELEGATED;
     }
     return DOGECOIN_ZK_ERR_BAD_MODE;
 }

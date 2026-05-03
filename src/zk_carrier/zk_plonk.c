@@ -32,8 +32,10 @@
  * path is libsnark's PLONK gadget or a thin C wrapper around an external
  * PLONK verifier (e.g., halo2-style).  The mode byte (DOGECOIN_ZK_MODE_PLONK
  * = 1) is reserved here so on-chain artifacts can be produced today and
- * verified once the verifier ships, mirroring the OP_CHECKZKP modular mode
- * selector.
+ * verified once the verifier ships.  An eventual ZK-verifying opcode
+ * (e.g. the DogeOS `OP_CHECKZKP` proposal at dogecoin/dogecoin#3869 or
+ * any libdogecoin successor) can adopt the same mode-byte selector with
+ * no carrier change.
  */
 
 #include <stddef.h>
