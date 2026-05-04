@@ -26,6 +26,14 @@
 */
 
 /*
+ * ZK P2SH carrier payload extraction and reassembly.
+ *
+ * Extends the PQ carrier pattern (src/pqc_carrier.c) for ZK proofs. Reads
+ * multi-part scriptSigs from TX_R, reassembles the canonical ZKP1 payload,
+ * and extracts public inputs, proof, and (for v1) verification key.
+ */
+
+/*
  * ZK carrier — payload codec, error strings, and OP_RETURN scriptPubKey
  * helper.  TX_C/TX_R construction lives in zk_commit.c, which thinly wraps
  * the existing PQ carrier helpers (src/pqc_carrier.c) so both carriers
