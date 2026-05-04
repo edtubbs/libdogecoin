@@ -328,12 +328,14 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
 IF(USE_LIBOQS)
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/pqc_dilithium.c
-    src/pqc_falcon.c
 )
 ENDIF()
+# pqc_falcon.c also defines dogecoin_tx_sighash32 (used by the ZK carrier),
+# so build it whenever either PQC or ZK helpers are enabled.
 IF(USE_LIBOQS OR USE_ZK_CARRIER)
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/pqc_carrier.c
+    src/pqc_falcon.c
 )
 ENDIF()
 IF(USE_LIBOQS_RACCOON)
