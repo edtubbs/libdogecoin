@@ -28,12 +28,11 @@
 /*
  * PLONK proof system.
  *
- * Not implemented in this revision.  When implemented, the recommended
- * path is libsnark's PLONK gadget or a thin C wrapper around an external
- * PLONK verifier (e.g., halo2-style).  The mode byte (DOGECOIN_ZK_MODE_PLONK
- * = 1) is reserved here so on-chain artifacts can be produced today and
- * verified once the verifier ships, mirroring the reserved-opcode mode
- * selector proposal.
+ * Proving and in-process verification are delegated.  The mode byte
+ * (DOGECOIN_ZK_MODE_PLONK = 1) is reserved here so on-chain artifacts can
+ * be encoded today; verification is performed off-box by the canonical
+ * snarkjs verifier (see contrib/zk_carrier/scripts/) which accepts the same
+ * JSON public_inputs/proof/vk libdogecoin packages into the ZKP1 payload.
  */
 
 #include <stddef.h>
@@ -57,5 +56,6 @@ dogecoin_zk_err_t dogecoin_zk_generate_plonk_proof(
     if (out_proof_len) *out_proof_len = 0;
     if (out_public) *out_public = NULL;
     if (out_public_len) *out_public_len = 0;
-    return DOGECOIN_ZK_ERR_NOT_IMPLEMENTED;
+    /* Per libdogecoin policy, proving lives outside the library. */
+    return DOGECOIN_ZK_ERR_DELEGATED;
 }

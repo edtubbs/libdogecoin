@@ -39,7 +39,6 @@ AC_HEADER_STDBOOL
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_PROG_CC
-# AC_PROG_CXX: always called so automake defines am__fastdepCXX for both --with-mcl and default configs.
 AC_PROG_CXX
 AM_PROG_AS
 AM_PROG_AR
@@ -357,46 +356,25 @@ if test "x$use_rapidsnark" != xno -a "x$use_rapidsnark" != x; then
   ])
 fi
 
-# --with-mcl[=DIR]: link herumi/mcl BN254 pairing + Groth16 verifier.
 have_mcl=no
 if test "x$use_mcl" != xno -a "x$use_mcl" != x; then
-  case "x$use_mcl" in
-    xyes)
-      MCL_CFLAGS=""
-      MCL_LIBS="-lmcl -lstdc++"
-      ;;
-    *)
-      MCL_CFLAGS="-I$use_mcl/include"
-      MCL_LIBS="-L$use_mcl/lib -lmcl -lstdc++"
-      ;;
-  esac
-  saved_CPPFLAGS="$CPPFLAGS"
-  saved_LIBS="$LIBS"
-  CPPFLAGS="$CPPFLAGS $MCL_CFLAGS"
-  LIBS="$LIBS $MCL_LIBS"
-  AC_LANG_PUSH([C++])
-  AC_MSG_CHECKING([for mcl/bn.hpp + BN_SNARK1 link])
-  AC_LINK_IFELSE([AC_LANG_PROGRAM([[
-    #include <mcl/bn.hpp>
-  ]], [[
-    using namespace mcl::bn;
-    initPairing(mcl::BN_SNARK1);
-    return 0;
-  ]])],[
-    AC_MSG_RESULT([yes])
+  if test "x$use_mcl" = xyes; then
+    MCL_CFLAGS=""
+  else
+    MCL_CFLAGS="-I$use_mcl/include"
+    MCL_LIBS="-L$use_mcl/lib"
+  fi
+  MCL_LIBS="$MCL_LIBS -lmcl -lstdc++"
+  AC_CHECK_LIB([mcl],[main],[
     have_mcl=yes
     AC_DEFINE([HAVE_MCL], [1], [Define if herumi/mcl BN254 pairing is available for Groth16 verification])
     AC_SUBST([MCL_CFLAGS])
     AC_SUBST([MCL_LIBS])
   ],[
-    AC_MSG_RESULT([no])
-    AC_MSG_WARN([--with-mcl requested but mcl link failed; falling back to delegated verification])
-    CPPFLAGS="$saved_CPPFLAGS"
-    LIBS="$saved_LIBS"
+    AC_MSG_WARN([--with-mcl requested but libmcl not found; falling back to delegated verification])
     MCL_CFLAGS=""
     MCL_LIBS=""
-  ])
-  AC_LANG_POP([C++])
+  ],[$MCL_LIBS])
 fi
 
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])

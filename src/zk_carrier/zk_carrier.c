@@ -277,3 +277,64 @@ dogecoin_zk_err_t dogecoin_zk_build_opreturn_scriptpubkey(
     *out_spk = s;
     return DOGECOIN_ZK_OK;
 }
+
+/*
+ * Parse the decimal string at index `idx` of a snarkjs public-inputs JSON
+ * array (`["...","..."]`) into a 32-byte big-endian field element.  The
+ * SPV reveal validator uses this to recover the canonical `tx_binding`
+ * value embedded in the third public input and compare it against the
+ * tx_base sighash recomputed locally.  See the BIP, §"Phase 1: Base
+ * Transaction Binding".
+ */
+dogecoin_zk_err_t dogecoin_zk_parse_public_input_be32(
+    const uint8_t* public_inputs,
+    size_t public_inputs_len,
+    size_t idx,
+    uint8_t out_be32[32],
+    size_t* out_token_count)
+{
+    if (!public_inputs || !out_be32) return DOGECOIN_ZK_ERR_INVALID_ARG;
+    memset(out_be32, 0, 32);
+    if (out_token_count) *out_token_count = 0;
+
+    /* Walk the JSON array as a stream of double-quoted tokens; capture the
+     * one at `idx`.  No nested objects are expected — snarkjs public.json
+     * is a flat array of decimal strings. */
+    char selected[80] = {0};
+    size_t selected_len = 0;
+    int    have_selected = 0;
+    size_t token_count = 0;
+    size_t j = 0;
+    while (j < public_inputs_len) {
+        if (public_inputs[j] != '"') { j++; continue; }
+        j++;
+        size_t start = j;
+        while (j < public_inputs_len && public_inputs[j] != '"') j++;
+        if (j >= public_inputs_len) break;
+        size_t tok_len = j - start;
+        if (token_count == idx && tok_len < sizeof(selected)) {
+            memcpy(selected, public_inputs + start, tok_len);
+            selected[tok_len] = '\0';
+            selected_len = tok_len;
+            have_selected = 1;
+        }
+        token_count++;
+        j++;
+    }
+    if (out_token_count) *out_token_count = token_count;
+    if (!have_selected || selected_len == 0) return DOGECOIN_ZK_ERR_INVALID_ARG;
+
+    /* Schoolbook decimal-to-base-256 with a 32-byte big-endian accumulator. */
+    for (size_t k = 0; k < selected_len; k++) {
+        char c = selected[k];
+        if (c < '0' || c > '9') return DOGECOIN_ZK_ERR_INVALID_ARG;
+        unsigned carry = (unsigned)(c - '0');
+        for (int bi = 31; bi >= 0; bi--) {
+            unsigned v = (unsigned)out_be32[bi] * 10u + carry;
+            out_be32[bi] = (uint8_t)(v & 0xff);
+            carry = v >> 8;
+        }
+        if (carry) return DOGECOIN_ZK_ERR_INVALID_ARG;
+    }
+    return DOGECOIN_ZK_OK;
+}

@@ -333,7 +333,7 @@ The format intentionally mirrors the PQC <code>[falcon-commit]</code> / <code>[d
 
 Three verification levels are emitted, mirroring the PQC carrier's commit-match-before-signature-verify staging:
 
-# '''PASSED:''' libdogecoin was built with <code>--with-rapidsnark</code> (or another in-process verifier) and the proof was checked locally against the encoded public inputs.
+# '''PASSED:''' libdogecoin was built with <code>--with-rapidsnark</code> or <code>--with-mcl</code> (or another in-process verifier) and the proof was checked locally against the encoded public inputs.
 # '''DELEGATED:''' the verifier is not compiled in and verification is left to off-box tooling. The commitment-match (Step 5 above) still holds, providing equivalent assurance to PQC's "commit_ok before sig_verify" intermediate state — the on-chain payload provably hashes to the published commitment.
 # '''FAILED:''' the verifier ran and rejected the proof.
 
@@ -442,9 +442,25 @@ Current reference behavior exists in libdogecoin components that:
 * attach the OP_RETURN commitment and P2SH carrier outputs in one operation via <code>dogecoin_zk_build_carrier_tx_c</code> (and the matching <code>such -c zk_add_commit_and_carrier_tx</code> CLI);
 * extract the canonical OP_RETURN commitment from a TX_C via <code>dogecoin_tx_extract_zk_commit</code>;
 * reassemble the ZK payload from TX_R scriptSigs via <code>dogecoin_zk_extract_carrier_payload</code>;
-* dispatch to per-mode verifiers via <code>dogecoin_zk_verify_proof</code>, with rapidsnark-backed in-process Groth16 verification gated on <code>HAVE_RAPIDSNARK</code>;
-* keep proving out-of-process per libdogecoin policy: <code>dogecoin_zk_generate_groth16_proof</code> / <code>dogecoin_zk_generate_plonk_proof</code> return <code>DOGECOIN_ZK_ERR_DELEGATED</code> / <code>DOGECOIN_ZK_ERR_NOT_IMPLEMENTED</code>; the supported proving path is <code>contrib/zk_carrier/witness_helper.py</code> driving snarkjs or the rapidsnark CLI on the host;
+* dispatch to per-mode verifiers via <code>dogecoin_zk_verify_proof</code>, with rapidsnark- or mcl-backed in-process Groth16 verification gated on <code>HAVE_RAPIDSNARK</code> / <code>HAVE_MCL</code>;
+* keep proving out-of-process per libdogecoin policy: <code>dogecoin_zk_generate_groth16_proof</code> / <code>dogecoin_zk_generate_plonk_proof</code> always return <code>DOGECOIN_ZK_ERR_DELEGATED</code>; the supported proving path is <code>contrib/zk_carrier/witness_helper.py</code> driving snarkjs or the rapidsnark CLI on the host;
 * detect canonical ZK commitments during SPV block scanning, buffer them as pending TX_C commits, and emit deterministic <code>[zk-commit]</code> log lines on TX_R reveal.
+
+====Prover / Verifier Support Matrix====
+
+The following matrix lists which proof systems libdogecoin natively supports (in-process inside the C library), which are delegated to off-box tooling, and which configure-time options enable each path. Proving is always delegated, by policy, to keep libdogecoin mobile-friendly; verification is the only path that can run in-process.
+
+{|
+! Proof system !! Native prover (in-library) !! Native verifier (in-library) !! Delegated verifier (off-box) !! Configure flags !! depends opt-in
+|-
+| Groth16 (BN254, snarkjs JSON) || none — DELEGATED || rapidsnark or herumi/mcl, dispatched by <code>dogecoin_zk_verify_proof</code> || snarkjs CLI || <code>--enable-zk-carrier</code> AND (<code>--with-rapidsnark</code> OR <code>--with-mcl[=DIR]</code>) || <code>ZK_CARRIER=1</code>
+|-
+| PLONK (snarkjs JSON) || none — DELEGATED || none — <code>dogecoin_zk_verify_proof</code> returns DELEGATED || snarkjs CLI (canonical PLONK reference) || <code>--enable-zk-carrier</code> only || none required
+|-
+| STARK_S2 || none — DELEGATED || none — <code>dogecoin_zk_verify_proof</code> returns NOT_IMPLEMENTED || none yet || <code>--enable-zk-carrier</code> reserves the mode byte || N/A (reserved)
+|}
+
+Native Groth16 verification is wired in two interchangeable backends — rapidsnark (<code>--with-rapidsnark</code>) and herumi/mcl (<code>--with-mcl[=DIR]</code>); both consume the same snarkjs JSON encoding embedded in the ZKP1 payload, so a build with either flag will verify the identical on-chain reveal end-to-end. Without either flag, Groth16 verification falls through to <code>DELEGATED</code> exactly like PLONK, and the off-box snarkjs invocation in <code>contrib/zk_carrier/scripts/</code> still validates against on-chain bytes alone.
 
 Current CLI wiring reflects this implementation model:
 

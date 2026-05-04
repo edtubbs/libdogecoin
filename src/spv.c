@@ -1411,44 +1411,15 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                     if (dogecoin_zk_compute_tx_base_sighash(txc, signer_spk, carrier_spk, recomputed) == DOGECOIN_ZK_OK) {
                                                         char recomputed_hex[65] = {0};
                                                         utils_bin_to_hex(recomputed, 32, recomputed_hex);
-                                                        /* Parse the 3rd quoted string out of dec_pub (snarkjs JSON).
-                                                         * Layout: ["...","...","<decimal>"]. We scan for quoted
-                                                         * tokens and pick index 2.  Reject if not exactly 3 tokens. */
-                                                        char binding_dec[80] = {0};
-                                                        int  binding_token_count = 0;
-                                                        const uint8_t* sp = dec_pub;
-                                                        size_t spn = dec_pub_len;
-                                                        size_t sj = 0;
-                                                        while (sj < spn) {
-                                                            if (sp[sj] != '"') { sj++; continue; }
-                                                            sj++;
-                                                            size_t start = sj;
-                                                            while (sj < spn && sp[sj] != '"') sj++;
-                                                            if (sj >= spn) break;
-                                                            size_t tok_len = sj - start;
-                                                            if (binding_token_count == 2 && tok_len < sizeof(binding_dec)) {
-                                                                memcpy(binding_dec, sp + start, tok_len);
-                                                                binding_dec[tok_len] = 0;
-                                                            }
-                                                            binding_token_count++;
-                                                            sj++;
-                                                        }
-                                                        if (binding_token_count >= 3 && binding_dec[0]) {
-                                                            /* Convert decimal string → 32-byte big-endian (top byte = 0). */
-                                                            uint8_t parsed[32] = {0};
-                                                            /* Schoolbook base-10 to base-256 conversion. */
-                                                            const char* dp = binding_dec;
-                                                            while (*dp) {
-                                                                if (*dp < '0' || *dp > '9') { parsed[0] = 0xff; break; }
-                                                                unsigned carry = (unsigned)(*dp - '0');
-                                                                for (int bi = 31; bi >= 0; bi--) {
-                                                                    unsigned v = (unsigned)parsed[bi] * 10u + carry;
-                                                                    parsed[bi] = (uint8_t)(v & 0xff);
-                                                                    carry = v >> 8;
-                                                                }
-                                                                if (carry) { parsed[0] = 0xff; break; }
-                                                                dp++;
-                                                            }
+                                                        /* Parse the snarkjs public-inputs array and pick out the
+                                                         * 3rd quoted string (index 2) — the canonical tx_binding
+                                                         * field element, see the BIP §"Phase 1: Base Transaction
+                                                         * Binding".  Layout: ["...","...","<decimal>"]. */
+                                                        uint8_t parsed[32] = {0};
+                                                        size_t binding_token_count = 0;
+                                                        dogecoin_zk_err_t bind_e = dogecoin_zk_parse_public_input_be32(
+                                                            dec_pub, dec_pub_len, 2, parsed, &binding_token_count);
+                                                        if (bind_e == DOGECOIN_ZK_OK) {
                                                             char parsed_hex[65] = {0};
                                                             utils_bin_to_hex(parsed, 32, parsed_hex);
                                                             int match = (memcmp(parsed, recomputed, 32) == 0);
@@ -1458,7 +1429,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                                                 txr_txid_hex, recomputed_hex, parsed_hex);
                                                         } else {
                                                             client->nodegroup->log_write_cb(
-                                                                "[zk-commit] tx_binding skipped: expected >=3 public inputs (got %d) — payload predates tx-base binding\n",
+                                                                "[zk-commit] tx_binding skipped: expected >=3 public inputs (got %zu) — payload predates tx-base binding\n",
                                                                 binding_token_count);
                                                         }
                                                     } else {

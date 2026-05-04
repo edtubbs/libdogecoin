@@ -420,8 +420,9 @@ Verify any ZK payload by mode. Dispatches on the decoded
 `dogecoin_zk_mode_t` to the proof-system specific verifier above. The
 payload's public inputs and proof bytes are passed verbatim to the
 verifier (proof systems are responsible for their own encoding — for
-snarkjs/Groth16 they are JSON). PLONK and STARK currently return
-`DOGECOIN_ZK_ERR_NOT_IMPLEMENTED`.
+snarkjs/Groth16 they are JSON). PLONK currently returns
+`DOGECOIN_ZK_ERR_DELEGATED` (verify off-box with `snarkjs plonk verify`);
+STARK returns `DOGECOIN_ZK_ERR_NOT_IMPLEMENTED`.
 
 _C usage:_
 ```c
@@ -433,10 +434,9 @@ dogecoin_zk_err_t rc = dogecoin_zk_verify_proof(
 
 These entry points are kept for surface-area completeness and to align with
 reserved-opcode proposal terminology. **They always return
-`DOGECOIN_ZK_ERR_DELEGATED` (Groth16) or `DOGECOIN_ZK_ERR_NOT_IMPLEMENTED`
-(PLONK)** in this build because libdogecoin's policy is that proving lives
-in the wallet/UI (snarkjs) or on a host (rapidsnark CLI). The
-contrib helper `contrib/zk_carrier/witness_helper.py` is the supported
+`DOGECOIN_ZK_ERR_DELEGATED`** in this build because libdogecoin's policy is
+that proving lives in the wallet/UI (snarkjs) or on a host (rapidsnark CLI).
+The contrib helper `contrib/zk_carrier/witness_helper.py` is the supported
 way to drive the off-library prover.
 
 ---
@@ -453,7 +453,9 @@ produce `proof.json` and `public.json`, then call
 
 `dogecoin_zk_err_t dogecoin_zk_generate_plonk_proof(const uint8_t* witness_json, size_t witness_json_len, const char* circuit_path, uint8_t** out_proof, size_t* out_proof_len, uint8_t** out_public, size_t* out_public_len);`
 
-Always returns `DOGECOIN_ZK_ERR_NOT_IMPLEMENTED`.
+Always returns `DOGECOIN_ZK_ERR_DELEGATED`. Use snarkjs to produce
+`proof.json` and `public.json`, then call
+[`dogecoin_zk_encode_payload`](#dogecoin_zk_encode_payload).
 
 ## Errors
 

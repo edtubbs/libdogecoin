@@ -1,5 +1,4 @@
-# rapidsnark — Groth16 verifier package (verifier-only, opt-in via --with-rapidsnark).
-# Requires ZK_CARRIER=1 in depends invocation.
+# rapidsnark — Groth16 verifier-only library (opt-in via --with-rapidsnark).
 
 package=rapidsnark
 $(package)_version=4b21f7a

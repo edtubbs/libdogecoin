@@ -28,16 +28,12 @@
 /*
  * STARK (S-two) proof system.
  *
- * Not wired up in this revision. The mode byte (DOGECOIN_ZK_MODE_STARK_S2 = 2)
- * is reserved so on-chain artifacts can be produced today. STARK verification
- * is not yet implemented — no canonical reference verifier is wired up
- * (unlike PLONK, which delegates to snarkjs).
+ * Reserved mode byte (DOGECOIN_ZK_MODE_STARK_S2 = 2).  No native or external
+ * canonical verifier is wired up yet, so the verify dispatch in zk_groth16.c
+ * returns DOGECOIN_ZK_ERR_NOT_IMPLEMENTED for this mode.
  */
 
 #include <stddef.h>
 #include <stdint.h>
 
 #include <dogecoin/zk_carrier.h>
-
-/* No public API yet beyond the verify dispatch in zk_groth16.c, which
- * already returns DOGECOIN_ZK_ERR_NOT_IMPLEMENTED for STARK mode. */

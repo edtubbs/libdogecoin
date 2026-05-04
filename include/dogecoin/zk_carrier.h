@@ -217,6 +217,25 @@ LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_compute_tx_base_sighash(
     const cstring* signer_p2pkh_spk,
     const cstring* carrier_spk,
     uint8_t out_sighash[32]);
+
+/*
+ * Parse the decimal string at index `idx` (0-based) from a snarkjs-style
+ * public-inputs JSON array (e.g. `["0", "0", "1234..."]`) and convert it
+ * to a 32-byte big-endian buffer.  Used by the ZK reveal-validation path
+ * to recover the `tx_binding` BN254 field element libdogecoin enforces as
+ * the third public input of every Phase-1 reveal.
+ *
+ * Returns DOGECOIN_ZK_OK on success and sets *out_token_count to the total
+ * number of quoted tokens seen.  Returns DOGECOIN_ZK_ERR_INVALID_ARG when
+ * the array contains fewer than `idx+1` tokens, when a non-decimal digit
+ * is encountered, or when the value would overflow 32 bytes.
+ */
+LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_parse_public_input_be32(
+    const uint8_t* public_inputs,
+    size_t public_inputs_len,
+    size_t idx,
+    uint8_t out_be32[32],
+    size_t* out_token_count);
 LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_build_opreturn_scriptpubkey(
     dogecoin_zk_mode_t mode,
     const uint8_t commitment[32],

@@ -133,7 +133,7 @@ libdogecoin_la_SOURCES += \
     src/pqc_dilithium.c
 endif
 
-# pqc_falcon.c: built for USE_PQC_CARRIER_HELPERS; defines dogecoin_tx_sighash32 (needed by ZK carrier) + Falcon-specific logic guarded by USE_LIBOQS.
+# pqc_falcon.c: provides dogecoin_tx_sighash32 used by both PQ and ZK carriers; Falcon logic is guarded by USE_LIBOQS.
 if USE_PQC_CARRIER_HELPERS
 libdogecoin_la_SOURCES += \
     src/pqc_falcon.c
@@ -144,7 +144,7 @@ libdogecoin_la_SOURCES += \
     src/pqc_raccoon.c
 endif
 
-# pqc_carrier.c: shared P2SH carrier helpers reused by PQ and ZK carriers.
+# pqc_carrier.c: P2SH carrier helpers shared by PQ and ZK carriers.
 if USE_PQC_CARRIER_HELPERS
 libdogecoin_la_SOURCES += \
     src/pqc_carrier.c
@@ -159,7 +159,7 @@ libdogecoin_la_SOURCES += \
     src/zk_carrier/zk_stark.c
 
 if HAVE_MCL
-# C++ verifier for Groth16 BN254 via herumi/mcl. Flags from configure.ac.
+# Groth16 BN254 verifier via herumi/mcl.
 libdogecoin_la_SOURCES += src/zk_carrier/zk_groth16_mcl.cpp
 endif
 endif
@@ -225,7 +225,7 @@ libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/includ
 libdogecoin_la_LIBADD = $(LIBSECP256K1) $(ASM_LIB_FILES)
 
 if HAVE_MCL
-# mcl BN254: C++ verifier flags.
+# mcl BN254 flags.
 libdogecoin_la_CFLAGS    += @MCL_CFLAGS@
 libdogecoin_la_CXXFLAGS   = -I$(top_srcdir)/include -fPIC @MCL_CFLAGS@ -std=c++14
 libdogecoin_la_LIBADD    += @MCL_LIBS@

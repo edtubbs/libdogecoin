@@ -223,6 +223,10 @@ dogecoin_zk_err_t dogecoin_zk_verify_proof(
                                           public_inputs, public_inputs_len,
                                           proof, proof_len);
     case DOGECOIN_ZK_MODE_PLONK:
+        /* No native PLONK verifier is linked into libdogecoin; the canonical
+         * verifier is snarkjs (see contrib/zk_carrier/scripts/).  The reveal
+         * and embedded vk are exposed to the caller for off-box verification. */
+        return DOGECOIN_ZK_ERR_DELEGATED;
     case DOGECOIN_ZK_MODE_STARK_S2:
         return DOGECOIN_ZK_ERR_NOT_IMPLEMENTED;
     }

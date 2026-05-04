@@ -1,5 +1,4 @@
-# mcl — herumi/mcl BN254 (BN_SNARK1) pairing library for Groth16 verification.
-# Builds a static libmcl.a (no GMP, no LLVM).  Requires ZK_CARRIER=1 in depends invocation.
+# mcl — herumi/mcl BN254 (BN_SNARK1) static library for Groth16 verification.
 
 package=mcl
 $(package)_version=2.10
