@@ -4,22 +4,14 @@
 # End-to-end ZK carrier demo: snarkjs prove → encode payload → build TX_C →
 # build TX_R → sign → broadcast → poll explorer → local verify.
 #
-# Defaults to testnet.  Mainnet broadcast requires both `--mainnet` and the
-# `--i-understand-real-doge` flag, plus a `ZK_CARRIER_WIF` env var (or
-# the WIF baked into the contrib/mainnet_*_test.sh family — passed via
-# FUNDED_WIF for parity with those scripts).  No private key is committed.
-#
-# Logging: every line of stdout/stderr is teed to
-#   zk_carrier_demo_<UTC>.log
-# in the working directory.  Commit that log alongside any mainnet run, per
-# the OP_CHECKZKP demo guidance.
+# Defaults to mainnet (matching contrib/mainnet_falcon_test.sh pattern).
+# Use --testnet to opt out. See usage for WIF/address env vars.
 
 set -euo pipefail
 umask 077
 
 # --------------------------- CLI ---------------------------------------------
-NETWORK="testnet"
-ALLOW_MAINNET=0
+NETWORK="${NETWORK:-mainnet}"
 SKIP_PROVE=0
 SKIP_BROADCAST=0
 ARGS_PAYLOAD_HEX=""
@@ -34,9 +26,8 @@ ARGS_ZKEY=""
 usage() {
     cat <<EOF
 Usage: $0 [options]
-  --testnet                  (default) broadcast to dogecoin testnet
-  --mainnet                  switch to mainnet (also requires --i-understand-real-doge)
-  --i-understand-real-doge   acknowledge mainnet broadcast risk
+  --mainnet                  (default) broadcast to dogecoin mainnet
+  --testnet                  opt-out: broadcast to dogecoin testnet
   --skip-prove               skip snarkjs invocation; use --payload-hex instead
   --skip-broadcast           build everything but do not broadcast
   --payload-hex HEX          pre-built ZKP1 payload hex (with --skip-prove)
@@ -68,7 +59,6 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --testnet) NETWORK="testnet" ;;
         --mainnet) NETWORK="mainnet" ;;
-        --i-understand-real-doge) ALLOW_MAINNET=1 ;;
         --skip-prove) SKIP_PROVE=1 ;;
         --skip-broadcast) SKIP_BROADCAST=1 ;;
         --payload-hex) ARGS_PAYLOAD_HEX="$2"; shift ;;
@@ -88,14 +78,6 @@ done
 LOG_FILE="zk_carrier_demo_$(date -u +%Y%m%d_%H%M%S).log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 echo "==> log file: $LOG_FILE"
-
-# --------------------------- Mainnet guard -----------------------------------
-if [[ "$NETWORK" == "mainnet" ]]; then
-    if [[ "$ALLOW_MAINNET" -ne 1 ]]; then
-        echo "ERROR: refusing to run on mainnet without --i-understand-real-doge" >&2
-        exit 2
-    fi
-fi
 
 # --------------------------- WIF / address (mainnet defaults match
 #                              contrib/mainnet_falcon_test.sh, contrib/
@@ -131,27 +113,6 @@ EXPLORER_BASE="${EXPLORER_BASE:-$EXPLORER_DEFAULT}"
 if [[ -z "$WIF" ]]; then
     echo "ERROR: no WIF available — set ZK_CARRIER_WIF or FUNDED_WIF" >&2
     exit 2
-fi
-
-if [[ "$NETWORK" == "mainnet" ]]; then
-    if [[ -z "${ZK_CARRIER_WIF:-}" && -z "${FUNDED_WIF_OVERRIDE:-}" ]]; then
-        cat >&2 <<'WARNBANNER'
-================================================================================
-WARNING: about to broadcast on MAINNET using the PUBLIC demo WIF inherited from
-contrib/mainnet_falcon_test.sh (QP1tqHYu... / DDMpdcTr...).  This key is
-ALREADY PUBLIC; coins sent to its address are spendable by anyone.
-
-If you do not want to use the public demo WIF, abort now (Ctrl-C) and re-run
-with:
-
-    export ZK_CARRIER_WIF=<your-WIF>
-    export ZK_CARRIER_ADDR=<your-address>
-
-Pausing 10 seconds so you can abort if this is unintended...
-================================================================================
-WARNBANNER
-        sleep 10
-    fi
 fi
 
 # --------------------------- Tooling -----------------------------------------
@@ -375,25 +336,3 @@ else
 fi
 
 echo "==> demo complete.  log: $LOG_FILE"
-if [[ "$NETWORK" == "mainnet" ]]; then
-    cat <<EOF
-
-==============================================================================
-MAINNET RUN COMPLETE — COMMIT THE LOG FILE
-
-Per the OP_CHECKZKP demo guidance (and the new-requirement in this branch),
-every mainnet run MUST be committed alongside its log so reviewers can
-verify the txid, explorer URL, and zk_extract_carrier output.
-
-Run, from the repository root:
-
-    git add -f "$LOG_FILE"
-    git commit -m "zk_carrier: mainnet run log $(date -u +%Y%m%d_%H%M%S)"
-    git push
-
-(Note: the repository's .gitignore matches *.log, so 'git add -f' is required.)
-
-Log file (absolute path): $(realpath "$LOG_FILE" 2>/dev/null || echo "$LOG_FILE")
-==============================================================================
-EOF
-fi

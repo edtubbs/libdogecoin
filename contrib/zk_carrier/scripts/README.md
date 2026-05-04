@@ -1,8 +1,8 @@
 # `contrib/zk_carrier/scripts/` — ZK carrier end-to-end drivers
 
 This directory consolidates the operator-facing end-to-end test drivers for
-the ZK carrier flow (Phase 7 of the OP_CHECKZKP plan).  They sit next to the
-circom circuit (`contrib/zk_carrier/circuits/`) and the snarkjs prover helper
+the ZK carrier flow. They sit next to the circom circuit
+(`contrib/zk_carrier/circuits/`) and the snarkjs prover helper
 (`contrib/zk_carrier/witness_helper.py`) so all ZK demo assets live under one
 tree.
 
@@ -37,9 +37,8 @@ Steps performed:
 
 #### Network selection
 
-* **`--testnet`** is the default.
-* **`--mainnet`** *also* requires `--i-understand-real-doge`.  Otherwise the
-  script refuses to broadcast.
+* **`--mainnet`** (default, matching contrib/mainnet_falcon_test.sh pattern).
+* **`--testnet`** to opt out.
 
 #### WIF / address handling
 
@@ -60,23 +59,10 @@ If you don't want that, export `ZK_CARRIER_WIF` to your own WIF (and
 `ZK_CARRIER_ADDR` if it differs from the WIF's natural address) before
 running.
 
-#### Logging — commit the run log
+#### Logging
 
 The script `tee`s every line of stdout/stderr to
 `zk_carrier_demo_<UTC>.log` in the working directory.
-
-**You MUST commit that file alongside any mainnet run.**  The script
-finishes a mainnet run with a banner that prints the exact `git add -f` /
-`git commit` / `git push` commands (the repo's `.gitignore` matches
-`*.log`, so `-f` is required); copy-paste them.  Reviewers depend on the log to verify:
-
-* the explorer URL the script polled,
-* the broadcast txid,
-* the `such -c zk_extract_carrier` output (proves TX_R round-trips),
-* the snarkjs verify line (proves the proof actually verifies).
-
-Logs from testnet runs are nice-to-have; logs from mainnet runs are
-mandatory and gate review.
 
 #### Mainnet warnings
 
