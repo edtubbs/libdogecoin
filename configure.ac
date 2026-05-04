@@ -39,10 +39,7 @@ AC_HEADER_STDBOOL
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_PROG_CC
-# AC_PROG_CXX must be unconditional so automake's am__fastdepCXX
-# conditional gets defined for both --with-mcl and the default config
-# (the C++ verifier in src/zk_carrier/zk_groth16_mcl.cpp is only compiled
-#  conditionally, but automake still needs to know we may use C++).
+# AC_PROG_CXX: always called so automake defines am__fastdepCXX for both --with-mcl and default configs.
 AC_PROG_CXX
 AM_PROG_AS
 AM_PROG_AR
@@ -360,10 +357,7 @@ if test "x$use_rapidsnark" != xno -a "x$use_rapidsnark" != x; then
   ])
 fi
 
-# --with-mcl[=DIR]: link herumi/mcl BN254 pairing library + the libdogecoin
-# mcl Groth16 verifier (src/zk_carrier/zk_groth16_mcl.cpp).  DIR is optional
-# and points at a manual install (uses DIR/include and DIR/lib).  We do a
-# light header / link probe and only define HAVE_MCL when both succeed.
+# --with-mcl[=DIR]: link herumi/mcl BN254 pairing + Groth16 verifier.
 have_mcl=no
 if test "x$use_mcl" != xno -a "x$use_mcl" != x; then
   case "x$use_mcl" in
@@ -391,12 +385,12 @@ if test "x$use_mcl" != xno -a "x$use_mcl" != x; then
   ]])],[
     AC_MSG_RESULT([yes])
     have_mcl=yes
-    AC_DEFINE([HAVE_MCL], [1], [Define if herumi/mcl BN254 pairing is available for in-process Groth16 verification])
+    AC_DEFINE([HAVE_MCL], [1], [Define if herumi/mcl BN254 pairing is available for Groth16 verification])
     AC_SUBST([MCL_CFLAGS])
     AC_SUBST([MCL_LIBS])
   ],[
     AC_MSG_RESULT([no])
-    AC_MSG_WARN([--with-mcl requested but mcl headers/libmcl link failed; falling back to delegated verification])
+    AC_MSG_WARN([--with-mcl requested but mcl link failed; falling back to delegated verification])
     CPPFLAGS="$saved_CPPFLAGS"
     LIBS="$saved_LIBS"
     MCL_CFLAGS=""

@@ -133,12 +133,7 @@ libdogecoin_la_SOURCES += \
     src/pqc_dilithium.c
 endif
 
-# pqc_falcon.c is built whenever the PQ carrier helpers are enabled (USE_LIBOQS
-# OR USE_ZK_CARRIER): the Falcon-specific entry points inside it are guarded
-# by #ifdef USE_LIBOQS, but the file also defines `dogecoin_tx_sighash32`
-# unconditionally — the ZK carrier needs that helper to compute the tx_base
-# sighash that the prover binds the proof to (mirroring how the PQC carrier
-# signs over the same value).
+# pqc_falcon.c: built for USE_PQC_CARRIER_HELPERS; defines dogecoin_tx_sighash32 (needed by ZK carrier) + Falcon-specific logic guarded by USE_LIBOQS.
 if USE_PQC_CARRIER_HELPERS
 libdogecoin_la_SOURCES += \
     src/pqc_falcon.c
@@ -149,11 +144,7 @@ libdogecoin_la_SOURCES += \
     src/pqc_raccoon.c
 endif
 
-# pqc_carrier.c provides shared P2SH carrier helpers (redeem script, scriptSig
-# chunking, scriptPubKey hashing).  These are reused by both the PQ carrier
-# (USE_LIBOQS) and the ZK carrier (USE_ZK_CARRIER), so build the file whenever
-# either is enabled.  Algorithm-specific extract code inside this TU is
-# itself guarded by #ifdef USE_LIBOQS.
+# pqc_carrier.c: shared P2SH carrier helpers reused by PQ and ZK carriers.
 if USE_PQC_CARRIER_HELPERS
 libdogecoin_la_SOURCES += \
     src/pqc_carrier.c
@@ -168,10 +159,7 @@ libdogecoin_la_SOURCES += \
     src/zk_carrier/zk_stark.c
 
 if HAVE_MCL
-# In-process Groth16 BN254 verifier, linked when --with-mcl=DIR succeeds.
-# Built as C++; flags come from configure.ac via @MCL_CFLAGS@/@MCL_LIBS@.
-# CFLAGS/LIBADD additions happen further down where the base vars are
-# defined; here we only add the source file.
+# C++ verifier for Groth16 BN254 via herumi/mcl. Flags from configure.ac.
 libdogecoin_la_SOURCES += src/zk_carrier/zk_groth16_mcl.cpp
 endif
 endif
@@ -237,8 +225,7 @@ libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/includ
 libdogecoin_la_LIBADD = $(LIBSECP256K1) $(ASM_LIB_FILES)
 
 if HAVE_MCL
-# Append MCL include/link flags after the base CFLAGS/LIBADD definitions.
-# CXXFLAGS for the C++ verifier file: AM_CXXFLAGS picks them up.
+# mcl BN254: C++ verifier flags.
 libdogecoin_la_CFLAGS    += @MCL_CFLAGS@
 libdogecoin_la_CXXFLAGS   = -I$(top_srcdir)/include -fPIC @MCL_CFLAGS@ -std=c++14
 libdogecoin_la_LIBADD    += @MCL_LIBS@
