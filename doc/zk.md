@@ -115,6 +115,22 @@ interpreter can be added without invalidating any historical TX_R.
 Future modes (e.g. Halo2, Bulletproofs) reserve higher integers; an
 unknown mode byte returns `DOGECOIN_ZK_ERR_BAD_MODE` from the codec.
 
+### Proof system verification paths
+
+| Proof System | Prover              | Verifier Path                                  | Config Flag                       |
+|--------------|---------------------|------------------------------------------------|-----------------------------------|
+| Groth16      | snarkjs (off-box)   | rapidsnark (in-process)                        | `--with-rapidsnark`               |
+| Groth16      | snarkjs (off-box)   | mcl BN254 (in-process)                         | `--with-mcl[=DIR]`                |
+| Groth16      | snarkjs (off-box)   | snarkjs (delegated)                            | (no flag → DELEGATED)             |
+| PLONK        | snarkjs (off-box)   | snarkjs (delegated; canonical PLONK verifier)  | (always DELEGATED)                |
+| STARK        | (none)              | (none)                                         | (always NOT_IMPLEMENTED)          |
+
+* **Groth16** verification is supported in-process via either rapidsnark or mcl when configured. Without either flag, verification is delegated to snarkjs.
+* **PLONK** verification is delegated to snarkjs (the canonical PLONK reference verifier). libdogecoin's policy delegates proving off-box; PLONK verifying is also off-box.
+* **STARK** has no canonical reference verifier wired up and currently returns NOT_IMPLEMENTED.
+
+All proof generation for all systems occurs off-box (snarkjs / rapidsnark CLI / circom) — libdogecoin never embeds a prover to stay mobile-friendly.
+
 ## Build flags
 
 * `--enable-zk-carrier` (default **on**) — compiles the module. Disable
@@ -151,7 +167,7 @@ code and including `libdogecoin.a` at link time:
 typedef enum {
     DOGECOIN_ZK_MODE_GROTH16  = 0,
     DOGECOIN_ZK_MODE_PLONK    = 1,
-    DOGECOIN_ZK_MODE_STARK_S2 = 2  /* placeholder for future S-two STARK */
+    DOGECOIN_ZK_MODE_STARK_S2 = 2  /* future STARK support */
 } dogecoin_zk_mode_t;
 ```
 

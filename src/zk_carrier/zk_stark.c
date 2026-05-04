@@ -26,11 +26,12 @@
 */
 
 /*
- * STARK (S-two) placeholder.
+ * STARK (S-two) proof system.
  *
- * Reserved for future integration with StarkWare's S-two prover/verifier
- * (or another STARK implementation).  Until then this file just claims the
- * mode byte (DOGECOIN_ZK_MODE_STARK_S2 = 2) so payloads can be tagged today.
+ * Not wired up in this revision. The mode byte (DOGECOIN_ZK_MODE_STARK_S2 = 2)
+ * is reserved so on-chain artifacts can be produced today. STARK verification
+ * is not yet implemented — no canonical reference verifier is wired up
+ * (unlike PLONK, which delegates to snarkjs).
  */
 
 #include <stddef.h>

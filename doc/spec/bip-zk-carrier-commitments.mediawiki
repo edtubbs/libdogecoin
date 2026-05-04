@@ -17,7 +17,7 @@ This document proposes a staged path for introducing zero-knowledge (ZK) proof s
 In the initial stage, a ZK proof commitment is embedded in a transaction output using a canonical OP_RETURN pattern, and the full proof bytes (public inputs and proof material) are published on-chain via a P2SH data-carrier reveal pattern (TX_C + TX_R), to enable immediate interoperability and chain-level observability without a consensus change.
 In a later stage, this proposal is intended to migrate from OP_RETURN commitments to a dedicated reserved opcode path (for example via OP_SUCCESSx-based soft fork design), enabling native script-level validation semantics and stronger on-chain composability.
 
-The current implementation focus is Groth16 (snarkjs/rapidsnark-compatible JSON encoding), PLONK, and a placeholder for STARK_S2.
+The current implementation focus is Groth16 (snarkjs/rapidsnark-compatible JSON encoding), PLONK, and future STARK_S2 support.
 This document is written in standard BIP format and is a sibling proposal to the Post-Quantum Signature Commitments BIP, sharing the same TX_C + TX_R staging model and the same SPV scanning/log conventions.
 It can be adapted to a DIP process if/when a formal DIP track is preferred.
 
@@ -90,7 +90,7 @@ The mode byte selects the proof system used by the off-chain verifier. libdogeco
 |-
 | 0x01 || <code>DOGECOIN_ZK_MODE_PLONK</code>   || PLONK || JSON-encoded public inputs and proof
 |-
-| 0x02 || <code>DOGECOIN_ZK_MODE_STARK_S2</code>|| STARK (S-two), placeholder || implementation-defined
+| 0x02 || <code>DOGECOIN_ZK_MODE_STARK_S2</code>|| STARK (S-two) || implementation-defined
 |}
 
 Future modes MAY be added by amending this BIP. Mode-byte assignments are reserved by this proposal; deployers SHOULD NOT use unassigned values for production proofs.
