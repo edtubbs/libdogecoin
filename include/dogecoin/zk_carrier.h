@@ -51,8 +51,8 @@ LIBDOGECOIN_BEGIN_DECL
  *      4 bytes  1B   1B    4B      2B    pl bytes     4B   xl bytes  4B   kl bytes
  *
  *   magic   : ASCII "ZKP1" (DOGECOIN_ZK_CARRIER_MAGIC)
- *   mode    : dogecoin_zk_mode_t selector (1B), aligned with the modular
- *             mode selector of the proposed OP_CHECKZKP opcode (185).
+ *   mode    : dogecoin_zk_mode_t selector (1B), aligned with the
+ *             reserved-opcode mode selector proposal.
  *   version : 1B payload-format version.  0x00 = legacy (no embedded vk; vk
  *             distributed out-of-band).  0x01 = vk-included; the verification
  *             key bytes follow the proof so the reveal is fully self-contained
@@ -106,12 +106,12 @@ LIBDOGECOIN_BEGIN_DECL
 #define DOGECOIN_ZK_PAYLOAD_VERSION_MASK   0x03  /* known flag bits */
 #define DOGECOIN_ZK_TX_BINDING_LEN         32
 
-/* Selectable proof systems.  Stable numeric values — these are what would be
- * pushed onto the script stack as the OP_CHECKZKP mode argument. */
+/* Selectable proof systems.  Stable numeric values — these are reserved-opcode
+ * mode selector values aligned with PQC carrier's design. */
 typedef enum {
     DOGECOIN_ZK_MODE_GROTH16  = 0,
     DOGECOIN_ZK_MODE_PLONK    = 1,
-    DOGECOIN_ZK_MODE_STARK_S2 = 2  /* placeholder for future S-two STARK */
+    DOGECOIN_ZK_MODE_STARK_S2 = 2  /* future STARK support */
 } dogecoin_zk_mode_t;
 
 typedef enum {
@@ -313,7 +313,7 @@ LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_verify_proof(
 
 /*
  * Proof generation API — kept here for surface-area completeness and to
- * line up with the OP_CHECKZKP proposal terminology.  Always returns
+ * align with reserved-opcode proposal terminology.  Always returns
  * DOGECOIN_ZK_ERR_DELEGATED in this build because libdogecoin's policy is
  * that proving lives in the wallet/UI (snarkjs) or in a host-side rapidsnark
  * CLI.  The contrib helper `contrib/zk_carrier/witness_helper.py`

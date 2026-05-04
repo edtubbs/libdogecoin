@@ -15,7 +15,7 @@
 
 This document proposes a staged path for introducing zero-knowledge (ZK) proof support in transactions.
 In the initial stage, a ZK proof commitment is embedded in a transaction output using a canonical OP_RETURN pattern, and the full proof bytes (public inputs and proof material) are published on-chain via a P2SH data-carrier reveal pattern (TX_C + TX_R), to enable immediate interoperability and chain-level observability without a consensus change.
-In a later stage, this proposal is intended to migrate from OP_RETURN commitments to a dedicated reserved opcode path (for example via OP_SUCCESSx-based soft fork design, sometimes referred to as <code>OP_CHECKZKP</code>), enabling native script-level validation semantics and stronger on-chain composability.
+In a later stage, this proposal is intended to migrate from OP_RETURN commitments to a dedicated reserved opcode path (for example via OP_SUCCESSx-based soft fork design), enabling native script-level validation semantics and stronger on-chain composability.
 
 The current implementation focus is Groth16 (snarkjs/rapidsnark-compatible JSON encoding), PLONK, and a placeholder for STARK_S2.
 This document is written in standard BIP format and is a sibling proposal to the Post-Quantum Signature Commitments BIP, sharing the same TX_C + TX_R staging model and the same SPV scanning/log conventions.
@@ -41,7 +41,7 @@ A reserved-opcode follow-up provides a path toward first-class script integratio
 The design is intentionally staged:
 
 * '''Phase 1 (Now):''' publish a 32-byte commitment (derived from the canonical ZK payload) in canonical OP_RETURN form, and optionally publish the full proof bytes via P2SH data-carrier in TX_R.
-* '''Phase 2 (Future):''' define and activate a dedicated script opcode path (e.g. <code>OP_CHECKZKP</code>) to validate ZK proofs in script execution, replacing commitment-only signaling.
+* '''Phase 2 (Future):''' define and activate a dedicated script opcode path to validate ZK proofs in script execution, replacing commitment-only signaling.
 
 This balances deployability and safety:
 
@@ -367,7 +367,7 @@ Properly-sized fees produce TX_C and TX_R confirmations within minutes on mainne
 
 ===Phase 2: Reserved Opcode Upgrade Path===
 
-This proposal reserves a follow-up soft-fork design track to migrate from OP_RETURN signaling to native script validation semantics using a reserved opcode approach (often referenced as <code>OP_CHECKZKP</code> in the literature).
+This proposal reserves a follow-up soft-fork design track to migrate from OP_RETURN signaling to native script validation semantics using a reserved opcode approach.
 The Phase 2 document is expected to define:
 
 * exact opcode assignment path (and its relationship to Phase 2 of the PQC carrier proposal, which may share an OP_SUCCESSx range);

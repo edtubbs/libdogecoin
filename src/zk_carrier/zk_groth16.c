@@ -43,8 +43,8 @@
  * The "delegated" status is not a stub: it's the documented behaviour of the
  * mobile-friendly build, and callers (the demo script, the wallet/UI) handle it.
  *
- * Tying into the OP_CHECKZKP proposal (Opcode 185): when that opcode lands,
- * an interpreter implementation will pull the verification key from a
+ * Tying into the reserved-opcode proposal: when a future reserved-opcode validator
+ * lands, an interpreter implementation will pull the verification key from a
  * consensus-anchored registry, reuse `dogecoin_zk_extract_carrier_payload`
  * to get the public inputs and proof, and call `dogecoin_zk_verify_groth16`
  * (or PLONK / STARK equivalents) for the matching mode byte.

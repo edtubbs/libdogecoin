@@ -993,7 +993,7 @@ Summary: 17 total validations (12 op_return_only TX_C, 5 carrier_scriptsig TX_R,
 
 > **Note**: ZK carrier commands require the `--enable-zk-carrier` configure flag (default **on**). In-process Groth16 verification additionally requires `--with-rapidsnark` or `--with-mcl[=DIR]`; without either, verification is *delegated* (the reveal payload is reassembled and logged, but the proof itself must be checked by an external `snarkjs` / `rapidsnark` invocation).
 
-The `such` tool exposes the on-chain side of the OP_CHECKZKP carrier flow — a canonical `ZKP1` payload (Groth16 / PLONK / STARK), a 32-byte `SHA256d(payload)` commitment broadcast in a tagged `OP_RETURN DZKC` output, and a P2SH data-carrier reveal that publishes the full proof bytes on-chain.  The transaction shape is the same `OP_DROP×5 OP_TRUE` redeem script used by the PQC carrier — only the 8-byte tag differs (`ZKP1FULL` vs `FLC1FULL` / `DIL2FULL` / `RCG4FULL`).
+The `such` tool exposes the on-chain side of the ZK carrier flow — a canonical `ZKP1` payload (Groth16 / PLONK / STARK), a 32-byte `SHA256d(payload)` commitment broadcast in a tagged `OP_RETURN DZKC` output, and a P2SH data-carrier reveal that publishes the full proof bytes on-chain.  The transaction shape is the same `OP_DROP×5 OP_TRUE` redeem script used by the PQC carrier — only the 8-byte tag differs (`ZKP1FULL` vs `FLC1FULL` / `DIL2FULL` / `RCG4FULL`).
 
 The `spvnode` tool exposes the verifying side via `-V, --zk-vkey <verification_key.json>`.
 

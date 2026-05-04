@@ -26,14 +26,14 @@
 */
 
 /*
- * PLONK proof system stub.
+ * PLONK proof system.
  *
  * Not implemented in this revision.  When implemented, the recommended
  * path is libsnark's PLONK gadget or a thin C wrapper around an external
  * PLONK verifier (e.g., halo2-style).  The mode byte (DOGECOIN_ZK_MODE_PLONK
  * = 1) is reserved here so on-chain artifacts can be produced today and
- * verified once the verifier ships, mirroring the OP_CHECKZKP modular mode
- * selector.
+ * verified once the verifier ships, mirroring the reserved-opcode mode
+ * selector proposal.
  */
 
 #include <stddef.h>

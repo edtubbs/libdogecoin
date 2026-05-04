@@ -45,8 +45,8 @@ Proof Carrier (ZK) Commands*). End-to-end demo drivers live under
 The module extends the PQ carrier pattern (`src/pqc_carrier.c`) so that
 succinct zero-knowledge proofs (Groth16 today, PLONK / STARK in future) can
 be committed and revealed on the Dogecoin chain using exactly the same
-TX_C (commit) + TX_R (reveal) flow. It implements the on-chain side of the
-proposed `OP_CHECKZKP` opcode 185: a canonical wire format for ZK proofs
+TX_C (commit) + TX_R (reveal) flow. It implements the on-chain side of a
+reserved-opcode proposal: a canonical wire format for ZK proofs
 and a P2SH carrier transaction shape that lets full nodes and SPV clients
 consume those proofs without a soft-fork-deployed interpreter on the
 network yet.
@@ -97,7 +97,7 @@ prover backends and avoids a separate canonicalisation step.
   * Outputs are operator-defined (typically a change output back to the
     funding address).
 
-When `OP_CHECKZKP` ships, an interpreter implementation will recognise the
+When a future reserved-opcode validator ships, an interpreter implementation will recognise the
 OP_RETURN by leading `"DZKC"` tag, walk the inputs of the redeeming TX_R
 to recover the payload (matching `"ZKP1FULL"`), look up the verification
 key for `(mode, circuit_id)` in a consensus-anchored registry, and call
@@ -155,8 +155,8 @@ typedef enum {
 } dogecoin_zk_mode_t;
 ```
 
-Stable numeric proof-system selectors. These are the values pushed onto
-the script stack as the `OP_CHECKZKP` mode argument and embedded as a
+Stable numeric proof-system selectors. These are the reserved-opcode mode
+selector values aligned with the PQC carrier's design and embedded as a
 single byte in the `ZKP1` payload and the `DZKC` OP_RETURN.
 
 ---
@@ -403,8 +403,8 @@ dogecoin_zk_err_t rc = dogecoin_zk_verify_proof(
 
 ## Proof Generation API
 
-These entry points are kept for surface-area completeness and to line up
-with the `OP_CHECKZKP` proposal terminology. **They always return
+These entry points are kept for surface-area completeness and to align with
+reserved-opcode proposal terminology. **They always return
 `DOGECOIN_ZK_ERR_DELEGATED` (Groth16) or `DOGECOIN_ZK_ERR_NOT_IMPLEMENTED`
 (PLONK)** in this build because libdogecoin's policy is that proving lives
 in the wallet/UI (snarkjs) or on a host (rapidsnark CLI). The

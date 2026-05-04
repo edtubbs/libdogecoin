@@ -46,9 +46,9 @@ snarkjs groth16 fullprove input.json \
     build/range_proof.zkey \
     proof.json public.json
 
-# 4. Verify off-box (libdogecoin will do the same on-chain via OP_CHECKZKP
-#    when that ships; today verification is delegated unless you build with
-#    --with-rapidsnark).
+# 4. Verify off-box (libdogecoin will do the same on-chain via reserved-opcode
+#    validator when that ships; today verification is delegated unless you build with
+#    --with-rapidsnark or --with-mcl).
 snarkjs groth16 verify build/verification_key.json public.json proof.json
 ```
 

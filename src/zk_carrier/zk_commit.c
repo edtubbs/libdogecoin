@@ -28,7 +28,7 @@
 /*
  * ZK carrier — TX_C / TX_R construction.
  *
- * This is the integration glue requested by the OP_CHECKZKP proposal:
+ * This is the integration glue requested by the reserved-opcode proposal:
  * we deliberately reuse the PQ carrier pattern (src/pqc_carrier.c) — same
  * P2SH redeem script, same chunked scriptSig layout, same 8-byte tag slot —
  * so a single SPV path can recognise both PQ-signature and ZK-proof carrier
