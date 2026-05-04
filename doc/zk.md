@@ -65,17 +65,29 @@ All multi-byte integers are big-endian.
 |-------:|-----:|------------------|--------------------|
 | 0      | 4    | magic `"ZKP1"`   | ASCII              |
 | 4      | 1    | mode             | `dogecoin_zk_mode_t` |
-| 5      | 1    | reserved         | must be `0x00`     |
+| 5      | 1    | version          | 0x00 (v0 legacy) or 0x01 (v1 vk-included) |
 | 6      | 4    | circuit_id       | uint32             |
 | 10     | 2    | public_inputs_len| uint16             |
 | 12     | N    | public_inputs    | opaque bytes       |
 | 12+N   | 4    | proof_len        | uint32             |
 | 16+N   | M    | proof            | opaque bytes       |
+| 16+N+M | 4    | vk_len           | uint32 (v1 only)   |
+| 20+N+M | K    | vk               | opaque bytes (v1 only) |
 
-`public_inputs` and `proof` are typically the JSON blobs emitted by snarkjs
-(`public.json`, `proof.json`); rapidsnark accepts the same JSON when it
-verifies on-chain. Carrying JSON keeps the formats interchangeable across
-prover backends and avoids a separate canonicalisation step.
+`public_inputs`, `proof`, and (for v1) `vk` are typically the JSON blobs
+emitted by snarkjs (`public.json`, `proof.json`, `verification_key.json`);
+rapidsnark and mcl accept the same JSON when they verify on-chain. Carrying
+JSON keeps the formats interchangeable across prover backends and avoids
+a separate canonicalisation step.
+
+**Version byte semantics:**
+* **v0 (`0x00`)**: legacy format with no embedded vk. The verifier must obtain
+  the verification key through an out-of-band channel. Retained for backwards
+  compatibility; new deployments MUST NOT emit v0.
+* **v1 (`0x01`)**: self-contained reveal. The vk is embedded in the payload so
+  verification uses only on-chain bytes. RECOMMENDED for all new deployments.
+  Because the vk is part of the canonical payload hashed to produce `commit32`,
+  swapping the vk after publication invalidates the OP_RETURN commitment match.
 
 ### TX_C / TX_R shape
 
