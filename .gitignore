@@ -162,3 +162,8 @@ store/*
 !/src/optee/host/Makefile
 !/src/optee/ta/Makefile
 /src/optee/build
+
+# Node.js (snarkjs etc. for ZK helpers)
+node_modules/
+package.json
+package-lock.json
