@@ -147,23 +147,40 @@ All proof generation for all systems occurs off-box (snarkjs / rapidsnark CLI / 
 
 * `--enable-zk-carrier` (default **on**) — compiles the module. Disable
   with `--disable-zk-carrier` to drop ~25 KB of code.
-* `--with-rapidsnark` — links a system-installed rapidsnark Groth16
-  verifier (providing the `groth16_verify` C ABI) into libdogecoin so
-  verification runs in-process. rapidsnark is *not* vendored by the
-  in-tree `depends/` system; install it from upstream
-  (https://github.com/iden3/rapidsnark) and pass its install prefix to
-  the linker.  Without `--with-rapidsnark` (or `--with-mcl`),
+* `--with-rapidsnark` — links the rapidsnark Groth16 verifier (providing
+  the `groth16_verify` C ABI) into libdogecoin so verification runs
+  in-process. rapidsnark v0.0.8 is now vendored via
+  `depends/packages/rapidsnark.mk`: setting `ZK_CARRIER=1` on the
+  `depends/` invocation builds the upstream tarball
+  (https://github.com/iden3/rapidsnark/releases/tag/v0.0.8) along with
+  its `ffiasm` and `nlohmann/json` submodules and stages
+  `librapidsnark.a / libfr.a / libfq.a` into
+  `depends/${HOST}/lib/`.  The depends recipe builds the C++ verifier
+  with `-DCMAKE_POSITION_INDEPENDENT_CODE=ON -DUSE_ASM=NO -DUSE_OPENMP=OFF`
+  so it links into libdogecoin's shared library, links against system
+  `libgmp` (install `libgmp-dev` on Linux / `brew install gmp` on macOS),
+  and is exercised end-to-end against on-chain mainnet pairs by
+  `contrib/zk_carrier/scripts/validate_onchain_pairs.py` (Pair G1).
+  Without `--with-rapidsnark` (or `--with-mcl`),
   `dogecoin_zk_verify_proof` returns `DOGECOIN_ZK_ERR_DELEGATED` and the
   demo script falls back to `snarkjs groth16 verify`.
+
+  > **Note:** rapidsnark v0.0.8 ships only a Groth16 verifier — it has
+  > no PLONK support upstream — so `dogecoin_zk_verify_proof` always
+  > returns `DOGECOIN_ZK_ERR_DELEGATED` for `DOGECOIN_ZK_MODE_PLONK`
+  > regardless of `--with-rapidsnark`.  PLONK reveals are validated by
+  > `snarkjs plonk verify` against the vk embedded in the on-chain
+  > reveal (Pair Q1 in `validate_onchain_pairs.py`).
 * `--with-mcl[=DIR]` — links the herumi/mcl BN254 pairing library plus
   the in-process Groth16 verifier in `src/zk_carrier/zk_groth16_mcl.cpp`.
   This is the in-tree natively-buildable Groth16 verifier (vendored via
   `depends/packages/mcl.mk` when `ZK_CARRIER=1`) and is what the
   published mainnet PASSED runs use for in-process verification
   (`spvnode --zk-vkey verification_key.json`).
-* `ZK_CARRIER=1` on the `depends/` invocation vendors herumi/mcl into
-  the depends staging tree so `--with-mcl` finds it without any system
-  package install.
+* `ZK_CARRIER=1` on the `depends/` invocation vendors herumi/mcl *and*
+  iden3/rapidsnark v0.0.8 into the depends staging tree so `--with-mcl`
+  and `--with-rapidsnark` find them without any system package install
+  (system `libgmp` / `libgmp-dev` is still required for rapidsnark).
 
 These flags are also summarised in [`tools.md`](tools.md) alongside the
 CLI commands they unlock.
