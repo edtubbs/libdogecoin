@@ -309,7 +309,9 @@ static void test_zk_carrier_tx_roundtrip(void)
 static void test_zk_modes_dispatch(void)
 {
     /* Build a minimal valid PLONK-tagged payload, verify dispatch returns
-     * NOT_IMPLEMENTED (PLONK stub) regardless of build flags. */
+     * DELEGATED for PLONK (libdogecoin policy: PLONK proving + verification
+     * runs in the host wallet/UI via snarkjs; we don't ship a native PLONK
+     * verifier).  Same for STARK. */
     uint8_t* payload = NULL;
     size_t payload_len = 0;
     uint8_t one = 0x01;
@@ -317,10 +319,10 @@ static void test_zk_modes_dispatch(void)
         DOGECOIN_ZK_MODE_PLONK, 0, &one, 1, &one, 1, NULL, 0, &payload, &payload_len);
     u_assert_int_eq(e, DOGECOIN_ZK_OK);
     e = dogecoin_zk_verify_proof(payload, payload_len, &one, 1);
-    u_assert_int_eq(e, DOGECOIN_ZK_ERR_NOT_IMPLEMENTED);
+    u_assert_int_eq(e, DOGECOIN_ZK_ERR_DELEGATED);
     dogecoin_free(payload);
 
-    /* Same for STARK. */
+    /* Same for STARK (reserved; native verifier not implemented). */
     e = dogecoin_zk_encode_payload(
         DOGECOIN_ZK_MODE_STARK_S2, 0, &one, 1, &one, 1, NULL, 0, &payload, &payload_len);
     u_assert_int_eq(e, DOGECOIN_ZK_OK);
@@ -341,7 +343,7 @@ static void test_zk_prover_is_delegated(void)
     e = dogecoin_zk_generate_plonk_proof(
         (const uint8_t*)"{}", 2, "/tmp/none.zkey",
         &p, &pl, &q, &ql);
-    u_assert_int_eq(e, DOGECOIN_ZK_ERR_NOT_IMPLEMENTED);
+    u_assert_int_eq(e, DOGECOIN_ZK_ERR_DELEGATED);
 }
 
 /* tx_base sighash binding: the ZK proof's `tx_binding` public input MUST

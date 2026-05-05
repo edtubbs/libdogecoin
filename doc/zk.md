@@ -147,18 +147,23 @@ All proof generation for all systems occurs off-box (snarkjs / rapidsnark CLI / 
 
 * `--enable-zk-carrier` (default **on**) — compiles the module. Disable
   with `--disable-zk-carrier` to drop ~25 KB of code.
-* `--with-rapidsnark` — links the rapidsnark Groth16 verifier into
-  libdogecoin so verification runs in-process. Without it, verify returns
-  `DOGECOIN_ZK_ERR_DELEGATED` and the demo script falls back to
-  `snarkjs groth16 verify`.
+* `--with-rapidsnark` — links a system-installed rapidsnark Groth16
+  verifier (providing the `groth16_verify` C ABI) into libdogecoin so
+  verification runs in-process. rapidsnark is *not* vendored by the
+  in-tree `depends/` system; install it from upstream
+  (https://github.com/iden3/rapidsnark) and pass its install prefix to
+  the linker.  Without `--with-rapidsnark` (or `--with-mcl`),
+  `dogecoin_zk_verify_proof` returns `DOGECOIN_ZK_ERR_DELEGATED` and the
+  demo script falls back to `snarkjs groth16 verify`.
 * `--with-mcl[=DIR]` — links the herumi/mcl BN254 pairing library plus
   the in-process Groth16 verifier in `src/zk_carrier/zk_groth16_mcl.cpp`.
-  This is what the published mainnet PASSED runs use for in-process
-  verification (`spvnode --zk-vkey verification_key.json`).
-* `depends/packages/rapidsnark.mk` plus `ZK_CARRIER=1` on the depends
-  invocation vendor a verifier-only rapidsnark for `x86_64-linux-gnu` and
-  `x86_64/arm64-apple-darwin`. Mingw / Android / iOS hosts are
-  intentionally guarded with a hard `$(error)`.
+  This is the in-tree natively-buildable Groth16 verifier (vendored via
+  `depends/packages/mcl.mk` when `ZK_CARRIER=1`) and is what the
+  published mainnet PASSED runs use for in-process verification
+  (`spvnode --zk-vkey verification_key.json`).
+* `ZK_CARRIER=1` on the `depends/` invocation vendors herumi/mcl into
+  the depends staging tree so `--with-mcl` finds it without any system
+  package install.
 
 These flags are also summarised in [`tools.md`](tools.md) alongside the
 CLI commands they unlock.

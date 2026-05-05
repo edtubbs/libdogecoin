@@ -9,7 +9,7 @@ darwin_native_packages =
 
 yubikey_packages = libyubikey libusb ykpers
 liboqs_packages = liboqs
-zk_carrier_packages = rapidsnark mcl
+zk_carrier_packages = mcl
 
 ifneq ($(build_os),darwin)
 darwin_native_packages += native_cctools native_libtapi

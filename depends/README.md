@@ -44,10 +44,9 @@ The following can be set when running make: make FOO=bar
     NO_LIBOQS: set to skip building liboqs (PQC library). Leave empty to include it (e.g. NO_LIBOQS=)
     LIBOQS_RACCOON: set to 'y' to build the Raccoon-G fork of liboqs (edtubbs/liboqs).
                     When omitted or empty, upstream liboqs (open-quantum-safe/liboqs) is used.
-    ZK_CARRIER: set to 'y' or '1' to vendor mcl and rapidsnark (Groth16 verifier-only)
-                for the ZK carrier module.  When unset, libdogecoin's verifier
-                returns DOGECOIN_ZK_ERR_DELEGATED and callers fall back to
-                off-box snarkjs (mobile-friendly default).
+    ZK_CARRIER: set to '1' to vendor herumi/mcl for native Groth16
+                verification in the ZK carrier module.  When unset,
+                Groth16 verification is delegated to off-box snarkjs.
     DEBUG: disable some optimizations and enable more runtime checking
     HOST_ID_SALT: Optional salt to use when generating host package ids
     BUILD_ID_SALT: Optional salt to use when generating build package ids
