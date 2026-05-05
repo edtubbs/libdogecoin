@@ -348,11 +348,22 @@ if test "x$use_zk_carrier" = xyes; then
 fi
 
 if test "x$use_rapidsnark" != xno -a "x$use_rapidsnark" != x; then
-  AC_CHECK_LIB([rapidsnark],[groth16_verify],[
-    LIBS="$LIBS -lrapidsnark"
+  RAPIDSNARK_LIBS="-lrapidsnark -lfr -lfq -lgmp -lstdc++ -lpthread"
+  ac_check_lib_save_LIBS="$LIBS"
+  LIBS="$RAPIDSNARK_LIBS $LIBS"
+  AC_MSG_CHECKING([for groth16_verify in -lrapidsnark])
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+    extern int groth16_verify(const char* proof, const char* inputs,
+                              const char* vk, char* err, unsigned long max);
+  ]],[[
+    return groth16_verify(0, 0, 0, 0, 0);
+  ]])],[
+    AC_MSG_RESULT([yes])
     AC_DEFINE([HAVE_RAPIDSNARK], [1], [Define if rapidsnark is available for in-process Groth16 verification])
   ],[
+    AC_MSG_RESULT([no])
     AC_MSG_WARN([--with-rapidsnark requested but librapidsnark not found; falling back to delegated verification])
+    LIBS="$ac_check_lib_save_LIBS"
   ])
 fi
 

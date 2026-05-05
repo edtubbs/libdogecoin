@@ -62,13 +62,23 @@
 #include <dogecoin/zk_carrier.h>
 
 #ifdef HAVE_RAPIDSNARK
-/* Forward declarations of the rapidsnark verifier C entry point.  The
- * verifier-only build of rapidsnark exposes a small C ABI; if the upstream
- * binding name changes, only this block needs to follow.  See
+/* Forward declaration of the rapidsnark v0.0.8 verifier C ABI.  Header lives
+ * at <rapidsnark/verifier.h> in the depends-staged install but we re-declare
+ * it here so HAVE_RAPIDSNARK builds don't require pulling the upstream header
+ * into libdogecoin's include path.  Argument order MUST match upstream:
+ *
+ *     int groth16_verify(const char *proof,
+ *                        const char *inputs,
+ *                        const char *verification_key,
+ *                        char *error_msg, unsigned long error_msg_maxsize);
+ *
+ * Returns 0 (VERIFIER_VALID_PROOF) on success, 1 (VERIFIER_INVALID_PROOF) for
+ * a well-formed-but-invalid proof, 2 (VERIFIER_ERROR) for any parse or
+ * arithmetic error (with a short diagnostic in error_msg).  See
  * depends/packages/rapidsnark.mk. */
-extern int groth16_verify(const char* vk_json,
+extern int groth16_verify(const char* proof_json,
                           const char* public_json,
-                          const char* proof_json,
+                          const char* vk_json,
                           char* error_msg,
                           unsigned long error_msg_maxsize);
 #endif
@@ -146,7 +156,8 @@ dogecoin_zk_err_t dogecoin_zk_verify_groth16(
 
     char err[256];
     err[0] = '\0';
-    int rc = groth16_verify(vk, pubj, prf, err, sizeof(err));
+    /* Upstream rapidsnark v0.0.8 ABI: groth16_verify(proof, inputs, vk, ...). */
+    int rc = groth16_verify(prf, pubj, vk, err, sizeof(err));
     dogecoin_free(vk);
     dogecoin_free(pubj);
     dogecoin_free(prf);
