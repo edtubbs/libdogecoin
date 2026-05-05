@@ -89,22 +89,13 @@ LIBDOGECOIN_BEGIN_DECL
 #define DOGECOIN_ZK_OPRETURN_DATA_LEN  (DOGECOIN_ZK_OPRETURN_TAG_LEN + 1 + 32)
 
 /* Wire-format version byte (the 6th byte of the ZKP1 payload, immediately
- * after the mode byte).  Treated as a flag bitfield so additive features can
- * be combined: bit 0 = vk-included, bit 1 = tx-bound (32-byte funding tx
- * binding hash present).  v0 (0x00) is the legacy "vk distributed
+ * after the mode byte).  v0 (0x00) is the legacy "vk distributed
  * out-of-band, no replay protection" layout; v1 (0x01) appends the vk so the
- * reveal is fully self-contained for on-chain verification; v2 (0x03 — vk +
- * binding) additionally appends a 32-byte SHA256d hash of the funding tx
- * (TX_C) input outpoints so a verifier can check the proof reveal is bound
- * to the on-chain spend that published it, providing a cryptographic
- * replay-protection layer on top of TX_R's UTXO single-shot semantics. */
+ * reveal is fully self-contained for on-chain verification. Replay protection
+ * is provided via the third public input (tx_base sighash). */
 #define DOGECOIN_ZK_PAYLOAD_VERSION_V0     0x00
 #define DOGECOIN_ZK_PAYLOAD_VERSION_V1     0x01
-#define DOGECOIN_ZK_PAYLOAD_FLAG_VK        0x01  /* bit 0 */
-#define DOGECOIN_ZK_PAYLOAD_FLAG_TX_BIND   0x02  /* bit 1 */
-#define DOGECOIN_ZK_PAYLOAD_VERSION_V2     (DOGECOIN_ZK_PAYLOAD_FLAG_VK | DOGECOIN_ZK_PAYLOAD_FLAG_TX_BIND)
-#define DOGECOIN_ZK_PAYLOAD_VERSION_MASK   0x03  /* known flag bits */
-#define DOGECOIN_ZK_TX_BINDING_LEN         32
+#define DOGECOIN_ZK_PAYLOAD_VERSION_MASK   0x01
 
 /* Selectable proof systems.  Stable numeric values — these are reserved-opcode
  * mode selector values aligned with PQC carrier's design. */
