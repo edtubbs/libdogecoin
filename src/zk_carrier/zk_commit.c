@@ -53,6 +53,19 @@
 /* Per-part chunked payload capacity (mirrors PQC carrier). */
 #define ZK_PART_PAYLOAD_MAX (DOGECOIN_PQC_CARRIER_MAX_CHUNKS * DOGECOIN_PQC_CARRIER_CHUNK_MAX)
 
+/**
+ * @brief Internal helper: derive the number of PQC-shaped carrier outputs
+ * needed to ferry a payload of `payload_len` bytes through TX_R.
+ *
+ * Mirrors the PQC carrier's chunking math (DOGECOIN_PQC_CARRIER_MAX_CHUNKS *
+ * DOGECOIN_PQC_CARRIER_CHUNK_MAX bytes per part).  Always returns at least
+ * one part so SPV has something to walk even for an empty payload.
+ *
+ * @param payload_len     length of the ZKP1 payload to chunk
+ * @param out_part_total  receives the part count (1..255)
+ *
+ * @return true on success; false if the payload would need >255 parts
+ */
 static dogecoin_bool zk_compute_part_total(size_t payload_len, uint8_t* out_part_total)
 {
     if (payload_len == 0) {
@@ -66,6 +79,29 @@ static dogecoin_bool zk_compute_part_total(size_t payload_len, uint8_t* out_part
     return true;
 }
 
+/**
+ * @brief Append the OP_RETURN commit output and the P2SH carrier outputs
+ * (one per required reveal-part) to an in-progress TX_C transaction.
+ *
+ * Combines dogecoin_zk_build_opreturn_scriptpubkey + dogecoin_tx_add_pqc_*
+ * outputs into a single call so the TX_C build path mirrors how PQC
+ * commitments are added.  `payload` is the payload that will later be
+ * revealed in TX_R; the number of carrier outputs is derived from its length
+ * via zk_compute_part_total.
+ *
+ * @param tx               in-progress transaction to append outputs to
+ * @param payload          ZKP1 payload that will be revealed by TX_R
+ * @param payload_len      byte length of `payload`
+ * @param mode             ZK mode written into the OP_RETURN commitment
+ * @param carrier_value    per-output value in koinu (must be >= dust)
+ * @param out_carrier_spk  receives the P2SH scriptPubKey of the carrier
+ *                         outputs (caller frees with cstr_free(..., true))
+ * @param out_part_total   receives the number of carrier outputs created
+ *
+ * @return DOGECOIN_ZK_OK on success, or one of DOGECOIN_ZK_ERR_INVALID_ARG /
+ *         DOGECOIN_ZK_ERR_BAD_MODE / DOGECOIN_ZK_ERR_OOM /
+ *         DOGECOIN_ZK_ERR_TRUNCATED on failure
+ */
 dogecoin_zk_err_t dogecoin_zk_build_carrier_tx_c(
     dogecoin_tx* tx,
     const uint8_t* payload,
@@ -132,6 +168,27 @@ dogecoin_zk_err_t dogecoin_zk_build_carrier_tx_c(
     return DOGECOIN_ZK_OK;
 }
 
+/**
+ * @brief Build the per-part scriptSigs that TX_R will use to spend the TX_C
+ * carrier outputs and reveal the previously-committed ZKP1 payload.
+ *
+ * One scriptSig is produced per chunk of the payload, each tagged with the
+ * canonical "ZKP1FULL" 8-byte tag and the (i, part_total) coordinates the
+ * reassembly path expects.  The advisory pk_len/full_len header fields are
+ * set from the embedded ZKP1 lengths; SPV consumers must rely on the 32-bit
+ * length fields inside the payload itself when reassembling.
+ *
+ * @param payload          ZKP1 payload to chunk into TX_R inputs
+ * @param payload_len      length of `payload`
+ * @param out_scriptsigs   receives a freshly-allocated cstring* array with
+ *                         `*out_part_total` entries; caller frees each
+ *                         element with cstr_free(..., true) and the array
+ *                         itself with dogecoin_free()
+ * @param out_part_total   receives the part count produced
+ *
+ * @return DOGECOIN_ZK_OK on success, DOGECOIN_ZK_ERR_INVALID_ARG /
+ *         DOGECOIN_ZK_ERR_OOM on failure
+ */
 dogecoin_zk_err_t dogecoin_zk_build_carrier_tx_r_scriptsigs(
     const uint8_t* payload,
     size_t payload_len,
@@ -207,6 +264,22 @@ dogecoin_zk_err_t dogecoin_zk_build_carrier_tx_r_scriptsigs(
     return DOGECOIN_ZK_OK;
 }
 
+/**
+ * @brief Reassemble the ZKP1 payload from the carrier inputs of TX_R.
+ *
+ * Walks every input of `tx_r`, matches the canonical PQC-style carrier
+ * scriptSig tagged with "ZKP1FULL", validates per-part headers (matching
+ * part_total / full_len / no duplicate indices), concatenates the parts
+ * in order, and returns the reassembled payload buffer.
+ *
+ * @param tx_r             reveal transaction whose inputs spend TX_C carriers
+ * @param out_payload      receives a freshly-allocated payload buffer
+ *                         (caller frees with dogecoin_free())
+ * @param out_payload_len  receives the byte length of *out_payload
+ *
+ * @return DOGECOIN_ZK_OK on success, or one of DOGECOIN_ZK_ERR_INVALID_ARG /
+ *         DOGECOIN_ZK_ERR_OOM / DOGECOIN_ZK_ERR_TRUNCATED on failure
+ */
 dogecoin_zk_err_t dogecoin_zk_extract_carrier_payload(
     const dogecoin_tx* tx_r,
     uint8_t** out_payload,
@@ -334,11 +407,20 @@ dogecoin_zk_err_t dogecoin_zk_extract_carrier_payload(
     return DOGECOIN_ZK_OK;
 }
 
-/*
- * Walk a tx's vouts looking for the canonical TX_C OP_RETURN commitment:
- *      0x6a 0x25 "DZKC" <mode-byte> <commitment32>
- * (39-byte scriptPubKey total).  Returns true on the first match and writes
- * the mode + 32-byte commit; false otherwise.  No allocation.
+/**
+ * @brief Walk a tx's vouts looking for the canonical TX_C OP_RETURN
+ * commitment (`0x6a 0x25 "DZKC" <mode-byte> <commitment32>`).
+ *
+ * Returns true on the first match and writes the mode + 32-byte commit;
+ * returns false otherwise.  Mirrors dogecoin_tx_extract_falcon512_commit
+ * (src/pqc_falcon.c) so the SPV layer can detect ZK commitments alongside
+ * Falcon/Dilithium/Raccoon ones.  No allocation.
+ *
+ * @param tx            transaction to scan
+ * @param out_mode      receives the decoded mode byte on success
+ * @param out_commit32  receives the 32-byte SHA256d commitment on success
+ *
+ * @return true if a DZKC commitment is found, false otherwise
  */
 dogecoin_bool dogecoin_tx_extract_zk_commit(
     const dogecoin_tx* tx,
@@ -386,15 +468,29 @@ dogecoin_bool dogecoin_tx_extract_zk_commit(
     return false;
 }
 
-/*
- * tx_base sighash for ZK proof binding — mirrors the PQC carrier's
- * tx_base reconstruction in src/pqc_carrier.c.  Strips OP_RETURN (nulldata)
- * outputs and outputs whose scriptPubKey exactly matches `carrier_spk`,
- * re-adds the carrier value to the first remaining output, and computes
- * dogecoin_tx_sighash32(tx_base, signer_p2pkh_spk, 0, SIGHASH_ALL).  The
- * top byte of the resulting digest is then zeroed so the value is an
- * unambiguous BN254 field element when fed into a circom circuit as the
- * `tx_binding` public input.
+/**
+ * @brief Compute the tx_base sighash for a candidate TX_C — the value the
+ * ZK prover MUST commit to as the `tx_binding` public input.
+ *
+ * Mirrors the PQC carrier's tx_base reconstruction in src/pqc_carrier.c so
+ * a ZK proof is bound to the same on-chain transaction the equivalent PQC
+ * signature would be: starting from `tx_c`, all OP_RETURN (nulldata)
+ * outputs are stripped, all outputs whose scriptPubKey equals `carrier_spk`
+ * are stripped with their values summed back into the first remaining
+ * output, and the sighash is computed via dogecoin_tx_sighash32(tx_base,
+ * signer_p2pkh_spk, vin_index=0, SIGHASH_ALL).  The top byte of the result
+ * is zeroed so the value is an unambiguous BN254 field element when fed
+ * into a circom circuit.
+ *
+ * @param tx_c              candidate TX_C transaction
+ * @param signer_p2pkh_spk  canonical P2PKH spk of the funding-input signer
+ *                          (use dogecoin_zk_extract_signer_p2pkh_spk)
+ * @param carrier_spk       P2SH spk of the ZK carrier outputs (returned by
+ *                          dogecoin_zk_build_carrier_tx_c)
+ * @param out_sighash       receives the 32-byte (top-byte-zeroed) digest
+ *
+ * @return DOGECOIN_ZK_OK on success, DOGECOIN_ZK_ERR_INVALID_ARG /
+ *         DOGECOIN_ZK_ERR_OOM / DOGECOIN_ZK_ERR_VERIFY_FAIL on failure
  */
 dogecoin_zk_err_t dogecoin_zk_compute_tx_base_sighash(
     const dogecoin_tx* tx_c,
@@ -473,11 +569,20 @@ dogecoin_zk_err_t dogecoin_zk_compute_tx_base_sighash(
     return DOGECOIN_ZK_OK;
 }
 
-/*
- * Reproduces the P2PKH scriptSig parser from
+/**
+ * @brief Extract the canonical 25-byte P2PKH scriptPubKey of the signer for
+ * input 0 of `tx`, parsing a standard `<sig> <pubkey>` P2PKH scriptSig.
+ *
+ * Reproduces the P2PKH parser used by
  * dogecoin_pqc_carrier_verify_signature_with_tx so the ZK carrier extracts
  * the *same* signer scriptPubKey as the PQC carrier when computing the
  * tx_base sighash a ZK proof is bound to.
+ *
+ * @param tx  transaction whose input 0 carries a P2PKH unlock
+ *
+ * @return a freshly-allocated cstring P2PKH scriptPubKey
+ *         (caller frees with cstr_free(..., true)), or NULL when the
+ *         scriptSig isn't a recognisable P2PKH input
  */
 cstring* dogecoin_zk_extract_signer_p2pkh_spk(const dogecoin_tx* tx)
 {

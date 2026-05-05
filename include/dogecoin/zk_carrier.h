@@ -176,6 +176,18 @@ LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_get_commitment_hash(
     uint8_t out_commitment[32]);
 
 /*
+ * Extract the canonical 25-byte P2PKH scriptPubKey of the signer for input 0
+ * of `tx`, parsing the standard `<sig> <pubkey>` P2PKH scriptSig.  Returns
+ * NULL if the scriptSig isn't a recognisable P2PKH input.  The returned
+ * cstring is allocated; caller frees with cstr_free(..., true).
+ *
+ * Mirrors the same parser used by `dogecoin_pqc_carrier_verify_signature_with_tx`
+ * so the ZK carrier and the PQC carrier agree on which P2PKH spk goes into
+ * the tx_base sighash that the proof / signature is bound to.
+ */
+LIBDOGECOIN_API cstring* dogecoin_zk_extract_signer_p2pkh_spk(const dogecoin_tx* tx);
+
+/*
  * Compute the tx_base sighash for a candidate TX_C.  This is the value the
  * ZK prover MUST commit to as the `tx_binding` public input — mirroring how
  * the PQC carrier signs over the same tx_base — so the resulting proof is
@@ -200,23 +212,22 @@ LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_get_commitment_hash(
  *
  * Returns DOGECOIN_ZK_OK on success.
  */
-/*
- * Extract the canonical 25-byte P2PKH scriptPubKey of the signer for input 0
- * of `tx`, parsing the standard `<sig> <pubkey>` P2PKH scriptSig.  Returns
- * NULL if the scriptSig isn't a recognisable P2PKH input.  The returned
- * cstring is allocated; caller frees with cstr_free(..., true).
- *
- * Mirrors the same parser used by `dogecoin_pqc_carrier_verify_signature_with_tx`
- * so the ZK carrier and the PQC carrier agree on which P2PKH spk goes into
- * the tx_base sighash that the proof / signature is bound to.
- */
-LIBDOGECOIN_API cstring* dogecoin_zk_extract_signer_p2pkh_spk(const dogecoin_tx* tx);
-
 LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_compute_tx_base_sighash(
     const dogecoin_tx* tx_c,
     const cstring* signer_p2pkh_spk,
     const cstring* carrier_spk,
     uint8_t out_sighash[32]);
+
+/*
+ * Build the canonical OP_RETURN scriptPubKey carrying a ZK commitment.
+ * Layout: `OP_RETURN <push 37> "DZKC" <mode-byte> <commitment32>`
+ * (39-byte scriptPubKey total).  Caller frees `*out_spk` with
+ * cstr_free(..., true).  Returns DOGECOIN_ZK_OK on success.
+ */
+LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_build_opreturn_scriptpubkey(
+    dogecoin_zk_mode_t mode,
+    const uint8_t commitment[32],
+    cstring** out_spk);
 
 /*
  * Parse the decimal string at index `idx` (0-based) from a snarkjs-style
@@ -236,10 +247,6 @@ LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_parse_public_input_be32(
     size_t idx,
     uint8_t out_be32[32],
     size_t* out_token_count);
-LIBDOGECOIN_API dogecoin_zk_err_t dogecoin_zk_build_opreturn_scriptpubkey(
-    dogecoin_zk_mode_t mode,
-    const uint8_t commitment[32],
-    cstring** out_spk);
 
 /*
  * Append the OP_RETURN commit output and the P2SH carrier outputs (one per

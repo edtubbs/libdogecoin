@@ -95,6 +95,25 @@ extern int groth16_verify_mcl(const char* vk_json,
                               unsigned long err_buf_max);
 #endif
 
+/**
+ * @brief Stub Groth16 prover entry point — always returns DOGECOIN_ZK_ERR_DELEGATED.
+ *
+ * libdogecoin's policy is that proving lives in the wallet/UI (snarkjs) or
+ * in a host-side rapidsnark CLI.  This entry point exists for surface-area
+ * completeness so the public header can declare the prover symmetrically
+ * with the verifier; the supported way to produce a Groth16 proof is the
+ * helper at `contrib/zk_carrier/witness_helper.py`.
+ *
+ * @param witness_json      ignored
+ * @param witness_json_len  ignored
+ * @param circuit_path      ignored
+ * @param out_proof         set to NULL on return (when non-NULL)
+ * @param out_proof_len     set to 0 on return (when non-NULL)
+ * @param out_public        set to NULL on return (when non-NULL)
+ * @param out_public_len    set to 0 on return (when non-NULL)
+ *
+ * @return DOGECOIN_ZK_ERR_DELEGATED, always
+ */
 dogecoin_zk_err_t dogecoin_zk_generate_groth16_proof(
     const uint8_t* witness_json,
     size_t witness_json_len,
@@ -115,6 +134,32 @@ dogecoin_zk_err_t dogecoin_zk_generate_groth16_proof(
     return DOGECOIN_ZK_ERR_DELEGATED;
 }
 
+/**
+ * @brief Verify a Groth16 proof against a verification key and public inputs.
+ *
+ * When libdogecoin was built with `--with-rapidsnark` (HAVE_RAPIDSNARK is
+ * defined) this calls into the upstream rapidsnark v0.0.8 verifier.  When
+ * built with `--with-mcl` it calls the herumi/mcl-backed verifier in
+ * src/zk_carrier/zk_groth16_mcl.cpp.  Otherwise it returns
+ * DOGECOIN_ZK_ERR_DELEGATED so callers can fall back to off-box verification
+ * (e.g. `snarkjs groth16 verify`).
+ *
+ * All three blobs are snarkjs-style JSON and are not assumed to be
+ * NUL-terminated; this function makes NUL-terminated copies before passing
+ * them to the underlying C ABI.
+ *
+ * @param vk_json          verification-key JSON bytes
+ * @param vk_json_len      length of `vk_json`
+ * @param public_json      `public.json` bytes (snarkjs flat decimal array)
+ * @param public_json_len  length of `public_json`
+ * @param proof_json       `proof.json` bytes
+ * @param proof_json_len   length of `proof_json`
+ *
+ * @return DOGECOIN_ZK_OK on a valid proof; DOGECOIN_ZK_ERR_VERIFY_FAIL on a
+ *         well-formed-but-invalid proof or a parse error; DOGECOIN_ZK_ERR_*
+ *         for invalid arguments / OOM; DOGECOIN_ZK_ERR_DELEGATED when no
+ *         in-process verifier was linked
+ */
 dogecoin_zk_err_t dogecoin_zk_verify_groth16(
     const uint8_t* vk_json,
     size_t vk_json_len,
@@ -199,6 +244,27 @@ dogecoin_zk_err_t dogecoin_zk_verify_groth16(
 #endif
 }
 
+/**
+ * @brief Verify any ZK reveal payload by mode, dispatching to the per-system
+ * verifier above.
+ *
+ * Decodes the payload's mode / public-inputs / proof / (optional) embedded
+ * vk slices, then forwards to dogecoin_zk_verify_groth16 (mode 0) or
+ * returns DOGECOIN_ZK_ERR_DELEGATED for mode 1 (PLONK — verified via
+ * snarkjs by the demo helpers) and DOGECOIN_ZK_ERR_NOT_IMPLEMENTED for mode
+ * 2 (STARK).  When the payload itself carries an embedded verification key
+ * (v1 layout) it is preferred over the caller-supplied `vk_blob`; the
+ * external vk is only used as a fallback for legacy v0 payloads.
+ *
+ * @param payload       ZKP1 reveal payload bytes
+ * @param payload_len   byte length of `payload`
+ * @param vk_blob       (optional) externally-supplied verification key for v0
+ * @param vk_blob_len   byte length of `vk_blob` (0 if `vk_blob` is NULL)
+ *
+ * @return DOGECOIN_ZK_OK on a valid proof; one of DOGECOIN_ZK_ERR_* on
+ *         decode / argument / verifier failure; DOGECOIN_ZK_ERR_DELEGATED
+ *         when verification is left to an off-box helper
+ */
 dogecoin_zk_err_t dogecoin_zk_verify_proof(
     const uint8_t* payload,
     size_t payload_len,

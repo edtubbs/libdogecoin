@@ -53,6 +53,14 @@ namespace {
 
 using namespace mcl::bn;
 
+/**
+ * @brief Internal helper: copy a NUL-terminated message into the caller's
+ * error buffer with truncation if needed.  No-ops on NULL inputs.
+ *
+ * @param err_buf      caller-provided buffer (may be NULL)
+ * @param err_buf_max  size of `err_buf` in bytes
+ * @param msg          NUL-terminated message to copy
+ */
 void set_err(char* err_buf, unsigned long err_buf_max, const char* msg) {
     if (!err_buf || err_buf_max == 0 || !msg) return;
     size_t n = std::strlen(msg);
@@ -61,7 +69,20 @@ void set_err(char* err_buf, unsigned long err_buf_max, const char* msg) {
     err_buf[n] = '\0';
 }
 
-/* Find the [...] block that follows `"key"`, return its [lo, hi) range. */
+/**
+ * @brief Find the [...] block that follows `"key"` in a JSON-ish string.
+ *
+ * Used to locate the per-field arrays inside a snarkjs verification key /
+ * proof / public-inputs blob without pulling in a full JSON parser.
+ *
+ * @param s       the JSON string to search
+ * @param key     the key whose value-array to locate (no quotes)
+ * @param out_lo  receives the offset of the leading '['
+ * @param out_hi  receives the offset just past the matching ']'
+ *
+ * @return true on success; false when the key is missing or the brackets
+ *         are unbalanced
+ */
 bool find_value_array(const std::string& s, const char* key, size_t& out_lo, size_t& out_hi) {
     std::string needle = std::string("\"") + key + "\"";
     size_t p = s.find(needle);
@@ -78,7 +99,19 @@ bool find_value_array(const std::string& s, const char* key, size_t& out_lo, siz
     return false;
 }
 
-/* Collect every "<digits>" token between [lo, hi) into a flat vector. */
+/**
+ * @brief Collect every `"<digits>"` token between [lo, hi) into a flat vector.
+ *
+ * snarkjs verification keys and proofs encode field elements as
+ * NUL-quoted decimal strings; this skims those tokens out of the
+ * value-array slice produced by find_value_array().
+ *
+ * @param s   the JSON string
+ * @param lo  inclusive lower bound (typically the leading '[')
+ * @param hi  exclusive upper bound (typically just past the matching ']')
+ *
+ * @return a vector of decimal-only string tokens, in source order
+ */
 std::vector<std::string> extract_decimal_strings(const std::string& s, size_t lo, size_t hi) {
     std::vector<std::string> out;
     size_t i = lo;
@@ -96,6 +129,17 @@ std::vector<std::string> extract_decimal_strings(const std::string& s, size_t lo
     return out;
 }
 
+/**
+ * @brief Build an mcl::bn::G1 point from decimal x/y coordinates.
+ *
+ * Wraps mcl's affine-non-zero serialization (`"1 <x> <y>"`) so the
+ * extractor in groth16_verify_mcl can stay focused on JSON parsing.
+ *
+ * @param x_dec  affine x-coordinate as decimal string
+ * @param y_dec  affine y-coordinate as decimal string
+ *
+ * @return the constructed G1 point
+ */
 G1 make_g1(const std::string& x_dec, const std::string& y_dec) {
     G1 P;
     /* mcl decimal serialization: "<flag> <x> <y>" with flag=1 = affine non-zero */
@@ -104,6 +148,19 @@ G1 make_g1(const std::string& x_dec, const std::string& y_dec) {
     return P;
 }
 
+/**
+ * @brief Build an mcl::bn::G2 point from a quadratic-extension affine pair.
+ *
+ * Wraps mcl's affine-non-zero serialization
+ * (`"1 <x0> <x1> <y0> <y1>"`) for the BN_SNARK1 G2 group.
+ *
+ * @param x0  real part of the affine x-coordinate
+ * @param x1  imag part of the affine x-coordinate
+ * @param y0  real part of the affine y-coordinate
+ * @param y1  imag part of the affine y-coordinate
+ *
+ * @return the constructed G2 point
+ */
 G2 make_g2(const std::string& x0, const std::string& x1,
            const std::string& y0, const std::string& y1) {
     G2 P;
@@ -114,14 +171,39 @@ G2 make_g2(const std::string& x0, const std::string& x1,
 
 bool g_pairing_initialised = false;
 
+/**
+ * @brief Initialise mcl's pairing tables for BN_SNARK1 (BN254) on first use.
+ *
+ * Idempotent — guarded by a static flag so repeated calls are cheap and
+ * thread-safe within the Phase-1 single-thread verifier path.
+ */
 void ensure_pairing_initialised() {
     if (g_pairing_initialised) return;
     initPairing(mcl::BN_SNARK1);
     g_pairing_initialised = true;
 }
 
-} // anonymous namespace
+} /* anonymous namespace */
 
+/**
+ * @brief Verify a Groth16 (BN_SNARK1) proof using the herumi/mcl pairing engine.
+ *
+ * snarkjs-style C ABI counterpart to the upstream rapidsnark `groth16_verify`
+ * — see depends/packages/mcl.mk.  All three input blobs MUST be NUL-terminated
+ * JSON; the libdogecoin wrapper in dogecoin_zk_verify_groth16 takes care of
+ * copying caller-supplied byte slices into NUL-terminated buffers.  Returns
+ * 0 on a valid proof, 1 on a well-formed-but-invalid proof, 2/3/4 on
+ * argument / parse / unexpected-exception errors (with a short non-sensitive
+ * diagnostic written to `err_buf`).
+ *
+ * @param vk_json      NUL-terminated verification-key JSON
+ * @param public_json  NUL-terminated public-inputs JSON
+ * @param proof_json   NUL-terminated proof JSON
+ * @param err_buf      caller-provided buffer for a short diagnostic (may be NULL)
+ * @param err_buf_max  size of `err_buf` in bytes (0 if `err_buf` is NULL)
+ *
+ * @return 0 on a valid proof, 1 on an invalid proof, 2/3/4 on input/parse/exception failure
+ */
 extern "C" int groth16_verify_mcl(const char* vk_json,
                                   const char* public_json,
                                   const char* proof_json,

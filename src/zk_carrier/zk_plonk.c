@@ -40,6 +40,25 @@
 
 #include <dogecoin/zk_carrier.h>
 
+/**
+ * @brief Stub PLONK prover entry point — always returns DOGECOIN_ZK_ERR_DELEGATED.
+ *
+ * Mirrors dogecoin_zk_generate_groth16_proof: libdogecoin reserves the
+ * symbol so the public API can declare both proof systems symmetrically,
+ * but proving lives in the wallet/UI (snarkjs) — see
+ * contrib/zk_carrier/witness_helper.py and the demo scripts under
+ * contrib/zk_carrier/scripts/.
+ *
+ * @param witness_json      ignored
+ * @param witness_json_len  ignored
+ * @param circuit_path      ignored
+ * @param out_proof         set to NULL on return (when non-NULL)
+ * @param out_proof_len     set to 0 on return (when non-NULL)
+ * @param out_public        set to NULL on return (when non-NULL)
+ * @param out_public_len    set to 0 on return (when non-NULL)
+ *
+ * @return DOGECOIN_ZK_ERR_DELEGATED, always
+ */
 dogecoin_zk_err_t dogecoin_zk_generate_plonk_proof(
     const uint8_t* witness_json,
     size_t witness_json_len,

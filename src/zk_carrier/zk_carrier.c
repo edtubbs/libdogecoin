@@ -50,6 +50,16 @@
 #include <dogecoin/sha2.h>
 #include <dogecoin/zk_carrier.h>
 
+/**
+ * @brief Convert a dogecoin_zk_err_t code to a short human-readable string.
+ *
+ * Mirrors the strerror-style helpers used elsewhere in libdogecoin (e.g.
+ * dogecoin_pqc_strerror) so callers can log a single line on failure.
+ *
+ * @param err the error code returned by any dogecoin_zk_* entry point
+ *
+ * @return a NUL-terminated string literal — never NULL, never freed
+ */
 const char* dogecoin_zk_strerror(dogecoin_zk_err_t err)
 {
     switch (err) {
@@ -66,6 +76,17 @@ const char* dogecoin_zk_strerror(dogecoin_zk_err_t err)
     return "unknown ZK carrier error";
 }
 
+/**
+ * @brief Internal helper: is `mode` one of the known dogecoin_zk_mode_t values?
+ *
+ * Used by both the encoder and decoder to gate the mode byte before any
+ * downstream logic so untrusted on-chain bytes can't reach mode-specific
+ * code paths.
+ *
+ * @param mode the candidate mode byte cast to dogecoin_zk_mode_t
+ *
+ * @return true if `mode` is one of GROTH16/PLONK/STARK_S2, false otherwise
+ */
 static dogecoin_bool zk_mode_is_known(dogecoin_zk_mode_t mode)
 {
     switch (mode) {
@@ -77,6 +98,31 @@ static dogecoin_bool zk_mode_is_known(dogecoin_zk_mode_t mode)
     return false;
 }
 
+/**
+ * @brief Encode a proof + public inputs (and optional verification key)
+ * into the canonical ZKP1 carrier payload.
+ *
+ * When `vk_bytes` is NULL or `vk_len` is zero the encoder emits a v0 (no-vk)
+ * payload; otherwise it emits a v1 payload with the vk bytes appended after
+ * the proof so the reveal is fully self-contained for on-chain validation.
+ * All length fields are written big-endian to match the on-wire ZKP1
+ * specification.
+ *
+ * @param mode              one of DOGECOIN_ZK_MODE_GROTH16/PLONK/STARK_S2
+ * @param circuit_id        application-level circuit identifier (BE32)
+ * @param public_inputs     pointer to the snarkjs-style public-inputs blob
+ * @param public_inputs_len length of `public_inputs` (must fit in 16 bits)
+ * @param proof             pointer to the proof bytes
+ * @param proof_len         length of `proof` (capped at 32 MiB)
+ * @param vk_bytes          optional verification-key bytes (NULL → v0)
+ * @param vk_len            length of `vk_bytes`
+ * @param out_payload       receives a freshly-allocated ZKP1 buffer
+ *                          (caller frees with dogecoin_free())
+ * @param out_payload_len   receives the byte length of *out_payload
+ *
+ * @return DOGECOIN_ZK_OK on success, or one of DOGECOIN_ZK_ERR_INVALID_ARG /
+ *         DOGECOIN_ZK_ERR_BAD_MODE / DOGECOIN_ZK_ERR_OOM on failure
+ */
 dogecoin_zk_err_t dogecoin_zk_encode_payload(
     dogecoin_zk_mode_t mode,
     uint32_t circuit_id,
@@ -154,6 +200,31 @@ dogecoin_zk_err_t dogecoin_zk_encode_payload(
     return DOGECOIN_ZK_OK;
 }
 
+/**
+ * @brief Decode a ZKP1 carrier payload back into its constituent fields.
+ *
+ * All `out_*` pointers alias into the input buffer (no allocation).  The
+ * caller must keep `payload` alive while using the decoded fields.  When the
+ * payload is v0 (no embedded vk) `*out_vk` is set to NULL and `*out_vk_len`
+ * to 0.  When the payload is v1, `*out_vk` aliases the embedded vk bytes.
+ * Pass NULL for `out_vk` / `out_vk_len` if the caller does not care about
+ * the vk slot (legacy callers).
+ *
+ * @param payload                pointer to the ZKP1 buffer
+ * @param payload_len            byte length of `payload`
+ * @param out_mode               receives the decoded mode
+ * @param out_circuit_id         receives the decoded BE32 circuit id
+ * @param out_public_inputs      receives a pointer aliasing the public bytes
+ * @param out_public_inputs_len  receives the public-inputs length
+ * @param out_proof              receives a pointer aliasing the proof bytes
+ * @param out_proof_len          receives the proof length
+ * @param out_vk                 (optional) receives a pointer aliasing the vk
+ * @param out_vk_len             (optional) receives the vk length
+ *
+ * @return DOGECOIN_ZK_OK on success, or one of DOGECOIN_ZK_ERR_INVALID_ARG /
+ *         DOGECOIN_ZK_ERR_BAD_MAGIC / DOGECOIN_ZK_ERR_BAD_MODE /
+ *         DOGECOIN_ZK_ERR_TRUNCATED on failure
+ */
 dogecoin_zk_err_t dogecoin_zk_decode_payload(
     const uint8_t* payload,
     size_t payload_len,
@@ -236,6 +307,20 @@ dogecoin_zk_err_t dogecoin_zk_decode_payload(
     return DOGECOIN_ZK_OK;
 }
 
+/**
+ * @brief Compute the TX_C commitment value: SHA256d(payload).
+ *
+ * This is the 32-byte digest the ZK carrier embeds in the OP_RETURN of TX_C.
+ * Reveal-side validators recompute this from the reassembled payload bytes
+ * and compare against the on-chain commit32 to prove the reveal binds to the
+ * commit.
+ *
+ * @param payload         pointer to the ZKP1 carrier payload
+ * @param payload_len     byte length of `payload` (must be > 0)
+ * @param out_commitment  receives the 32-byte SHA256d digest
+ *
+ * @return DOGECOIN_ZK_OK on success, DOGECOIN_ZK_ERR_INVALID_ARG on bad args
+ */
 dogecoin_zk_err_t dogecoin_zk_get_commitment_hash(
     const uint8_t* payload,
     size_t payload_len,
@@ -248,6 +333,20 @@ dogecoin_zk_err_t dogecoin_zk_get_commitment_hash(
     return DOGECOIN_ZK_OK;
 }
 
+/**
+ * @brief Build the OP_RETURN scriptPubKey carrying the ZK commitment.
+ *
+ * Layout: `OP_RETURN <push 37> "DZKC" <mode-byte> <commitment32>`.  The
+ * resulting scriptPubKey is exactly 39 bytes and is unspendable, so it does
+ * not consume a UTXO.  Caller frees `*out_spk` with cstr_free(..., true).
+ *
+ * @param mode        the ZK mode byte (matches what the encoder wrote)
+ * @param commitment  the 32-byte SHA256d(payload) digest
+ * @param out_spk     receives a freshly-allocated cstring scriptPubKey
+ *
+ * @return DOGECOIN_ZK_OK on success, DOGECOIN_ZK_ERR_INVALID_ARG /
+ *         DOGECOIN_ZK_ERR_BAD_MODE / DOGECOIN_ZK_ERR_OOM on failure
+ */
 dogecoin_zk_err_t dogecoin_zk_build_opreturn_scriptpubkey(
     dogecoin_zk_mode_t mode,
     const uint8_t commitment[32],
@@ -278,13 +377,25 @@ dogecoin_zk_err_t dogecoin_zk_build_opreturn_scriptpubkey(
     return DOGECOIN_ZK_OK;
 }
 
-/*
- * Parse the decimal string at index `idx` of a snarkjs public-inputs JSON
- * array (`["...","..."]`) into a 32-byte big-endian field element.  The
- * SPV reveal validator uses this to recover the canonical `tx_binding`
- * value embedded in the third public input and compare it against the
- * tx_base sighash recomputed locally.  See the BIP, §"Phase 1: Base
- * Transaction Binding".
+/**
+ * @brief Parse one decimal token of a snarkjs public-inputs JSON array into
+ * a 32-byte big-endian field element.
+ *
+ * The SPV reveal validator uses this to recover the canonical `tx_binding`
+ * value embedded in the third public input (Phase-1 reveal layout) and
+ * compare it against the tx_base sighash recomputed locally — see the BIP,
+ * §"Phase 1: Base Transaction Binding".  No nested objects are expected;
+ * snarkjs `public.json` is a flat array of decimal strings.
+ *
+ * @param public_inputs      the JSON-array bytes (e.g. `["0","1","1234..."]`)
+ * @param public_inputs_len  length of `public_inputs`
+ * @param idx                0-based index of the token to extract
+ * @param out_be32           receives the 32-byte big-endian value
+ * @param out_token_count    (optional) receives the total token count seen
+ *
+ * @return DOGECOIN_ZK_OK on success; DOGECOIN_ZK_ERR_INVALID_ARG when the
+ *         array contains fewer than `idx+1` tokens, when a non-decimal
+ *         digit is encountered, or when the value would overflow 32 bytes
  */
 dogecoin_zk_err_t dogecoin_zk_parse_public_input_be32(
     const uint8_t* public_inputs,
