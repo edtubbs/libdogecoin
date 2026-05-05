@@ -99,7 +99,29 @@ IF(WITH_NET)
         find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         FIND_LIBRARY(LIBEVENT NAMES event event_core event_extras event_pthreads HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
         IF(USE_TSS2)
-            FIND_LIBRARY(LIBTSS2 tss2-esys REQUIRED)
+            # Prefer pkg-config (handles transitive deps and version checking),
+            # but fall back to a plain library lookup so builds work even when
+            # pkg-config metadata for tss2-esys is missing.
+            FIND_PACKAGE(PkgConfig QUIET)
+            IF(PkgConfig_FOUND)
+                PKG_CHECK_MODULES(TSS2_ESYS QUIET tss2-esys>=2.4.0)
+            ENDIF()
+            IF(TSS2_ESYS_FOUND)
+                SET(LIBTSS2 ${TSS2_ESYS_LIBRARIES})
+                INCLUDE_DIRECTORIES(${TSS2_ESYS_INCLUDE_DIRS})
+            ELSE()
+                FIND_LIBRARY(LIBTSS2 tss2-esys)
+                IF(NOT LIBTSS2)
+                    MESSAGE(FATAL_ERROR
+                        "USE_TSS2 requested but libtss2-esys was not found. "
+                        "Install libtss2-dev (>= 2.4.0) or disable USE_TSS2.")
+                ENDIF()
+            ENDIF()
+            FIND_PATH(TSS2_ESYS_HEADER tss2/tss2_esys.h)
+            IF(NOT TSS2_ESYS_HEADER)
+                MESSAGE(FATAL_ERROR
+                    "tss2/tss2_esys.h not found; install libtss2-dev.")
+            ENDIF()
             FIND_LIBRARY(LIBUNISTRING unistring REQUIRED)
         ENDIF()
     ENDIF()

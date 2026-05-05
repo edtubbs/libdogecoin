@@ -323,7 +323,21 @@ if test "x$use_liboqs" = xyes; then
 fi
 
 if test "x$with_tss2" = xyes; then
-  AC_CHECK_LIB([tss2-esys],[main],LIBTSS2=-ltss2-esys,AC_MSG_ERROR(libtss2 missing))
+  # Prefer pkg-config (handles dependency libs and version), fall back to a
+  # plain library check. Require the public Esys header so a misconfigured
+  # libtss2-dev install fails loudly at configure time rather than at link.
+  m4_ifdef([PKG_CHECK_MODULES], [
+    PKG_CHECK_MODULES([TSS2_ESYS], [tss2-esys >= 2.4.0],
+      [LIBTSS2="$TSS2_ESYS_LIBS"
+       CFLAGS="$CFLAGS $TSS2_ESYS_CFLAGS"],
+      [AC_CHECK_LIB([tss2-esys],[Esys_Initialize],[LIBTSS2=-ltss2-esys],
+        [AC_MSG_ERROR([libtss2-esys missing or too old (need >= 2.4.0); install libtss2-dev])])])
+  ], [
+    AC_CHECK_LIB([tss2-esys],[Esys_Initialize],[LIBTSS2=-ltss2-esys],
+      [AC_MSG_ERROR([libtss2-esys missing; install libtss2-dev])])
+  ])
+  AC_CHECK_HEADER([tss2/tss2_esys.h], [],
+    [AC_MSG_ERROR([tss2/tss2_esys.h missing; install libtss2-dev])])
   LIBS="$LIBS $LIBTSS2"
   AC_DEFINE(USE_TSS2, 1, [Define this symbol if libtss2 works])
 fi

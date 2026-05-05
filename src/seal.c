@@ -60,6 +60,7 @@
 #endif
 
 #if defined (__linux__) && defined (USE_TSS2)
+#include <stdarg.h>
 #include <unistd.h>
 #include <wchar.h>
 #include <tss2/tss2_esys.h>
@@ -217,6 +218,29 @@ static TPM2_HANDLE linux_tpm_persistent_handle(const char* filename_prefix, int 
         return 0;
     }
     return (TPM2_HANDLE)(base | (uint32_t)file_num);
+}
+
+// Common TSS2 cleanup helper: frees a NULL-terminated list of Esys-allocated
+// pointers (Esys_Free) and finalizes the ESYS context. Both `ctx` and any
+// pointer in the list may be NULL. Always pass a trailing NULL sentinel.
+//
+// Example:
+//   tpm_cleanup(&context, outPublic, creationData, NULL);
+static void tpm_cleanup(ESYS_CONTEXT** ctx, ...)
+{
+    va_list ap;
+    va_start(ap, ctx);
+    for (;;) {
+        void* p = va_arg(ap, void*);
+        if (p == NULL) {
+            break;
+        }
+        Esys_Free(p);
+    }
+    va_end(ap);
+    if (ctx && *ctx) {
+        Esys_Finalize(ctx);
+    }
 }
 
 // Encrypt a blob with a per-slot RSA wrapping key persisted in the TPM via
@@ -1338,13 +1362,12 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin
                             32,
                             &random_bytes);
     if (result != TSS2_RC_SUCCESS || random_bytes == NULL || random_bytes->size != 32) {
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, random_bytes, NULL);
         return false;
     }
 
     dogecoin_hdnode_from_seed((uint8_t*)random_bytes->buffer, 32, out);
-    Esys_Free(random_bytes);
-    Esys_Finalize(&context);
+    tpm_cleanup(&context, random_bytes, NULL);
     return linux_tpm_encrypt_blob((const uint8_t*)out, sizeof(dogecoin_hdnode), file_num, overwrite, "encrypted_hdnode", "Enter password for HD node encryption: ");
 
 #elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
@@ -2185,7 +2208,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
                             32,
                             &random_bytes);
     if (result != TSS2_RC_SUCCESS || random_bytes == NULL || random_bytes->size != 32) {
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, random_bytes, NULL);
         return false;
     }
 
@@ -2193,8 +2216,7 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
     size_t mnemonicSize = 0;
     int mnemonicResult = dogecoin_generate_mnemonic("256", lang, space, (const char*)rand_hex, words, NULL, &mnemonicSize, mnemonic);
     utils_clear_buffers();
-    Esys_Free(random_bytes);
-    Esys_Finalize(&context);
+    tpm_cleanup(&context, random_bytes, NULL);
     if (mnemonicResult == -1) {
         return false;
     }
@@ -3036,7 +3058,12 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
                                         TPM2_CAP_HANDLES, start,
                                         TPM2_MAX_CAP_HANDLES, &more, &cap);
         if (rc != TSS2_RC_SUCCESS || cap == NULL) {
-            Esys_Finalize(&context);
+            for (size_t i = 0; i < *count; i++) {
+                free(names[i]);
+                names[i] = NULL;
+            }
+            *count = 0;
+            tpm_cleanup(&context, cap, NULL);
             return false;
         }
 
@@ -3063,8 +3090,12 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
             }
             names[*count] = malloc(buflen * sizeof(wchar_t));
             if (names[*count] == NULL) {
-                Esys_Free(cap);
-                Esys_Finalize(&context);
+                for (size_t j = 0; j < *count; j++) {
+                    free(names[j]);
+                    names[j] = NULL;
+                }
+                *count = 0;
+                tpm_cleanup(&context, cap, NULL);
                 return false;
             }
             swprintf(names[*count], buflen, fmt, slot);
