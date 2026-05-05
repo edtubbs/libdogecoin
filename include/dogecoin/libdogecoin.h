@@ -78,8 +78,12 @@ typedef struct dogecoin_context_ {
     int enable_net;
     int error_code;
     uint32_t refcount;
+    int thread_safe; /* nonzero when constructed via dogecoin_ctx_new_ts() */
     char last_error[256];
 } dogecoin_context;
+
+/* Short-form alias type used by the _ts API surface. */
+typedef dogecoin_context dogecoin_ctx;
 
 extern const dogecoin_chainparams dogecoin_chainparams_main;
 extern const dogecoin_chainparams dogecoin_chainparams_test;
@@ -104,6 +108,19 @@ void dogecoin_context_set_error(dogecoin_context* ctx, int code, const char* msg
 int dogecoin_context_get_error_code(const dogecoin_context* ctx);
 const char* dogecoin_context_get_error(const dogecoin_context* ctx);
 int dogecoin_generate_keypair_ex(dogecoin_context* ctx, char* wif, size_t* wif_size, char* addr, size_t* addr_size);
+
+/* THREAD-SAFE short-form aliases for the dogecoin_context API.
+ * dogecoin_ctx_new() returns a context whose refcount is guarded by a
+ * process-wide mutex; dogecoin_ctx_new_ts() additionally tags the context
+ * as thread-safe so dependent subsystems (wallet / tx / spv helpers) can
+ * select per-object locking when wired through the context. The non-_ts
+ * constructor remains thread-compatible: any single owning thread may use
+ * it, and reference counting is always atomic. */
+dogecoin_ctx* dogecoin_ctx_new(dogecoin_bool testnet, dogecoin_bool enable_net);
+dogecoin_ctx* dogecoin_ctx_new_ts(dogecoin_bool testnet, dogecoin_bool enable_net);
+void dogecoin_ctx_acquire(dogecoin_ctx* ctx);
+void dogecoin_ctx_release(dogecoin_ctx* ctx);
+int dogecoin_ctx_is_thread_safe(const dogecoin_ctx* ctx);
 
 /* basic address functions: return 1 if succesful
    ----------------------------------------------

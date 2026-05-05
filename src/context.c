@@ -235,3 +235,41 @@ int dogecoin_generate_keypair_ex(dogecoin_context* ctx, char* wif, size_t* wif_s
     *addr_size = addr_need;
     return true;
 }
+
+/* ---------------------------------------------------------------------------
+ * Short-form alias API: dogecoin_ctx_*
+ *
+ * These are thin aliases over dogecoin_context_* that match the API surface
+ * documented in doc/thread_safety.md. dogecoin_ctx_new_ts() additionally
+ * marks the context as thread-safe so dependent subsystems can opt into
+ * per-object locking when wired through the context.
+ * --------------------------------------------------------------------------- */
+
+dogecoin_ctx* dogecoin_ctx_new(dogecoin_bool testnet, dogecoin_bool enable_net)
+{
+    dogecoin_ctx* ctx = dogecoin_context_new(testnet, enable_net);
+    if (ctx) ctx->thread_safe = 0;
+    return ctx;
+}
+
+dogecoin_ctx* dogecoin_ctx_new_ts(dogecoin_bool testnet, dogecoin_bool enable_net)
+{
+    dogecoin_ctx* ctx = dogecoin_context_new(testnet, enable_net);
+    if (ctx) ctx->thread_safe = 1;
+    return ctx;
+}
+
+void dogecoin_ctx_acquire(dogecoin_ctx* ctx)
+{
+    dogecoin_context_acquire(ctx);
+}
+
+void dogecoin_ctx_release(dogecoin_ctx* ctx)
+{
+    dogecoin_context_release(ctx);
+}
+
+int dogecoin_ctx_is_thread_safe(const dogecoin_ctx* ctx)
+{
+    return ctx ? ctx->thread_safe : 0;
+}

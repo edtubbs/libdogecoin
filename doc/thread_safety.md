@@ -100,8 +100,12 @@ ring only addresses innocuous gap-fill caused by concurrent peers.
 
 ### Safe to call from multiple threads
 
-* `dogecoin_ctx_acquire` / `dogecoin_ctx_release` — context refcount is
-  guarded by a process-wide mutex (`src/context.c`).
+* `dogecoin_ctx_new` / `dogecoin_ctx_new_ts` / `dogecoin_ctx_acquire` /
+  `dogecoin_ctx_release` — short-form aliases over `dogecoin_context_*`. The
+  refcount is guarded by a process-wide mutex (`src/context.c`).
+  `dogecoin_ctx_new_ts()` additionally tags the context as thread-safe so
+  dependent subsystems can branch on `dogecoin_ctx_is_thread_safe(ctx)` to
+  select per-object locking when needed.
 * `dogecoin_headersdb_*` read APIs (`find`, `getchaintip`,
   `fill_blocklocator_tip`) on a DB owned by one writer — the DB itself is
   single-writer; concurrent reads from other threads are safe only while
@@ -159,3 +163,79 @@ Chaintip at height ...
 
 An example capture is kept under
 `doc/verification/spvnode_ts_phase2_thread_safe_sample.txt`.
+
+## Code examples
+
+### Single-threaded (legacy) usage
+
+```c
+#include <dogecoin/libdogecoin.h>
+
+dogecoin_context* ctx = dogecoin_context_new(false, false);
+if (!ctx) { /* handle error */ }
+char wif[PRIVKEYWIFLEN]  = {0};
+char addr[P2PKHLEN]      = {0};
+size_t wif_n = sizeof(wif), addr_n = sizeof(addr);
+dogecoin_generate_keypair_ex(ctx, wif, &wif_n, addr, &addr_n);
+dogecoin_context_release(ctx);
+```
+
+### Multi-threaded (`_ts`) usage
+
+```c
+#include <dogecoin/libdogecoin.h>
+
+/* One context shared between threads. The refcount is atomic; per-object
+ * subsystems can be added under the same TS umbrella as they grow _ts
+ * variants. */
+dogecoin_ctx* ctx = dogecoin_ctx_new_ts(false, false);
+
+/* Each thread acquires before use and releases when it is done. */
+dogecoin_ctx_acquire(ctx);
+/* ... do work, e.g. call dogecoin_generate_keypair_ex(ctx, ...) ... */
+dogecoin_ctx_release(ctx);
+
+/* Final release frees the context. */
+dogecoin_ctx_release(ctx);
+```
+
+`dogecoin_ctx_new_ts()` returns the same `dogecoin_context` type as
+`dogecoin_context_new()`; the only behavioural difference today is the
+`thread_safe` flag, which dependent subsystems can branch on as their `_ts`
+variants land. The non-`_ts` constructor remains thread-compatible (any
+single owning thread may use it) and the refcount itself is always atomic.
+
+## Roadmap for `_ts` API surface
+
+The following modules currently require single-thread ownership; their
+`_ts` variants are tracked here and will be added in subsequent passes:
+
+* Wallet (`dogecoin_wallet_*`) — needs a per-wallet mutex; the rbtree /
+  vec_wtxes ownership invariants documented in `src/wallet.c` must be
+  preserved.
+* Transaction builder (`dogecoin_tx_*`) — most operations are pure
+  functions over an owned `dogecoin_tx*`; the `_ts` variants would add
+  per-object locking only where input/output vectors are mutated.
+* HD derivation (`dogecoin_hdnode_*`) — derivation is functional; the
+  `_ts` variants would protect cached child key tables when those exist.
+
+Until those land, callers that need to mix wallet/tx work with the SPV
+client should keep each non-TS object on a single owning thread.
+
+## Verifying with sanitizers
+
+Recommended local invocations once the full `_ts` surface lands:
+
+```sh
+# ThreadSanitizer build (autotools)
+CFLAGS="-fsanitize=thread -O1 -g" \
+LDFLAGS="-fsanitize=thread" \
+./configure --with-net --with-tools --enable-test-passwd
+make -j$(nproc)
+LIBDOGECOIN_TEST_PASSWD=testpass ./test/tests
+```
+
+```sh
+# Valgrind (helgrind) for lock-order auditing
+valgrind --tool=helgrind ./tests
+```
