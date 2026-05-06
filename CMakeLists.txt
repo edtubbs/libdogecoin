@@ -99,6 +99,7 @@ IF(WITH_NET)
         find_path(LIBEVENT_INCLUDE_DIR event-config.h PATHS "${PROJECT_SOURCE_DIR}/include/event2" REQUIRED)
         FIND_LIBRARY(LIBEVENT NAMES event event_core event_extras event_pthreads HINTS "${PROJECT_SOURCE_DIR}/src/libevent/build/lib/${CMAKE_BUILD_TYPE}" REQUIRED)
         IF(USE_TSS2)
+            # Minimum recommended libtss2-esys version: 2.4.0
             # Prefer pkg-config (handles transitive deps and version checking),
             # but fall back to a plain library lookup so builds work even when
             # pkg-config metadata for tss2-esys is missing.

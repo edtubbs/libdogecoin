@@ -12,6 +12,7 @@
 #include <dogecoin/sha2.h>
 #include <dogecoin/seal.h>
 #include <dogecoin/utils.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -112,6 +113,22 @@ void test_tpm()
     u_assert_true (dogecoin_decrypt_seed_with_tpm (decrypted_seed, TEST_FILE));
     debug_print ("Decrypted seed: %s\n", utils_uint8_to_hex (decrypted_seed, sizeof (SEED)));
     u_assert_mem_eq (seed, decrypted_seed, sizeof (SEED));
+
+    // Exercise an explicit TPM error path: bad persistent handle in blob.
+    {
+        const int bad_slot = TEST_FILE - 1;
+        char bad_filename[64] = {0};
+        TPM2_HANDLE bad_handle = 0;
+        uint8_t bad_ciphertext[8] = {0xAA, 0x55, 0xCC, 0x33, 0x0F, 0xF0, 0x5A, 0xA5};
+        snprintf(bad_filename, sizeof(bad_filename), "encrypted_seed_%d", bad_slot);
+        FILE* bad_fp = fopen(bad_filename, "wb");
+        u_assert_true(bad_fp != NULL);
+        u_assert_int_eq((int)fwrite(&bad_handle, 1, sizeof(bad_handle), bad_fp), (int)sizeof(bad_handle));
+        u_assert_int_eq((int)fwrite(bad_ciphertext, 1, sizeof(bad_ciphertext), bad_fp), (int)sizeof(bad_ciphertext));
+        fclose(bad_fp);
+        u_assert_false(dogecoin_decrypt_seed_with_tpm(decrypted_seed, bad_slot));
+        remove(bad_filename);
+    }
 
     if (tpm_has_room_for_multi) {
     // Generate and decrypt an HD node with the TPM2

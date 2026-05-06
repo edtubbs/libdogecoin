@@ -17,6 +17,8 @@ Install the userspace TSS2 stack and a TPM (real hardware or an emulator):
 ```sh
 # Build dependencies
 sudo apt-get install -y libtss2-dev pkg-config
+# Some distros package Esys headers/libs as:
+#   libtss2-esys-dev
 
 # For local testing without real hardware
 sudo apt-get install -y swtpm tpm2-tools
@@ -32,8 +34,9 @@ make -j$(nproc)
 
 Both autotools and CMake prefer `pkg-config` (`tss2-esys >= 2.4.0`) and fall
 back to a plain library lookup. They additionally verify the
-`tss2/tss2_esys.h` header is present, so a misconfigured `libtss2-dev`
-install fails at configure time rather than at link time.
+`tss2/tss2_esys.h` header is present, so a misconfigured
+`libtss2-dev`/`libtss2-esys-dev` install fails at configure time rather than
+at link time.
 
 ## Testing with the swtpm emulator
 

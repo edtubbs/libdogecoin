@@ -323,6 +323,7 @@ if test "x$use_liboqs" = xyes; then
 fi
 
 if test "x$with_tss2" = xyes; then
+  # Minimum recommended libtss2-esys version: 2.4.0
   # Prefer pkg-config (handles dependency libs and version), fall back to a
   # plain library check. Require the public Esys header so a misconfigured
   # libtss2-dev install fails loudly at configure time rather than at link.
