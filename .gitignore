@@ -170,3 +170,5 @@ store/*
 spvbench_out/
 build-ctx/
 build-ci-fix/
+build-local/
+build-winfix/
