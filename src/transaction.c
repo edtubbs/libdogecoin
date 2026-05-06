@@ -243,6 +243,7 @@ int dogecoin_tx_add_output_ts(dogecoin_tx* tx, const dogecoin_tx_out* tx_out)
 /* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
 int dogecoin_tx_sign_ts(dogecoin_tx* tx, dogecoin_wallet* wallet, const char* passphrase)
 {
+    /* Reserved for future encrypted-wallet integration. */
     (void)passphrase;
     if (!tx || !wallet || !wallet->masterkey || !dogecoin_hdnode_has_privkey(wallet->masterkey)) return false;
     if (tx->thread_safe) dogecoin_mutex_lock(&tx->lock);

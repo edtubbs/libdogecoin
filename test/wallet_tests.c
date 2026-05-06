@@ -29,8 +29,6 @@ static const char *wallettmpfile = "/tmp/dummy";
 #include <dogecoin/script.h>
 #define is_spent(x) (((dogecoin_utxo*)x)->spendable == false)
 
-dogecoin_ctx* dogecoin_ctx_new_ts(dogecoin_bool testnet, dogecoin_bool enable_net);
-void dogecoin_ctx_release(dogecoin_ctx* ctx);
 
 /* this are the tx_valid test vectors from Bitcoin Core 0.15, run through Bitcoin Core's SignatureHash function */
 static const char * wallet_txns[] = {

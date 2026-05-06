@@ -182,6 +182,12 @@ typedef uint8_t SEED[MAX_SEED_SIZE];
 
 static const int WIDTH = 0x0000100/32;
 
+LIBDOGECOIN_API dogecoin_ctx* dogecoin_ctx_new(dogecoin_bool testnet, dogecoin_bool enable_net);
+LIBDOGECOIN_API dogecoin_ctx* dogecoin_ctx_new_ts(dogecoin_bool testnet, dogecoin_bool enable_net);
+LIBDOGECOIN_API void dogecoin_ctx_acquire(dogecoin_ctx* ctx);
+LIBDOGECOIN_API void dogecoin_ctx_release(dogecoin_ctx* ctx);
+LIBDOGECOIN_API int dogecoin_ctx_is_thread_safe(const dogecoin_ctx* ctx);
+
 static inline dogecoin_bool dogecoin_mutex_init(dogecoin_mutex_t* mutex)
 {
     if (!mutex) return false;

@@ -21,8 +21,6 @@
 #include <dogecoin/utils.h>
 #include <dogecoin/wallet.h>
 
-dogecoin_ctx* dogecoin_ctx_new_ts(dogecoin_bool testnet, dogecoin_bool enable_net);
-void dogecoin_ctx_release(dogecoin_ctx* ctx);
 
 void test_transaction()
 {

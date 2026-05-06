@@ -48,8 +48,6 @@
 #include <dogecoin/seal.h>
 
 const dogecoin_chainparams* dogecoin_context_get_chainparams(const struct dogecoin_context_* ctx);
-void dogecoin_ctx_acquire(dogecoin_ctx* ctx);
-void dogecoin_ctx_release(dogecoin_ctx* ctx);
 
 #define COINBASE_MATURITY 100
 
@@ -722,8 +720,12 @@ dogecoin_wallet* dogecoin_wallet_load_ts(dogecoin_ctx* ctx, const char* file)
     dogecoin_bool created = false;
     dogecoin_wallet* wallet = dogecoin_wallet_new_ts(ctx);
     if (!wallet) return NULL;
+    const char* target_file = file;
+    if (!target_file || target_file[0] == '\0') {
+        target_file = wallet->filename[0] ? wallet->filename : "wallet.db";
+    }
     wallet_lock(wallet);
-    dogecoin_bool ok = dogecoin_wallet_load(wallet, file ? file : wallet->filename, &error, &created, false);
+    dogecoin_bool ok = dogecoin_wallet_load(wallet, target_file, &error, &created, false);
     wallet_unlock(wallet);
     if (!ok) {
         dogecoin_wallet_free(wallet);
