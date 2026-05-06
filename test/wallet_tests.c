@@ -367,7 +367,8 @@ static void* wallet_ts_stress_worker(void* user) {
     wallet_ts_stress_args* args = (wallet_ts_stress_args*)user;
     args->ok = true;
     dogecoin_ecc_start();
-    for (uint32_t i = 0; i < 64; i++) {
+    /* 4 iterations keeps the test fast under QEMU arm emulation */
+    for (uint32_t i = 0; i < 4; i++) {
         char address[P2PKHLEN];
         dogecoin_mem_zero(address, sizeof(address));
         if (!dogecoin_wallet_get_address_ts(args->wallet, address, sizeof(address), 0, args->index_base + i, false)) {

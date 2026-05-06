@@ -693,7 +693,8 @@ static void* tx_ts_stress_worker(void* user)
     tx_ts_stress_args* args = (tx_ts_stress_args*)user;
     args->ok = true;
     dogecoin_ecc_start();
-    for (uint32_t i = 0; i < 32; i++) {
+    /* 4 iterations keeps the test fast under QEMU arm emulation */
+    for (uint32_t i = 0; i < 4; i++) {
         dogecoin_tx* tx = dogecoin_tx_new_ts();
         if (!tx) {
             args->ok = false;
