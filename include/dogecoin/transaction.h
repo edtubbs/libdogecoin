@@ -135,6 +135,7 @@ LIBDOGECOIN_API int dogecoin_tx_add_input_ts(dogecoin_tx* tx, const dogecoin_tx_
 /* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
 LIBDOGECOIN_API int dogecoin_tx_add_output_ts(dogecoin_tx* tx, const dogecoin_tx_out* tx_out);
 /* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* passphrase is currently reserved for future encrypted-wallet integration */
 LIBDOGECOIN_API int dogecoin_tx_sign_ts(dogecoin_tx* tx, struct dogecoin_wallet_* wallet, const char* passphrase);
 /* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
 LIBDOGECOIN_API int dogecoin_tx_finalize_ts(dogecoin_tx* tx);

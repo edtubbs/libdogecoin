@@ -331,12 +331,8 @@ void test_wallet_ts_wrappers()
     dogecoin_ctx* ctx = dogecoin_ctx_new_ts(false, false);
     u_assert_not_null(ctx);
 
-    dogecoin_wallet* wallet = dogecoin_wallet_new_ts(ctx);
+    dogecoin_wallet* wallet = dogecoin_wallet_load_ts(ctx, wallettmpfile);
     u_assert_not_null(wallet);
-
-    int error = 0;
-    dogecoin_bool created = false;
-    u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created, false), true);
 
     uint8_t seed[32];
     dogecoin_mem_zero(seed, sizeof(seed));

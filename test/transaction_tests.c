@@ -636,6 +636,7 @@ void test_transaction_ts_wrappers() {
     u_assert_not_null(tx_in);
     tx_in->prevout.n = 0;
     tx_in->script_sig = cstr_new_sz(32);
+    /* P2PKH script template used by legacy transaction test vectors. */
     uint8_t script_raw[25] = {
         0x76, 0xa9, 0x14, 0xd8, 0xc4, 0x3e, 0x6f, 0x68, 0xca, 0x4e,
         0xa1, 0xe9, 0xb9, 0x3d, 0xa2, 0xd1, 0xe3, 0xa9, 0x51, 0x18,
