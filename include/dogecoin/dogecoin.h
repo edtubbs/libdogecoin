@@ -34,9 +34,21 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef _WIN32
+/* Avoid pulling in legacy <winsock.h> from <windows.h>, which would conflict
+ * with <winsock2.h> included by libdogecoin's net code on MSVC. */
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
+#define DOGECOIN_HAVE_THREADS 1
+#elif defined(__has_include)
+#  if __has_include(<pthread.h>)
+#    include <pthread.h>
+#    define DOGECOIN_HAVE_THREADS 1
+#  endif
 #else
 #include <pthread.h>
+#define DOGECOIN_HAVE_THREADS 1
 #endif
 
 #if defined(HAVE_CONFIG_H) && !defined(USE_LIB)
@@ -52,8 +64,13 @@ typedef struct dogecoin_context_ dogecoin_ctx;
 typedef struct dogecoin_mutex_ {
 #ifdef _WIN32
     CRITICAL_SECTION handle;
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
     pthread_mutex_t handle;
+#else
+    /* Freestanding/baremetal targets (e.g. OP-TEE TAs) without a threading
+     * runtime: keep the struct compilable; the inline helpers below become
+     * no-ops, and TS APIs must not be invoked in such builds. */
+    int handle;
 #endif
     dogecoin_bool initialized;
 } dogecoin_mutex_t;
@@ -195,13 +212,16 @@ static inline dogecoin_bool dogecoin_mutex_init(dogecoin_mutex_t* mutex)
     InitializeCriticalSection(&mutex->handle);
     mutex->initialized = true;
     return true;
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
     if (pthread_mutex_init(&mutex->handle, NULL) != 0) {
         mutex->initialized = false;
         return false;
     }
     mutex->initialized = true;
     return true;
+#else
+    (void)mutex;
+    return false;
 #endif
 }
 
@@ -210,8 +230,10 @@ static inline void dogecoin_mutex_lock(dogecoin_mutex_t* mutex)
     if (!mutex || !mutex->initialized) return;
 #ifdef _WIN32
     EnterCriticalSection(&mutex->handle);
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
     pthread_mutex_lock(&mutex->handle);
+#else
+    (void)mutex;
 #endif
 }
 
@@ -220,8 +242,10 @@ static inline void dogecoin_mutex_unlock(dogecoin_mutex_t* mutex)
     if (!mutex || !mutex->initialized) return;
 #ifdef _WIN32
     LeaveCriticalSection(&mutex->handle);
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
     pthread_mutex_unlock(&mutex->handle);
+#else
+    (void)mutex;
 #endif
 }
 
@@ -230,7 +254,7 @@ static inline void dogecoin_mutex_destroy(dogecoin_mutex_t* mutex)
     if (!mutex || !mutex->initialized) return;
 #ifdef _WIN32
     DeleteCriticalSection(&mutex->handle);
-#else
+#elif defined(DOGECOIN_HAVE_THREADS)
     pthread_mutex_destroy(&mutex->handle);
 #endif
     mutex->initialized = false;
