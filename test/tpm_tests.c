@@ -126,7 +126,7 @@ void test_tpm()
         u_assert_int_eq((int)fwrite(&bad_handle, 1, sizeof(bad_handle), bad_fp), (int)sizeof(bad_handle));
         u_assert_int_eq((int)fwrite(bad_ciphertext, 1, sizeof(bad_ciphertext), bad_fp), (int)sizeof(bad_ciphertext));
         fclose(bad_fp);
-        u_assert_false(dogecoin_decrypt_seed_with_tpm(decrypted_seed, bad_slot));
+        u_assert_true(!dogecoin_decrypt_seed_with_tpm(decrypted_seed, bad_slot));
         remove(bad_filename);
     }
 
