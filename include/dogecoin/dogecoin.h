@@ -46,6 +46,7 @@
 typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
 
 struct dogecoin_context_;
+/* Short-form context alias used by the `_ts` API surface. */
 typedef struct dogecoin_context_ dogecoin_ctx;
 
 typedef struct dogecoin_mutex_ {

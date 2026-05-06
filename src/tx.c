@@ -703,7 +703,6 @@ void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
 {
     dest->version = src->version;
     dest->locktime = src->locktime;
-    dest->thread_safe = src->thread_safe;
 
     if (!src->vin) {
         dest->vin = NULL;

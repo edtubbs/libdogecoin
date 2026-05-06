@@ -669,7 +669,7 @@ void test_transaction_ts_wrappers() {
     dogecoin_wallet_set_master_key_copy(wallet, &node);
 
     int sign_rc = dogecoin_tx_sign_ts(tx, wallet, NULL);
-    u_assert_true(sign_rc == true || sign_rc == false);
+    u_assert_int_eq(sign_rc, true);
     u_assert_int_eq(dogecoin_tx_finalize_ts(tx), true);
 
     dogecoin_wallet_free_ts(wallet);
