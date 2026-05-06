@@ -34,13 +34,14 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef _WIN32
-/* Require Vista+ so NormalizeString/NormalizationKD and other Vista-level APIs
- * are available from winnls.h when any file includes this header. */
+/* Require Windows 8+ so both winnls.h's NormalizationKD/NormalizeString and
+ * winsock2.h's htonll/ntohll prototypes are visible to all consumers of this
+ * header. (NormalizationKD needs 0x0600, htonll needs 0x0602.) */
 #ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0600
+#define _WIN32_WINNT 0x0602
 #endif
 #ifndef WINVER
-#define WINVER 0x0600
+#define WINVER 0x0602
 #endif
 /* Avoid pulling in legacy <winsock.h> from <windows.h>, which would conflict
  * with <winsock2.h> included by libdogecoin's net code on MSVC. */
@@ -49,12 +50,15 @@
 #endif
 #include <windows.h>
 #define DOGECOIN_HAVE_THREADS 1
-#elif defined(__has_include)
-#  if __has_include(<pthread.h>)
-#    include <pthread.h>
-#    define DOGECOIN_HAVE_THREADS 1
-#  endif
-#else
+/* Only enable pthread-backed mutexes on hosted POSIX-like targets where we
+ * know <pthread.h> exists AND the pthread runtime will be linked.  Bare-metal
+ * / freestanding targets such as OP-TEE Trusted Applications (libutee) ship a
+ * <pthread.h> via the cross toolchain headers but cannot resolve
+ * pthread_mutex_* at link time, so they fall through to the no-op stubs. */
+#elif defined(__GLIBC__) || defined(__BIONIC__) || defined(__APPLE__) || \
+      defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
+      defined(__DragonFly__) || defined(__CYGWIN__) || defined(__MINGW32__) || \
+      defined(__MINGW64__) || defined(__sun) || defined(__HAIKU__)
 #include <pthread.h>
 #define DOGECOIN_HAVE_THREADS 1
 #endif
