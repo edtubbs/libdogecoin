@@ -52,9 +52,16 @@ typedef struct {
 } benchmark_context;
 
 double gettimedouble(void) {
+#ifdef _WIN32
+    LARGE_INTEGER freq, count;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&count);
+    return (double)count.QuadPart / (double)freq.QuadPart;
+#else
     struct timeval tv;
     gettimeofday(&tv, NULL);
     return tv.tv_usec * 0.000001 + tv.tv_sec;
+#endif
 }
 
 uint64_t perf_cpucycles(void) {

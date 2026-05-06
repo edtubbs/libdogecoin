@@ -73,7 +73,9 @@ extern void test_tpm();
 extern void test_transaction();
 extern void test_transaction_ts_contexts();
 extern void test_transaction_ts_wrappers();
+#if !defined(_WIN32)
 extern void test_transaction_ts_multithread_stress();
+#endif
 extern void test_tx_serialization();
 extern void test_tx_sighash();
 extern void test_tx_sighash_ext();
@@ -99,7 +101,9 @@ extern void test_wallet_basics();
 extern void test_wallet();
 extern void test_wallet_reorg_utxo_update();
 extern void test_wallet_ts_wrappers();
+#if !defined(_WIN32)
 extern void test_wallet_ts_multithread_stress();
+#endif
 #endif
 
 #ifdef WITH_TOOLS
@@ -165,7 +169,9 @@ int main()
     u_run_test(test_transaction);
     u_run_test(test_transaction_ts_contexts);
     u_run_test(test_transaction_ts_wrappers);
+#if !defined(_WIN32)
     u_run_test(test_transaction_ts_multithread_stress);
+#endif
     u_run_test(test_tx_serialization);
     u_run_test(test_invalid_tx_deser);
     u_run_test(test_tx_sign);
@@ -191,7 +197,9 @@ int main()
     u_run_test(test_wallet);
     u_run_test(test_wallet_reorg_utxo_update);
     u_run_test(test_wallet_ts_wrappers);
+#if !defined(_WIN32)
     u_run_test(test_wallet_ts_multithread_stress);
+#endif
 #endif
 
 #ifdef WITH_TOOLS
