@@ -34,6 +34,14 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef _WIN32
+/* Require Vista+ so NormalizeString/NormalizationKD and other Vista-level APIs
+ * are available from winnls.h when any file includes this header. */
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0600
+#endif
+#ifndef WINVER
+#define WINVER 0x0600
+#endif
 /* Avoid pulling in legacy <winsock.h> from <windows.h>, which would conflict
  * with <winsock2.h> included by libdogecoin's net code on MSVC. */
 #ifndef WIN32_LEAN_AND_MEAN
