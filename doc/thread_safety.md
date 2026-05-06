@@ -243,11 +243,13 @@ dogecoin_ctx_release(ctx);
 
 ```c
 dogecoin_tx* tx = dogecoin_tx_new_ts();
-dogecoin_tx_in in = {0};
-dogecoin_tx_out out = {0};
-
-dogecoin_tx_add_input_ts(tx, &in);
-dogecoin_tx_add_output_ts(tx, &out);
+dogecoin_tx_in* in = dogecoin_tx_in_new();
+dogecoin_tx_out* out = dogecoin_tx_out_new();
+/* initialize prevout/script/value fields before add_*_ts calls */
+dogecoin_tx_add_input_ts(tx, in);
+dogecoin_tx_add_output_ts(tx, out);
+dogecoin_tx_in_free(in);
+dogecoin_tx_out_free(out);
 dogecoin_tx_sign_ts(tx, wallet, NULL);
 dogecoin_tx_finalize_ts(tx);
 dogecoin_tx_free_ts(tx);

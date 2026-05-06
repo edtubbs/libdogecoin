@@ -280,6 +280,8 @@ int dogecoin_tx_finalize_ts(dogecoin_tx* tx)
 {
     if (!tx) return false;
     if (tx->thread_safe) dogecoin_mutex_lock(&tx->lock);
+    /* Finalization currently performs a deterministic serialization+hash pass
+     * as an integrity check; no additional state is persisted yet. */
     cstring* tmp = cstr_new_sz(256);
     dogecoin_tx_serialize(tmp, tx);
     uint256_t hash;
