@@ -14,12 +14,16 @@
 
 #include <dogecoin/address.h>
 #include <dogecoin/buffer.h>
+#include <dogecoin/ecc.h>
 #include <dogecoin/key.h>
 #include <dogecoin/koinu.h>
 #include <dogecoin/transaction.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/wallet.h>
+#if !defined(_WIN32)
+#include <pthread.h>
+#endif
 
 
 void test_transaction()
@@ -674,3 +678,86 @@ void test_transaction_ts_wrappers() {
     dogecoin_tx_free_ts(tx);
     remove("tx_ts_wallet.db");
 }
+
+#if !defined(_WIN32)
+typedef struct tx_ts_stress_args_ {
+    dogecoin_wallet* wallet;
+    uint32_t id;
+    dogecoin_bool ok;
+} tx_ts_stress_args;
+
+static void* tx_ts_stress_worker(void* user)
+{
+    tx_ts_stress_args* args = (tx_ts_stress_args*)user;
+    args->ok = true;
+    dogecoin_ecc_start();
+    for (uint32_t i = 0; i < 32; i++) {
+        dogecoin_tx* tx = dogecoin_tx_new_ts();
+        if (!tx) {
+            args->ok = false;
+            break;
+        }
+
+        dogecoin_tx_in* tx_in = dogecoin_tx_in_new();
+        dogecoin_hash_clear(tx_in->prevout.hash);
+        tx_in->prevout.n = args->id * 1000 + i;
+        tx_in->script_sig = cstr_new_sz(25);
+        /* P2PKH script template reused from existing transaction test vectors. */
+        uint8_t script_raw[25] = {
+            0x76, 0xa9, 0x14, 0xd8, 0xc4, 0x3e, 0x6f, 0x68, 0xca, 0x4e,
+            0xa1, 0xe9, 0xb9, 0x3d, 0xa2, 0xd1, 0xe3, 0xa9, 0x51, 0x18,
+            0xfa, 0x4a, 0x7c, 0x88, 0xac
+        };
+        cstr_append_buf(tx_in->script_sig, script_raw, sizeof(script_raw));
+        if (!dogecoin_tx_add_input_ts(tx, tx_in)) args->ok = false;
+        dogecoin_tx_in_free(tx_in);
+
+        dogecoin_tx_out* tx_out = dogecoin_tx_out_new();
+        tx_out->value = 1000 + i;
+        tx_out->script_pubkey = cstr_new_sz(1);
+        cstr_append_c(tx_out->script_pubkey, OP_TRUE);
+        if (!dogecoin_tx_add_output_ts(tx, tx_out)) args->ok = false;
+        dogecoin_tx_out_free(tx_out);
+
+        if (args->ok && !dogecoin_tx_sign_ts(tx, args->wallet, NULL)) args->ok = false;
+        if (args->ok && !dogecoin_tx_finalize_ts(tx)) args->ok = false;
+        dogecoin_tx_free_ts(tx);
+
+        if (!args->ok) break;
+    }
+    dogecoin_ecc_stop();
+    return NULL;
+}
+
+void test_transaction_ts_multithread_stress()
+{
+    dogecoin_ctx* ctx = dogecoin_ctx_new_ts(true, false);
+    u_assert_not_null(ctx);
+    dogecoin_wallet* wallet = dogecoin_wallet_load_ts(ctx, "tx_ts_wallet_stress.db");
+    u_assert_not_null(wallet);
+
+    uint8_t seed[32];
+    dogecoin_mem_zero(seed, sizeof(seed));
+    seed[0] = 0x39;
+    dogecoin_hdnode node;
+    u_assert_true(dogecoin_hdnode_from_seed(seed, sizeof(seed), &node));
+    dogecoin_wallet_set_master_key_copy(wallet, &node);
+
+    pthread_t threads[4];
+    tx_ts_stress_args args[4];
+    for (uint32_t i = 0; i < 4; i++) {
+        args[i].wallet = wallet;
+        args[i].id = i;
+        args[i].ok = false;
+        u_assert_int_eq(pthread_create(&threads[i], NULL, tx_ts_stress_worker, &args[i]), 0);
+    }
+    for (uint32_t i = 0; i < 4; i++) {
+        pthread_join(threads[i], NULL);
+        u_assert_true(args[i].ok);
+    }
+
+    dogecoin_wallet_free_ts(wallet);
+    dogecoin_ctx_release(ctx);
+    remove("tx_ts_wallet_stress.db");
+}
+#endif

@@ -197,6 +197,18 @@ dogecoin_ctx_release(ctx);
 dogecoin_ctx_release(ctx);
 ```
 
+### Recommended usage patterns
+
+* Use `dogecoin_ctx_new_ts()` for concurrent apps and keep object ownership
+  explicit.
+* Prefer **one mutable wallet/transaction object per worker thread** whenever
+  possible to minimize lock contention.
+* If sharing a wallet object across threads, use only the `_ts` wallet
+  functions (`dogecoin_wallet_*_ts`) and avoid mixing direct non-`_ts` wallet
+  mutation in parallel.
+* For signing, `dogecoin_tx_sign_ts()` acquires locks in a fixed order
+  (`tx->lock` then `wallet->lock`) to avoid inversion.
+
 `dogecoin_ctx_new_ts()` returns the same `dogecoin_context` type as
 `dogecoin_context_new()`; the only behavioural difference today is the
 `thread_safe` flag, which dependent subsystems can branch on as their `_ts`

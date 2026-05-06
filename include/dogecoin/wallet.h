@@ -154,6 +154,7 @@ LIBDOGECOIN_API dogecoin_output* dogecoin_wallet_output_new();
 LIBDOGECOIN_API void dogecoin_wallet_output_free(dogecoin_output* output);
 /** ------------------------------------ */
 
+/* NOT THREAD-SAFE - use _ts variant for shared wallet access */
 LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params);
 /* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
 LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new_ts(dogecoin_ctx* ctx);
@@ -166,12 +167,14 @@ LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_load_ts(dogecoin_ctx* ctx, cons
 LIBDOGECOIN_API void dogecoin_wallet_free_ts(dogecoin_wallet* wallet);
 
 /** load the wallet, sets masterkey, sets next_childindex */
+/* NOT THREAD-SAFE - use dogecoin_wallet_load_ts() for shared wallet access */
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_path, int *error, dogecoin_bool *created, dogecoin_bool prompt);
 
 /** load the wallet and replace a record */
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_replace(dogecoin_wallet* wallet, const char* file_path, cstring* record, uint8_t record_type, int *error);
 
 /** writes the wallet state to disk */
+/* NOT THREAD-SAFE - use dogecoin_wallet_save_ts() for shared wallet access */
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_flush(dogecoin_wallet* wallet);
 /* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
 LIBDOGECOIN_API int dogecoin_wallet_save_ts(dogecoin_wallet* wallet);

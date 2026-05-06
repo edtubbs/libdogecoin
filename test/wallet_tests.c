@@ -24,9 +24,13 @@ static const char *wallettmpfile = "/tmp/dummy";
 #include <logdb/logdb.h>
 
 #include <dogecoin/base58.h>
+#include <dogecoin/ecc.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/wallet.h>
 #include <dogecoin/script.h>
+#if !defined(_WIN32)
+#include <pthread.h>
+#endif
 #define is_spent(x) (((dogecoin_utxo*)x)->spendable == false)
 
 
@@ -352,3 +356,67 @@ void test_wallet_ts_wrappers()
     dogecoin_wallet_free_ts(wallet2);
     dogecoin_ctx_release(ctx);
 }
+
+#if !defined(_WIN32)
+typedef struct wallet_ts_stress_args_ {
+    dogecoin_wallet* wallet;
+    uint32_t index_base;
+    dogecoin_bool ok;
+} wallet_ts_stress_args;
+
+static void* wallet_ts_stress_worker(void* user) {
+    wallet_ts_stress_args* args = (wallet_ts_stress_args*)user;
+    args->ok = true;
+    dogecoin_ecc_start();
+    for (uint32_t i = 0; i < 64; i++) {
+        char address[P2PKHLEN];
+        dogecoin_mem_zero(address, sizeof(address));
+        if (!dogecoin_wallet_get_address_ts(args->wallet, address, sizeof(address), 0, args->index_base + i, false)) {
+            args->ok = false;
+            break;
+        }
+        if (strlen(address) == 0) {
+            args->ok = false;
+            break;
+        }
+    }
+    dogecoin_ecc_stop();
+    return NULL;
+}
+
+void test_wallet_ts_multithread_stress()
+{
+    unlink(wallettmpfile);
+    dogecoin_ctx* ctx = dogecoin_ctx_new_ts(false, false);
+    u_assert_not_null(ctx);
+
+    dogecoin_wallet* wallet = dogecoin_wallet_load_ts(ctx, wallettmpfile);
+    u_assert_not_null(wallet);
+
+    uint8_t seed[32];
+    dogecoin_mem_zero(seed, sizeof(seed));
+    seed[0] = 0x77;
+    dogecoin_hdnode node;
+    u_assert_true(dogecoin_hdnode_from_seed(seed, sizeof(seed), &node));
+    dogecoin_wallet_set_master_key_copy(wallet, &node);
+
+    u_assert_int_eq(dogecoin_wallet_add_hd_account_ts(wallet, 0), true);
+
+    pthread_t threads[4];
+    wallet_ts_stress_args args[4];
+    for (uint32_t i = 0; i < 4; i++) {
+        args[i].wallet = wallet;
+        args[i].index_base = i * 64;
+        args[i].ok = false;
+        u_assert_int_eq(pthread_create(&threads[i], NULL, wallet_ts_stress_worker, &args[i]), 0);
+    }
+    for (uint32_t i = 0; i < 4; i++) {
+        pthread_join(threads[i], NULL);
+        u_assert_true(args[i].ok);
+    }
+
+    u_assert_int_eq(dogecoin_wallet_save_ts(wallet), true);
+    dogecoin_wallet_free_ts(wallet);
+    dogecoin_ctx_release(ctx);
+}
+#endif
