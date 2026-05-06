@@ -220,6 +220,7 @@ static TPM2_HANDLE linux_tpm_persistent_handle(const char* filename_prefix, int 
     return (TPM2_HANDLE)(base | (uint32_t)file_num);
 }
 
+/* TPM2 Seal/Unseal - Linux via libtss2 */
 // Common TSS2 cleanup helper: frees a NULL-terminated list of Esys-allocated
 // pointers (Esys_Free) and finalizes the ESYS context. Both `ctx` and any
 // pointer in the list may be NULL. Always pass a trailing NULL sentinel.
@@ -243,12 +244,29 @@ static void tpm_cleanup(ESYS_CONTEXT** ctx, ...)
     }
 }
 
+/* TPM2 Seal/Unseal - Linux via libtss2 */
+static dogecoin_bool linux_tpm_startup(ESYS_CONTEXT* context)
+{
+    TSS2_RC rc = Esys_Startup(context, TPM2_SU_CLEAR);
+    if (rc == TSS2_RC_SUCCESS) {
+        return true;
+    }
+    // TPM2_RC_INITIALIZE here means startup was already completed by another
+    // consumer (resource manager, prior client, or firmware path).
+    if (rc == TPM2_RC_INITIALIZE) {
+        return true;
+    }
+    return false;
+}
+
+/* TPM2 Seal/Unseal - Linux via libtss2 */
 // Encrypt a blob with a per-slot RSA wrapping key persisted in the TPM via
 // Esys_EvictControl, mirroring the Windows NCryptCreatePersistedKey path. The
 // on-disk file stores only the persistent handle followed by the ciphertext;
 // the wrapping key itself lives in TPM NV until evicted.
 static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, const int file_num, const dogecoin_bool overwrite, const char* filename_prefix, const char* password_prompt)
 {
+    dogecoin_bool ok = false;
     TPM2_HANDLE persistent_addr = linux_tpm_persistent_handle(filename_prefix, file_num);
     if (persistent_addr == 0) {
         return false;
@@ -263,9 +281,8 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
         return false;
     }
 
-    result = Esys_Startup(context, TPM2_SU_STATE);
-    if (result != TSS2_RC_SUCCESS && result != TPM2_RC_INITIALIZE) {
-        Esys_Finalize(&context);
+    if (!linux_tpm_startup(context)) {
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
@@ -279,19 +296,26 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
     if (tr_rc == TSS2_RC_SUCCESS) {
         if (!overwrite) {
             Esys_TR_Close(context, &existing);
-            Esys_Finalize(&context);
+            tpm_cleanup(&context, NULL);
             return false;
         }
         ESYS_TR removed = ESYS_TR_NONE;
-        (void)Esys_EvictControl(context, ESYS_TR_RH_OWNER, existing,
-                                ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE,
-                                persistent_addr, &removed);
+        tr_rc = Esys_EvictControl(context, ESYS_TR_RH_OWNER, existing,
+                                  ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE,
+                                  persistent_addr, &removed);
+        if (removed != ESYS_TR_NONE) {
+            Esys_TR_Close(context, &removed);
+        }
         Esys_TR_Close(context, &existing);
+        if (tr_rc != TSS2_RC_SUCCESS) {
+            tpm_cleanup(&context, NULL);
+            return false;
+        }
     }
 
     char password[128] = {0};
     if (!linux_tpm_get_password(password, sizeof(password), password_prompt, true)) {
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
@@ -306,7 +330,7 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
     TPM2B_AUTH authValuePrimary = {0};
     authValuePrimary.size = strlen(password);
     if (authValuePrimary.size > sizeof(authValuePrimary.buffer)) {
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
     memcpy(authValuePrimary.buffer, password, authValuePrimary.size);
@@ -349,7 +373,7 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
 
     result = Esys_TR_SetAuth(context, ESYS_TR_RH_OWNER, &authValue);
     if (result != TSS2_RC_SUCCESS) {
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
@@ -368,15 +392,11 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
                                 &creationHash,
                                 &creationTicket);
 
-    Esys_Free(outPublic);
-    Esys_Free(creationData);
-    Esys_Free(creationHash);
-    Esys_Free(creationTicket);
-
     if (result != TSS2_RC_SUCCESS) {
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, outPublic, creationData, creationHash, creationTicket, NULL);
         return false;
     }
+    tpm_cleanup(NULL, outPublic, creationData, creationHash, creationTicket, NULL);
 
     // Encrypt the plaintext against the freshly created transient RSA key
     // before persisting it. Doing the encrypt while the key is transient (and
@@ -388,7 +408,7 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
     TPM2B_PUBLIC_KEY_RSA plain = {0};
     if (in_size > sizeof(plain.buffer)) {
         Esys_FlushContext(context, keyHandle);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
     plain.size = in_size;
@@ -406,7 +426,7 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
                               &cipher);
     if (result != TSS2_RC_SUCCESS) {
         Esys_FlushContext(context, keyHandle);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
@@ -417,57 +437,57 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
                                ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE,
                                persistent_addr, &persistentHandle);
     if (result != TSS2_RC_SUCCESS || persistentHandle == ESYS_TR_NONE) {
-        Esys_Free(cipher);
+        tpm_cleanup(NULL, cipher, NULL);
         Esys_FlushContext(context, keyHandle);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
     result = Esys_TR_SetAuth(context, persistentHandle, &authValuePrimary);
     if (result != TSS2_RC_SUCCESS) {
-        Esys_Free(cipher);
+        tpm_cleanup(NULL, cipher, NULL);
         Esys_TR_Close(context, &persistentHandle);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
     if (!overwrite && access(filename, F_OK) == 0) {
-        Esys_Free(cipher);
+        tpm_cleanup(NULL, cipher, NULL);
         Esys_TR_Close(context, &persistentHandle);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
     FILE* fp = fopen(filename, "wb");
     if (!fp) {
-        Esys_Free(cipher);
+        tpm_cleanup(NULL, cipher, NULL);
         Esys_TR_Close(context, &persistentHandle);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
-    dogecoin_bool ok = true;
-    ok &= fwrite(&persistent_addr, 1, sizeof(persistent_addr), fp) == sizeof(persistent_addr);
+    ok = fwrite(&persistent_addr, 1, sizeof(persistent_addr), fp) == sizeof(persistent_addr);
     ok &= fwrite(cipher->buffer, 1, cipher->size, fp) == cipher->size;
 
     fclose(fp);
-    Esys_Free(cipher);
+    tpm_cleanup(NULL, cipher, NULL);
     Esys_TR_Close(context, &persistentHandle);
-    Esys_Finalize(&context);
+    tpm_cleanup(&context, NULL);
     return ok;
 }
 
+/* TPM2 Seal/Unseal - Linux via libtss2 */
 static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const int file_num, const char* filename_prefix, const char* password_prompt, size_t* actual_size)
 {
+    dogecoin_bool ok = false;
     ESYS_CONTEXT* context = NULL;
     TSS2_RC result = Esys_Initialize(&context, NULL, NULL);
     if (result != TSS2_RC_SUCCESS) {
         return false;
     }
 
-    result = Esys_Startup(context, TPM2_SU_STATE);
-    if (result != TSS2_RC_SUCCESS && result != TPM2_RC_INITIALIZE) {
-        Esys_Finalize(&context);
+    if (!linux_tpm_startup(context)) {
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
@@ -475,40 +495,40 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
     snprintf(filename, sizeof(filename), "%s_%d", filename_prefix, file_num);
     FILE* fp = fopen(filename, "rb");
     if (!fp) {
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
     TPM2_HANDLE persistent_addr = 0;
     if (fread(&persistent_addr, 1, sizeof(persistent_addr), fp) != sizeof(persistent_addr)) {
         fclose(fp);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
     if (fseek(fp, 0, SEEK_END) != 0) {
         fclose(fp);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
     long file_size = ftell(fp);
     long header_size = (long)sizeof(persistent_addr);
     if (file_size <= header_size || fseek(fp, header_size, SEEK_SET) != 0) {
         fclose(fp);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
     size_t encrypted_size = (size_t)(file_size - header_size);
     if (encrypted_size > MAX_RSA_ENCRYPTED_SIZE) {
         fclose(fp);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
     uint8_t encrypted_blob[MAX_RSA_ENCRYPTED_SIZE] = {0};
     if (fread(encrypted_blob, 1, encrypted_size, fp) != encrypted_size) {
         fclose(fp);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
     fclose(fp);
@@ -519,14 +539,14 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
                                    ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE,
                                    &keyHandle);
     if (result != TSS2_RC_SUCCESS) {
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
     char password[128] = {0};
     if (!linux_tpm_get_password(password, sizeof(password), password_prompt, false)) {
         Esys_TR_Close(context, &keyHandle);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
@@ -534,7 +554,7 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
     authValue.size = strlen(password);
     if (authValue.size > sizeof(authValue.buffer)) {
         Esys_TR_Close(context, &keyHandle);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
     memcpy(authValue.buffer, password, authValue.size);
@@ -543,13 +563,13 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
     result = Esys_TR_SetAuth(context, ESYS_TR_RH_OWNER, &authValuePrimary);
     if (result != TSS2_RC_SUCCESS) {
         Esys_TR_Close(context, &keyHandle);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
     result = Esys_TR_SetAuth(context, keyHandle, &authValue);
     if (result != TSS2_RC_SUCCESS) {
         Esys_TR_Close(context, &keyHandle);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
@@ -561,9 +581,9 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
 
     result = Esys_RSA_Decrypt(context, keyHandle, ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE, &cipher, &scheme, &label, &plain);
     if (result != TSS2_RC_SUCCESS || plain == NULL || plain->size > out_size) {
-        if (plain) Esys_Free(plain);
+        tpm_cleanup(NULL, plain, NULL);
         Esys_TR_Close(context, &keyHandle);
-        Esys_Finalize(&context);
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
@@ -571,10 +591,11 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
     if (actual_size) {
         *actual_size = plain->size;
     }
-    Esys_Free(plain);
+    tpm_cleanup(NULL, plain, NULL);
     Esys_TR_Close(context, &keyHandle);
-    Esys_Finalize(&context);
-    return true;
+    tpm_cleanup(&context, NULL);
+    ok = true;
+    return ok;
 }
 #endif
 
@@ -1349,9 +1370,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin
         return false;
     }
 
-    result = Esys_Startup(context, TPM2_SU_STATE);
-    if (result != TSS2_RC_SUCCESS && result != TPM2_RC_INITIALIZE) {
-        Esys_Finalize(&context);
+    if (!linux_tpm_startup(context)) {
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
@@ -2195,9 +2215,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMON
         return false;
     }
 
-    result = Esys_Startup(context, TPM2_SU_STATE);
-    if (result != TSS2_RC_SUCCESS && result != TPM2_RC_INITIALIZE) {
-        Esys_Finalize(&context);
+    if (!linux_tpm_startup(context)) {
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
@@ -3040,9 +3059,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
     if (Esys_Initialize(&context, NULL, NULL) != TSS2_RC_SUCCESS) {
         return false;
     }
-    TSS2_RC startup_rc = Esys_Startup(context, TPM2_SU_STATE);
-    if (startup_rc != TSS2_RC_SUCCESS && startup_rc != TPM2_RC_INITIALIZE) {
-        Esys_Finalize(&context);
+    if (!linux_tpm_startup(context)) {
+        tpm_cleanup(&context, NULL);
         return false;
     }
 
@@ -3107,10 +3125,10 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* name
         } else {
             more = TPM2_NO;
         }
-        Esys_Free(cap);
+        tpm_cleanup(NULL, cap, NULL);
     } while (more == TPM2_YES && start <= TPM2_PERSISTENT_LAST && *count < MAX_FILES);
 
-    Esys_Finalize(&context);
+    tpm_cleanup(&context, NULL);
     return true;
 
 #elif defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
