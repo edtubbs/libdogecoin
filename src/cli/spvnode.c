@@ -55,6 +55,7 @@
 #include <time.h>
 
 #include <event2/buffer.h>
+#include <event2/event.h>
 #include <event2/http.h>
 #include <event2/thread.h>
 
@@ -871,6 +872,8 @@ int main(int argc, char* argv[]) {
             }
         spv_worker_pool_stop();
         dogecoin_ecc_stop();
+        /* THREAD-SAFE: release libevent global locks/allocations initialized by evthread_use_*(). */
+        libevent_global_shutdown();
     } else if (strcmp(data, "sanity") == 0) {
 #if WITH_WALLET
     dogecoin_ecc_start();

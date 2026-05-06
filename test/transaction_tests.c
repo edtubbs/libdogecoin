@@ -604,6 +604,8 @@ void test_transaction()
     u_assert_true(sign_transaction_w_privkey_ex(working_transaction_index, private_key_wif, buf5, sizeof(buf5)));
     u_assert_str_eq(buf5, get_raw_transaction(working_transaction_index));
 
+    // cleanup large transaction context entries (important for leak checks)
+    remove_all();
 }
 
 void test_transaction_ts_contexts() {

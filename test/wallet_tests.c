@@ -314,13 +314,14 @@ void test_wallet_reorg_utxo_update() {
    dogecoin_tx_copy(wtx_new->tx, tx);
    wtx_new->height = 105;
    dogecoin_wallet_scrape_utxos(wallet, wtx_new);
-   HASH_ITER(hh, utxos, u, tmp) {
+    HASH_ITER(hh, utxos, u, tmp) {
         if (!is_spent(u)) {
             u_assert_int_eq(u->height, 105);
         }
     }
 
     dogecoin_wallet_flush(wallet);
+    dogecoin_wallet_wtx_free(wtx);
     dogecoin_wallet_wtx_free(wtx_new);
     dogecoin_wallet_free(wallet);
     dogecoin_hdnode_free(node);
