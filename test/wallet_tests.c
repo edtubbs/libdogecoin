@@ -310,10 +310,10 @@ void test_wallet_reorg_utxo_update() {
             u_assert_int_eq(u->height, 100);
         }
     }
-   dogecoin_wtx* wtx_new = dogecoin_wallet_wtx_new();
-   dogecoin_tx_copy(wtx_new->tx, tx);
-   wtx_new->height = 105;
-   dogecoin_wallet_scrape_utxos(wallet, wtx_new);
+    dogecoin_wtx* wtx_new = dogecoin_wallet_wtx_new();
+    dogecoin_tx_copy(wtx_new->tx, tx);
+    wtx_new->height = 105;
+    dogecoin_wallet_scrape_utxos(wallet, wtx_new);
     HASH_ITER(hh, utxos, u, tmp) {
         if (!is_spent(u)) {
             u_assert_int_eq(u->height, 105);
