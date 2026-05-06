@@ -728,7 +728,7 @@ dogecoin_wallet* dogecoin_wallet_load_ts(dogecoin_ctx* ctx, const char* file)
     dogecoin_bool ok = dogecoin_wallet_load(wallet, target_file, &error, &created, false);
     wallet_unlock(wallet);
     if (!ok) {
-        dogecoin_wallet_free(wallet);
+        dogecoin_wallet_free_ts(wallet);
         return NULL;
     }
     return wallet;
@@ -1299,17 +1299,19 @@ int dogecoin_wallet_add_hd_account_ts(dogecoin_wallet* wallet, uint32_t account)
         if (derive_bip44_extended_key(hdnode, &account, &index, change_level, NULL, false, keypath, bip44_key) == 0) {
             dogecoin_hdnode_get_hash160(bip44_key, waddr->pubkeyhash);
             waddr->childindex = wallet->next_childindex;
-            dogecoin_btree_tsearch(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
-            vector_add(wallet->waddr_vector, waddr);
-            added_to_wallet = true;
-            cstring* record = cstr_new_sz(256);
-            dogecoin_wallet_addr_serialize(record, wallet->chain, waddr);
-            if (wallet_write_record(wallet, record, WALLET_DB_REC_TYPE_ADDR)) {
-                dogecoin_file_commit(wallet->dbfile);
-                wallet->next_childindex++;
-                ret = true;
+            void* tree_pos = dogecoin_btree_tsearch(waddr, &wallet->waddr_rbtree, dogecoin_wallet_addr_compare);
+            if (tree_pos) {
+                vector_add(wallet->waddr_vector, waddr);
+                added_to_wallet = true;
+                cstring* record = cstr_new_sz(256);
+                dogecoin_wallet_addr_serialize(record, wallet->chain, waddr);
+                if (wallet_write_record(wallet, record, WALLET_DB_REC_TYPE_ADDR)) {
+                    dogecoin_file_commit(wallet->dbfile);
+                    wallet->next_childindex++;
+                    ret = true;
+                }
+                cstr_free(record, true);
             }
-            cstr_free(record, true);
         }
     }
     if (!ret && waddr && !added_to_wallet) dogecoin_wallet_addr_free(waddr);

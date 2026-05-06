@@ -632,6 +632,7 @@ void test_transaction_ts_wrappers() {
 
     dogecoin_tx_in* tx_in = dogecoin_tx_in_new();
     u_assert_not_null(tx_in);
+    dogecoin_hash_clear(tx_in->prevout.hash);
     tx_in->prevout.n = 0;
     tx_in->script_sig = cstr_new_sz(32);
     /* P2PKH script template used by legacy transaction test vectors. */
