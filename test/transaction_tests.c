@@ -19,6 +19,10 @@
 #include <dogecoin/transaction.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/wallet.h>
+
+dogecoin_ctx* dogecoin_ctx_new_ts(dogecoin_bool testnet, dogecoin_bool enable_net);
+void dogecoin_ctx_release(dogecoin_ctx* ctx);
 
 void test_transaction()
 {
@@ -622,4 +626,54 @@ void test_transaction_ts_contexts() {
     remove_transaction_ts(ctx2, wtx2);
     dogecoin_transaction_context_free(ctx1);
     dogecoin_transaction_context_free(ctx2);
+}
+
+void test_transaction_ts_wrappers() {
+    dogecoin_tx* tx = dogecoin_tx_new_ts();
+    u_assert_not_null(tx);
+
+    dogecoin_tx_in* tx_in = dogecoin_tx_in_new();
+    u_assert_not_null(tx_in);
+    tx_in->prevout.n = 0;
+    tx_in->script_sig = cstr_new_sz(32);
+    uint8_t script_raw[25] = {
+        0x76, 0xa9, 0x14, 0xd8, 0xc4, 0x3e, 0x6f, 0x68, 0xca, 0x4e,
+        0xa1, 0xe9, 0xb9, 0x3d, 0xa2, 0xd1, 0xe3, 0xa9, 0x51, 0x18,
+        0xfa, 0x4a, 0x7c, 0x88, 0xac
+    };
+    cstr_append_buf(tx_in->script_sig, script_raw, sizeof(script_raw));
+    u_assert_int_eq(dogecoin_tx_add_input_ts(tx, tx_in), true);
+    dogecoin_tx_in_free(tx_in);
+
+    dogecoin_tx_out* tx_out = dogecoin_tx_out_new();
+    u_assert_not_null(tx_out);
+    tx_out->value = 1000;
+    tx_out->script_pubkey = cstr_new_sz(1);
+    cstr_append_c(tx_out->script_pubkey, OP_TRUE);
+    u_assert_int_eq(dogecoin_tx_add_output_ts(tx, tx_out), true);
+    dogecoin_tx_out_free(tx_out);
+
+    dogecoin_ctx* ctx = dogecoin_ctx_new_ts(true, false);
+    u_assert_not_null(ctx);
+    dogecoin_wallet* wallet = dogecoin_wallet_new_ts(ctx);
+    u_assert_not_null(wallet);
+    int error = 0;
+    dogecoin_bool created = false;
+    u_assert_int_eq(dogecoin_wallet_load(wallet, "tx_ts_wallet.db", &error, &created, false), true);
+
+    uint8_t seed[32];
+    dogecoin_mem_zero(seed, sizeof(seed));
+    seed[0] = 0x24;
+    dogecoin_hdnode node;
+    u_assert_true(dogecoin_hdnode_from_seed(seed, sizeof(seed), &node));
+    dogecoin_wallet_set_master_key_copy(wallet, &node);
+
+    int sign_rc = dogecoin_tx_sign_ts(tx, wallet, NULL);
+    u_assert_true(sign_rc == true || sign_rc == false);
+    u_assert_int_eq(dogecoin_tx_finalize_ts(tx), true);
+
+    dogecoin_wallet_free_ts(wallet);
+    dogecoin_ctx_release(ctx);
+    dogecoin_tx_free_ts(tx);
+    remove("tx_ts_wallet.db");
 }

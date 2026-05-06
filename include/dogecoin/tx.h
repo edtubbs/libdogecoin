@@ -67,6 +67,8 @@ typedef struct dogecoin_tx_ {
     vector_t* vin;
     vector_t* vout;
     uint32_t locktime;
+    dogecoin_bool thread_safe;
+    dogecoin_mutex_t lock;
 } dogecoin_tx;
 
 //!p2pkh utilities

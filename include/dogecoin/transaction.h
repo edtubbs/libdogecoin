@@ -49,6 +49,8 @@ typedef struct dogecoin_transaction_context {
     working_transaction* transactions;
 } dogecoin_transaction_context;
 
+struct dogecoin_wallet_;
+
 // instantiates a new transaction
 LIBDOGECOIN_API working_transaction* new_transaction();
 LIBDOGECOIN_API working_transaction* new_transaction_ts(dogecoin_transaction_context* ctx);
@@ -123,6 +125,19 @@ LIBDOGECOIN_API int sign_indexed_raw_transaction_ex(int txindex, int inputindex,
 LIBDOGECOIN_API int sign_transaction_ex(int txindex, const char* script_pubkey, const char* privkey, char* buf, size_t buf_cap);
 
 LIBDOGECOIN_API int sign_transaction_w_privkey_ex(int txindex, const char* privkey, char* buf, size_t buf_cap);
+
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API dogecoin_tx* dogecoin_tx_new_ts(void);
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API void dogecoin_tx_free_ts(dogecoin_tx* tx);
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API int dogecoin_tx_add_input_ts(dogecoin_tx* tx, const dogecoin_tx_in* tx_in);
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API int dogecoin_tx_add_output_ts(dogecoin_tx* tx, const dogecoin_tx_out* tx_out);
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API int dogecoin_tx_sign_ts(dogecoin_tx* tx, struct dogecoin_wallet_* wallet, const char* passphrase);
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API int dogecoin_tx_finalize_ts(dogecoin_tx* tx);
 
 LIBDOGECOIN_END_DECL
 

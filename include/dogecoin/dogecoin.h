@@ -33,12 +33,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
 
 #if defined(HAVE_CONFIG_H) && !defined(USE_LIB)
 #include <config/libdogecoin-config.h>
 #endif
 
 typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
+
+struct dogecoin_context_;
+typedef struct dogecoin_context_ dogecoin_ctx;
+
+typedef struct dogecoin_mutex_ {
+#ifdef _WIN32
+    CRITICAL_SECTION handle;
+#else
+    pthread_mutex_t handle;
+#endif
+    dogecoin_bool initialized;
+} dogecoin_mutex_t;
 
 #ifndef __cplusplus
 #ifndef true
@@ -163,6 +180,54 @@ typedef uint8_t uint160_t[20];
 typedef uint8_t SEED[MAX_SEED_SIZE];
 
 static const int WIDTH = 0x0000100/32;
+
+static inline dogecoin_bool dogecoin_mutex_init(dogecoin_mutex_t* mutex)
+{
+    if (!mutex) return false;
+#ifdef _WIN32
+    InitializeCriticalSection(&mutex->handle);
+    mutex->initialized = true;
+    return true;
+#else
+    if (pthread_mutex_init(&mutex->handle, NULL) != 0) {
+        mutex->initialized = false;
+        return false;
+    }
+    mutex->initialized = true;
+    return true;
+#endif
+}
+
+static inline void dogecoin_mutex_lock(dogecoin_mutex_t* mutex)
+{
+    if (!mutex || !mutex->initialized) return;
+#ifdef _WIN32
+    EnterCriticalSection(&mutex->handle);
+#else
+    pthread_mutex_lock(&mutex->handle);
+#endif
+}
+
+static inline void dogecoin_mutex_unlock(dogecoin_mutex_t* mutex)
+{
+    if (!mutex || !mutex->initialized) return;
+#ifdef _WIN32
+    LeaveCriticalSection(&mutex->handle);
+#else
+    pthread_mutex_unlock(&mutex->handle);
+#endif
+}
+
+static inline void dogecoin_mutex_destroy(dogecoin_mutex_t* mutex)
+{
+    if (!mutex || !mutex->initialized) return;
+#ifdef _WIN32
+    DeleteCriticalSection(&mutex->handle);
+#else
+    pthread_mutex_destroy(&mutex->handle);
+#endif
+    mutex->initialized = false;
+}
 
 LIBDOGECOIN_END_DECL
 

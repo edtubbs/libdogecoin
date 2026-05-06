@@ -29,6 +29,9 @@ static const char *wallettmpfile = "/tmp/dummy";
 #include <dogecoin/script.h>
 #define is_spent(x) (((dogecoin_utxo*)x)->spendable == false)
 
+dogecoin_ctx* dogecoin_ctx_new_ts(dogecoin_bool testnet, dogecoin_bool enable_net);
+void dogecoin_ctx_release(dogecoin_ctx* ctx);
+
 /* this are the tx_valid test vectors from Bitcoin Core 0.15, run through Bitcoin Core's SignatureHash function */
 static const char * wallet_txns[] = {
 "0200000002e8629e0a2cb324d76ad009161fca7846bc048f74b4656fbd24d92a25837c2c8d010000006a47304402201ef8ecb8626cd91e55ae78196bdc5ef5d64316b5d2fa704d4b7dd8e6a7a9cbb902200602d33b76fc325c64fad0e87c426b5bc1f830975f5579a45e770fd9bbd3bfa7012103cc0b3842090d0be5282b03e679839a2b6ae33f8166a8c32c91e548d673cccd81feffffffdcb17ca5ed5ea21db72c919e134a383eafc5ceacbb63bb1c9c2f7f07cc28e314040000006a47304402205493c55fedb1f5336d9830ce713c6f988c78df795f266278ba79450aa1d6ade3022046405012d9605239fb2376a18f6667c3836ffbc6ed488d42d0ae99a231917b5a012102aeb302e28b3e2e3297b418128824032349cb25b5955e9f24ef274daf4f958136feffffff02ecd80b00000000001976a914933537aafd8c608efd08470efc2b92421190c99188ac30030d010000000017a9146aa814e14fd99dd5d75e00fe6482464be89e9cc48797be0700",
@@ -320,4 +323,38 @@ void test_wallet_reorg_utxo_update() {
     dogecoin_wallet_free(wallet);
     dogecoin_hdnode_free(node);
     remove_all_utxos();
+}
+
+void test_wallet_ts_wrappers()
+{
+    unlink(wallettmpfile);
+    dogecoin_ctx* ctx = dogecoin_ctx_new_ts(false, false);
+    u_assert_not_null(ctx);
+
+    dogecoin_wallet* wallet = dogecoin_wallet_new_ts(ctx);
+    u_assert_not_null(wallet);
+
+    int error = 0;
+    dogecoin_bool created = false;
+    u_assert_int_eq(dogecoin_wallet_load(wallet, wallettmpfile, &error, &created, false), true);
+
+    uint8_t seed[32];
+    dogecoin_mem_zero(seed, sizeof(seed));
+    seed[0] = 0x42;
+    dogecoin_hdnode node;
+    u_assert_true(dogecoin_hdnode_from_seed(seed, sizeof(seed), &node));
+    dogecoin_wallet_set_master_key_copy(wallet, &node);
+
+    u_assert_int_eq(dogecoin_wallet_add_hd_account_ts(wallet, 0), true);
+    char addr[P2PKHLEN];
+    dogecoin_mem_zero(addr, sizeof(addr));
+    u_assert_int_eq(dogecoin_wallet_get_address_ts(wallet, addr, sizeof(addr), 0, 0, false), true);
+    u_assert_true(strlen(addr) > 0);
+    u_assert_int_eq(dogecoin_wallet_save_ts(wallet), true);
+    dogecoin_wallet_free_ts(wallet);
+
+    dogecoin_wallet* wallet2 = dogecoin_wallet_load_ts(ctx, wallettmpfile);
+    u_assert_not_null(wallet2);
+    dogecoin_wallet_free_ts(wallet2);
+    dogecoin_ctx_release(ctx);
 }

@@ -174,6 +174,10 @@ dogecoin_tx_out* dogecoin_tx_out_new()
  */
 void dogecoin_tx_free(dogecoin_tx* tx)
 {
+    if (!tx) return;
+    if (tx->lock.initialized) {
+        dogecoin_mutex_destroy(&tx->lock);
+    }
     if (tx->vin) {
         vector_free(tx->vin, true);
         tx->vin = NULL;
@@ -398,6 +402,8 @@ dogecoin_tx* dogecoin_tx_new()
     tx->vout = vector_new(8, dogecoin_tx_out_free_cb);
     tx->version = 1;
     tx->locktime = 0;
+    tx->thread_safe = false;
+    tx->lock.initialized = false;
     return tx;
 }
 
@@ -697,6 +703,7 @@ void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
 {
     dest->version = src->version;
     dest->locktime = src->locktime;
+    dest->thread_safe = src->thread_safe;
 
     if (!src->vin) {
         dest->vin = NULL;
@@ -1238,4 +1245,3 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
 int getAddrFromPubkeyHash(const char pubkey_hash[PUBKEYHASHLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]) {
     return dogecoin_pubkey_hash_to_p2pkh_address((char *)utils_hex_to_uint8(pubkey_hash), SCRIPT_PUBKEY_LENGTH, p2pkh_address, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main);
 }
-

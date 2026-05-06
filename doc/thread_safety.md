@@ -124,9 +124,7 @@ ring only addresses innocuous gap-fill caused by concurrent peers.
 
 ### Not thread-safe (must be single-threaded)
 
-* `dogecoin_wallet_*` mutation APIs.
 * `dogecoin_hdnode_*` mutation APIs.
-* `dogecoin_tx` construction/serialization on a shared instance.
 * `working_transaction` / `eckey` slab APIs unless used via their `*_ts`
   variants that take an explicit context (`new_transaction_ts`,
   `new_eckey_ts`, etc.).
@@ -207,20 +205,53 @@ single owning thread may use it) and the refcount itself is always atomic.
 
 ## Roadmap for `_ts` API surface
 
-The following modules currently require single-thread ownership; their
-`_ts` variants are tracked here and will be added in subsequent passes:
+The following modules still require single-thread ownership; `_ts` variants
+remain tracked here for a future pass:
 
-* Wallet (`dogecoin_wallet_*`) — needs a per-wallet mutex; the rbtree /
-  vec_wtxes ownership invariants documented in `src/wallet.c` must be
-  preserved.
-* Transaction builder (`dogecoin_tx_*`) — most operations are pure
-  functions over an owned `dogecoin_tx*`; the `_ts` variants would add
-  per-object locking only where input/output vectors are mutated.
 * HD derivation (`dogecoin_hdnode_*`) — derivation is functional; the
-  `_ts` variants would protect cached child key tables when those exist.
+  `_ts` variants should protect cached child key tables when caches exist.
 
-Until those land, callers that need to mix wallet/tx work with the SPV
-client should keep each non-TS object on a single owning thread.
+## Wallet and transaction `_ts` wrappers
+
+The wallet and transaction builder now expose explicit `_ts` variants that add
+internal per-object mutex protection in `DOGECOIN_THREAD_SAFE` builds:
+
+* Wallet: `dogecoin_wallet_new_ts`, `dogecoin_wallet_load_ts`,
+  `dogecoin_wallet_add_hd_account_ts`, `dogecoin_wallet_get_address_ts`,
+  `dogecoin_wallet_save_ts`, `dogecoin_wallet_free_ts`.
+* Transaction builder: `dogecoin_tx_new_ts`, `dogecoin_tx_add_input_ts`,
+  `dogecoin_tx_add_output_ts`, `dogecoin_tx_sign_ts`,
+  `dogecoin_tx_finalize_ts`, `dogecoin_tx_free_ts`.
+
+Legacy non-`_ts` APIs remain unchanged for backwards compatibility.
+
+### Wallet `_ts` usage example
+
+```c
+dogecoin_ctx* ctx = dogecoin_ctx_new_ts(false, false);
+dogecoin_wallet* wallet = dogecoin_wallet_load_ts(ctx, "main_wallet.db");
+char addr[P2PKHLEN] = {0};
+
+dogecoin_wallet_add_hd_account_ts(wallet, 0);
+dogecoin_wallet_get_address_ts(wallet, addr, sizeof(addr), 0, 0, false);
+dogecoin_wallet_save_ts(wallet);
+dogecoin_wallet_free_ts(wallet);
+dogecoin_ctx_release(ctx);
+```
+
+### Transaction `_ts` usage example
+
+```c
+dogecoin_tx* tx = dogecoin_tx_new_ts();
+dogecoin_tx_in in = {0};
+dogecoin_tx_out out = {0};
+
+dogecoin_tx_add_input_ts(tx, &in);
+dogecoin_tx_add_output_ts(tx, &out);
+dogecoin_tx_sign_ts(tx, wallet, NULL);
+dogecoin_tx_finalize_ts(tx);
+dogecoin_tx_free_ts(tx);
+```
 
 ## Verifying with sanitizers
 

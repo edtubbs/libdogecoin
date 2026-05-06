@@ -99,6 +99,9 @@ typedef struct dogecoin_wallet_ {
     void* wtxes_rbtree;
     vector_t *waddr_vector; //points to the addr objects managed by the waddr_rbtree [in order]
     void* waddr_rbtree;
+    dogecoin_ctx* ctx;
+    dogecoin_bool thread_safe;
+    dogecoin_mutex_t lock;
 } dogecoin_wallet;
 
 typedef struct dogecoin_wtx_ {
@@ -152,9 +155,15 @@ LIBDOGECOIN_API void dogecoin_wallet_output_free(dogecoin_output* output);
 /** ------------------------------------ */
 
 LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params);
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new_ts(dogecoin_ctx* ctx);
 LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const char* address, const char* name, const dogecoin_wallet_opts* opts);
 LIBDOGECOIN_API void print_utxos(dogecoin_wallet* wallet);
 LIBDOGECOIN_API void dogecoin_wallet_free(dogecoin_wallet* wallet);
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_load_ts(dogecoin_ctx* ctx, const char* file);
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API void dogecoin_wallet_free_ts(dogecoin_wallet* wallet);
 
 /** load the wallet, sets masterkey, sets next_childindex */
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_path, int *error, dogecoin_bool *created, dogecoin_bool prompt);
@@ -164,6 +173,8 @@ LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_replace(dogecoin_wallet* wallet, c
 
 /** writes the wallet state to disk */
 LIBDOGECOIN_API dogecoin_bool dogecoin_wallet_flush(dogecoin_wallet* wallet);
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API int dogecoin_wallet_save_ts(dogecoin_wallet* wallet);
 
 /** set the master key of new created wallet
  consuming app needs to ensure that we don't override exiting masterkeys */
@@ -172,6 +183,10 @@ LIBDOGECOIN_API void dogecoin_wallet_set_master_key_copy(dogecoin_wallet* wallet
 /** derives the next child hdnode and derives an address (memory is owned by the wallet) */
 LIBDOGECOIN_API dogecoin_wallet_addr* dogecoin_wallet_next_addr(dogecoin_wallet* wallet);
 LIBDOGECOIN_API dogecoin_wallet_addr* dogecoin_wallet_next_bip44_addr(dogecoin_wallet* wallet);
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API int dogecoin_wallet_add_hd_account_ts(dogecoin_wallet* wallet, uint32_t account);
+/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+LIBDOGECOIN_API int dogecoin_wallet_get_address_ts(dogecoin_wallet* wallet, char* address, size_t len, uint32_t account, uint32_t index, dogecoin_bool change);
 LIBDOGECOIN_API dogecoin_bool dogecoin_p2pkh_address_to_wallet_pubkeyhash(const char* address_in, dogecoin_wallet_addr* addr, dogecoin_wallet* wallet);
 LIBDOGECOIN_API dogecoin_wallet_addr* dogecoin_p2pkh_address_to_wallet(const char* address_in, dogecoin_wallet* wallet);
 

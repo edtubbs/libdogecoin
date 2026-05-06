@@ -82,9 +82,6 @@ typedef struct dogecoin_context_ {
     char last_error[256];
 } dogecoin_context;
 
-/* Short-form alias type used by the _ts API surface. */
-typedef dogecoin_context dogecoin_ctx;
-
 extern const dogecoin_chainparams dogecoin_chainparams_main;
 extern const dogecoin_chainparams dogecoin_chainparams_test;
 extern const dogecoin_chainparams dogecoin_chainparams_regtest;
