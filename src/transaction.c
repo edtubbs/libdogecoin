@@ -246,6 +246,7 @@ int dogecoin_tx_sign_ts(dogecoin_tx* tx, dogecoin_wallet* wallet, const char* pa
     /* Reserved for future encrypted-wallet integration. */
     (void)passphrase;
     if (!tx || !wallet || !wallet->masterkey || !dogecoin_hdnode_has_privkey(wallet->masterkey)) return false;
+    /* Lock-order contract: always acquire tx->lock before wallet->lock. */
     if (tx->thread_safe) dogecoin_mutex_lock(&tx->lock);
     if (wallet->thread_safe) dogecoin_mutex_lock(&wallet->lock);
 

@@ -78,7 +78,7 @@ typedef struct dogecoin_context_ {
     int enable_net;
     int error_code;
     uint32_t refcount;
-    int thread_safe; /* nonzero when constructed via dogecoin_ctx_new_ts() */
+    int thread_safe; /* nonzero when constructed via dogecoin_ctx_new_ts() (alias in dogecoin.h) */
     char last_error[256];
 } dogecoin_context;
 
