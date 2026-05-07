@@ -166,6 +166,18 @@ dogecoin_bool fileValid (const int file_num)
 }
 
 #if defined(__linux__) && defined(USE_TSS2)
+/**
+ * @brief Reads a password from the user for TPM operations.
+ *
+ * Reads a password interactively using getpass, optionally prompting for
+ * confirmation. In test mode, uses the compiled-in PASSWD_STR constant.
+ *
+ * @param out Output buffer for the password.
+ * @param out_size Size of the output buffer.
+ * @param prompt Prompt string displayed to the user.
+ * @param confirm Whether to prompt for password confirmation.
+ * @return Returns true if the password was read successfully, false otherwise.
+ */
 static dogecoin_bool linux_tpm_get_password(char* out, size_t out_size, const char* prompt, dogecoin_bool confirm)
 {
 #ifdef TEST_PASSWD
@@ -203,9 +215,12 @@ static dogecoin_bool linux_tpm_get_password(char* out, size_t out_size, const ch
 /**
  * @brief Computes the persistent TPM2 handle for a given filename prefix and slot.
  *
- * @param[in] filename_prefix Prefix used to identify the encrypted object type.
- * @param[in] file_num Slot number used to derive the persistent handle.
- * @return Persistent handle value, or 0 if inputs do not map to a valid handle.
+ * Computes the owner-hierarchy persistent TPM2 handle for the given secret type
+ * prefix and slot number. Returns 0 if the prefix is not a known libdogecoin prefix.
+ *
+ * @param filename_prefix Prefix used to identify the encrypted object type.
+ * @param file_num Slot number used to derive the persistent handle.
+ * @return The persistent handle value, or 0 if inputs do not map to a valid handle.
  */
 static TPM2_HANDLE linux_tpm_persistent_handle(const char* filename_prefix, int file_num)
 {
@@ -229,10 +244,11 @@ static TPM2_HANDLE linux_tpm_persistent_handle(const char* filename_prefix, int 
  * @brief Frees ESYS allocations and finalizes an ESYS context.
  *
  * Frees a NULL-terminated list of Esys-allocated pointers with Esys_Free and
- * finalizes the ESYS context when provided.
+ * finalizes the ESYS context when provided. Both ctx and any list pointer may
+ * be NULL.
  *
- * @param[in,out] ctx Optional ESYS context pointer to finalize.
- * @param[in] ... NULL-terminated list of Esys-allocated pointers to free.
+ * @param ctx Optional ESYS context pointer to finalize.
+ * @param ... NULL-terminated list of Esys-allocated pointers to free.
  */
 static void tpm_cleanup(ESYS_CONTEXT** ctx, ...)
 {
@@ -254,8 +270,11 @@ static void tpm_cleanup(ESYS_CONTEXT** ctx, ...)
 /**
  * @brief Runs TPM startup for Linux TSS2 paths.
  *
- * @param[in] context Initialized ESYS context.
- * @return true when startup succeeds or TPM is already initialized.
+ * Runs the TPM startup command using ESAPI. Returns true if startup succeeds
+ * or if the TPM is already initialized by another consumer.
+ *
+ * @param context Initialized ESYS context.
+ * @return Returns true when startup succeeds or TPM is already initialized.
  */
 static dogecoin_bool linux_tpm_startup(ESYS_CONTEXT* context)
 {
@@ -263,7 +282,7 @@ static dogecoin_bool linux_tpm_startup(ESYS_CONTEXT* context)
     if (rc == TSS2_RC_SUCCESS) {
         return true;
     }
-    /* TPM2_RC_INITIALIZE means startup was already completed elsewhere. */
+    // TPM2_RC_INITIALIZE means startup was already completed elsewhere.
     if (rc == TPM2_RC_INITIALIZE) {
         return true;
     }
@@ -273,13 +292,16 @@ static dogecoin_bool linux_tpm_startup(ESYS_CONTEXT* context)
 /**
  * @brief Encrypts a blob using a TPM-persisted per-slot RSA wrapping key.
  *
- * @param[in] in Input plaintext bytes.
- * @param[in] in_size Number of plaintext bytes.
- * @param[in] file_num Slot index used for persistent object addressing.
- * @param[in] overwrite Whether to evict and replace an existing persistent key.
- * @param[in] filename_prefix Prefix used for encrypted file naming.
- * @param[in] password_prompt Prompt string for user password entry.
- * @return true on successful encryption and file write, false otherwise.
+ * Encrypts input bytes using a per-slot RSA wrapping key persisted in the TPM.
+ * The on-disk file stores the persistent handle followed by the RSA ciphertext.
+ *
+ * @param in Input plaintext bytes.
+ * @param in_size Number of plaintext bytes.
+ * @param file_num Slot index used for persistent object addressing.
+ * @param overwrite Whether to evict and replace an existing persistent key.
+ * @param filename_prefix Prefix used for encrypted file naming.
+ * @param password_prompt Prompt string for user password entry.
+ * @return Returns true on successful encryption and file write, false otherwise.
  */
 static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, const int file_num, const dogecoin_bool overwrite, const char* filename_prefix, const char* password_prompt)
 {
@@ -303,11 +325,9 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
         return false;
     }
 
-    /*
-     * If a persistent object already occupies the slot, refuse unless
-     * overwrite is set. When overwrite is set, evict first so EvictControl can
-     * install the new key on the same persistent address.
-     */
+    // If a persistent object already occupies the slot, refuse unless
+    // overwrite is set. When overwrite is set, evict first so EvictControl can
+    // install the new key on the same persistent address.
     ESYS_TR existing = ESYS_TR_NONE;
     TSS2_RC tr_rc = Esys_TR_FromTPMPublic(context, persistent_addr,
                                           ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE,
@@ -417,11 +437,9 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
     }
     tpm_cleanup(NULL, outPublic, creationData, creationHash, creationTicket, NULL);
 
-    /*
-     * Encrypt plaintext against the transient RSA key before persisting it.
-     * This avoids immediate persistent-slot round-tripping and reduces
-     * TPM_RC_OBJECT_MEMORY risk on constrained TPM implementations.
-     */
+    // Encrypt plaintext against the transient RSA key before persisting it.
+    // This avoids immediate persistent-slot round-tripping and reduces
+    // TPM_RC_OBJECT_MEMORY risk on constrained TPM implementations.
     TPM2B_PUBLIC_KEY_RSA plain = {0};
     if (in_size > sizeof(plain.buffer)) {
         Esys_FlushContext(context, keyHandle);
@@ -447,11 +465,9 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
         return false;
     }
 
-    /*
-     * Persist the wrapping key under the deterministic 0x81xx_xxxx handle.
-     * After this call, keyHandle is consumed and persistentHandle becomes the
-     * live ESYS_TR for the persistent object.
-     */
+    // Persist the wrapping key under the deterministic 0x81xx_xxxx handle.
+    // After this call, keyHandle is consumed and persistentHandle becomes the
+    // live ESYS_TR for the persistent object.
     result = Esys_EvictControl(context, ESYS_TR_RH_OWNER, keyHandle,
                                ESYS_TR_PASSWORD, ESYS_TR_NONE, ESYS_TR_NONE,
                                persistent_addr, &persistentHandle);
@@ -498,13 +514,16 @@ static dogecoin_bool linux_tpm_encrypt_blob(const uint8_t* in, size_t in_size, c
 /**
  * @brief Decrypts a blob using a TPM-persisted per-slot RSA wrapping key.
  *
- * @param[out] out Output plaintext buffer.
- * @param[in] out_size Output buffer size in bytes.
- * @param[in] file_num Slot index used for persistent object addressing.
- * @param[in] filename_prefix Prefix used for encrypted file naming.
- * @param[in] password_prompt Prompt string for user password entry.
- * @param[out] actual_size Optional decrypted byte count output.
- * @return true on successful decryption, false otherwise.
+ * Decrypts a blob previously encrypted with a per-slot RSA wrapping key
+ * persisted in the TPM. Reads the persistent handle and ciphertext from disk.
+ *
+ * @param out Output plaintext buffer.
+ * @param out_size Output buffer size in bytes.
+ * @param file_num Slot index used for persistent object addressing.
+ * @param filename_prefix Prefix used for encrypted file naming.
+ * @param password_prompt Prompt string for user password entry.
+ * @param actual_size Optional decrypted byte count output.
+ * @return Returns true on successful decryption, false otherwise.
  */
 static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const int file_num, const char* filename_prefix, const char* password_prompt, size_t* actual_size)
 {
@@ -562,7 +581,7 @@ static dogecoin_bool linux_tpm_decrypt_blob(uint8_t* out, size_t out_size, const
     }
     fclose(fp);
 
-    /* Resolve the persistent TPM2 handle into an ESYS_TR for the live object. */
+    // Resolve the persistent TPM2 handle into an ESYS_TR for the live object.
     ESYS_TR keyHandle = ESYS_TR_NONE;
     result = Esys_TR_FromTPMPublic(context, persistent_addr,
                                    ESYS_TR_NONE, ESYS_TR_NONE, ESYS_TR_NONE,

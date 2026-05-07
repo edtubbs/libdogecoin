@@ -1,16 +1,61 @@
-# Seal — TPM-Backed Seed/Mnemonic/HD-Node Encryption
+# Libdogecoin Seal API
 
-`src/seal.c` implements TPM-backed encryption of secrets (seeds, BIP-39
-mnemonics, and `dogecoin_hdnode` masters) on three platforms:
+## Table of Contents
+
+- [Libdogecoin Seal API](#libdogecoin-seal-api)
+  - [Table of Contents](#table-of-contents)
+  - [Introduction](#introduction)
+    - [Platform support](#platform-support)
+    - [Linux setup](#linux-setup)
+    - [Testing with the swtpm emulator](#testing-with-the-swtpm-emulator)
+    - [Persistent-handle layout (Linux/TSS2)](#persistent-handle-layout-linuxtss2)
+  - [Seed API](#seed-api)
+    - [**dogecoin_encrypt_seed_with_tpm:**](#dogecoin_encrypt_seed_with_tpm)
+    - [**dogecoin_decrypt_seed_with_tpm:**](#dogecoin_decrypt_seed_with_tpm)
+    - [**dogecoin_encrypt_seed_with_sw:**](#dogecoin_encrypt_seed_with_sw)
+    - [**dogecoin_decrypt_seed_with_sw:**](#dogecoin_decrypt_seed_with_sw)
+    - [**dogecoin_encrypt_seed_with_sw_to_yubikey:**](#dogecoin_encrypt_seed_with_sw_to_yubikey)
+    - [**dogecoin_decrypt_seed_with_sw_from_yubikey:**](#dogecoin_decrypt_seed_with_sw_from_yubikey)
+  - [Mnemonic API](#mnemonic-api)
+    - [**dogecoin_generate_mnemonic_encrypt_with_tpm:**](#dogecoin_generate_mnemonic_encrypt_with_tpm)
+    - [**dogecoin_decrypt_mnemonic_with_tpm:**](#dogecoin_decrypt_mnemonic_with_tpm)
+    - [**dogecoin_generate_mnemonic_encrypt_with_sw:**](#dogecoin_generate_mnemonic_encrypt_with_sw)
+    - [**dogecoin_decrypt_mnemonic_with_sw:**](#dogecoin_decrypt_mnemonic_with_sw)
+    - [**dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey:**](#dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey)
+    - [**dogecoin_decrypt_mnemonic_with_sw_from_yubikey:**](#dogecoin_decrypt_mnemonic_with_sw_from_yubikey)
+    - [**generateRandomEnglishMnemonicTPM:**](#generaterandomenglishmnemonictpm)
+    - [**generateRandomEnglishMnemonicSW:**](#generaterandomenglishmnemonicsw)
+  - [HD Node API](#hd-node-api)
+    - [**dogecoin_generate_hdnode_encrypt_with_tpm:**](#dogecoin_generate_hdnode_encrypt_with_tpm)
+    - [**dogecoin_decrypt_hdnode_with_tpm:**](#dogecoin_decrypt_hdnode_with_tpm)
+    - [**dogecoin_generate_hdnode_encrypt_with_sw:**](#dogecoin_generate_hdnode_encrypt_with_sw)
+    - [**dogecoin_decrypt_hdnode_with_sw:**](#dogecoin_decrypt_hdnode_with_sw)
+    - [**dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey:**](#dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey)
+    - [**dogecoin_decrypt_hdnode_with_sw_from_yubikey:**](#dogecoin_decrypt_hdnode_with_sw_from_yubikey)
+  - [Enumeration API](#enumeration-api)
+    - [**dogecoin_list_encryption_keys_in_tpm:**](#dogecoin_list_encryption_keys_in_tpm)
+
+## Introduction
+
+The Seal API provides hardware-backed and software-backed encryption of
+cryptographic secrets: BIP-32 seeds, BIP-39 mnemonics, and `dogecoin_hdnode`
+master keys. Secrets are encrypted to a persistent wrapping key and the
+resulting ciphertext is stored on disk, so the plaintext never resides in
+unprotected storage.
+
+### Platform support
+
+`src/seal.c` selects an encryption backend at compile time:
 
 - **Windows (TBS / NCrypt)** — `_WIN64 && USE_TPM2`
 - **Linux (TSS2 / ESAPI)** — `__linux__ && USE_TSS2`
-- **YubiKey PIV (PKCS#11)** — `USE_YUBIKEY` (cross-platform fallback)
+- **YubiKey PIV (PKCS#11)** — `USE_YUBIKEY` (cross-platform)
+- **Software (AES-256-GCM)** — always available as a fallback
 
-This document focuses on the Linux/TSS2 path: setup, testing with the
-emulator, persistent-handle layout, and the public API.
+Include `<dogecoin/seal.h>` and link against `-ldogecoin` to use these
+functions.
 
-## Linux setup
+### Linux setup
 
 Install the userspace TSS2 stack and a TPM (real hardware or an emulator):
 
@@ -38,7 +83,7 @@ back to a plain library lookup. They additionally verify the
 `libtss2-dev`/`libtss2-esys-dev` install fails at configure time rather than
 at link time.
 
-## Testing with the swtpm emulator
+### Testing with the swtpm emulator
 
 The unit tests under `test/tpm_tests.c` work against either a real TPM 2.0
 device or the [swtpm](https://github.com/stefanberger/swtpm) emulator. The
@@ -67,25 +112,11 @@ export TPM2TOOLS_TCTI="swtpm:host=127.0.0.1,port=2321"
 make check
 ```
 
-To exercise the seal module specifically:
-
-```sh
-./tests
-```
-
-`test_tpm` will exercise:
-
-- `dogecoin_generate_mnemonic_encrypt_with_tpm` /
-  `dogecoin_decrypt_mnemonic_with_tpm`
-- `dogecoin_generate_hdnode_encrypt_with_tpm` /
-  `dogecoin_decrypt_hdnode_with_tpm`
-- `dogecoin_list_encryption_keys_in_tpm`
-
 The multi-persistent slot path is gated on
 `TPM2_PT_HR_TRANSIENT_AVAIL >= 4`. Older `libtpms` (e.g. Ubuntu 22.04 ships
 0.9.3 with `MAX_LOADED_OBJECTS = 3`) will skip those subtests.
 
-## Persistent-handle layout
+### Persistent-handle layout (Linux/TSS2)
 
 Each slot's wrapping key lives at a deterministic persistent handle in the
 **owner hierarchy** range (`0x81710000`–`0x817EFFFF`). The base address
@@ -97,84 +128,443 @@ encodes the kind of secret, and the low 16 bits encode the file slot:
 | Encrypted mnemonic  | `0x81720000`  | `0x81720000`–`0x8172FFFF` |
 | Encrypted HD node   | `0x81730000`  | `0x81730000`–`0x8173FFFF` |
 
-The persistent-handle constants are defined in `src/seal.c`
-(`LINUX_TPM_PERSISTENT_BASE_*`). They live in the **owner** range
-(`0x81000000`–`0x817FFFFF`) so `Esys_EvictControl` succeeds with
-`ESYS_TR_RH_OWNER` authorization. The platform range (`0x81800000`+)
-requires platform auth that user-mode processes typically cannot obtain
-on a real TPM.
-
 On disk, an encrypted blob is stored as:
 
 ```
 [ TPM2_HANDLE persistent_addr ][ RSA-2048 ciphertext ]
 ```
 
-`dogecoin_list_encryption_keys_in_tpm` enumerates persistent handles via
-`Esys_GetCapability(TPM2_CAP_HANDLES, TPM2_PERSISTENT_FIRST)` and reports
-the slots that match a libdogecoin base.
+---
 
-## Resource management
+## Seed API
 
-All Linux/TSS2 code paths route every early-return through a small helper
-defined in `src/seal.c`:
+---
 
-```c
-// Frees a NULL-terminated list of Esys-allocated pointers and finalizes
-// the ESYS context. Both ctx and any list pointer may be NULL.
-static void tpm_cleanup(ESYS_CONTEXT** ctx, ...);
-```
+### **dogecoin_encrypt_seed_with_tpm:**
 
-Callers pass the address of the context plus any `Esys_Free`-able pointers
-returned via `Esys_GetRandom`, `Esys_CreatePrimary`, `Esys_RSA_Encrypt`, or
-`Esys_GetCapability`. Transient handles created with `Esys_CreatePrimary`
-are explicitly flushed via `Esys_FlushContext` before `tpm_cleanup`, and
-persistent handles obtained via `Esys_TR_FromTPMPublic` are closed with
-`Esys_TR_Close`.
+`dogecoin_bool dogecoin_encrypt_seed_with_tpm(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite)`
 
-## API examples
+Encrypts a BIP-32 seed using the TPM and stores the ciphertext in a file
+identified by `file_num`. If `overwrite` is false and a file already exists,
+the function returns false. The user is prompted for a password to protect
+the TPM wrapping key.
 
-Encrypt a freshly generated seed and persist it under slot 0:
+_C usage:_
 
 ```c
 #include <dogecoin/seal.h>
 
 SEED seed = {0};
-if (!dogecoin_generate_seed_encrypt_with_tpm(seed, /*file_num=*/0,
-                                             /*overwrite=*/true)) {
-    /* TPM unavailable, slot already in use, or password mismatch. */
-    abort();
-}
+/* populate seed ... */
+dogecoin_bool ok = dogecoin_encrypt_seed_with_tpm(seed, sizeof(seed), 0, true);
 ```
 
-Decrypt the same slot back into a usable seed buffer:
+---
+
+### **dogecoin_decrypt_seed_with_tpm:**
+
+`dogecoin_bool dogecoin_decrypt_seed_with_tpm(SEED seed, const int file_num)`
+
+Decrypts a BIP-32 seed previously encrypted with
+`dogecoin_encrypt_seed_with_tpm`. The user is prompted for the password used
+during encryption. Returns true on success and writes the plaintext into
+`seed`.
+
+_C usage:_
 
 ```c
+#include <dogecoin/seal.h>
+
 SEED seed = {0};
-if (!dogecoin_decrypt_seed_with_tpm(seed, /*file_num=*/0)) {
-    /* Wrong password, missing file, or TPM unavailable. */
-    abort();
-}
+dogecoin_bool ok = dogecoin_decrypt_seed_with_tpm(seed, 0);
 ```
 
-Mnemonic and HD-node variants follow the same pattern:
+---
+
+### **dogecoin_encrypt_seed_with_sw:**
+
+`dogecoin_bool dogecoin_encrypt_seed_with_sw(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite, const char* test_password, ENCRYPTED_BLOB* encrypted_blob_out, size_t* encrypted_blob_size)`
+
+Encrypts a BIP-32 seed using AES-256-GCM (software path) and stores the
+result in a file identified by `file_num`. Pass `test_password` as NULL to
+prompt the user interactively. The raw ciphertext is also returned via
+`encrypted_blob_out` and `encrypted_blob_size` when those pointers are
+non-NULL.
+
+_C usage:_
 
 ```c
-MNEMONIC mnemonic = {0};
-dogecoin_generate_mnemonic_encrypt_with_tpm(
-    mnemonic, /*file_num=*/0, /*overwrite=*/true,
-    "english", " ", NULL);
+#include <dogecoin/seal.h>
 
-dogecoin_decrypt_mnemonic_with_tpm(mnemonic, /*file_num=*/0);
+SEED seed = {0};
+/* populate seed ... */
+dogecoin_bool ok = dogecoin_encrypt_seed_with_sw(seed, sizeof(seed), 0, true,
+                                                 NULL, NULL, NULL);
+```
+
+---
+
+### **dogecoin_decrypt_seed_with_sw:**
+
+`dogecoin_bool dogecoin_decrypt_seed_with_sw(SEED seed, const int file_num, const char* test_password, ENCRYPTED_BLOB encrypted_blob)`
+
+Decrypts a BIP-32 seed previously encrypted with `dogecoin_encrypt_seed_with_sw`.
+Pass `test_password` as NULL to prompt interactively. Pass a non-NULL
+`encrypted_blob` to decrypt from an in-memory buffer rather than from disk.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+SEED seed = {0};
+dogecoin_bool ok = dogecoin_decrypt_seed_with_sw(seed, 0, NULL, NULL);
+```
+
+---
+
+### **dogecoin_encrypt_seed_with_sw_to_yubikey:**
+
+`dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite, const char* test_password)`
+
+Encrypts a BIP-32 seed with AES-256-GCM and stores the encrypted blob on a
+YubiKey via PKCS#11 PIV. Requires a connected YubiKey and the
+`USE_YUBIKEY` build flag. Pass `test_password` as NULL to prompt the user.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+SEED seed = {0};
+/* populate seed ... */
+dogecoin_bool ok = dogecoin_encrypt_seed_with_sw_to_yubikey(seed, sizeof(seed),
+                                                             0, true, NULL);
+```
+
+---
+
+### **dogecoin_decrypt_seed_with_sw_from_yubikey:**
+
+`dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey(SEED seed, const int file_num, const char* test_password)`
+
+Retrieves an encrypted seed blob from a YubiKey and decrypts it with
+AES-256-GCM. Requires `USE_YUBIKEY`. Pass `test_password` as NULL to prompt
+interactively.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+SEED seed = {0};
+dogecoin_bool ok = dogecoin_decrypt_seed_with_sw_from_yubikey(seed, 0, NULL);
+```
+
+---
+
+## Mnemonic API
+
+---
+
+### **dogecoin_generate_mnemonic_encrypt_with_tpm:**
+
+`dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_tpm(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, const char* lang, const char* space, const char* words)`
+
+Generates a new BIP-39 mnemonic phrase, stores it in `mnemonic`, encrypts it
+with the TPM, and writes the ciphertext to a file for slot `file_num`. The
+user is prompted for a password to protect the wrapping key. Use `"english"`
+for `lang` and `" "` for `space`. Pass NULL for `words` to generate a random
+mnemonic.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+MNEMONIC mnemonic = {0};
+dogecoin_bool ok = dogecoin_generate_mnemonic_encrypt_with_tpm(
+    mnemonic, 0, true, "english", " ", NULL);
+```
+
+---
+
+### **dogecoin_decrypt_mnemonic_with_tpm:**
+
+`dogecoin_bool dogecoin_decrypt_mnemonic_with_tpm(MNEMONIC mnemonic, const int file_num)`
+
+Decrypts a BIP-39 mnemonic previously encrypted with
+`dogecoin_generate_mnemonic_encrypt_with_tpm`. The user is prompted for the
+password used during encryption. Returns true on success and writes the
+plaintext mnemonic into `mnemonic`.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+MNEMONIC mnemonic = {0};
+dogecoin_bool ok = dogecoin_decrypt_mnemonic_with_tpm(mnemonic, 0);
+```
+
+---
+
+### **dogecoin_generate_mnemonic_encrypt_with_sw:**
+
+`dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, const char* lang, const char* space, const char* words, const char* test_password, ENCRYPTED_BLOB* encrypted_blob_out, size_t* encrypted_blob_size)`
+
+Generates a BIP-39 mnemonic and encrypts it with AES-256-GCM. Pass
+`test_password` as NULL to prompt interactively. The raw ciphertext is also
+returned via `encrypted_blob_out` and `encrypted_blob_size` when non-NULL.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+MNEMONIC mnemonic = {0};
+dogecoin_bool ok = dogecoin_generate_mnemonic_encrypt_with_sw(
+    mnemonic, 0, true, "english", " ", NULL, NULL, NULL, NULL);
+```
+
+---
+
+### **dogecoin_decrypt_mnemonic_with_sw:**
+
+`dogecoin_bool dogecoin_decrypt_mnemonic_with_sw(MNEMONIC mnemonic, const int file_num, const char* test_password, ENCRYPTED_BLOB encrypted_blob)`
+
+Decrypts a BIP-39 mnemonic previously encrypted with
+`dogecoin_generate_mnemonic_encrypt_with_sw`. Pass `test_password` as NULL
+to prompt interactively. Pass a non-NULL `encrypted_blob` to decrypt from
+memory instead of disk.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+MNEMONIC mnemonic = {0};
+dogecoin_bool ok = dogecoin_decrypt_mnemonic_with_sw(mnemonic, 0, NULL, NULL);
+```
+
+---
+
+### **dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey:**
+
+`dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, const char* lang, const char* space, const char* words, const char* test_password)`
+
+Generates a BIP-39 mnemonic, encrypts it with AES-256-GCM, and stores it on
+a YubiKey. Requires `USE_YUBIKEY`. Pass `test_password` as NULL to prompt
+the user.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+MNEMONIC mnemonic = {0};
+dogecoin_bool ok = dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey(
+    mnemonic, 0, true, "english", " ", NULL, NULL);
+```
+
+---
+
+### **dogecoin_decrypt_mnemonic_with_sw_from_yubikey:**
+
+`dogecoin_bool dogecoin_decrypt_mnemonic_with_sw_from_yubikey(MNEMONIC mnemonic, const int file_num, const char* test_password)`
+
+Retrieves an encrypted mnemonic blob from a YubiKey and decrypts it.
+Requires `USE_YUBIKEY`. Pass `test_password` as NULL to prompt interactively.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+MNEMONIC mnemonic = {0};
+dogecoin_bool ok = dogecoin_decrypt_mnemonic_with_sw_from_yubikey(mnemonic, 0, NULL);
+```
+
+---
+
+### **generateRandomEnglishMnemonicTPM:**
+
+`dogecoin_bool generateRandomEnglishMnemonicTPM(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite)`
+
+Convenience wrapper that generates a random 256-bit English BIP-39 mnemonic
+and encrypts it with the TPM under slot `file_num`. Equivalent to calling
+`dogecoin_generate_mnemonic_encrypt_with_tpm` with `lang="english"`,
+`space=" "`, and `words=NULL`.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+MNEMONIC mnemonic = {0};
+dogecoin_bool ok = generateRandomEnglishMnemonicTPM(mnemonic, 0, true);
+```
+
+---
+
+### **generateRandomEnglishMnemonicSW:**
+
+`dogecoin_bool generateRandomEnglishMnemonicSW(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, ENCRYPTED_BLOB* encrypted_blob, size_t* encrypted_blob_size)`
+
+Convenience wrapper that generates a random 256-bit English BIP-39 mnemonic
+and encrypts it with the software (AES-256-GCM) path under slot `file_num`.
+The raw ciphertext is returned via `encrypted_blob` and
+`encrypted_blob_size` when non-NULL.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+MNEMONIC mnemonic = {0};
+dogecoin_bool ok = generateRandomEnglishMnemonicSW(mnemonic, 0, true, NULL, NULL);
+```
+
+---
+
+## HD Node API
+
+---
+
+### **dogecoin_generate_hdnode_encrypt_with_tpm:**
+
+`dogecoin_bool dogecoin_generate_hdnode_encrypt_with_tpm(dogecoin_hdnode* out, const int file_num, const dogecoin_bool overwrite)`
+
+Generates a new BIP-32 HD master node, stores it in `out`, encrypts it with
+the TPM, and writes the ciphertext to a file for slot `file_num`. The user is
+prompted for a password to protect the wrapping key.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
 
 dogecoin_hdnode node;
-dogecoin_generate_hdnode_encrypt_with_tpm(&node, 0, true);
-dogecoin_decrypt_hdnode_with_tpm(&node, 0);
+dogecoin_bool ok = dogecoin_generate_hdnode_encrypt_with_tpm(&node, 0, true);
 ```
 
-To enumerate the slots currently provisioned in the TPM:
+---
+
+### **dogecoin_decrypt_hdnode_with_tpm:**
+
+`dogecoin_bool dogecoin_decrypt_hdnode_with_tpm(dogecoin_hdnode* out, const int file_num)`
+
+Decrypts a BIP-32 HD node previously encrypted with
+`dogecoin_generate_hdnode_encrypt_with_tpm`. The user is prompted for the
+password used during encryption. Returns true and populates `out` on success.
+
+_C usage:_
 
 ```c
+#include <dogecoin/seal.h>
+
+dogecoin_hdnode node;
+dogecoin_bool ok = dogecoin_decrypt_hdnode_with_tpm(&node, 0);
+```
+
+---
+
+### **dogecoin_generate_hdnode_encrypt_with_sw:**
+
+`dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw(dogecoin_hdnode* out, const int file_num, const dogecoin_bool overwrite, const char* test_password, ENCRYPTED_BLOB* encrypted_blob_out, size_t* encrypted_blob_size)`
+
+Generates a BIP-32 HD master node and encrypts it with AES-256-GCM. Pass
+`test_password` as NULL to prompt interactively. The raw ciphertext is
+returned via `encrypted_blob_out` and `encrypted_blob_size` when non-NULL.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+dogecoin_hdnode node;
+dogecoin_bool ok = dogecoin_generate_hdnode_encrypt_with_sw(
+    &node, 0, true, NULL, NULL, NULL);
+```
+
+---
+
+### **dogecoin_decrypt_hdnode_with_sw:**
+
+`dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* out, const int file_num, const char* test_password, ENCRYPTED_BLOB encrypted_blob)`
+
+Decrypts a BIP-32 HD node previously encrypted with
+`dogecoin_generate_hdnode_encrypt_with_sw`. Pass `test_password` as NULL to
+prompt interactively. Pass a non-NULL `encrypted_blob` to decrypt from memory
+instead of disk.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+dogecoin_hdnode node;
+dogecoin_bool ok = dogecoin_decrypt_hdnode_with_sw(&node, 0, NULL, NULL);
+```
+
+---
+
+### **dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey:**
+
+`dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey(dogecoin_hdnode* out, const int file_num, const dogecoin_bool overwrite, const char* test_password)`
+
+Generates a BIP-32 HD master node, encrypts it with AES-256-GCM, and stores
+it on a YubiKey. Requires `USE_YUBIKEY`. Pass `test_password` as NULL to
+prompt the user.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+dogecoin_hdnode node;
+dogecoin_bool ok = dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey(
+    &node, 0, true, NULL);
+```
+
+---
+
+### **dogecoin_decrypt_hdnode_with_sw_from_yubikey:**
+
+`dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey(dogecoin_hdnode* out, const int file_num, const char* test_password)`
+
+Retrieves an encrypted HD node blob from a YubiKey and decrypts it.
+Requires `USE_YUBIKEY`. Pass `test_password` as NULL to prompt interactively.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
+dogecoin_hdnode node;
+dogecoin_bool ok = dogecoin_decrypt_hdnode_with_sw_from_yubikey(&node, 0, NULL);
+```
+
+---
+
+## Enumeration API
+
+---
+
+### **dogecoin_list_encryption_keys_in_tpm:**
+
+`dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* names[], size_t* count)`
+
+Enumerates all libdogecoin persistent handles currently provisioned in the
+TPM and writes their string names into `names`. On return, `*count` contains
+the number of entries populated. The caller is responsible for freeing each
+`names[i]` string. Returns true if the enumeration succeeded.
+
+_C usage:_
+
+```c
+#include <dogecoin/seal.h>
+
 wchar_t* names[MAX_FILES] = {0};
 size_t count = 0;
 if (dogecoin_list_encryption_keys_in_tpm(names, &count)) {
@@ -185,15 +575,4 @@ if (dogecoin_list_encryption_keys_in_tpm(names, &count)) {
 }
 ```
 
-## Troubleshooting
-
-- **`Esys_Initialize` fails immediately** — no TCTI configured. Set
-  `TPM2TOOLS_TCTI` (e.g. `swtpm:host=127.0.0.1,port=2321` for emulator,
-  `device:/dev/tpmrm0` for real hardware) or install
-  `libtss2-tcti-tabrmd0` and run via the resource manager.
-- **`TPM_RC_OBJECT_MEMORY` on emulator** — `libtpms < 0.10` ships with
-  `MAX_LOADED_OBJECTS = 3`. Each persistent reserves a transient slot, so
-  multi-key tests need `TPM2_PT_HR_TRANSIENT_AVAIL >= 4`. The test suite
-  gates on this property automatically.
-- **`TPM_RC_VALUE` from `EvictControl`** — the persistent handle is in the
-  platform range. Use only the libdogecoin owner-hierarchy bases above.
+---
