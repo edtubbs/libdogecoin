@@ -86,10 +86,14 @@ run_one() {
   # Invalid-streak rejections (legacy without staging will accumulate these)
   local invalid_rejects
   invalid_rejects=$(grep -c "invalid header streak" "$log" || true)
-  # Distinct lane anchors observed in the log — sanity check that advance lanes
-  # actually fanned out to different forward checkpoints.
+  # Distinct start_locator hashes seen in the dispatcher log — proxy for the
+  # number of forward steps the chain actually advanced through (one new
+  # locator hash per committed batch). NOT a fan-out metric: header download
+  # is inherently sequential (the next locator depends on the previous batch
+  # being committed), so all replica peers in a given round always see the
+  # same start_locator hash. See doc/verification/spvnode_ts_performance_report.md.
   local distinct_anchors
-  distinct_anchors=$(grep -oE "anchor_height=[0-9]+" "$log" | sort -u | wc -l)
+  distinct_anchors=$(grep -oE "start_locator=[0-9a-f]+" "$log" | sort -u | wc -l)
   # Block deliveries (full-block sync mode only)
   local blocks_received
   blocks_received=$(grep -c "Connected block at height" "$log" || true)
@@ -110,7 +114,7 @@ run_one() {
          >> "$OUTDIR/results.csv"
 }
 
-echo "tag,bin,workers,mode,elapsed_s,connected_headers,headers_per_s,batches_2000,staged,invalid_rejects,distinct_lane_anchors,blocks_received" \
+echo "tag,bin,workers,mode,elapsed_s,connected_headers,headers_per_s,batches_2000,staged,invalid_rejects,distinct_locator_hashes,blocks_received" \
      > "$OUTDIR/results.csv"
 : > "$OUTDIR/summary.txt"
 

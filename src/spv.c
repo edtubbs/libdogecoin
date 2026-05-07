@@ -71,81 +71,27 @@ static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 #define MAX_HEADER_SYNC_CANDIDATES 64
-/* Per-peer lane hint stored in node->hints low byte.
+/* Header download is inherently sequential.  Each 2000-header batch is a
+ * hash chain whose connecting parent only becomes known after the previous
+ * batch is processed, so a single-chain header sync cannot be split across
+ * peers the way independent-blob block downloads can.  We still dispatch
+ * the same getheaders message to MAX_PARALLEL_HEADER_REQUESTS peers as
+ * "race replication": the staging ring (TS mode) discards duplicate
+ * out-of-order batches and keeps the fastest one, so a single slow peer
+ * does not stall progress.  The throughput benefit therefore comes from
+ *   (a) the bounded out-of-order staging ring (TS mode),
+ *   (b) the master-writer pump that drains it without blocking I/O peers,
+ * and *not* from per-lane locator fan-out.
  *
- * Encoding: 0 = "normal" lane (locator built from current chain tip).
- *           N > 0 = "advance" lane anchored at the (N-1)-th compiled
- *           checkpoint whose height is strictly greater than the local
- *           tip height + SPV_LANE_FORWARD_GAP.  The peer matches that
- *           single-hash locator and returns up to 2000 fresh headers
- *           starting at checkpoint_height + 1, so each advance lane
- *           covers a *different* forward span.  These arrive ahead of
- *           the live tip and are kept in the bounded out-of-order
- *           staging ring (TS mode) until the master writer connects
- *           them as the contiguous tip catches up.
+ * The low byte of node->hints is reserved (HEADER_LANE_HINT_MASK) for a
+ * future per-peer routing tag and is currently always set to 0.
  */
 #define HEADER_LANE_HINT_MASK 0xFFU
 #define HEADER_INVALID_STREAK_SHIFT 8
 #define HEADER_INVALID_STREAK_MASK (0xFFU << HEADER_INVALID_STREAK_SHIFT)
 static const unsigned int MAX_INVALID_STREAK_VALUE = 0xFFU;
 static const unsigned int INVALID_STREAK_SENTINEL = 0x100U;
-static const unsigned int MAX_PARALLEL_HEADER_REQUESTS = 5;
-/* Don't anchor an advance lane within this many blocks of the local tip
- * (one full 2000-header batch); otherwise its returned span would
- * overlap with lane 0's normal-locator batch. */
-static const uint32_t SPV_LANE_FORWARD_GAP = 2000;
-
-/* Return the index-th compiled checkpoint whose height is strictly greater
- * than (tip_height + SPV_LANE_FORWARD_GAP), or NULL if no such entry exists.
- * The compiled mainnet/testnet checkpoint arrays are stored in ascending
- * height order, so we walk forward from the start. */
-static const dogecoin_checkpoint *spv_get_forward_checkpoint(
-        const dogecoin_chainparams *params, uint32_t tip_height, size_t index)
-{
-    const dogecoin_checkpoint *table;
-    size_t length;
-    if (memcmp(params, &dogecoin_chainparams_main, 4) == 0) {
-        table = dogecoin_mainnet_checkpoint_array;
-        length = sizeof(dogecoin_mainnet_checkpoint_array) /
-                 sizeof(dogecoin_mainnet_checkpoint_array[0]);
-    } else {
-        table = dogecoin_testnet_checkpoint_array;
-        length = sizeof(dogecoin_testnet_checkpoint_array) /
-                 sizeof(dogecoin_testnet_checkpoint_array[0]);
-    }
-    size_t seen = 0;
-    for (size_t i = 0; i < length; i++) {
-        if (table[i].height > tip_height + SPV_LANE_FORWARD_GAP) {
-            if (seen == index) {
-                return &table[i];
-            }
-            seen++;
-        }
-    }
-    return NULL;
-}
-
-/* Count compiled checkpoints strictly ahead of (tip_height + gap). */
-static size_t spv_count_forward_checkpoints(
-        const dogecoin_chainparams *params, uint32_t tip_height)
-{
-    const dogecoin_checkpoint *table;
-    size_t length;
-    if (memcmp(params, &dogecoin_chainparams_main, 4) == 0) {
-        table = dogecoin_mainnet_checkpoint_array;
-        length = sizeof(dogecoin_mainnet_checkpoint_array) /
-                 sizeof(dogecoin_mainnet_checkpoint_array[0]);
-    } else {
-        table = dogecoin_testnet_checkpoint_array;
-        length = sizeof(dogecoin_testnet_checkpoint_array) /
-                 sizeof(dogecoin_testnet_checkpoint_array[0]);
-    }
-    size_t count = 0;
-    for (size_t i = 0; i < length; i++) {
-        if (table[i].height > tip_height + SPV_LANE_FORWARD_GAP) count++;
-    }
-    return count;
-}
+static const unsigned int MAX_PARALLEL_HEADER_REQUESTS = 2;
 
 static unsigned int spv_get_invalid_header_streak(const dogecoin_node* node)
 {
@@ -1064,33 +1010,12 @@ void dogecoin_net_spv_node_request_headers_or_blocks(dogecoin_node *node, dogeco
 {
     // request next headers
     vector_t *blocklocators = vector_new(1, free);
-    unsigned int lane_hint = 0;
-    if (!blocks) {
-        lane_hint = (unsigned int)(node->hints & HEADER_LANE_HINT_MASK);
-    }
 
     dogecoin_spv_client *client = (dogecoin_spv_client *)node->nodegroup->ctx;
-    const dogecoin_checkpoint *anchor = NULL;
-    if (!blocks && lane_hint > 0) {
-        uint32_t tip_height = client->headers_db->getchaintip(client->headers_db_ctx)->height;
-        anchor = spv_get_forward_checkpoint(client->chainparams, tip_height, (size_t)(lane_hint - 1));
-    }
-    if (anchor != NULL) {
-        /* Advance lane: anchor at a single compiled-checkpoint hash strictly ahead
-         * of our tip so this peer returns a *different* forward 2000-header span
-         * than lane 0 (whose locator follows the live tip). The TS staging ring
-         * holds the result until our contiguous tip catches up. */
-        uint256_t *hash = dogecoin_calloc(1, sizeof(uint256_t));
-        utils_uint256_sethex((char *)anchor->hash, (uint8_t *)hash);
-        vector_add(blocklocators, (void *)hash);
-    } else {
-        /* Lane 0 (or advance lane with no checkpoint ahead): use the normal
-         * tip-derived locator. We deliberately do NOT trim the front of the
-         * locator anymore — the prior lane_trim_offset scheme actually caused
-         * the peer to match an *older* hash and return a backward-shifted,
-         * overlapping range rather than a parallel forward one. */
-        dogecoin_net_spv_fill_block_locator(client, blocklocators);
-    }
+    /* Header download is sequential: we always send the same tip-derived
+     * locator. When dispatched to multiple peers the staging ring keeps
+     * the fastest reply and discards duplicates (race replication). */
+    dogecoin_net_spv_fill_block_locator(client, blocklocators);
 
     if (!blocks && blocklocators->len > 0) {
         uint256_t* start_locator = vector_idx(blocklocators, 0);
@@ -1098,13 +1023,8 @@ void dogecoin_net_spv_node_request_headers_or_blocks(dogecoin_node *node, dogeco
             char locator_buf[DOGECOIN_HASH_LENGTH * 2 + 1];
             const char* locator_str = hash_to_string(*start_locator);
             memcpy_safe(locator_buf, locator_str, sizeof(locator_buf));
-            if (anchor != NULL) {
-                node->nodegroup->log_write_cb("Header request node %d: lane=%u anchor_height=%u locator_count=%zu start_locator=%s\n",
-                    node->nodeid, lane_hint, anchor->height, blocklocators->len, locator_buf);
-            } else {
-                node->nodegroup->log_write_cb("Header request node %d: lane=0 (tip locator) locator_count=%zu start_locator=%s\n",
-                    node->nodeid, blocklocators->len, locator_buf);
-            }
+            node->nodegroup->log_write_cb("Header request node %d: locator_count=%zu start_locator=%s\n",
+                node->nodeid, blocklocators->len, locator_buf);
         }
     }
 
@@ -1201,23 +1121,15 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
                 }
             }
             if (!request_blocks && candidate_len > 0) {
-                size_t max_parallel_cap = candidate_len < MAX_PARALLEL_HEADER_REQUESTS ? candidate_len : MAX_PARALLEL_HEADER_REQUESTS;
-                /* Cap advance lanes by the number of compiled checkpoints that
-                 * are actually ahead of our tip. Lane 0 is always available
-                 * (normal tip locator); each additional lane needs its own
-                 * forward checkpoint anchor or it would just duplicate lane 0. */
-                size_t forward_anchors = spv_count_forward_checkpoints(client->chainparams, tip_height);
-                size_t usable_lanes = forward_anchors + 1; /* +1 for lane 0 */
-                if (max_parallel_cap > usable_lanes) max_parallel_cap = usable_lanes;
-                size_t max_parallel = max_parallel_cap;
+                size_t max_parallel = candidate_len < MAX_PARALLEL_HEADER_REQUESTS ? candidate_len : MAX_PARALLEL_HEADER_REQUESTS;
+                /* Race-replicate the same getheaders to N peers; the staging
+                 * ring discards duplicate batches and keeps the fastest one. */
                 for (size_t lane = 0; lane < max_parallel; lane++) {
                     size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
                     dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
-                    /* lane 0 = normal tip locator; lane N>=1 = (N-1)-th forward checkpoint */
-                    uint32_t lane_hint = (uint32_t)lane;
-                    selected_node->hints = (selected_node->hints & ~HEADER_LANE_HINT_MASK) | lane_hint;
+                    selected_node->hints = (selected_node->hints & ~HEADER_LANE_HINT_MASK);
                     dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
-                    client->nodegroup->log_write_cb("Requested next headers chunk from node %d (lane=%zu/%zu, hint=%u, tip=%u)\n", selected_node->nodeid, lane + 1, max_parallel, lane_hint, tip_height);
+                    client->nodegroup->log_write_cb("Requested next headers chunk from node %d (replica=%zu/%zu, tip=%u)\n", selected_node->nodeid, lane + 1, max_parallel, tip_height);
                     new_headers_available = true;
                     request_count++;
                 }
@@ -1253,16 +1165,11 @@ dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client *client)
             }
         }
         if (candidate_len > 0) {
-            size_t max_parallel_cap = candidate_len < MAX_PARALLEL_HEADER_REQUESTS ? candidate_len : MAX_PARALLEL_HEADER_REQUESTS;
-            size_t forward_anchors = spv_count_forward_checkpoints(client->chainparams, tip_height);
-            size_t usable_lanes = forward_anchors + 1; /* +1 for lane 0 */
-            if (max_parallel_cap > usable_lanes) max_parallel_cap = usable_lanes;
-            size_t max_parallel = max_parallel_cap;
+            size_t max_parallel = candidate_len < MAX_PARALLEL_HEADER_REQUESTS ? candidate_len : MAX_PARALLEL_HEADER_REQUESTS;
             for (size_t lane = 0; lane < max_parallel; lane++) {
                 size_t selected = candidate_node_indices[(client->next_headers_peer_cursor + lane) % candidate_len];
                 dogecoin_node *selected_node = vector_idx(client->nodegroup->nodes, selected);
-                uint32_t lane_hint = (uint32_t)lane;
-                selected_node->hints = (selected_node->hints & ~HEADER_LANE_HINT_MASK) | lane_hint;
+                selected_node->hints = (selected_node->hints & ~HEADER_LANE_HINT_MASK);
                 dogecoin_net_spv_node_request_headers_or_blocks(selected_node, false);
                 new_headers_available = true;
             }
