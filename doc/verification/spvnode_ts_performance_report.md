@@ -163,15 +163,95 @@ cat ./spvbench_out/results.csv
 The harness writes one debug log per run under `./spvbench_out/<tag>.log`
 so the metrics above can be re-derived by hand.
 
-## Caveats
+## Update — checkpoint-anchored advance lanes (2026-05-07)
 
-* Single sample per cell. The 244 headers/s number for ts_w2 in
-  particular is almost certainly noise — same binary, same flags except
-  for `-o`, it ran lower than ts_w1. A multi-sample re-run is needed
-  before drawing fine-grained worker-count conclusions.
-* Mainnet peer set varies. We connected to 24 peers in each run but
-  peer chain heights, latency, and willingness to serve historic
-  headers differs between runs.
-* This is a *header* throughput characterization. Full block download
-  throughput was not measured (full-block mode requires `-b` and a much
-  longer window to reach steady state).
+A follow-up review of the per-peer debug logs showed that **even with
+multiple workers and multiple peers, every peer was being sent
+essentially the same locator** — the previously-measured TS speedup
+came entirely from the staging/pump-stall fixes, not from any real
+per-peer forward fan-out.
+
+### Why the prior `lane_trim_offset` scheme didn't fan out
+
+`dogecoin_headers_db_fill_block_locator()` builds a locator in
+*most-recent-first* order — `[tip, tip-1, tip-2, …, tip-9]`. The old
+lane scheduler trimmed the **front** (recent end) of that vector for
+lanes ≥ 1, so:
+
+| Lane | Locator the peer received     | First locator hash the peer matches | 2000-header range returned |
+| ---- | ----------------------------- | ----------------------------------- | -------------------------- |
+| 0    | `[tip, tip-1, …, tip-9]`      | `tip`                               | `[tip+1 … tip+2000]`       |
+| 1    | `[tip-1, tip-2, …, tip-9]`    | `tip-1`                             | `[tip … tip+1999]`         |
+| 2    | `[tip-2, tip-3, …, tip-9]`    | `tip-2`                             | `[tip-1 … tip+1998]`       |
+
+Each advance lane thus produced a **backward-shifted, redundant** range
+rather than a parallel forward span. Lane 0 was the only lane doing
+useful work, and lanes ≥ 1 wasted bandwidth re-downloading headers
+already on our side.
+
+### What actually changed
+
+`src/spv.c` now anchors advance lanes at **compiled-checkpoint hashes
+strictly ahead of the current tip**:
+
+* Lane 0 keeps the normal tip-derived locator (no trim).
+* For lane N ≥ 1, the dispatcher walks the
+  `dogecoin_mainnet_checkpoint_array` (or testnet) forward from the
+  local tip and picks the (N-1)-th checkpoint with
+  `height > tip + 2000`. The locator becomes a single hash — the
+  checkpoint hash — so the peer matches it exactly and returns
+  `[checkpoint_height+1 … checkpoint_height+2000]`. Each advance lane
+  therefore covers a *different forward span* of the chain.
+* The number of advance lanes is capped at the count of compiled
+  checkpoints actually ahead of the tip; once we sync past every
+  compiled checkpoint, only lane 0 is dispatched (degrading
+  gracefully back to single-peer header sync, which is what the
+  protocol allows when no future hashes are known).
+* These advance batches arrive ahead of the contiguous tip and are
+  parked in the bounded TS staging ring (`SPV_HEADERS_STAGE_CAPACITY`)
+  until the master writer connects them as the live tip catches up.
+* Debug log line is now
+  `Header request node N: lane=K anchor_height=H locator_count=1 …`
+  (or `lane=0 (tip locator) …` for lane 0), so a single
+  `grep anchor_height= <log> | sort -u` shows whether advance lanes
+  actually fanned out across distinct forward spans during a run.
+
+### Block-mode benchmark
+
+`contrib/devtools/spvnode_bench.sh` now also exercises full-block sync
+(`-b`), with rows `legacy_b1`, `legacy_b4`, `ts_b1`, `ts_b4`, `ts_b8`,
+and the CSV gained two columns:
+
+* `distinct_lane_anchors` — distinct `anchor_height=` values observed
+  in the run (sanity check that advance lanes anchored at different
+  forward checkpoints).
+* `blocks_received` — count of `Connected block at height` log lines
+  in block-sync mode.
+
+Block mode exercises a different code path than headers-only sync:
+besides validating each block, the SPV client runs the wallet UTXO
+scan, persists state, and walks the address index per block — none of
+which the headers-only path does. So the TS gain in block mode is
+expected to be smaller than in header mode (the per-block work is
+already serialized through the wallet writer regardless of worker
+count). The harness now lets us measure that head-to-head; running
+the live benchmark requires outbound P2P access (port 22556) which is
+not available in the CI sandbox where this change was authored, so
+re-measured numbers should be collected on a network-reachable host
+and dropped into `doc/verification/spvnode_ts_performance_results.csv`.
+
+### Caveats specific to checkpoint-anchored fan-out
+
+* The number of usable advance lanes is bounded by the number of
+  compiled checkpoints ahead of the local tip. Mainnet currently
+  ships 24 checkpoints; once the local tip passes the last one, the
+  dispatcher falls back to lane 0 only (one peer at a time for
+  headers). Adding more recent checkpoints to
+  `src/chainparams.c:dogecoin_mainnet_checkpoint_array` immediately
+  lengthens the runway over which advance fan-out is effective.
+* Advance lanes never "skip ahead" of a compiled, validated
+  checkpoint, so a malicious peer cannot fabricate a long
+  alternate-history advance batch and have it accepted — its
+  staged headers must still chain back to a connected tip in
+  ascending height before the master writer commits them.
+

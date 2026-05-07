@@ -42,22 +42,26 @@ if [[ ! -x ./spvnode || ! -x ./spvnode_ts ]]; then
 fi
 
 run_one() {
-  local bin="$1" workers="$2" tag="$3"
+  local bin="$1" workers="$2" tag="$3" mode="${4:-headers}"
   local log="$OUTDIR/${tag}.log"
 
   rm -f bench_main_headers.db bench_main_wallet.db
-  echo "=== $tag : $bin -o $workers (${DURATION}s) ===" | tee -a "$OUTDIR/summary.txt"
+  local mode_flag=""
+  if [[ "$mode" == "blocks" ]]; then
+    mode_flag="-b"
+  fi
+  echo "=== $tag : $bin -o $workers ${mode_flag:+$mode_flag} (${DURATION}s) ===" \
+    | tee -a "$OUTDIR/summary.txt"
 
   local t0 t1
   t0=$(date +%s)
   # -l (--no_prompt) is required so spvnode/spvnode_ts run unattended (no
   # password/wallet prompts). -p starts from the latest compiled checkpoint.
-  # stdbuf forces line-buffered stdio so log output is preserved when SIGTERM
-  # arrives at end-of-window (default fully-buffered stdio loses everything
-  # when the timeout signal hits).
+  # -b enables full-block sync mode. stdbuf forces line-buffered stdio so
+  # log output is preserved when SIGTERM arrives at end-of-window.
   timeout --foreground --signal=INT --kill-after=5 "$DURATION" \
       stdbuf -oL -eL \
-      ./"$bin" -d -p -c -l -m 8 -o "$workers" \
+      ./"$bin" -d -p -c -l -m 8 -o "$workers" $mode_flag \
         -h ./bench_main_headers.db -w ./bench_main_wallet.db scan \
         > "$log" 2>&1 || true
   t1=$(date +%s)
@@ -71,15 +75,24 @@ run_one() {
   # Number of "Got 2000 headers" deliveries (raw batch arrivals)
   local batches
   batches=$(grep -c "Got 2000 headers" "$log" || true)
-  # Number of staged out-of-order batches (TS-mode only)
+  # Number of staged out-of-order batches (TS-mode only) — match either the
+  # legacy "staged prev=" tag or the live "Staged out-of-order headers batch"
+  # log line.
   local staged
-  staged=$(grep -c "staged prev=" "$log" || true)
+  staged=$(grep -cE "staged prev=|Staged out-of-order headers batch" "$log" || true)
   # Final tip height advanced
   local final_tip
   final_tip=$(awk '/Chaintip at height/ {h=$NF} END {print h+0}' "$log")
   # Invalid-streak rejections (legacy without staging will accumulate these)
   local invalid_rejects
   invalid_rejects=$(grep -c "invalid header streak" "$log" || true)
+  # Distinct lane anchors observed in the log — sanity check that advance lanes
+  # actually fanned out to different forward checkpoints.
+  local distinct_anchors
+  distinct_anchors=$(grep -oE "anchor_height=[0-9]+" "$log" | sort -u | wc -l)
+  # Block deliveries (full-block sync mode only)
+  local blocks_received
+  blocks_received=$(grep -c "Connected block at height" "$log" || true)
 
   local rate
   if (( elapsed > 0 )); then
@@ -88,28 +101,40 @@ run_one() {
     rate="0.0"
   fi
 
-  printf "  elapsed=%ds  connected=%s  rate=%s/s  batches=%s  staged=%s  invalid_rejects=%s  final_tip=%s\n" \
-         "$elapsed" "$connected" "$rate" "$batches" "$staged" "$invalid_rejects" "$final_tip" \
+  printf "  elapsed=%ds  mode=%s  connected=%s  rate=%s/s  batches=%s  staged=%s  invalid=%s  anchors=%s  blocks=%s  final_tip=%s\n" \
+         "$elapsed" "$mode" "$connected" "$rate" "$batches" "$staged" "$invalid_rejects" "$distinct_anchors" "$blocks_received" "$final_tip" \
          | tee -a "$OUTDIR/summary.txt"
 
-  printf "%s,%s,%s,%s,%s,%s,%s,%s,%s\n" \
-         "$tag" "$bin" "$workers" "$elapsed" "$connected" "$rate" "$batches" "$staged" "$invalid_rejects" \
+  printf "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n" \
+         "$tag" "$bin" "$workers" "$mode" "$elapsed" "$connected" "$rate" "$batches" "$staged" "$invalid_rejects" "$distinct_anchors" "$blocks_received" \
          >> "$OUTDIR/results.csv"
 }
 
-echo "tag,bin,workers,elapsed_s,connected_headers,headers_per_s,batches_2000,staged,invalid_rejects" \
+echo "tag,bin,workers,mode,elapsed_s,connected_headers,headers_per_s,batches_2000,staged,invalid_rejects,distinct_lane_anchors,blocks_received" \
      > "$OUTDIR/results.csv"
 : > "$OUTDIR/summary.txt"
 
-# Matrix: legacy at w=1,4 (workers > legacy SMP doesn't increase fan-out)
-# vs spvnode_ts at w=1,2,4,8 to characterize TS scaling.
-run_one spvnode    1 legacy_w1
-run_one spvnode    4 legacy_w4
-run_one spvnode_ts 1 ts_w1
-run_one spvnode_ts 2 ts_w2
-run_one spvnode_ts 4 ts_w4
-run_one spvnode_ts 8 ts_w8
+# Header-sync matrix (default scan mode): legacy at w=1,4 (workers > legacy
+# SMP doesn't increase fan-out) vs spvnode_ts at w=1,2,4,8 to characterize
+# TS scaling.
+run_one spvnode    1 legacy_w1 headers
+run_one spvnode    4 legacy_w4 headers
+run_one spvnode_ts 1 ts_w1     headers
+run_one spvnode_ts 2 ts_w2     headers
+run_one spvnode_ts 4 ts_w4     headers
+run_one spvnode_ts 8 ts_w8     headers
+
+# Block-sync matrix (-b): characterize full-block download throughput at the
+# same worker counts so the TS gain (or absence thereof) in block mode can be
+# compared head-to-head with header-only mode above. Block mode triggers the
+# full-block code path which has different bottlenecks (per-block UTXO scan,
+# wallet update, on-disk persistence) than headers-only sync.
+run_one spvnode    1 legacy_b1 blocks
+run_one spvnode    4 legacy_b4 blocks
+run_one spvnode_ts 1 ts_b1     blocks
+run_one spvnode_ts 4 ts_b4     blocks
+run_one spvnode_ts 8 ts_b8     blocks
 
 echo
 echo "Results written to: $OUTDIR/results.csv and $OUTDIR/summary.txt"
-echo "Per-run debug logs:  $OUTDIR/{legacy_w1,legacy_w4,ts_w1,ts_w2,ts_w4,ts_w8}.log"
+echo "Per-run debug logs:  $OUTDIR/{legacy_w1,legacy_w4,ts_w1,ts_w2,ts_w4,ts_w8,legacy_b1,legacy_b4,ts_b1,ts_b4,ts_b8}.log"
