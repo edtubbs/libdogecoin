@@ -33,6 +33,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* Pull in libdogecoin-config.h early so platform gates below (e.g. USE_OPTEE)
+ * are visible before we decide whether to enable a pthread-backed mutex. */
+#if defined(HAVE_CONFIG_H) && !defined(USE_LIB)
+#include <config/libdogecoin-config.h>
+#endif
+
 #ifdef _WIN32
 /* Require Windows 8+ so both winnls.h's NormalizationKD/NormalizeString and
  * winsock2.h's htonll/ntohll prototypes are visible to all consumers of this
@@ -55,16 +62,13 @@
  * / freestanding targets such as OP-TEE Trusted Applications (libutee) ship a
  * <pthread.h> via the cross toolchain headers but cannot resolve
  * pthread_mutex_* at link time, so they fall through to the no-op stubs. */
-#elif defined(__GLIBC__) || defined(__BIONIC__) || defined(__APPLE__) || \
-      defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
-      defined(__DragonFly__) || defined(__CYGWIN__) || defined(__MINGW32__) || \
-      defined(__MINGW64__) || defined(__sun) || defined(__HAIKU__)
+#elif !defined(USE_OPTEE) && \
+      (defined(__GLIBC__) || defined(__BIONIC__) || defined(__APPLE__) || \
+       defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
+       defined(__DragonFly__) || defined(__CYGWIN__) || defined(__MINGW32__) || \
+       defined(__MINGW64__) || defined(__sun) || defined(__HAIKU__))
 #include <pthread.h>
 #define DOGECOIN_HAVE_THREADS 1
-#endif
-
-#if defined(HAVE_CONFIG_H) && !defined(USE_LIB)
-#include <config/libdogecoin-config.h>
 #endif
 
 typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
