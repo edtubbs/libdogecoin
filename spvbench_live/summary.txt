@@ -1,0 +1,13 @@
+=== legacy_w1 : spvnode -o 1  (90s) ===
+  elapsed=90s  mode=headers  connected=80000  rate=888.9/s  batches=1029  staged=0  invalid=988  anchors=41  blocks=0  final_tip=5480000
+=== legacy_w4 : spvnode -o 4  (90s) ===
+  elapsed=90s  mode=headers  connected=80000  rate=888.9/s  batches=1199  staged=0  invalid=1158  anchors=41  blocks=0  final_tip=5480000
+=== ts_w1 : spvnode_ts -o 1  (90s) ===
+  elapsed=90s  mode=headers  connected=82000  rate=911.1/s  batches=1002  staged=960  invalid=0  anchors=42  blocks=0  final_tip=5482000
+=== ts_w2 : spvnode_ts -o 2  (90s) ===
+  elapsed=90s  mode=headers  connected=84000  rate=933.3/s  batches=993  staged=950  invalid=0  anchors=43  blocks=0  final_tip=5484000
+=== ts_w4 : spvnode_ts -o 4  (90s) ===
+  elapsed=90s  mode=headers  connected=84000  rate=933.3/s  batches=823  staged=780  invalid=0  anchors=43  blocks=0  final_tip=5484000
+=== ts_w8 : spvnode_ts -o 8  (90s) ===
+  elapsed=90s  mode=headers  connected=86000  rate=955.6/s  batches=1201  staged=1157  invalid=0  anchors=44  blocks=0  final_tip=5486000
+=== legacy_b1 : spvnode -o 1 -b (90s) ===
