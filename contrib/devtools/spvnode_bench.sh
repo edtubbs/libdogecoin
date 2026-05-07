@@ -93,7 +93,7 @@ run_one() {
   # being committed), so all replica peers in a given round always see the
   # same start_locator hash. See doc/verification/spvnode_ts_performance_report.md.
   local distinct_anchors
-  distinct_anchors=$(grep -oE "start_locator=[0-9a-f]+" "$log" | sort -u | wc -l)
+  distinct_anchors=$( (grep -oE "start_locator=[0-9a-f]+" "$log" || true) | sort -u | sed '/^$/d' | wc -l )
   # Block deliveries (full-block sync mode only)
   local blocks_received
   blocks_received=$(grep -c "Connected block at height" "$log" || true)

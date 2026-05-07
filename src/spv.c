@@ -166,6 +166,29 @@ typedef struct spv_headers_stage_ctx_ {
     uint64_t dropped_total;
 } spv_headers_stage_ctx;
 
+/* Bounded master-writer staging for out-of-order full blocks.
+ * Full blocks can arrive from different peers out-of-order in block mode.
+ * In TS mode we stage these blocks by prev_block/hash and drain when the
+ * chaintip advances, instead of marking the peer as misbehaved. */
+#define SPV_BLOCKS_STAGE_CAPACITY 64
+
+typedef struct spv_block_stage_slot_ {
+    int in_use;
+    int nodeid;
+    uint8_t* payload;       /* owned */
+    size_t payload_len;
+    uint8_t prev_block[32]; /* little-endian */
+    uint8_t block_hash[32]; /* little-endian */
+} spv_block_stage_slot;
+
+typedef struct spv_blocks_stage_ctx_ {
+    spv_block_stage_slot slots[SPV_BLOCKS_STAGE_CAPACITY];
+    size_t count;
+    uint64_t staged_total;
+    uint64_t drained_total;
+    uint64_t dropped_total;
+} spv_blocks_stage_ctx;
+
 static spv_headers_stage_ctx* spv_headers_stage_init(void)
 {
     return (spv_headers_stage_ctx*)dogecoin_calloc(1, sizeof(spv_headers_stage_ctx));
@@ -189,6 +212,29 @@ static void spv_headers_stage_clear_slot(spv_header_stage_slot* slot)
     memset(slot, 0, sizeof(*slot));
 }
 
+static spv_blocks_stage_ctx* spv_blocks_stage_init(void)
+{
+    return (spv_blocks_stage_ctx*)dogecoin_calloc(1, sizeof(spv_blocks_stage_ctx));
+}
+
+static void spv_blocks_stage_clear_slot(spv_block_stage_slot* slot)
+{
+    if (!slot) return;
+    if (slot->payload) dogecoin_free(slot->payload);
+    memset(slot, 0, sizeof(*slot));
+}
+
+static void spv_blocks_stage_free(spv_blocks_stage_ctx* stage)
+{
+    if (!stage) return;
+    for (size_t i = 0; i < SPV_BLOCKS_STAGE_CAPACITY; i++) {
+        if (stage->slots[i].in_use) {
+            spv_blocks_stage_clear_slot(&stage->slots[i]);
+        }
+    }
+    dogecoin_free(stage);
+}
+
 static dogecoin_node* spv_find_node_by_id(dogecoin_spv_client* client, int nodeid)
 {
     size_t i;
@@ -199,6 +245,23 @@ static dogecoin_node* spv_find_node_by_id(dogecoin_spv_client* client, int nodei
         }
     }
     return NULL;
+}
+
+static dogecoin_bool spv_extract_block_header_info(dogecoin_spv_client* client, const uint8_t* payload, size_t payload_len, uint8_t prev_block[32], uint8_t block_hash[32])
+{
+    if (!client || !payload || payload_len == 0 || !prev_block || !block_hash) return false;
+    struct const_buffer cbuf = { payload, payload_len };
+    dogecoin_block_header* hdr = dogecoin_block_header_new();
+    uint256_t chainwork;
+    if (!hdr) return false;
+    if (!dogecoin_block_header_deserialize(hdr, &cbuf, client->chainparams, &chainwork)) {
+        dogecoin_block_header_free(hdr);
+        return false;
+    }
+    memcpy_safe(prev_block, hdr->prev_block, 32);
+    dogecoin_block_header_hash(hdr, block_hash);
+    dogecoin_block_header_free(hdr);
+    return true;
 }
 
 static dogecoin_bool spv_validate_headers_payload(uint32_t amount_of_headers, const uint8_t* payload, size_t payload_len, const dogecoin_chainparams* params)
@@ -343,6 +406,7 @@ static void spv_headers_pipeline_free(spv_headers_pipeline_ctx* ctx) { UNUSED(ct
 
 /* Forward declaration so staging helpers can call the committer. */
 static void spv_commit_parsed_headers_batch(dogecoin_spv_client* client, int nodeid, uint32_t amount_of_headers, const uint8_t* payload, size_t payload_len, dogecoin_bool parse_ok);
+static dogecoin_bool spv_commit_block_payload(dogecoin_spv_client* client, int nodeid, const uint8_t* payload, size_t payload_len);
 
 /* Read the first header's prev_block (32 bytes at offset 4 of the serialized header).
  * Returns true on success; false if payload is too short. */
@@ -442,6 +506,85 @@ static void spv_stage_drain_for_tip(dogecoin_spv_client* client)
     }
 }
 
+static dogecoin_bool spv_stage_block(dogecoin_spv_client* client, int nodeid, const uint8_t* payload, size_t payload_len, const uint8_t prev_block[32], const uint8_t block_hash[32])
+{
+    spv_blocks_stage_ctx* stage = (spv_blocks_stage_ctx*)client->blocks_stage_ctx;
+    if (!stage || !payload || payload_len == 0) return false;
+
+    uint8_t* copy = (uint8_t*)dogecoin_calloc(1, payload_len);
+    if (!copy) return false;
+    memcpy(copy, payload, payload_len);
+
+    for (size_t i = 0; i < SPV_BLOCKS_STAGE_CAPACITY; i++) {
+        if (stage->slots[i].in_use && memcmp(stage->slots[i].block_hash, block_hash, 32) == 0) {
+            dogecoin_free(copy);
+            return true;
+        }
+    }
+
+    size_t target = SPV_BLOCKS_STAGE_CAPACITY;
+    for (size_t i = 0; i < SPV_BLOCKS_STAGE_CAPACITY; i++) {
+        if (!stage->slots[i].in_use) { target = i; break; }
+    }
+    if (target == SPV_BLOCKS_STAGE_CAPACITY) {
+        spv_blocks_stage_clear_slot(&stage->slots[0]);
+        stage->count--;
+        stage->dropped_total++;
+        target = 0;
+    }
+
+    spv_block_stage_slot* slot = &stage->slots[target];
+    slot->payload = copy;
+    slot->payload_len = payload_len;
+    slot->nodeid = nodeid;
+    memcpy(slot->prev_block, prev_block, 32);
+    memcpy(slot->block_hash, block_hash, 32);
+    slot->in_use = 1;
+    stage->count++;
+    stage->staged_total++;
+
+    if (client->nodegroup && client->nodegroup->log_write_cb) {
+        client->nodegroup->log_write_cb("Staged out-of-order block from node %d (staged=%zu)\n", nodeid, stage->count);
+    }
+    return true;
+}
+
+static void spv_blocks_stage_drain_for_tip(dogecoin_spv_client* client)
+{
+    spv_blocks_stage_ctx* stage = (spv_blocks_stage_ctx*)client->blocks_stage_ctx;
+    if (!stage || stage->count == 0 || !client->headers_db) return;
+
+    int made_progress = 1;
+    while (made_progress) {
+        made_progress = 0;
+        dogecoin_blockindex* tip = client->headers_db->getchaintip(client->headers_db_ctx);
+        if (!tip) break;
+        for (size_t i = 0; i < SPV_BLOCKS_STAGE_CAPACITY; i++) {
+            spv_block_stage_slot* slot = &stage->slots[i];
+            if (!slot->in_use) continue;
+            if (memcmp(slot->prev_block, tip->hash, 32) != 0) continue;
+
+            uint8_t* payload = slot->payload;
+            size_t payload_len = slot->payload_len;
+            int nodeid = slot->nodeid;
+            slot->payload = NULL;
+            slot->in_use = 0;
+            slot->payload_len = 0;
+            stage->count--;
+            stage->drained_total++;
+
+            if (client->nodegroup && client->nodegroup->log_write_cb) {
+                client->nodegroup->log_write_cb("Draining staged block from node %d (remaining_staged=%zu)\n", nodeid, stage->count);
+            }
+            if (spv_commit_block_payload(client, nodeid, payload, payload_len)) {
+                made_progress = 1;
+            }
+            dogecoin_free(payload);
+            break;
+        }
+    }
+}
+
 void dogecoin_spv_client_enable_thread_safe_mode(dogecoin_spv_client* client)
 {
     if (!client) return;
@@ -449,9 +592,12 @@ void dogecoin_spv_client_enable_thread_safe_mode(dogecoin_spv_client* client)
     if (!client->headers_stage_ctx) {
         client->headers_stage_ctx = spv_headers_stage_init();
     }
+    if (!client->blocks_stage_ctx) {
+        client->blocks_stage_ctx = spv_blocks_stage_init();
+    }
     client->thread_safe_mode = true;
     if (client->nodegroup && client->nodegroup->log_write_cb) {
-        client->nodegroup->log_write_cb("SPV thread-safe mode enabled: master-writer pipeline with %d out-of-order staging slots\n", SPV_HEADERS_STAGE_CAPACITY);
+        client->nodegroup->log_write_cb("SPV thread-safe mode enabled: master-writer pipeline with %d header + %d block staging slots\n", SPV_HEADERS_STAGE_CAPACITY, SPV_BLOCKS_STAGE_CAPACITY);
     }
 }
 
@@ -759,6 +905,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->smpv_enabled = false;
     client->headers_pipeline_ctx = spv_headers_pipeline_init();
     client->headers_stage_ctx = NULL;
+    client->blocks_stage_ctx = NULL;
     client->thread_safe_mode = false;
 
     return client;
@@ -837,6 +984,11 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
     if (client->headers_stage_ctx) {
         spv_headers_stage_free((spv_headers_stage_ctx*)client->headers_stage_ctx);
         client->headers_stage_ctx = NULL;
+    }
+
+    if (client->blocks_stage_ctx) {
+        spv_blocks_stage_free((spv_blocks_stage_ctx*)client->blocks_stage_ctx);
+        client->blocks_stage_ctx = NULL;
     }
 
     if (client->headers_db)
@@ -1212,6 +1364,148 @@ void dogecoin_net_spv_node_handshake_done(dogecoin_node *node)
     UNUSED(node);
 }
 
+static dogecoin_bool spv_commit_block_payload(dogecoin_spv_client* client, int nodeid, const uint8_t* payload, size_t payload_len)
+{
+    if (!client || !payload || payload_len == 0) return false;
+    dogecoin_node* node = spv_find_node_by_id(client, nodeid);
+    struct const_buffer block_buf = { payload, payload_len };
+    dogecoin_bool connected;
+    dogecoin_blockindex *pindex = client->headers_db->connect_hdr(client->headers_db_ctx, &block_buf, false, &connected);
+
+    if (node) {
+        node->time_last_request = time(NULL);
+    }
+
+    if (!connected)
+    {
+        client->nodegroup->log_write_cb("Got invalid block (not in sequence) from node %d\n", nodeid);
+        if (node) {
+            node->state &= ~NODE_BLOCKSYNC;
+            node->state |= NODE_MISSBEHAVED;
+            node->nodegroup->node_connection_state_changed_cb(node);
+        }
+        dogecoin_free(pindex);
+        return false;
+    }
+
+    if (client->header_connected) { client->header_connected(client); }
+
+    if (node && pindex->header.timestamp > node->time_last_request - 30*60) {
+        node->time_last_request = 0;
+    }
+
+    time_t lasttime = pindex->header.timestamp;
+    char s[1000];
+    time_t t = lasttime;
+    struct tm *p = localtime(&t);
+    strftime(s, sizeof s, "%F %T", p);
+    char *ctime_no_newline = strtok(s, "\n");
+    printf("%s|%d|%s|%d\n", hash_to_string(pindex->hash), pindex->height, ctime_no_newline, (int)payload_len);
+    uint64_t start = time(NULL);
+
+    uint32_t amount_of_txs;
+    if (!deser_varlen(&amount_of_txs, &block_buf)) {
+        if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
+            dogecoin_free(pindex);
+        }
+        client->nodegroup->log_write_cb("Error deserializing amount of transactions from node %d\n", nodeid);
+        if (node) {
+            node->state &= ~NODE_BLOCKSYNC;
+            node->nodegroup->node_connection_state_changed_cb(node);
+        }
+        return false;
+    }
+
+    client->nodegroup->log_write_cb("Start parsing %d transactions...\n", (int)amount_of_txs);
+    client->last_block_tx_count = amount_of_txs;
+    client->last_block_size = payload_len;
+
+    uint64_t total_tx_size = 0;
+    uint64_t block_outputs_value = 0;
+    uint32_t block_outputs_count = 0;
+    uint64_t coinbase_value = 0;
+
+    size_t consumedlength = 0;
+    for (unsigned int i = 0; i < amount_of_txs; i++)
+    {
+        dogecoin_tx* tx = dogecoin_tx_new();
+        if (!dogecoin_tx_deserialize(block_buf.p, block_buf.len, tx, &consumedlength)) {
+            client->nodegroup->log_write_cb("Error deserializing transaction\n");
+            if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
+                dogecoin_free(pindex);
+            }
+            dogecoin_tx_free(tx);
+            if (node) {
+                node->state &= ~NODE_BLOCKSYNC;
+                node->nodegroup->node_connection_state_changed_cb(node);
+            }
+            return false;
+        }
+        deser_skip(&block_buf, consumedlength);
+        if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
+        total_tx_size += consumedlength;
+
+        uint64_t tx_out_sum = 0;
+        for (unsigned int oi = 0; oi < tx->vout->len; oi++)
+        {
+            dogecoin_tx_out *txout = vector_idx(tx->vout, oi);
+            tx_out_sum += txout->value;
+            block_outputs_value += txout->value;
+            block_outputs_count++;
+        }
+        if (i == 0 && dogecoin_tx_is_coinbase(tx)) {
+            coinbase_value = tx_out_sum;
+        }
+        dogecoin_tx_free(tx);
+    }
+    client->last_block_total_tx_size = total_tx_size;
+
+    uint64_t block_fees = 0;
+    if (coinbase_value > DOGECOIN_CURRENT_SUBSIDY_KOINU) {
+        block_fees = coinbase_value - DOGECOIN_CURRENT_SUBSIDY_KOINU;
+    }
+
+    client->stats_blocks_total++;
+    client->stats_txs_total += amount_of_txs;
+    client->stats_outputs_total += block_outputs_count;
+    client->stats_out_value_total += block_outputs_value;
+    client->stats_fees_total += block_fees;
+    client->stats_block_bytes_total += payload_len;
+
+    spv_block_sample *smp = &client->stats_ring[client->stats_ring_head];
+    smp->ts = pindex->header.timestamp;
+    smp->txs = amount_of_txs;
+    smp->outputs = block_outputs_count;
+    smp->out_value = block_outputs_value;
+    smp->size = payload_len;
+    smp->fees = block_fees;
+
+    client->stats_ring_head = (client->stats_ring_head + 1) % SPV_STATS_RING;
+    if (client->stats_ring_len < SPV_STATS_RING) {
+        client->stats_ring_len++;
+    }
+
+    client->nodegroup->log_write_cb("done (took %lld secs)\n", (unsigned long long)(time(NULL) - start));
+    if (client->thread_safe_mode) {
+        spv_blocks_stage_drain_for_tip(client);
+    }
+
+    if (node && dogecoin_hash_equal((uint8_t *)node->last_requested_inv, (uint8_t *)pindex->hash)) {
+        if (client->headers_db->getchaintip(client->headers_db_ctx)->height >= node->bestknownheight - 5) {
+            if (!client->called_sync_completed && client->sync_completed) {
+                if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
+                client->sync_completed(client);
+                client->called_sync_completed = true;
+            }
+        } else if (client->headers_db->getchaintip(client->headers_db_ctx)->height < node->bestknownheight - 1440) {
+            node->time_last_request = time(NULL);
+            dogecoin_net_spv_node_request_headers_or_blocks(node, true);
+        }
+    }
+
+    return true;
+}
+
 /**
  * The function is called when a new message is received from a peer
  *
@@ -1273,144 +1567,24 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
     if (strcmp(hdr->command, DOGECOIN_MSG_BLOCK) == 0)
     {
-        dogecoin_bool connected;
-        dogecoin_blockindex *pindex = client->headers_db->connect_hdr(client->headers_db_ctx, buf, false, &connected);
-
-        node->time_last_request = time(NULL);
-
-        if (connected) {
-            if (client->header_connected) { client->header_connected(client); }
-
-            // for now, turn of stall checks if we are near the tip
-            if (pindex->header.timestamp > node->time_last_request - 30*60) {
-                node->time_last_request = 0;
-            }
-
-            time_t lasttime = pindex->header.timestamp;
-            char s[1000];
-            time_t t = lasttime;
-            struct tm *p = localtime(&t);
-            strftime(s, sizeof s, "%F %T", p);
-            char *ctime_no_newline;
-            ctime_no_newline = strtok(s, "\n");
-            printf("%s|%d|%s|%d\n", hash_to_string(pindex->hash), pindex->height, ctime_no_newline, hdr->data_len);
-            uint64_t start = time(NULL);
-
-            uint32_t amount_of_txs;
-            if (!deser_varlen(&amount_of_txs, buf)) {
-                if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                    dogecoin_free(pindex);
-                }
-                client->nodegroup->log_write_cb("Error deserializing amount of transactions from node %d\n", node->nodeid);
-                node->state &= ~NODE_BLOCKSYNC;
-                node->nodegroup->node_connection_state_changed_cb(node);
-                return;
-            }
-
-            client->nodegroup->log_write_cb("Start parsing %d transactions...\n", (int)amount_of_txs);
-
-            // update the last block info for the client
-            client->last_block_tx_count = amount_of_txs;
-            client->last_block_size = hdr->data_len;
-
-            uint64_t total_tx_size = 0;
-
-            // per-block accumulation for stats
-            uint64_t block_outputs_value = 0;
-            uint32_t block_outputs_count = 0;
-            uint64_t coinbase_value = 0;
-
-            size_t consumedlength = 0;
-            unsigned int i;
-            for (i = 0; i < amount_of_txs; i++)
-            {
-                dogecoin_tx* tx = dogecoin_tx_new();
-                if (!dogecoin_tx_deserialize(buf->p, buf->len, tx, &consumedlength)) {
-                    client->nodegroup->log_write_cb("Error deserializing transaction\n");
-                    if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
-                        dogecoin_free(pindex);
+        if (client->thread_safe_mode && client->blocks_stage_ctx) {
+            uint8_t prev_block[32];
+            uint8_t block_hash[32];
+            if (spv_extract_block_header_info(client, (const uint8_t*)buf->p, buf->len, prev_block, block_hash)) {
+                dogecoin_blockindex* tip = client->headers_db->getchaintip(client->headers_db_ctx);
+                if (tip && memcmp(prev_block, tip->hash, 32) != 0) {
+                    if (spv_stage_block(client, node->nodeid, (const uint8_t*)buf->p, buf->len, prev_block, block_hash)) {
+                        node->state &= ~NODE_BLOCKSYNC;
+                        node->nodegroup->node_connection_state_changed_cb(node);
+                        dogecoin_net_spv_node_request_headers_or_blocks(node, true);
+                        return;
                     }
-                    dogecoin_tx_free(tx);
-                    node->state &= ~NODE_BLOCKSYNC;
-                    node->nodegroup->node_connection_state_changed_cb(node);
-                    return;
                 }
-                deser_skip(buf, consumedlength);
-                if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
-                total_tx_size += consumedlength;
-
-                // accumulate outputs for this tx
-                uint64_t tx_out_sum = 0;
-                unsigned int oi;
-                for (oi = 0; oi < tx->vout->len; oi++)
-                {
-                    dogecoin_tx_out *txout = vector_idx(tx->vout, oi);
-                    tx_out_sum += txout->value;
-                    block_outputs_value += txout->value;
-                    block_outputs_count++;
-                }
-                if (i == 0 && dogecoin_tx_is_coinbase(tx)) {
-                    coinbase_value = tx_out_sum; // coinbase tx is always the first tx in a block
-                }
-                dogecoin_tx_free(tx);
             }
-            client->last_block_total_tx_size = total_tx_size;
-
-            // approximate fees (OK for recent blocks where subsidy is 10k0 DOGE)
-            uint64_t block_fees = 0;
-            if (coinbase_value > DOGECOIN_CURRENT_SUBSIDY_KOINU) {
-                block_fees = coinbase_value - DOGECOIN_CURRENT_SUBSIDY_KOINU;
-            }
-
-            // session totals
-            client->stats_blocks_total++;
-            client->stats_txs_total += amount_of_txs;
-            client->stats_outputs_total += block_outputs_count;
-            client->stats_out_value_total += block_outputs_value;
-            client->stats_fees_total += block_fees;
-            client->stats_block_bytes_total += hdr->data_len;
-
-            // ring insert (latest)
-            spv_block_sample *smp = &client->stats_ring[client->stats_ring_head];
-            smp->ts = pindex->header.timestamp;
-            smp->txs = amount_of_txs;
-            smp->outputs = block_outputs_count;
-            smp->out_value = block_outputs_value;
-            smp->size = hdr->data_len;
-            smp->fees = block_fees;
-
-            client->stats_ring_head = (client->stats_ring_head + 1) % SPV_STATS_RING;
-            if (client->stats_ring_len < SPV_STATS_RING) {
-                client->stats_ring_len++;
-            }
-
-            client->nodegroup->log_write_cb("done (took %lld secs)\n", (unsigned long long)(time(NULL) - start));
         }
-        else
-        {
-            client->nodegroup->log_write_cb("Got invalid block (not in sequence) from node %d\n", node->nodeid);
-            node->state &= ~NODE_BLOCKSYNC;
-            node->state |= NODE_MISSBEHAVED;
-            node->nodegroup->node_connection_state_changed_cb(node);
-            dogecoin_free(pindex);
+
+        if (!spv_commit_block_payload(client, node->nodeid, (const uint8_t*)buf->p, buf->len)) {
             return;
-        }
-
-        if (dogecoin_hash_equal((uint8_t *)node->last_requested_inv, (uint8_t *)pindex->hash)) {
-            // instead of querying whether the last connected header timestamp is greater than the oldest item of interest
-            // we check if the height is greater than or equal to the node's bestknown height minus 5 minutes
-            if (client->headers_db->getchaintip(client->headers_db_ctx)->height >= node->bestknownheight - 5) {
-                // last requested block reached, consider stop syncing
-                if (!client->called_sync_completed && client->sync_completed) {
-                    // enable mempool requests if smpv is enabled
-                    if (client->smpv_enabled) dogecoin_net_spv_request_mempool(client);
-                    client->sync_completed(client);
-                    client->called_sync_completed = true;
-                }
-            } else if (client->headers_db->getchaintip(client->headers_db_ctx)->height < node->bestknownheight - 1440) {
-                node->time_last_request = time(NULL);
-                dogecoin_net_spv_node_request_headers_or_blocks(node, true);
-            }
         }
     }
 

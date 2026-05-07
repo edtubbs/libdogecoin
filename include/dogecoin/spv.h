@@ -88,6 +88,7 @@ typedef struct dogecoin_spv_client_
     dogecoin_bool smpv_enabled;
     void* headers_pipeline_ctx;
     void* headers_stage_ctx;         /* bounded out-of-order header batch staging (master-writer) */
+    void* blocks_stage_ctx;          /* bounded out-of-order full block staging (master-writer) */
     dogecoin_bool thread_safe_mode;  /* set by dogecoin_spv_client_enable_thread_safe_mode() in TS builds */
 
     /* callbacks */
