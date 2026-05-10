@@ -287,6 +287,14 @@ tests_SOURCES += \
 endif
 endif
 
+if USE_RACCOON_G
+if USE_TESTS
+tests_SOURCES += \
+    test/raccoong_polyr_tests.c \
+    test/data/raccoong_polyr_vectors.h
+endif
+endif
+
 if WITH_BENCH
 noinst_PROGRAMS += bench
 bench_LDADD = libdogecoin.la $(ASM_LIB_FILES)
