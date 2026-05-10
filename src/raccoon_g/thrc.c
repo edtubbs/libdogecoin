@@ -33,7 +33,10 @@
 
 #include "thrc.h"
 
+#include <string.h>
+
 #include "polyr.h"
+#include "ntt.h"
 #include "shake256.h"
 
 void raccoong_hdr8(uint8_t out[8], char ds,
@@ -91,6 +94,87 @@ dogecoin_bool raccoong_xof_sample_q(uint64_t out[/* RACCOONG_N */],
         x &= mask;
         if (x < RACCOONG_Q) {
             out[i++] = x;
+        }
+    }
+    return true;
+}
+
+dogecoin_bool raccoong_expand_a(polyr A[RACCOONG_K][RACCOONG_ELL],
+                                const uint8_t A_seed[RACCOONG_A_SEED_BYTES])
+{
+    if (!A || !A_seed) return false;
+
+    /* Upstream: a[i][j] = _xof_sample_q(_hdr8('A', i, j) + A_seed). */
+    uint8_t buf[8 + RACCOONG_A_SEED_BYTES];
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        for (unsigned j = 0; j < RACCOONG_ELL; ++j) {
+            raccoong_hdr8(buf, 'A',
+                          (uint8_t)i, (uint8_t)j, 0, 0, 0, 0, 0);
+            memcpy(buf + 8, A_seed, RACCOONG_A_SEED_BYTES);
+            if (!raccoong_xof_sample_q(A[i][j].coeffs, buf, sizeof(buf))) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+dogecoin_bool raccoong_vec_ntt(polyr* v, size_t n)
+{
+    if (!v) return false;
+    for (size_t i = 0; i < n; ++i) {
+        if (!ntt_forward(&v[i])) return false;
+    }
+    return true;
+}
+
+dogecoin_bool raccoong_vec_intt(polyr* v, size_t n)
+{
+    if (!v) return false;
+    for (size_t i = 0; i < n; ++i) {
+        if (!ntt_inverse(&v[i])) return false;
+    }
+    return true;
+}
+
+dogecoin_bool raccoong_vec_add(polyr* r, const polyr* a, const polyr* b,
+                               size_t n)
+{
+    if (!r || !a || !b) return false;
+    for (size_t i = 0; i < n; ++i) {
+        if (!polyr_add(&r[i], &a[i], &b[i])) return false;
+    }
+    return true;
+}
+
+dogecoin_bool raccoong_vec_rshift(polyr* r, const polyr* a, unsigned shift,
+                                  size_t n)
+{
+    if (!r || !a) return false;
+    for (size_t i = 0; i < n; ++i) {
+        if (!polyr_rshift(&r[i], &a[i], shift)) return false;
+    }
+    return true;
+}
+
+dogecoin_bool raccoong_mul_mat_vec_ntt(polyr out[RACCOONG_K],
+                                       const polyr A[RACCOONG_K][RACCOONG_ELL],
+                                       const polyr v[RACCOONG_ELL])
+{
+    if (!out || !A || !v) return false;
+
+    /* Upstream:
+     *     for i in range(k):
+     *         for j in range(ell):
+     *             r[i] = poly_add(r[i], mul_ntt(m[i][j], v[j]))
+     * `mul_ntt` is coefficient-wise (NTT-domain) multiplication.
+     */
+    polyr tmp;
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        polyr_set_zero(&out[i]);
+        for (unsigned j = 0; j < RACCOONG_ELL; ++j) {
+            if (!polyr_mul_pointwise(&tmp, &A[i][j], &v[j])) return false;
+            if (!polyr_add(&out[i], &out[i], &tmp)) return false;
         }
     }
     return true;

@@ -87,9 +87,10 @@ extern void test_qr();
 #ifdef USE_RACCOON_G
 extern void test_raccoong_polyr();
 extern void test_raccoong_ntt();
-extern void test_raccoong_gaussian();
 extern void test_raccoong_shake();
 extern void test_raccoong_xof_sample_q();
+extern void test_raccoong_matvec();
+extern void test_raccoong_gaussian();
 #endif
 
 #ifdef WITH_LOGDB
@@ -186,6 +187,7 @@ int main()
     u_run_test(test_raccoong_ntt);
     u_run_test(test_raccoong_shake);
     u_run_test(test_raccoong_xof_sample_q);
+    u_run_test(test_raccoong_matvec);
     u_run_test(test_raccoong_gaussian);
 #endif
 

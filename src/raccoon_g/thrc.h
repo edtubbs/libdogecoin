@@ -33,7 +33,21 @@
 
 #include <dogecoin/dogecoin.h>
 
+#include "polyr.h"
+
 LIBDOGECOIN_BEGIN_DECL
+
+/*
+ * Raccoon-G-44 threshold core dimensions (mirrors upstream `ThRc_Core` defaults
+ * for HD-wallet sigs at #sigs 2^60: k = ell = 9).
+ */
+#define RACCOONG_K   9u
+#define RACCOONG_ELL 9u
+
+/*
+ * Size of `A_seed` (the public-matrix seed, "as_sz" upstream).
+ */
+#define RACCOONG_A_SEED_BYTES 16u
 
 /*
  * Threshold core ("thrc") for Raccoon-G-44: keygen, sign, verify, and BIP-32
@@ -88,6 +102,41 @@ void raccoong_hdr8(uint8_t out[8], char ds,
                    uint8_t b4, uint8_t b5, uint8_t b6, uint8_t b7);
 void raccoong_hdr24(uint8_t out[8], char ds,
                     uint32_t i, uint32_t j, uint8_t k);
+
+/*
+ * `_expand_a` — fill the public k×ell matrix A from `A_seed`.
+ *
+ * 1:1 port of upstream `ThRc_Core._expand_a`: for each (i, j) the entry is
+ * `_xof_sample_q(_hdr8('A', i, j) + A_seed)`.  Upstream treats this matrix
+ * as already living in NTT domain (uniform random in either basis), so the
+ * output is consumable directly by `raccoong_mul_mat_vec_ntt`.
+ *
+ * Returns false on null inputs.
+ */
+dogecoin_bool raccoong_expand_a(polyr A[RACCOONG_K][RACCOONG_ELL],
+                                const uint8_t A_seed[RACCOONG_A_SEED_BYTES]);
+
+/*
+ * Vector / matrix-vector helpers over the ring R_q = Z_q[X]/(X^n+1).
+ * Mirrors upstream polyr.py functions of the same shape.  All routines
+ * return false on null inputs.  Aliasing rules match the underlying
+ * `polyr_*` and `ntt_*` calls.
+ */
+dogecoin_bool raccoong_vec_ntt(polyr* v, size_t n);    /* in-place forward */
+dogecoin_bool raccoong_vec_intt(polyr* v, size_t n);   /* in-place inverse */
+
+dogecoin_bool raccoong_vec_add(polyr* r, const polyr* a, const polyr* b,
+                               size_t n);
+dogecoin_bool raccoong_vec_rshift(polyr* r, const polyr* a, unsigned shift,
+                                  size_t n);
+
+/*
+ * out[i] = sum_j A[i][j] *_ntt v[j]   for i in [0, k), j in [0, ell).
+ * Inputs must already be in NTT domain.  Output is in NTT domain.
+ */
+dogecoin_bool raccoong_mul_mat_vec_ntt(polyr out[RACCOONG_K],
+                                       const polyr A[RACCOONG_K][RACCOONG_ELL],
+                                       const polyr v[RACCOONG_ELL]);
 
 LIBDOGECOIN_END_DECL
 

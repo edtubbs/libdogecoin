@@ -77,6 +77,7 @@ the same numerics as the reference.
 | `gaussian.{c,h}` | MPFR-backed rounded Gaussian sampler            | Session 5 ✓ |
 | `shake256.{c,h}` | FIPS 202 SHAKE256 + SHAKE128 (Keccak-f[1600])   | Session 6 ✓ / 7a ✓ |
 | `thrc.{c,h}` `xof_sample_q` | Uniform Z_q rejection sampler (SHAKE128) | Session 7a ✓ |
+| `thrc.{c,h}` `expand_a` + matvec | 9×9 ExpandA + `vec_ntt`/`mul_mat_vec_ntt` | Session 7b ✓ |
 | `thrc.{c,h}`  | Keygen, sign, verify, BIP-32 HMAC-SHA512 derive    | Sessions 6-7 |
 | `raccoong.{c,h}` | Public-shape glue called by `src/pqc_raccoon.c` | Stubs       |
 | `README.md`   | This file.                                         | —           |
@@ -144,6 +145,14 @@ they aren't silent:
   uniform Z_q rejection sampler used by `ExpandA` and threshold-share
   generation.  Byte-exact gate covers four (A_seed, i, j) / (key, i, j, k)
   cells against pinned upstream output (256 Z_q samples each).
+- [x] (Session 7b) `raccoong_expand_a` (9×9 matrix loop over
+  `xof_sample_q`) plus the vector helpers `raccoong_vec_ntt` /
+  `_vec_intt` / `_vec_add` / `_vec_rshift` and `raccoong_mul_mat_vec_ntt`
+  (mirrors upstream `polyr.py::mul_mat_vec_ntt`).  Byte-exact gate
+  records the upstream `mul_mat_vec_ntt(_expand_a(A_seed),
+  [_xof_sample_q(seed_j) for j])` 9-vector (9·256 u64) and reproduces
+  it from seeds in C; an additional NTT-domain pointwise gate isolates
+  any regression in `polyr_mul_pointwise`.
 - [ ] (Session 6) `thrc.c`: seed-deterministic keygen, BIP-32 HMAC-SHA512
   derivation, child-SK SHA-256 gate against upstream digest.
 - [ ] (Session 7) `thrc.c`: deterministic sign / verify; tampered-signature
