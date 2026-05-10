@@ -86,6 +86,7 @@ extern void test_qr();
 
 #ifdef USE_RACCOON_G
 extern void test_raccoong_polyr();
+extern void test_raccoong_ntt();
 #endif
 
 #ifdef WITH_LOGDB
@@ -179,6 +180,7 @@ int main()
 
 #ifdef USE_RACCOON_G
     u_run_test(test_raccoong_polyr);
+    u_run_test(test_raccoong_ntt);
 #endif
 
 #ifdef WITH_LOGDB

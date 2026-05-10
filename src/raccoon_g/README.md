@@ -25,6 +25,19 @@ Pinned in `polyr.h` from `src/raccoon/thrc-py/polyr.py`:
 | `RACCOONG_NI`  | 560750930183101      | `RACC_NI` (= n⁻¹ mod q) |
 | `RACCOONG_LOG_Q` | 50                 | ⌈log₂ q⌉                |
 
+The negacyclic NTT twiddle table (`RACC_W`, 256 entries) is embedded
+verbatim in `src/raccoon_g/ntt.c`. Its SHA-256 over the LE-u64 byte
+encoding is:
+
+    007cf593d0147d705768503556f096e25ac65b9837cf99d2bd7a43b251f0df36
+
+`test/raccoong_ntt_tests.c` recomputes this digest against the in-tree
+table and additionally checks `ntt_forward(A)` byte-for-byte, the
+`intt(ntt(A)) == A` roundtrip, and the
+`intt(pw(ntt(A), ntt(B))) == schoolbook(A, B) mod (X^n + 1)` equivalence
+against vectors generated from upstream by
+`contrib/raccoon_g/gen_ntt_vectors.py`.
+
 The remaining algorithm-level parameters (κ, k, ℓ, weight bounds, σ, σₜ,
 masking depth d, signature shape) are pinned alongside the threshold core in
 Sessions 6–7.
@@ -60,7 +73,7 @@ the same numerics as the reference.
 | File          | Responsibility                                     | Status      |
 |---------------|----------------------------------------------------|-------------|
 | `polyr.{c,h}` | `Z_q[X]/(X^n+1)` polynomial arithmetic             | Session 3 ✓ |
-| `ntt.{c,h}`   | Forward / inverse NTT, pointwise multiply          | Session 4   |
+| `ntt.{c,h}`   | Forward / inverse NTT, pointwise multiply          | Session 4 ✓ |
 | `gaussian.{c,h}` | MPFR-backed rounded Gaussian sampler            | Session 5   |
 | `thrc.{c,h}`  | Keygen, sign, verify, BIP-32 HMAC-SHA512 derive    | Sessions 6-7 |
 | `raccoong.{c,h}` | Public-shape glue called by `src/pqc_raccoon.c` | Stubs       |
@@ -71,8 +84,10 @@ the same numerics as the reference.
 The Raccoon-G test fixtures are generated from the upstream Python and
 checked in alongside the regenerator script:
 
-- `contrib/raccoon_g/gen_polyr_vectors.py` — generator
-- `test/data/raccoong_polyr_vectors.h` — generated fixture for `polyr.c`
+- `contrib/raccoon_g/gen_polyr_vectors.py` — generator (polyr.c)
+- `contrib/raccoon_g/gen_ntt_vectors.py`   — generator (ntt.c)
+- `test/data/raccoong_polyr_vectors.h`     — generated fixture for polyr.c
+- `test/data/raccoong_ntt_vectors.h`       — generated fixture for ntt.c
 
 To regenerate:
 
@@ -82,18 +97,13 @@ git -C /tmp/lattice-hd-wallets checkout 461a5ed9b6d57e3bf8c381be3bb79325ab21d906
 python3 contrib/raccoon_g/gen_polyr_vectors.py \
     --upstream /tmp/lattice-hd-wallets/src/raccoon/thrc-py \
     --out test/data/raccoong_polyr_vectors.h
+python3 contrib/raccoon_g/gen_ntt_vectors.py \
+    --upstream /tmp/lattice-hd-wallets/src/raccoon/thrc-py \
+    --out test/data/raccoong_ntt_vectors.h
 ```
 
 The committed header SHA must match a fresh regeneration; if it ever drifts,
 the upstream pin has moved and the rest of this directory needs re-validation.
-
-## Parameter set (Raccoon-G-44)
-
-The Z_q ring parameters (`RACCOONG_N`, `RACCOONG_Q`, `RACCOONG_NI`,
-`RACCOONG_LOG_Q`) are pinned in `polyr.h` and verified by
-`test/raccoong_polyr_tests.c`. The remaining algorithm-level constants are
-added alongside the code that uses them (NTT in Session 4, sampler in
-Session 5, signature shape in Sessions 6–7).
 
 ## Deviations from the public Python API
 
@@ -113,7 +123,7 @@ they aren't silent:
 
 - [x] (Session 3) `polyr.c`: parameter set, coefficient layout, add/sub/
   mul_pointwise/scale/lshift/rshift/center, fixture-driven byte-exact test.
-- [ ] (Session 4) `ntt.c`: twiddle table, forward/inverse NTT, pointwise
+- [x] (Session 4) `ntt.c`: twiddle table, forward/inverse NTT, pointwise
   multiply, twiddle-SHA matched against upstream.
 - [ ] (Session 5) `gaussian.c`: MPFR sampler matching `mpmath` at σ = 2⁷/2⁴⁰;
   first-2048-samples gate.

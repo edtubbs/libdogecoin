@@ -291,7 +291,9 @@ if USE_RACCOON_G
 if USE_TESTS
 tests_SOURCES += \
     test/raccoong_polyr_tests.c \
-    test/data/raccoong_polyr_vectors.h
+    test/raccoong_ntt_tests.c \
+    test/data/raccoong_polyr_vectors.h \
+    test/data/raccoong_ntt_vectors.h
 endif
 endif
 
