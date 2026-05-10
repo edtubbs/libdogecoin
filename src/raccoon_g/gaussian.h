@@ -38,23 +38,43 @@ LIBDOGECOIN_BEGIN_DECL
 /*
  * Rounded Gaussian sampler for Raccoon-G-44.
  *
- * The upstream Python reference (p-11/lattice-hd-wallets) uses mpmath at
- * sigma = 2^7 / 2^40. The C analogue is MPFR with matching precision; this
- * is why GMP and MPFR are vendored in depends/. The sampler MUST produce
- * byte-identical samples to the reference for an identical seed; this is
- * the primary release-blocking gate.
- *
- * Implementation lands in Session 5, gated by a fixture of the first 2048
- * upstream samples (test/data/raccoong_gauss.json).
+ * Mirrors `sample_rounded` from upstream `thrc_gauss.py` (Marsaglia polar
+ * method) at mpmath/MPFR precision = 256 bits.  The math kernel is exposed
+ * here so it can be exercised against a recorded XOF byte stream without
+ * pulling SHAKE256 into the libdogecoin build (Sessions 1-5 stay free of
+ * additional crypto primitives; the SHAKE256 wrapper that drives the kernel
+ * from a 32-byte seed lands in Session 6).
  */
 
 dogecoin_bool gaussian_sampler_init(void);
 void          gaussian_sampler_shutdown(void);
 
 /*
- * Fill `out` with `n` samples of the Raccoon-G-44 rounded Gaussian, deriving
- * randomness from the supplied 32-byte seed via the same PRG construction the
- * upstream reference uses (Shake-256 or HMAC; pinned in README.md).
+ * Drive the rounded-Gaussian sampler from a *pre-extracted* XOF byte stream
+ * (i.e., the bytes that `SHAKE256(seed).read(xof_len)` would yield in the
+ * upstream Python).  Produces `n` samples in `out`, returning false if:
+ *   - any pointer is NULL;
+ *   - sigma^2 = 2^lg_sigma2 cannot be represented as an MPFR value (always
+ *     false in practice for lg_sigma2 in [0, 60]);
+ *   - the supplied stream is exhausted before `n` accepted samples are
+ *     produced (callers should over-provision; 8 KiB is sufficient for n=256
+ *     at sigma = 2^20 with the canonical rejection rate).
+ *
+ * On success, `*xof_consumed_bytes` (if non-NULL) receives the number of
+ * stream bytes actually consumed; this lets callers / tests confirm they
+ * stayed within the recorded prefix.
+ */
+dogecoin_bool gaussian_sample_rounded_from_xof(int64_t* out,
+                                               size_t n,
+                                               uint32_t lg_sigma2,
+                                               const uint8_t* xof_bytes,
+                                               size_t xof_len,
+                                               size_t* xof_consumed_bytes);
+
+/*
+ * Public seed-driven entry point.  Returns false until Session 6 wires the
+ * SHAKE256 byte source.  Kept here so the downstream `thrc.c` call sites
+ * (Session 6 and 7) can be written against the final shape today.
  */
 dogecoin_bool gaussian_sample(int64_t* out, size_t n, const uint8_t seed[32]);
 

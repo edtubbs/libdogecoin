@@ -74,7 +74,7 @@ the same numerics as the reference.
 |---------------|----------------------------------------------------|-------------|
 | `polyr.{c,h}` | `Z_q[X]/(X^n+1)` polynomial arithmetic             | Session 3 ✓ |
 | `ntt.{c,h}`   | Forward / inverse NTT, pointwise multiply          | Session 4 ✓ |
-| `gaussian.{c,h}` | MPFR-backed rounded Gaussian sampler            | Session 5   |
+| `gaussian.{c,h}` | MPFR-backed rounded Gaussian sampler            | Session 5 ✓ (math kernel) |
 | `thrc.{c,h}`  | Keygen, sign, verify, BIP-32 HMAC-SHA512 derive    | Sessions 6-7 |
 | `raccoong.{c,h}` | Public-shape glue called by `src/pqc_raccoon.c` | Stubs       |
 | `README.md`   | This file.                                         | —           |
@@ -86,8 +86,10 @@ checked in alongside the regenerator script:
 
 - `contrib/raccoon_g/gen_polyr_vectors.py` — generator (polyr.c)
 - `contrib/raccoon_g/gen_ntt_vectors.py`   — generator (ntt.c)
+- `contrib/raccoon_g/gen_gaussian_vectors.py` — generator (gaussian.c)
 - `test/data/raccoong_polyr_vectors.h`     — generated fixture for polyr.c
 - `test/data/raccoong_ntt_vectors.h`       — generated fixture for ntt.c
+- `test/data/raccoong_gaussian_vectors.h`  — generated fixture for gaussian.c
 
 To regenerate:
 
@@ -100,6 +102,9 @@ python3 contrib/raccoon_g/gen_polyr_vectors.py \
 python3 contrib/raccoon_g/gen_ntt_vectors.py \
     --upstream /tmp/lattice-hd-wallets/src/raccoon/thrc-py \
     --out test/data/raccoong_ntt_vectors.h
+python3 contrib/raccoon_g/gen_gaussian_vectors.py \
+    --upstream /tmp/lattice-hd-wallets/src/raccoon/thrc-py \
+    --out test/data/raccoong_gaussian_vectors.h
 ```
 
 The committed header SHA must match a fresh regeneration; if it ever drifts,
@@ -125,8 +130,12 @@ they aren't silent:
   mul_pointwise/scale/lshift/rshift/center, fixture-driven byte-exact test.
 - [x] (Session 4) `ntt.c`: twiddle table, forward/inverse NTT, pointwise
   multiply, twiddle-SHA matched against upstream.
-- [ ] (Session 5) `gaussian.c`: MPFR sampler matching `mpmath` at σ = 2⁷/2⁴⁰;
-  first-2048-samples gate.
+- [x] (Session 5) `gaussian.c`: MPFR-backed Marsaglia polar method 1:1 from
+  upstream `sample_rounded`; byte-exact gate against a recorded SHAKE256
+  prefix at σ² = 2⁴⁰ (256 samples).  The seed-driven entry point
+  (`gaussian_sample(out, n, seed[32])`) is still a stub returning `false` —
+  the SHAKE256 wrapper that drives it lands in Session 6 alongside the rest
+  of the upstream XOF construction.
 - [ ] (Session 6) `thrc.c`: seed-deterministic keygen, BIP-32 HMAC-SHA512
   derivation, child-SK SHA-256 gate against upstream digest.
 - [ ] (Session 7) `thrc.c`: deterministic sign / verify; tampered-signature
