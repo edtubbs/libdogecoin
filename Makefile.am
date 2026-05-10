@@ -297,11 +297,13 @@ tests_SOURCES += \
     test/raccoong_shake_tests.c \
     test/raccoong_xof_sample_q_tests.c \
     test/raccoong_matvec_tests.c \
+    test/raccoong_keygen_t_tests.c \
     test/data/raccoong_polyr_vectors.h \
     test/data/raccoong_ntt_vectors.h \
     test/data/raccoong_gaussian_vectors.h \
     test/data/raccoong_xof_sample_q_vectors.h \
-    test/data/raccoong_matvec_vectors.h
+    test/data/raccoong_matvec_vectors.h \
+    test/data/raccoong_keygen_t_vectors.h
 endif
 endif
 

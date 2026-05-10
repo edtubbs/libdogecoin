@@ -90,6 +90,7 @@ extern void test_raccoong_ntt();
 extern void test_raccoong_shake();
 extern void test_raccoong_xof_sample_q();
 extern void test_raccoong_matvec();
+extern void test_raccoong_keygen_t();
 extern void test_raccoong_gaussian();
 #endif
 
@@ -188,6 +189,7 @@ int main()
     u_run_test(test_raccoong_shake);
     u_run_test(test_raccoong_xof_sample_q);
     u_run_test(test_raccoong_matvec);
+    u_run_test(test_raccoong_keygen_t);
     u_run_test(test_raccoong_gaussian);
 #endif
 

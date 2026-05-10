@@ -35,6 +35,7 @@
 
 #include <string.h>
 
+#include "gaussian.h"
 #include "polyr.h"
 #include "ntt.h"
 #include "shake256.h"
@@ -178,6 +179,83 @@ dogecoin_bool raccoong_mul_mat_vec_ntt(polyr out[RACCOONG_K],
         }
     }
     return true;
+}
+
+/* Reduce a signed int64_t array to a polyr in [0, RACCOONG_Q). */
+static void polyr_load_signed(polyr* dst, const int64_t* src)
+{
+    const int64_t Q = (int64_t)RACCOONG_Q;
+    for (size_t i = 0; i < RACCOONG_N; ++i) {
+        int64_t v = src[i] % Q;
+        if (v < 0) v += Q;
+        dst->coeffs[i] = (uint64_t)v;
+    }
+}
+
+dogecoin_bool raccoong_keygen_t_unrounded(const uint8_t key[32],
+                                          uint8_t A_seed_out[RACCOONG_A_SEED_BYTES],
+                                          polyr t_out[RACCOONG_K],
+                                          polyr s_out[RACCOONG_ELL])
+{
+    if (!key || !A_seed_out || !t_out) return false;
+
+    /* --- 1. A_seed = SHAKE256(_hdr8('A') + key, 16) --- */
+    uint8_t hdr_in[8 + 32];
+    raccoong_hdr8(hdr_in, 'A', 0, 0, 0, 0, 0, 0, 0);
+    memcpy(hdr_in + 8, key, 32);
+    shake256(A_seed_out, RACCOONG_A_SEED_BYTES, hdr_in, sizeof(hdr_in));
+
+    /* --- 1b. A = ExpandA(A_seed)  (already in NTT domain). --- */
+    static polyr A[RACCOONG_K][RACCOONG_ELL];
+    if (!raccoong_expand_a(A, A_seed_out)) return false;
+
+    /* --- 2. s ~ D_t^ell, e1 ~ D_t^k via sample_rounded(2^14, hdr8 + key). */
+    static polyr s_poly[RACCOONG_ELL];
+    static polyr e1_poly[RACCOONG_K];
+    int64_t sample_buf[RACCOONG_N];
+
+    uint8_t seed_buf[8 + 32];
+    memcpy(seed_buf + 8, key, 32);
+
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+        raccoong_hdr8(seed_buf, 's', (uint8_t)i, 0, 0, 0, 0, 0, 0);
+        if (!gaussian_sample_seed(sample_buf, RACCOONG_N,
+                                  RACCOONG_LG_SIGMA_T2,
+                                  seed_buf, sizeof(seed_buf))) {
+            return false;
+        }
+        polyr_load_signed(&s_poly[i], sample_buf);
+    }
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        raccoong_hdr8(seed_buf, 'e', (uint8_t)i, 1, 0, 0, 0, 0, 0);
+        if (!gaussian_sample_seed(sample_buf, RACCOONG_N,
+                                  RACCOONG_LG_SIGMA_T2,
+                                  seed_buf, sizeof(seed_buf))) {
+            return false;
+        }
+        polyr_load_signed(&e1_poly[i], sample_buf);
+    }
+
+    /* Capture s in caller's signed-secret slot before we forward-NTT it. */
+    if (s_out) {
+        for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+            polyr_copy(&s_out[i], &s_poly[i]);
+        }
+    }
+
+    /* --- 3. t := A * s + e1   (no rshift). --- */
+    static polyr s_ntt[RACCOONG_ELL];
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+        polyr_copy(&s_ntt[i], &s_poly[i]);
+    }
+    if (!raccoong_vec_ntt(s_ntt, RACCOONG_ELL)) return false;
+
+    static polyr t_ntt[RACCOONG_K];
+    if (!raccoong_mul_mat_vec_ntt(t_ntt, A, s_ntt)) return false;
+
+    if (!raccoong_vec_intt(t_ntt, RACCOONG_K)) return false;
+
+    return raccoong_vec_add(t_out, t_ntt, e1_poly, RACCOONG_K);
 }
 
 dogecoin_bool thrc_keygen_from_seed(const uint8_t seed[32],

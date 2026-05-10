@@ -207,18 +207,28 @@ fail:
 dogecoin_bool gaussian_sample(int64_t* out, size_t n, const uint8_t seed[32])
 {
     if (!out || !seed || (n & 1u)) return false;
+    return gaussian_sample_seed(out, n,
+                                (uint32_t)RACCOONG_GAUSS_LG_SIGMA2_DEFAULT,
+                                seed, 32);
+}
 
-    /* Pre-stream 8 KiB from SHAKE256 — sufficient for sigma = 2^20 over
-     * RACCOONG_N samples at the canonical rejection rate (~22%).  If a
-     * downstream caller ever needs a larger n or smaller sigma we will
-     * switch to streaming the XOF directly into the kernel; for now the
-     * batched form keeps this function side-effect-free on the SHAKE state
-     * and matches the way the Session-5 fixture is recorded. */
+/*
+ * Generalized seed-driven entry point.  Reads the same 8 KiB SHAKE256(seed)
+ * prefix as `gaussian_sample` but accepts an arbitrary-length seed (so the
+ * upstream `hdr8(ds, i) + key` 40-byte seeds for keygen / sign work) and
+ * an explicit `lg_sigma2`.  Byte-exact against the upstream
+ * `sample_rounded(1 << lg_sigma2, seed, n=n)` for every gate in 7c-7e.
+ */
+dogecoin_bool gaussian_sample_seed(int64_t* out, size_t n,
+                                   uint32_t lg_sigma2,
+                                   const uint8_t* seed, size_t seed_len)
+{
+    if (!out || !seed || (n & 1u)) return false;
+
     uint8_t xof[8192];
-    shake256(xof, sizeof(xof), seed, 32);
+    shake256(xof, sizeof(xof), seed, seed_len);
 
     return gaussian_sample_rounded_from_xof(
-        out, n,
-        (uint32_t)RACCOONG_GAUSS_LG_SIGMA2_DEFAULT,
+        out, n, lg_sigma2,
         xof, sizeof(xof), /*xof_consumed_bytes=*/NULL);
 }

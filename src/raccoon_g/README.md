@@ -78,6 +78,7 @@ the same numerics as the reference.
 | `shake256.{c,h}` | FIPS 202 SHAKE256 + SHAKE128 (Keccak-f[1600])   | Session 6 ✓ / 7a ✓ |
 | `thrc.{c,h}` `xof_sample_q` | Uniform Z_q rejection sampler (SHAKE128) | Session 7a ✓ |
 | `thrc.{c,h}` `expand_a` + matvec | 9×9 ExpandA + `vec_ntt`/`mul_mat_vec_ntt` | Session 7b ✓ |
+| `thrc.{c,h}` `keygen_t_unrounded` | A_seed + s/e1 + (A·s)+e1 (unrounded t) | Session 7c ✓ |
 | `thrc.{c,h}`  | Keygen, sign, verify, BIP-32 HMAC-SHA512 derive    | Sessions 6-7 |
 | `raccoong.{c,h}` | Public-shape glue called by `src/pqc_raccoon.c` | Stubs       |
 | `README.md`   | This file.                                         | —           |
@@ -153,6 +154,15 @@ they aren't silent:
   [_xof_sample_q(seed_j) for j])` 9-vector (9·256 u64) and reproduces
   it from seeds in C; an additional NTT-domain pointwise gate isolates
   any regression in `polyr_mul_pointwise`.
+- [x] (Session 7c) `raccoong_keygen_t_unrounded(key[32], A_seed_out,
+  t_out, s_out)` — 1:1 port of upstream `_keygen_unrounded`.
+  Composes `SHAKE256(_hdr8('A')+key, 16)` for `A_seed`,
+  `gaussian_sample_seed(2^14, _hdr8('s',i)+key, n)` for `s_i`,
+  `gaussian_sample_seed(2^14, _hdr8('e',i,1)+key, n)` for `e1_i`,
+  then `t = vec_intt(A_ntt * vec_ntt(s)) + e1`  (no rshift; preserves
+  HD-wallet additive linearity).  Byte-exact tiered gate covers
+  s[0]/e1[0] at sigma_t²=2^14, A_seed (16 bytes) and the full
+  9·256 u64 unrounded `t`.
 - [ ] (Session 6) `thrc.c`: seed-deterministic keygen, BIP-32 HMAC-SHA512
   derivation, child-SK SHA-256 gate against upstream digest.
 - [ ] (Session 7) `thrc.c`: deterministic sign / verify; tampered-signature

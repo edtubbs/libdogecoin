@@ -87,6 +87,19 @@ dogecoin_bool gaussian_sample_rounded_from_xof(int64_t* out,
  */
 dogecoin_bool gaussian_sample(int64_t* out, size_t n, const uint8_t seed[32]);
 
+/*
+ * Generalized seed-driven entry point.  Accepts an arbitrary-length `seed`
+ * (the upstream `sample_rounded(sig2, seed, n)` opens SHAKE256 on whatever
+ * bytes it is given) and an explicit `lg_sigma2` so callers can hit the
+ * sigma_t² = 2^14 and sigma_w² = 2^80 settings used by Raccoon-G keygen and
+ * sign.  Pre-extracts 8 KiB from SHAKE256(seed) — sufficient for n=256 at
+ * the canonical ~21.5% rejection rate (≈ 7.27 bytes/sample); returns false
+ * if the kernel exhausts that prefix before n samples are produced.
+ */
+dogecoin_bool gaussian_sample_seed(int64_t* out, size_t n,
+                                   uint32_t lg_sigma2,
+                                   const uint8_t* seed, size_t seed_len);
+
 LIBDOGECOIN_END_DECL
 
 #endif /* LIBDOGECOIN_RACCOON_G_GAUSSIAN_H */

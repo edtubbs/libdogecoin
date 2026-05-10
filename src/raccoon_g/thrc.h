@@ -138,6 +138,29 @@ dogecoin_bool raccoong_mul_mat_vec_ntt(polyr out[RACCOONG_K],
                                        const polyr A[RACCOONG_K][RACCOONG_ELL],
                                        const polyr v[RACCOONG_ELL]);
 
+/*
+ * `_keygen_unrounded(key)` — byte-exact port of upstream
+ * `raccoon_primitives._keygen_unrounded`.  Emits:
+ *   - `A_seed_out` (16 bytes)        = SHAKE256(_hdr8('A') + key, 16)
+ *   - `t_out[k]`  (k polyrs in [0,q)) = vec_intt(A_ntt * vec_ntt(s)) + e1
+ *
+ * No rshift / nu_t rounding is applied — the unrounded shape is the
+ * canonical HD-wallet variant (preserves additive linearity for non-
+ * hardened child derivation, see upstream docstring).
+ *
+ * `s_out` (ell polyrs in [0,q)) may be NULL when only the public vk is
+ * needed; supplying it lets the caller assemble the full signing key
+ * sk = (vk, s).  Returns false on null A_seed_out / t_out / key, or if
+ * the gaussian/NTT primitives reject any input.
+ */
+dogecoin_bool raccoong_keygen_t_unrounded(const uint8_t key[32],
+                                          uint8_t A_seed_out[RACCOONG_A_SEED_BYTES],
+                                          polyr t_out[RACCOONG_K],
+                                          polyr s_out[RACCOONG_ELL]);
+
+/* Upstream `lg_st = 7` ⇒ sigma_t² = 2^14. */
+#define RACCOONG_LG_SIGMA_T2 14u
+
 LIBDOGECOIN_END_DECL
 
 #endif /* LIBDOGECOIN_RACCOON_G_THRC_H */
