@@ -93,6 +93,7 @@ extern void test_raccoong_matvec();
 extern void test_raccoong_keygen_t();
 extern void test_raccoong_keypair();
 extern void test_raccoong_gaussian();
+extern void test_raccoong_hd_derive();
 #endif
 
 #ifdef WITH_LOGDB
@@ -193,6 +194,7 @@ int main()
     u_run_test(test_raccoong_keygen_t);
     u_run_test(test_raccoong_keypair);
     u_run_test(test_raccoong_gaussian);
+    u_run_test(test_raccoong_hd_derive);
 #endif
 
 #ifdef WITH_LOGDB

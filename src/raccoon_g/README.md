@@ -163,11 +163,30 @@ they aren't silent:
   HD-wallet additive linearity).  Byte-exact tiered gate covers
   s[0]/e1[0] at sigma_t²=2^14, A_seed (16 bytes) and the full
   9·256 u64 unrounded `t`.
-- [ ] (Session 6) `thrc.c`: seed-deterministic keygen, BIP-32 HMAC-SHA512
-  derivation, child-SK SHA-256 gate against upstream digest.
-- [ ] (Session 7) `thrc.c`: deterministic sign / verify; tampered-signature
-  reject; wrong-pk reject; valgrind clean.
-- [ ] (Session 7) `test/data/raccoong_kat.json` + `test/raccoong_kat.c`
+- [x] (Session 7d) `thrc_keygen_from_seed(seed[32], pk, sk)` — full
+  seed→keypair pipeline. HKDF-SHA256(seed, 48) → NIST_KAT_DRBG → 32-byte
+  drbg key → `raccoong_keygen_t_unrounded` → canonical LE 7-byte/coeff
+  serialization. pk = 16144 B, sk = 32272 B. Byte-exact gated against
+  upstream `generate_keypair_from_seed`.
+- [x] (Session 7e) `thrc_hd_derive_priv / _pub` — non-hardened and
+  hardened child derivation. tweak_seed = `HMAC-SHA512(chaincode,
+  tag||sha256(parent_key)||index_BE)[:32]`, with `tag = 'p'` and
+  `parent_key = parent_pk` for non-hardened, `tag = 'S'` and
+  `parent_key = parent_sk` for hardened (index encoded with the BIP-32
+  hardened high bit). The tweak keypair reuses the parent `A_seed`
+  (`generate_tweak_keypair_from_seed` upstream); child polynomials are
+  obtained by coefficient-wise addition mod q:
+  `child_t = parent_t + tweak_t`, `child_s = parent_s + tweak_s`.
+  Byte-exact gated against upstream
+  `generate_tweak_keypair_from_seed` + `add_public_keys` +
+  `add_signing_keys`.
+- [ ] (Session 7f) `thrc.c`: deterministic sign / verify (Algorithm 2/3
+  with unrounded `t̂`, BUFF `mu`, challenge poly, variable-length
+  signature serialization); tampered-signature reject; wrong-pk reject.
+- [ ] (Session 7g) `test/data/raccoong_kat.json` + `test/raccoong_kat.c`
   driver wired into the `tests` binary.
-- [ ] (Session 7) CI matrix entry exercising `--enable-raccoon-g`.
-- [ ] Flip `raccoong_is_ready()` to `true` only when all of the above pass.
+- [ ] (Session 7h) CI matrix entry exercising `--enable-raccoon-g`.
+- [ ] Flip `raccoong_is_ready()` to `true` once sign/verify land (HD
+  derive is already wired through `raccoong_hd_derive_*`, but the public
+  libdogecoin API still short-circuits on `raccoong_is_ready()` until
+  sign/verify are byte-exact).

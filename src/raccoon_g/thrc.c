@@ -35,6 +35,8 @@
 
 #include <string.h>
 
+#include <dogecoin/sha2.h>
+
 #include "gaussian.h"
 #include "keygen_kdf.h"
 #include "polyr.h"
@@ -193,22 +195,14 @@ static void polyr_load_signed(polyr* dst, const int64_t* src)
     }
 }
 
-dogecoin_bool raccoong_keygen_t_unrounded(const uint8_t key[32],
-                                          uint8_t A_seed_out[RACCOONG_A_SEED_BYTES],
-                                          polyr t_out[RACCOONG_K],
-                                          polyr s_out[RACCOONG_ELL])
+static dogecoin_bool keygen_t_unrounded_inner(const uint8_t key[32],
+                                              const uint8_t A_seed_in[RACCOONG_A_SEED_BYTES],
+                                              polyr t_out[RACCOONG_K],
+                                              polyr s_out[RACCOONG_ELL])
 {
-    if (!key || !A_seed_out || !t_out) return false;
-
-    /* --- 1. A_seed = SHAKE256(_hdr8('A') + key, 16) --- */
-    uint8_t hdr_in[8 + 32];
-    raccoong_hdr8(hdr_in, 'A', 0, 0, 0, 0, 0, 0, 0);
-    memcpy(hdr_in + 8, key, 32);
-    shake256(A_seed_out, RACCOONG_A_SEED_BYTES, hdr_in, sizeof(hdr_in));
-
     /* --- 1b. A = ExpandA(A_seed)  (already in NTT domain). --- */
     static polyr A[RACCOONG_K][RACCOONG_ELL];
-    if (!raccoong_expand_a(A, A_seed_out)) return false;
+    if (!raccoong_expand_a(A, A_seed_in)) return false;
 
     /* --- 2. s ~ D_t^ell, e1 ~ D_t^k via sample_rounded(2^14, hdr8 + key). */
     static polyr s_poly[RACCOONG_ELL];
@@ -259,9 +253,56 @@ dogecoin_bool raccoong_keygen_t_unrounded(const uint8_t key[32],
     return raccoong_vec_add(t_out, t_ntt, e1_poly, RACCOONG_K);
 }
 
+dogecoin_bool raccoong_keygen_t_unrounded(const uint8_t key[32],
+                                          uint8_t A_seed_out[RACCOONG_A_SEED_BYTES],
+                                          polyr t_out[RACCOONG_K],
+                                          polyr s_out[RACCOONG_ELL])
+{
+    if (!key || !A_seed_out || !t_out) return false;
+
+    /* --- 1. A_seed = SHAKE256(_hdr8('A') + key, 16) --- */
+    uint8_t hdr_in[8 + 32];
+    raccoong_hdr8(hdr_in, 'A', 0, 0, 0, 0, 0, 0, 0);
+    memcpy(hdr_in + 8, key, 32);
+    shake256(A_seed_out, RACCOONG_A_SEED_BYTES, hdr_in, sizeof(hdr_in));
+
+    return keygen_t_unrounded_inner(key, A_seed_out, t_out, s_out);
+}
+
+/*
+ * Tweak variant of the unrounded keygen — reuses the parent's `A_seed`
+ * instead of deriving it from `key`.  Mirrors upstream
+ * `generate_tweak_keypair_from_seed`'s middle section (after the DRBG key
+ * is drawn): A_ntt = expand(parent_A_seed); s/e1 ~ sample_rounded(...+key);
+ * t = A*s + e1 (unrounded).
+ */
+static dogecoin_bool raccoong_keygen_t_with_aseed(const uint8_t key[32],
+                                                  const uint8_t A_seed_in[RACCOONG_A_SEED_BYTES],
+                                                  polyr t_out[RACCOONG_K],
+                                                  polyr s_out[RACCOONG_ELL])
+{
+    if (!key || !A_seed_in || !t_out) return false;
+    return keygen_t_unrounded_inner(key, A_seed_in, t_out, s_out);
+}
+
 dogecoin_bool thrc_keygen_from_seed(const uint8_t seed[32],
                                     uint8_t* pk_out, size_t pk_len,
                                     uint8_t* sk_out, size_t sk_len);
+
+/* Forward decls for HD-derive helpers. */
+static dogecoin_bool deserialize_poly_le7(polyr* dst, const uint8_t* src);
+static dogecoin_bool deserialize_pk_into(const uint8_t* pk, size_t pk_len,
+                                         uint8_t A_seed_out[RACCOONG_A_SEED_BYTES],
+                                         polyr t_out[RACCOONG_K]);
+static dogecoin_bool deserialize_sk_into(const uint8_t* sk, size_t sk_len,
+                                         uint8_t A_seed_out[RACCOONG_A_SEED_BYTES],
+                                         polyr t_out[RACCOONG_K],
+                                         polyr s_out[RACCOONG_ELL]);
+static dogecoin_bool hd_derive_tweak_seed(uint8_t tweak_seed_out[32],
+                                          const uint8_t* parent_pk, size_t parent_pk_len,
+                                          const uint8_t* parent_sk, size_t parent_sk_len,
+                                          const uint8_t chaincode[32],
+                                          uint32_t index, dogecoin_bool hardened);
 
 /* Pack one polyr (already in [0, q)) as 256 little-endian 7-byte coeffs. */
 static void serialize_poly_le7(uint8_t* dst, const polyr* p)
@@ -377,11 +418,96 @@ dogecoin_bool thrc_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len
                                   uint8_t* child_sk_out, size_t child_sk_len,
                                   uint8_t* child_pk_out, size_t child_pk_len)
 {
-    (void)parent_sk; (void)parent_sk_len; (void)parent_pk; (void)parent_pk_len;
-    (void)chaincode; (void)index; (void)hardened;
-    (void)child_sk_out; (void)child_sk_len;
-    (void)child_pk_out; (void)child_pk_len;
-    return false;
+    if (!parent_sk || !parent_pk || !chaincode ||
+        !child_sk_out || !child_pk_out) {
+        return false;
+    }
+    if (child_sk_len != RACCOONG_SK_BYTES) return false;
+    if (child_pk_len != RACCOONG_PK_BYTES) return false;
+
+    /* 1. Deserialize parent sk = (A_seed, t, s); cross-check A_seed against pk. */
+    uint8_t parent_A_seed[RACCOONG_A_SEED_BYTES];
+    uint8_t parent_pk_A_seed[RACCOONG_A_SEED_BYTES];
+    static polyr parent_t[RACCOONG_K];
+    static polyr parent_s[RACCOONG_ELL];
+    if (!deserialize_sk_into(parent_sk, parent_sk_len, parent_A_seed,
+                             parent_t, parent_s)) {
+        return false;
+    }
+    if (!deserialize_pk_into(parent_pk, parent_pk_len, parent_pk_A_seed,
+                             /*t_out=*/NULL)) {
+        memset(parent_s, 0, sizeof(parent_s));
+        return false;
+    }
+    if (memcmp(parent_A_seed, parent_pk_A_seed, RACCOONG_A_SEED_BYTES) != 0) {
+        memset(parent_s, 0, sizeof(parent_s));
+        return false;
+    }
+
+    /* 2. tweak_seed = HMAC-SHA512(chaincode, tag || sha256(parent_key) || idx_BE)[:32]
+     *    tag is 'p' for non-hardened (uses parent_pk hash) or 'S' for hardened
+     *    (uses parent_sk hash). This mirrors the liboqs-side derive_hd_bytes
+     *    domain separator tags. */
+    uint8_t tweak_seed[32];
+    if (!hd_derive_tweak_seed(tweak_seed, parent_pk, parent_pk_len,
+                              parent_sk, parent_sk_len, chaincode,
+                              index, hardened)) {
+        memset(parent_s, 0, sizeof(parent_s));
+        return false;
+    }
+
+    /* 3. drbg_seed = HKDF-SHA256(tweak_seed, 48); drbg.random_bytes(32) = key. */
+    uint8_t drbg_seed[48];
+    if (!raccoong_hkdf_sha256(drbg_seed, sizeof(drbg_seed),
+                              tweak_seed, sizeof(tweak_seed),
+                              NULL, 0, NULL, 0)) {
+        memset(tweak_seed, 0, sizeof(tweak_seed));
+        memset(parent_s, 0, sizeof(parent_s));
+        return false;
+    }
+    memset(tweak_seed, 0, sizeof(tweak_seed));
+
+    raccoong_nist_kat_drbg drbg;
+    raccoong_nist_kat_drbg_init(&drbg, drbg_seed);
+    memset(drbg_seed, 0, sizeof(drbg_seed));
+
+    uint8_t key[32];
+    raccoong_nist_kat_drbg_random_bytes(&drbg, key, sizeof(key));
+    memset(&drbg, 0, sizeof(drbg));
+
+    /* 4. tweak keygen reusing parent A_seed. */
+    static polyr tweak_t[RACCOONG_K];
+    static polyr tweak_s[RACCOONG_ELL];
+    if (!raccoong_keygen_t_with_aseed(key, parent_A_seed, tweak_t, tweak_s)) {
+        memset(key, 0, sizeof(key));
+        memset(parent_s, 0, sizeof(parent_s));
+        return false;
+    }
+    memset(key, 0, sizeof(key));
+
+    /* 5. child_t = parent_t + tweak_t (mod q); child_s = parent_s + tweak_s (mod q). */
+    static polyr child_t[RACCOONG_K];
+    static polyr child_s[RACCOONG_ELL];
+    if (!raccoong_vec_add(child_t, parent_t, tweak_t, RACCOONG_K)) {
+        memset(parent_s, 0, sizeof(parent_s));
+        memset(tweak_s, 0, sizeof(tweak_s));
+        return false;
+    }
+    if (!raccoong_vec_add(child_s, parent_s, tweak_s, RACCOONG_ELL)) {
+        memset(parent_s, 0, sizeof(parent_s));
+        memset(tweak_s, 0, sizeof(tweak_s));
+        memset(child_s, 0, sizeof(child_s));
+        return false;
+    }
+
+    raccoong_serialize_pk(child_pk_out, parent_A_seed, child_t);
+    raccoong_serialize_sk(child_sk_out, parent_A_seed, child_t, child_s);
+
+    /* Wipe transient secrets. */
+    memset(parent_s, 0, sizeof(parent_s));
+    memset(tweak_s, 0, sizeof(tweak_s));
+    memset(child_s, 0, sizeof(child_s));
+    return true;
 }
 
 dogecoin_bool thrc_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
@@ -389,7 +515,154 @@ dogecoin_bool thrc_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
                                  uint32_t index,
                                  uint8_t* child_pk_out, size_t child_pk_len)
 {
-    (void)parent_pk; (void)parent_pk_len; (void)chaincode; (void)index;
-    (void)child_pk_out; (void)child_pk_len;
-    return false;
+    if (!parent_pk || !chaincode || !child_pk_out) return false;
+    if (child_pk_len != RACCOONG_PK_BYTES) return false;
+    /* Hardened derivation needs the secret key. */
+    if (index & 0x80000000U) return false;
+
+    uint8_t parent_A_seed[RACCOONG_A_SEED_BYTES];
+    static polyr parent_t[RACCOONG_K];
+    if (!deserialize_pk_into(parent_pk, parent_pk_len, parent_A_seed, parent_t)) {
+        return false;
+    }
+
+    uint8_t tweak_seed[32];
+    if (!hd_derive_tweak_seed(tweak_seed, parent_pk, parent_pk_len,
+                              /*parent_sk=*/NULL, 0, chaincode,
+                              index, /*hardened=*/false)) {
+        return false;
+    }
+
+    uint8_t drbg_seed[48];
+    if (!raccoong_hkdf_sha256(drbg_seed, sizeof(drbg_seed),
+                              tweak_seed, sizeof(tweak_seed),
+                              NULL, 0, NULL, 0)) {
+        memset(tweak_seed, 0, sizeof(tweak_seed));
+        return false;
+    }
+    memset(tweak_seed, 0, sizeof(tweak_seed));
+
+    raccoong_nist_kat_drbg drbg;
+    raccoong_nist_kat_drbg_init(&drbg, drbg_seed);
+    memset(drbg_seed, 0, sizeof(drbg_seed));
+
+    uint8_t key[32];
+    raccoong_nist_kat_drbg_random_bytes(&drbg, key, sizeof(key));
+    memset(&drbg, 0, sizeof(drbg));
+
+    static polyr tweak_t[RACCOONG_K];
+    if (!raccoong_keygen_t_with_aseed(key, parent_A_seed, tweak_t, NULL)) {
+        memset(key, 0, sizeof(key));
+        return false;
+    }
+    memset(key, 0, sizeof(key));
+
+    static polyr child_t[RACCOONG_K];
+    if (!raccoong_vec_add(child_t, parent_t, tweak_t, RACCOONG_K)) {
+        return false;
+    }
+
+    raccoong_serialize_pk(child_pk_out, parent_A_seed, child_t);
+    return true;
+}
+
+/* ============================================================
+ * Deserialization helpers + chain-code-driven tweak derivation.
+ * ============================================================ */
+
+static dogecoin_bool deserialize_poly_le7(polyr* dst, const uint8_t* src)
+{
+    for (size_t i = 0; i < RACCOONG_N; ++i) {
+        uint64_t c =
+              ((uint64_t)src[0])
+            | ((uint64_t)src[1] << 8)
+            | ((uint64_t)src[2] << 16)
+            | ((uint64_t)src[3] << 24)
+            | ((uint64_t)src[4] << 32)
+            | ((uint64_t)src[5] << 40)
+            | ((uint64_t)src[6] << 48);
+        if (c >= RACCOONG_Q) return false;
+        dst->coeffs[i] = c;
+        src += RACCOONG_COEFF_BYTES;
+    }
+    return true;
+}
+
+static dogecoin_bool deserialize_pk_into(const uint8_t* pk, size_t pk_len,
+                                         uint8_t A_seed_out[RACCOONG_A_SEED_BYTES],
+                                         polyr t_out[RACCOONG_K])
+{
+    if (!pk || pk_len != RACCOONG_PK_BYTES) return false;
+    memcpy(A_seed_out, pk, RACCOONG_A_SEED_BYTES);
+    if (!t_out) return true;
+    const uint8_t* p = pk + RACCOONG_A_SEED_BYTES;
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        if (!deserialize_poly_le7(&t_out[i], p)) return false;
+        p += (size_t)RACCOONG_N * RACCOONG_COEFF_BYTES;
+    }
+    return true;
+}
+
+static dogecoin_bool deserialize_sk_into(const uint8_t* sk, size_t sk_len,
+                                         uint8_t A_seed_out[RACCOONG_A_SEED_BYTES],
+                                         polyr t_out[RACCOONG_K],
+                                         polyr s_out[RACCOONG_ELL])
+{
+    if (!sk || sk_len != RACCOONG_SK_BYTES) return false;
+    if (!deserialize_pk_into(sk, RACCOONG_PK_BYTES, A_seed_out, t_out)) {
+        return false;
+    }
+    if (!s_out) return true;
+    const uint8_t* p = sk + RACCOONG_PK_BYTES;
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+        if (!deserialize_poly_le7(&s_out[i], p)) return false;
+        p += (size_t)RACCOONG_N * RACCOONG_COEFF_BYTES;
+    }
+    return true;
+}
+
+/*
+ * tweak_seed derivation:
+ *
+ *   data = tag || sha256(parent_key) || index_BE
+ *   tweak_seed = HMAC-SHA512(chaincode, data)[:32]
+ *
+ *  - non-hardened: tag = 'p' (0x70), parent_key = parent_pk
+ *  - hardened:     tag = 'S' (0x53), parent_key = parent_sk
+ *
+ * sha256() of the parent serialized key keeps the HMAC input small while
+ * preserving uniqueness; using parent_pk for non-hardened keeps the pub-only
+ * path consistent (no secret-key dependence).
+ */
+static dogecoin_bool hd_derive_tweak_seed(uint8_t tweak_seed_out[32],
+                                          const uint8_t* parent_pk, size_t parent_pk_len,
+                                          const uint8_t* parent_sk, size_t parent_sk_len,
+                                          const uint8_t chaincode[32],
+                                          uint32_t index, dogecoin_bool hardened)
+{
+    uint8_t data[1 + 32 + 4];
+    uint8_t digest[32];
+
+    uint32_t encoded_index = hardened ? (index | 0x80000000u) : index;
+    if (hardened) {
+        if (!parent_sk || parent_sk_len != RACCOONG_SK_BYTES) return false;
+        data[0] = 'S';
+        sha256_raw(parent_sk, parent_sk_len, digest);
+    } else {
+        if (!parent_pk || parent_pk_len != RACCOONG_PK_BYTES) return false;
+        data[0] = 'p';
+        sha256_raw(parent_pk, parent_pk_len, digest);
+    }
+    memcpy(data + 1, digest, 32);
+    data[33] = (uint8_t)(encoded_index >> 24);
+    data[34] = (uint8_t)(encoded_index >> 16);
+    data[35] = (uint8_t)(encoded_index >> 8);
+    data[36] = (uint8_t)(encoded_index);
+
+    uint8_t I[64];
+    hmac_sha512(chaincode, 32, data, sizeof(data), I);
+    memcpy(tweak_seed_out, I, 32);
+    memset(I, 0, sizeof(I));
+    memset(data, 0, sizeof(data));
+    return true;
 }
