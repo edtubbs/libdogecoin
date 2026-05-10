@@ -257,6 +257,34 @@ dogecoin_bool raccoong_deserialize_signature(
     int16_t h_signed_out[RACCOONG_K][256],
     const uint8_t* sig, size_t sig_len);
 
+/*
+ * Challenge-polynomial expansion (`_chal_poly` upstream).
+ *
+ * Maps the 32-byte challenge digest `c_hash` to a τ-weight ternary
+ * polynomial in {-1, 0, +1}^256 (exactly RACCOONG_TAU non-zero
+ * coefficients).  Used by both `thrc_sign` and `thrc_verify`.
+ *
+ * Algorithm (byte-exact with `ThRc_Core._chal_poly`):
+ *   xof = SHAKE256(_hdr8('c', τ) || c_hash)
+ *   while weight < τ:
+ *       z    = xof.read(blen=2)            # 9 bits needed, blen=ceil(9/8)
+ *       x    = u16_le(z)
+ *       sign = x & 1
+ *       idx  = (x >> 1) & 0xff
+ *       if c[idx] == 0:
+ *           c[idx] = 2*sign - 1
+ *           weight += 1
+ *
+ * `out` is written iff the call returns true (which it always does for
+ * valid arguments — SHAKE256 is unbounded so the rejection loop always
+ * terminates within a few hundred reads).  Returns false only on null
+ * arguments.
+ */
+#define RACCOONG_TAU 23u
+
+dogecoin_bool raccoong_chal_poly(int8_t out[256],
+                                 const uint8_t c_hash[RACCOONG_C_HASH_BYTES]);
+
 LIBDOGECOIN_END_DECL
 
 #endif /* LIBDOGECOIN_RACCOON_G_THRC_H */

@@ -302,6 +302,7 @@ tests_SOURCES += \
     test/raccoong_keypair_tests.c \
     test/raccoong_hd_derive_tests.c \
     test/raccoong_signature_serialize_tests.c \
+    test/raccoong_chal_poly_tests.c \
     test/data/raccoong_polyr_vectors.h \
     test/data/raccoong_ntt_vectors.h \
     test/data/raccoong_gaussian_vectors.h \
@@ -310,7 +311,8 @@ tests_SOURCES += \
     test/data/raccoong_keygen_t_vectors.h \
     test/data/raccoong_keypair_vectors.h \
     test/data/raccoong_hd_derive_vectors.h \
-    test/data/raccoong_signature_serialize_vectors.h
+    test/data/raccoong_signature_serialize_vectors.h \
+    test/data/raccoong_chal_poly_vectors.h
 endif
 endif
 

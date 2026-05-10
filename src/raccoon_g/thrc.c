@@ -103,6 +103,50 @@ dogecoin_bool raccoong_xof_sample_q(uint64_t out[/* RACCOONG_N */],
     return true;
 }
 
+dogecoin_bool raccoong_chal_poly(int8_t out[256],
+                                 const uint8_t c_hash[RACCOONG_C_HASH_BYTES])
+{
+    if (!out || !c_hash) return false;
+
+    /* Upstream:
+     *     mask_n  = n - 1                              # = 0xff for n=256
+     *     blen    = (mask_n.bit_length() + 1 + 7) // 8  # = (8+1+7)//8 = 2
+     *     xof     = SHAKE256(_hdr8('c', tau) + c_hash)
+     *     while wt < tau:
+     *         z    = xof.read(blen)
+     *         x    = int.from_bytes(z, 'little')
+     *         sign = x & 1
+     *         idx  = (x >> 1) & mask_n
+     *         if c[idx] == 0:
+     *             c[idx] = 2*sign - 1
+     *             wt    += 1
+     */
+    memset(out, 0, 256);
+
+    uint8_t hdr[8];
+    raccoong_hdr8(hdr, 'c', (uint8_t)RACCOONG_TAU, 0, 0, 0, 0, 0, 0);
+
+    shake256_ctx ctx;
+    shake256_init(&ctx);
+    shake256_absorb(&ctx, hdr, sizeof(hdr));
+    shake256_absorb(&ctx, c_hash, RACCOONG_C_HASH_BYTES);
+    shake256_finalize(&ctx);
+
+    unsigned wt = 0;
+    while (wt < RACCOONG_TAU) {
+        uint8_t z[2];
+        shake256_squeeze(&ctx, z, sizeof(z));
+        unsigned x   = (unsigned)z[0] | ((unsigned)z[1] << 8);
+        unsigned sgn = x & 1u;
+        unsigned idx = (x >> 1) & 0xffu;       /* mask_n = 255 for n=256 */
+        if (out[idx] == 0) {
+            out[idx] = (int8_t)((int)(2u * sgn) - 1);   /* sgn=1 -> +1, sgn=0 -> -1 */
+            wt++;
+        }
+    }
+    return true;
+}
+
 dogecoin_bool raccoong_expand_a(polyr A[RACCOONG_K][RACCOONG_ELL],
                                 const uint8_t A_seed[RACCOONG_A_SEED_BYTES])
 {
