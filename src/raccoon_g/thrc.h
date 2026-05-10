@@ -56,9 +56,39 @@ LIBDOGECOIN_BEGIN_DECL
  * to allow byte-exact KAT comparison against the upstream Python reference.
  */
 
+/*
+ * Canonical Raccoon-G-44 serialization sizes (mirrors upstream
+ * `raccoon_primitives._PUBLIC_KEY_SIZE` / `_SIGNING_KEY_SIZE`):
+ *   q is 50-bit so each coefficient packs into 7 little-endian bytes.
+ *   pk = A_seed (16 B) || t (k * n * 7 B)               = 16144 B
+ *   sk = pk || s (ell * n * 7 B)                        = 32272 B
+ */
+#define RACCOONG_COEFF_BYTES 7u
+#define RACCOONG_PK_BYTES \
+    (RACCOONG_A_SEED_BYTES + (size_t)RACCOONG_K * 256u * RACCOONG_COEFF_BYTES)
+#define RACCOONG_SK_BYTES \
+    (RACCOONG_PK_BYTES + (size_t)RACCOONG_ELL * 256u * RACCOONG_COEFF_BYTES)
+
 dogecoin_bool thrc_keygen_from_seed(const uint8_t seed[32],
                                     uint8_t* pk_out, size_t pk_len,
                                     uint8_t* sk_out, size_t sk_len);
+
+/*
+ * Canonical little-endian serialization helpers (mirror
+ * upstream `serialize_public_key` / `serialize_signing_key`).
+ * `pk_out` must point to RACCOONG_PK_BYTES of writable storage; `sk_out`
+ * to RACCOONG_SK_BYTES.  Secret coefficients are stored as `c mod q` to
+ * match the upstream `int(coefficient % _Q).to_bytes(_COEFF_BYTES, "little")`
+ * convention, so freshly-sampled negative gaussians round-trip cleanly.
+ */
+void raccoong_serialize_pk(uint8_t pk_out[/*RACCOONG_PK_BYTES*/],
+                           const uint8_t A_seed[RACCOONG_A_SEED_BYTES],
+                           const polyr t[RACCOONG_K]);
+
+void raccoong_serialize_sk(uint8_t sk_out[/*RACCOONG_SK_BYTES*/],
+                           const uint8_t A_seed[RACCOONG_A_SEED_BYTES],
+                           const polyr t[RACCOONG_K],
+                           const polyr s[RACCOONG_ELL]);
 
 dogecoin_bool thrc_sign(const uint8_t* sk, size_t sk_len,
                         const uint8_t* msg, size_t msg_len,

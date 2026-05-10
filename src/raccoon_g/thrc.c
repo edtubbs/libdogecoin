@@ -36,6 +36,7 @@
 #include <string.h>
 
 #include "gaussian.h"
+#include "keygen_kdf.h"
 #include "polyr.h"
 #include "ntt.h"
 #include "shake256.h"
@@ -260,10 +261,96 @@ dogecoin_bool raccoong_keygen_t_unrounded(const uint8_t key[32],
 
 dogecoin_bool thrc_keygen_from_seed(const uint8_t seed[32],
                                     uint8_t* pk_out, size_t pk_len,
+                                    uint8_t* sk_out, size_t sk_len);
+
+/* Pack one polyr (already in [0, q)) as 256 little-endian 7-byte coeffs. */
+static void serialize_poly_le7(uint8_t* dst, const polyr* p)
+{
+    for (size_t i = 0; i < RACCOONG_N; ++i) {
+        uint64_t c = p->coeffs[i]; /* normalized [0, q), q < 2^50 */
+        dst[0] = (uint8_t)(c);
+        dst[1] = (uint8_t)(c >> 8);
+        dst[2] = (uint8_t)(c >> 16);
+        dst[3] = (uint8_t)(c >> 24);
+        dst[4] = (uint8_t)(c >> 32);
+        dst[5] = (uint8_t)(c >> 40);
+        dst[6] = (uint8_t)(c >> 48);
+        dst += RACCOONG_COEFF_BYTES;
+    }
+}
+
+void raccoong_serialize_pk(uint8_t pk_out[/*RACCOONG_PK_BYTES*/],
+                           const uint8_t A_seed[RACCOONG_A_SEED_BYTES],
+                           const polyr t[RACCOONG_K])
+{
+    memcpy(pk_out, A_seed, RACCOONG_A_SEED_BYTES);
+    uint8_t* p = pk_out + RACCOONG_A_SEED_BYTES;
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        serialize_poly_le7(p, &t[i]);
+        p += (size_t)RACCOONG_N * RACCOONG_COEFF_BYTES;
+    }
+}
+
+void raccoong_serialize_sk(uint8_t sk_out[/*RACCOONG_SK_BYTES*/],
+                           const uint8_t A_seed[RACCOONG_A_SEED_BYTES],
+                           const polyr t[RACCOONG_K],
+                           const polyr s[RACCOONG_ELL])
+{
+    raccoong_serialize_pk(sk_out, A_seed, t);
+    uint8_t* p = sk_out + RACCOONG_PK_BYTES;
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+        serialize_poly_le7(p, &s[i]);
+        p += (size_t)RACCOONG_N * RACCOONG_COEFF_BYTES;
+    }
+}
+
+dogecoin_bool thrc_keygen_from_seed(const uint8_t seed[32],
+                                    uint8_t* pk_out, size_t pk_len,
                                     uint8_t* sk_out, size_t sk_len)
 {
-    (void)seed; (void)pk_out; (void)pk_len; (void)sk_out; (void)sk_len;
-    return false;
+    if (!seed || !pk_out || !sk_out) return false;
+    if (pk_len != RACCOONG_PK_BYTES) return false;
+    if (sk_len != RACCOONG_SK_BYTES) return false;
+
+    /* Upstream `generate_keypair_from_seed`:
+     *     drbg_seed = HKDF(seed, 48, salt=None, hashmod=SHA256)
+     *     drbg = NIST_KAT_DRBG(drbg_seed)
+     *     key  = drbg.random_bytes(32)
+     *     (vk, s) = _keygen_unrounded(raccoon, key)
+     *     return serialize_public_key(vk), serialize_signing_key((vk, s))
+     */
+    uint8_t drbg_seed[48];
+    if (!raccoong_hkdf_sha256(drbg_seed, sizeof(drbg_seed),
+                              seed, 32,
+                              /*salt=*/NULL, 0,
+                              /*info=*/NULL, 0)) {
+        return false;
+    }
+
+    raccoong_nist_kat_drbg drbg;
+    raccoong_nist_kat_drbg_init(&drbg, drbg_seed);
+    memset(drbg_seed, 0, sizeof(drbg_seed));
+
+    uint8_t key[32];
+    raccoong_nist_kat_drbg_random_bytes(&drbg, key, sizeof(key));
+    memset(&drbg, 0, sizeof(drbg));
+
+    uint8_t A_seed[RACCOONG_A_SEED_BYTES];
+    static polyr t_vec[RACCOONG_K];
+    static polyr s_vec[RACCOONG_ELL];
+
+    if (!raccoong_keygen_t_unrounded(key, A_seed, t_vec, s_vec)) {
+        memset(key, 0, sizeof(key));
+        return false;
+    }
+    memset(key, 0, sizeof(key));
+
+    raccoong_serialize_pk(pk_out, A_seed, t_vec);
+    raccoong_serialize_sk(sk_out, A_seed, t_vec, s_vec);
+
+    /* Wipe the secret share; the caller now owns sk_out. */
+    memset(s_vec, 0, sizeof(s_vec));
+    return true;
 }
 
 dogecoin_bool thrc_sign(const uint8_t* sk, size_t sk_len,

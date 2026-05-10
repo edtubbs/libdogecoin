@@ -146,6 +146,7 @@ libdogecoin_la_SOURCES += \
     src/raccoon_g/ntt.c \
     src/raccoon_g/gaussian.c \
     src/raccoon_g/shake256.c \
+    src/raccoon_g/keygen_kdf.c \
     src/raccoon_g/thrc.c \
     src/raccoon_g/raccoong.c
 endif
@@ -298,12 +299,14 @@ tests_SOURCES += \
     test/raccoong_xof_sample_q_tests.c \
     test/raccoong_matvec_tests.c \
     test/raccoong_keygen_t_tests.c \
+    test/raccoong_keypair_tests.c \
     test/data/raccoong_polyr_vectors.h \
     test/data/raccoong_ntt_vectors.h \
     test/data/raccoong_gaussian_vectors.h \
     test/data/raccoong_xof_sample_q_vectors.h \
     test/data/raccoong_matvec_vectors.h \
-    test/data/raccoong_keygen_t_vectors.h
+    test/data/raccoong_keygen_t_vectors.h \
+    test/data/raccoong_keypair_vectors.h
 endif
 endif
 
