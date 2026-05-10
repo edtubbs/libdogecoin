@@ -44,7 +44,7 @@ LIBDOGECOIN_BEGIN_DECL
 /*
  * Check if Raccoon-G-44 is available at runtime.
  */
-#ifdef USE_LIBOQS_RACCOON
+#if defined(USE_LIBOQS_RACCOON) || defined(USE_RACCOON_G)
 LIBDOGECOIN_API dogecoin_bool dogecoin_raccoong44_is_available(void);
 
 /*

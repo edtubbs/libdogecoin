@@ -188,6 +188,20 @@ if test "x$use_liboqs_raccoon" = xyes; then
   use_liboqs=yes
 fi
 
+dnl --enable-raccoon-g selects the in-tree Raccoon-G-44 backend. It is
+dnl experimental and gated; byte-exact agreement with the upstream Python
+dnl reference (p-11/lattice-hd-wallets) KATs is a release-blocking gate.
+dnl It is mutually exclusive with --enable-liboqs-raccoon.
+AC_ARG_ENABLE([raccoon-g],
+  [AS_HELP_STRING([--enable-raccoon-g],
+  [Build with the in-tree Raccoon-G-44 implementation backed by GMP/MPFR (default is no, experimental)])],
+  [use_raccoon_g=$enableval],
+  [use_raccoon_g=no])
+
+if test "x$use_raccoon_g" = xyes && test "x$use_liboqs_raccoon" = xyes; then
+  AC_MSG_ERROR([--enable-raccoon-g is mutually exclusive with --enable-liboqs-raccoon])
+fi
+
 
 AC_ARG_ENABLE(tests,
   AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
@@ -317,6 +331,15 @@ if test "x$use_liboqs" = xyes; then
   fi
 fi
 
+if test "x$use_raccoon_g" = xyes; then
+  AC_CHECK_HEADER([gmp.h],,[AC_MSG_ERROR([gmp.h missing (required by --enable-raccoon-g; build via depends RACCOON_G=y or install libgmp-dev)])])
+  AC_CHECK_HEADER([mpfr.h],,[AC_MSG_ERROR([mpfr.h missing (required by --enable-raccoon-g; build via depends RACCOON_G=y or install libmpfr-dev)])])
+  AC_CHECK_LIB([gmp],[__gmpz_init],[LIBGMP=-lgmp],AC_MSG_ERROR(libgmp missing))
+  AC_CHECK_LIB([mpfr],[mpfr_init],[LIBMPFR=-lmpfr],AC_MSG_ERROR(libmpfr missing),[$LIBGMP])
+  LIBS="$LIBS $LIBMPFR $LIBGMP"
+  AC_DEFINE(USE_RACCOON_G, 1, [Define this symbol to enable the in-tree Raccoon-G-44 backend])
+fi
+
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
@@ -341,6 +364,7 @@ AM_CONDITIONAL([USE_OPTEE], [test "x$use_optee" = "xyes"])
 AM_CONDITIONAL([USE_YUBIKEY], [test "x$use_yubikey" = "xyes"])
 AM_CONDITIONAL([USE_LIBOQS], [test "x$use_liboqs" = "xyes"])
 AM_CONDITIONAL([USE_LIBOQS_RACCOON], [test "x$use_liboqs_raccoon" = "xyes"])
+AM_CONDITIONAL([USE_RACCOON_G], [test "x$use_raccoon_g" = "xyes"])
 AM_CONDITIONAL([USE_ARMV8], [test "x$armv8_crypto" = "xyes"])
 AM_CONDITIONAL([USE_ARMV82], [test "x$armv82_crypto" = "xyes"])
 AC_SUBST(LIB_VERSION_CURRENT, _LIB_VERSION_CURRENT)
@@ -376,6 +400,7 @@ echo "  optee           = $use_optee"
 echo "  Yubikey         = $use_yubikey"
 echo "  liboqs          = $use_liboqs"
 echo "  liboqs-raccoon  = $use_liboqs_raccoon"
+echo "  raccoon-g       = $use_raccoon_g (experimental, in-tree)"
 echo
 echo "  host            = $host"
 echo "  target os       = $TARGET_OS"

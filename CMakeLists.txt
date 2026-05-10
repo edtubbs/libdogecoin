@@ -36,6 +36,7 @@ SET(USE_OPENENCLAVE FALSE CACHE BOOL "enable openenclave")
 SET(USE_YUBIKEY FALSE CACHE BOOL "enable yubikey")
 SET(USE_LIBOQS FALSE CACHE BOOL "enable liboqs")
 SET(USE_LIBOQS_RACCOON FALSE CACHE BOOL "enable liboqs raccoon fork")
+SET(USE_RACCOON_G FALSE CACHE BOOL "enable in-tree Raccoon-G-44 (experimental, requires GMP/MPFR)")
 string(RANDOM LENGTH 12 ALPHABET abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 PASSWD_STR)
 SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random data from")
 
@@ -222,6 +223,14 @@ ENDIF()
 IF(USE_LIBOQS_RACCOON)
     ADD_DEFINITIONS(-DUSE_LIBOQS_RACCOON=1)
 ENDIF()
+IF(USE_RACCOON_G AND USE_LIBOQS_RACCOON)
+    MESSAGE(FATAL_ERROR "USE_RACCOON_G and USE_LIBOQS_RACCOON are mutually exclusive")
+ENDIF()
+IF(USE_RACCOON_G)
+    FIND_LIBRARY(LIBGMP NAMES gmp REQUIRED)
+    FIND_LIBRARY(LIBMPFR NAMES mpfr REQUIRED)
+    ADD_DEFINITIONS(-DUSE_RACCOON_G=1)
+ENDIF()
 IF(USE_TESTS)
     ADD_DEFINITIONS(-DPASSWD_STR="${PASSWD_STR}")
 ENDIF()
@@ -251,6 +260,7 @@ MESSAGE(STATUS "  openenclave    = ${USE_OPENENCLAVE}")
 MESSAGE(STATUS "  yubikey        = ${USE_YUBIKEY}")
 MESSAGE(STATUS "  liboqs         = ${USE_LIBOQS}")
 MESSAGE(STATUS "  liboqs_raccoon = ${USE_LIBOQS_RACCOON}")
+MESSAGE(STATUS "  raccoon_g      = ${USE_RACCOON_G} (experimental, in-tree)")
 MESSAGE(STATUS "")
 message(STATUS "  library type   = ${library_type}")
 MESSAGE(STATUS "")
@@ -326,6 +336,17 @@ IF(USE_LIBOQS_RACCOON)
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/pqc_raccoon.c
 )
+ENDIF()
+IF(USE_RACCOON_G)
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
+    src/pqc_raccoon.c
+    src/raccoon_g/polyr.c
+    src/raccoon_g/ntt.c
+    src/raccoon_g/gaussian.c
+    src/raccoon_g/thrc.c
+    src/raccoon_g/raccoong.c
+)
+TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBMPFR} ${LIBGMP})
 ENDIF()
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PUBLIC
     src/chainparams.c

@@ -54,6 +54,18 @@ It is intended that connecting the bits together into an engine be done at the l
 - Native constant time AES (+256CBC) cipher implementation including NIST testvectors
 - Event based dogecoin P2P client capable of connecting to multiple nodes in a single thread (requires [libevent](https://github.com/libevent/libevent))
 
+#### Post-quantum (experimental)
+
+An in-tree port of Raccoon-G-44 (post-quantum threshold signatures) is staged
+in `src/raccoon_g/`, gated by `--enable-raccoon-g` (default off). It depends
+on GMP and MPFR (vendored via `depends/` under `RACCOON_G=y`); MPFR is the C
+analogue of Python `mpmath` that the upstream reference uses for its Gaussian
+sampler. The port ships only when every test vector from the upstream
+reference (`p-11/lattice-hd-wallets`) passes byte-for-byte; until then,
+`dogecoin_raccoong44_is_available()` returns false and every Raccoon-G API
+fails closed. See [src/raccoon_g/README.md](src/raccoon_g/README.md) for
+status and the release-blocking gate.
+
 ## Why C?
 
 The Dogecoin Core project is written in C++, why move to C? This is a good question.

@@ -85,6 +85,7 @@ static inline void sha256_pk_msg(uint8_t out32[32],
  *
  * @return Nothing.
  */
+#ifdef USE_LIBOQS
 static void derive_hd_bytes(uint8_t* out, size_t out_len,
                             const uint8_t* parent, size_t parent_len,
                             const uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN],
@@ -115,6 +116,7 @@ static void derive_hd_bytes(uint8_t* out, size_t out_len,
         counter++;
     }
 }
+#endif /* USE_LIBOQS */
 
 /**
  * @brief This function computes a 32-byte Raccoon-G-44
@@ -525,4 +527,178 @@ dogecoin_bool dogecoin_raccoong44_hd_derive_pub(const uint8_t* parent_pk, size_t
     OQS_SIG_free(alg);
     return true;
 }
+#endif
+
+#ifdef USE_RACCOON_G
+
+/*
+ * In-tree Raccoon-G-44 backend. Built when --enable-raccoon-g is configured.
+ * Mutually exclusive with USE_LIBOQS_RACCOON (enforced at configure time).
+ *
+ * The implementation is staged across multiple commits (see
+ * src/raccoon_g/README.md). Until raccoong_is_ready() flips to true, every
+ * entry point fails closed.
+ */
+
+#include "raccoon_g/raccoong.h"
+
+dogecoin_bool dogecoin_raccoong44_is_available(void)
+{
+    return raccoong_is_ready();
+}
+
+dogecoin_bool dogecoin_raccoong44_keypair(uint8_t** pk, size_t* pk_len,
+                                          uint8_t** sk, size_t* sk_len)
+{
+    if (!pk || !pk_len || !sk || !sk_len) {
+        return false;
+    }
+    if (!raccoong_is_ready()) {
+        return false;
+    }
+
+    size_t pkl = raccoong_pk_len();
+    size_t skl = raccoong_sk_len();
+    if (!pkl || !skl) {
+        return false;
+    }
+
+    uint8_t* pk_buf = (uint8_t*)dogecoin_malloc(pkl);
+    uint8_t* sk_buf = (uint8_t*)dogecoin_malloc(skl);
+    if (!pk_buf || !sk_buf) {
+        if (pk_buf) dogecoin_free(pk_buf);
+        if (sk_buf) dogecoin_free(sk_buf);
+        return false;
+    }
+
+    /* Seed-deterministic keygen requires a 32-byte seed; the public API takes
+     * none, so future revisions will source one from the libdogecoin RNG.
+     * Until raccoong_is_ready() returns true the call is short-circuited above
+     * and this path is unreachable. */
+    uint8_t seed[32] = {0};
+    if (!raccoong_keygen_from_seed(seed, pk_buf, pkl, sk_buf, skl)) {
+        dogecoin_free(pk_buf);
+        dogecoin_free(sk_buf);
+        return false;
+    }
+    *pk = pk_buf;
+    *pk_len = pkl;
+    *sk = sk_buf;
+    *sk_len = skl;
+    return true;
+}
+
+dogecoin_bool dogecoin_raccoong44_sign(const uint8_t* sk, size_t sk_len,
+                                       const uint8_t* msg, size_t msg_len,
+                                       uint8_t** sig_out, size_t* sig_len)
+{
+    if (!sk || !msg || !sig_out || !sig_len) {
+        return false;
+    }
+    if (!raccoong_is_ready()) {
+        return false;
+    }
+    size_t cap = raccoong_sig_max_len();
+    if (!cap) {
+        return false;
+    }
+    uint8_t* buf = (uint8_t*)dogecoin_malloc(cap);
+    if (!buf) {
+        return false;
+    }
+    size_t outlen = cap;
+    if (!raccoong_sign(sk, sk_len, msg, msg_len, buf, &outlen)) {
+        dogecoin_free(buf);
+        return false;
+    }
+    *sig_out = buf;
+    *sig_len = outlen;
+    return true;
+}
+
+dogecoin_bool dogecoin_raccoong44_verify(const uint8_t* pk, size_t pk_len,
+                                         const uint8_t* msg, size_t msg_len,
+                                         const uint8_t* sig, size_t sig_len)
+{
+    if (!pk || !msg || !sig) {
+        return false;
+    }
+    if (!raccoong_is_ready()) {
+        return false;
+    }
+    return raccoong_verify(pk, pk_len, msg, msg_len, sig, sig_len);
+}
+
+dogecoin_bool dogecoin_raccoong44_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len,
+                                                 const uint8_t* parent_pk, size_t parent_pk_len,
+                                                 const uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN],
+                                                 uint32_t index, dogecoin_bool hardened,
+                                                 uint8_t** child_sk, size_t* child_sk_len,
+                                                 uint8_t** child_pk, size_t* child_pk_len)
+{
+    if (!parent_sk || !parent_pk || !chaincode ||
+        !child_sk || !child_sk_len || !child_pk || !child_pk_len) {
+        return false;
+    }
+    if (!raccoong_is_ready()) {
+        return false;
+    }
+    size_t skl = raccoong_sk_len();
+    size_t pkl = raccoong_pk_len();
+    if (!skl || !pkl) {
+        return false;
+    }
+    uint8_t* sk_buf = (uint8_t*)dogecoin_malloc(skl);
+    uint8_t* pk_buf = (uint8_t*)dogecoin_malloc(pkl);
+    if (!sk_buf || !pk_buf) {
+        if (sk_buf) dogecoin_free(sk_buf);
+        if (pk_buf) dogecoin_free(pk_buf);
+        return false;
+    }
+    if (!raccoong_hd_derive_priv(parent_sk, parent_sk_len, parent_pk, parent_pk_len,
+                                 chaincode, index, hardened,
+                                 sk_buf, skl, pk_buf, pkl)) {
+        dogecoin_free(sk_buf);
+        dogecoin_free(pk_buf);
+        return false;
+    }
+    *child_sk = sk_buf;
+    *child_sk_len = skl;
+    *child_pk = pk_buf;
+    *child_pk_len = pkl;
+    return true;
+}
+
+dogecoin_bool dogecoin_raccoong44_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
+                                                const uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN],
+                                                uint32_t index,
+                                                uint8_t** child_pk, size_t* child_pk_len)
+{
+    if (!parent_pk || !chaincode || !child_pk || !child_pk_len) {
+        return false;
+    }
+    if (index & 0x80000000U) {
+        return false; /* hardened derivation requires the secret key */
+    }
+    if (!raccoong_is_ready()) {
+        return false;
+    }
+    size_t pkl = raccoong_pk_len();
+    if (!pkl) {
+        return false;
+    }
+    uint8_t* pk_buf = (uint8_t*)dogecoin_malloc(pkl);
+    if (!pk_buf) {
+        return false;
+    }
+    if (!raccoong_hd_derive_pub(parent_pk, parent_pk_len, chaincode, index,
+                                pk_buf, pkl)) {
+        dogecoin_free(pk_buf);
+        return false;
+    }
+    *child_pk = pk_buf;
+    *child_pk_len = pkl;
+    return true;
+}
+
 #endif

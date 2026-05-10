@@ -139,6 +139,16 @@ libdogecoin_la_SOURCES += \
     src/pqc_raccoon.c
 endif
 
+if USE_RACCOON_G
+libdogecoin_la_SOURCES += \
+    src/pqc_raccoon.c \
+    src/raccoon_g/polyr.c \
+    src/raccoon_g/ntt.c \
+    src/raccoon_g/gaussian.c \
+    src/raccoon_g/thrc.c \
+    src/raccoon_g/raccoong.c
+endif
+
 
 # NASM assembler setup
 NASM = nasm
