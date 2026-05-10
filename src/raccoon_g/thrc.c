@@ -394,6 +394,104 @@ dogecoin_bool thrc_keygen_from_seed(const uint8_t seed[32],
     return true;
 }
 
+dogecoin_bool raccoong_serialize_signature(
+    uint8_t* sig_out, size_t* sig_len_inout,
+    const uint8_t c_hash[RACCOONG_C_HASH_BYTES],
+    const polyr z[RACCOONG_ELL],
+    const int16_t h_signed[RACCOONG_K][256])
+{
+    if (!sig_out || !sig_len_inout || !c_hash || !z || !h_signed) {
+        return false;
+    }
+    if (*sig_len_inout < RACCOONG_SIG_BYTES) {
+        return false;
+    }
+
+    /* Reject malformed z up front so we never write a partial signature. */
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+        for (size_t j = 0; j < RACCOONG_N; ++j) {
+            if (z[i].coeffs[j] >= RACCOONG_Q) {
+                return false;
+            }
+        }
+    }
+
+    memcpy(sig_out, c_hash, RACCOONG_C_HASH_BYTES);
+    uint8_t* p = sig_out + RACCOONG_C_HASH_BYTES;
+
+    /* z block: ell * n * 7 bytes, little-endian, value already in [0, q). */
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+        serialize_poly_le7(p, &z[i]);
+        p += (size_t)RACCOONG_N * RACCOONG_COEFF_BYTES;
+    }
+
+    /* h block: k * n * 2 bytes. Upstream encodes (coeff % q_w) so a signed
+     * coefficient and its (coeff + q_w) representative produce the same
+     * wire bytes; we just reduce into [0, q_w) here. q_w == 2048 fits in
+     * a 16-bit int with room to spare so the modular add never overflows. */
+    const uint64_t qw = RACCOONG_Q_W;
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        for (size_t j = 0; j < RACCOONG_N; ++j) {
+            int32_t v = (int32_t)h_signed[i][j];
+            uint64_t u = (uint64_t)((int64_t)v % (int64_t)qw);
+            /* C99 % can return negative for negative v; normalize. */
+            if ((int64_t)u < 0) {
+                u = (uint64_t)((int64_t)u + (int64_t)qw);
+            }
+            p[0] = (uint8_t)(u & 0xffu);
+            p[1] = (uint8_t)((u >> 8) & 0xffu);
+            p += RACCOONG_H_COEFF_BYTES;
+        }
+    }
+
+    *sig_len_inout = RACCOONG_SIG_BYTES;
+    return true;
+}
+
+dogecoin_bool raccoong_deserialize_signature(
+    uint8_t c_hash_out[RACCOONG_C_HASH_BYTES],
+    polyr z_out[RACCOONG_ELL],
+    int16_t h_signed_out[RACCOONG_K][256],
+    const uint8_t* sig, size_t sig_len)
+{
+    if (!c_hash_out || !z_out || !h_signed_out || !sig) {
+        return false;
+    }
+    if (sig_len != RACCOONG_SIG_BYTES) {
+        return false;
+    }
+
+    memcpy(c_hash_out, sig, RACCOONG_C_HASH_BYTES);
+    const uint8_t* p = sig + RACCOONG_C_HASH_BYTES;
+
+    /* z block: 7-byte LE, must be < q. */
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+        if (!deserialize_poly_le7(&z_out[i], p)) {
+            return false;
+        }
+        p += (size_t)RACCOONG_N * RACCOONG_COEFF_BYTES;
+    }
+
+    /* h block: 2-byte LE in [0, q_w), centered to [-q_w/2, q_w/2). */
+    const uint64_t qw = RACCOONG_Q_W;
+    const int32_t half_qw = (int32_t)(qw >> 1);
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        for (size_t j = 0; j < RACCOONG_N; ++j) {
+            uint32_t u = (uint32_t)p[0] | ((uint32_t)p[1] << 8);
+            if ((uint64_t)u >= qw) {
+                return false;
+            }
+            int32_t centered = (int32_t)u;
+            if (centered > half_qw) {
+                centered -= (int32_t)qw;
+            }
+            h_signed_out[i][j] = (int16_t)centered;
+            p += RACCOONG_H_COEFF_BYTES;
+        }
+    }
+    return true;
+}
+
 dogecoin_bool thrc_sign(const uint8_t* sk, size_t sk_len,
                         const uint8_t* msg, size_t msg_len,
                         uint8_t* sig_out, size_t* sig_len_inout)
@@ -401,9 +499,7 @@ dogecoin_bool thrc_sign(const uint8_t* sk, size_t sk_len,
     (void)sk; (void)sk_len; (void)msg; (void)msg_len;
     (void)sig_out; (void)sig_len_inout;
     return false;
-}
-
-dogecoin_bool thrc_verify(const uint8_t* pk, size_t pk_len,
+}dogecoin_bool thrc_verify(const uint8_t* pk, size_t pk_len,
                           const uint8_t* msg, size_t msg_len,
                           const uint8_t* sig, size_t sig_len)
 {

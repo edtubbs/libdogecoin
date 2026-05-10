@@ -94,6 +94,7 @@ extern void test_raccoong_keygen_t();
 extern void test_raccoong_keypair();
 extern void test_raccoong_gaussian();
 extern void test_raccoong_hd_derive();
+extern void test_raccoong_signature_serialize();
 #endif
 
 #ifdef WITH_LOGDB
@@ -195,6 +196,7 @@ int main()
     u_run_test(test_raccoong_keypair);
     u_run_test(test_raccoong_gaussian);
     u_run_test(test_raccoong_hd_derive);
+    u_run_test(test_raccoong_signature_serialize);
 #endif
 
 #ifdef WITH_LOGDB

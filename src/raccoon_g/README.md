@@ -91,9 +91,13 @@ checked in alongside the regenerator script:
 - `contrib/raccoon_g/gen_polyr_vectors.py` — generator (polyr.c)
 - `contrib/raccoon_g/gen_ntt_vectors.py`   — generator (ntt.c)
 - `contrib/raccoon_g/gen_gaussian_vectors.py` — generator (gaussian.c)
+- `contrib/raccoon_g/gen_signature_serialize_vectors.py` — generator
+  (signature wire format)
 - `test/data/raccoong_polyr_vectors.h`     — generated fixture for polyr.c
 - `test/data/raccoong_ntt_vectors.h`       — generated fixture for ntt.c
 - `test/data/raccoong_gaussian_vectors.h`  — generated fixture for gaussian.c
+- `test/data/raccoong_signature_serialize_vectors.h` — generated fixture
+  for the signature wire format
 
 To regenerate:
 
@@ -180,9 +184,15 @@ they aren't silent:
   Byte-exact gated against upstream
   `generate_tweak_keypair_from_seed` + `add_public_keys` +
   `add_signing_keys`.
-- [ ] (Session 7f) `thrc.c`: deterministic sign / verify (Algorithm 2/3
-  with unrounded `t̂`, BUFF `mu`, challenge poly, variable-length
-  signature serialization); tampered-signature reject; wrong-pk reject.
+- [x] (Session 7f.1) `thrc.c`: canonical 20768-byte signature wire format
+  (`raccoong_serialize_signature` / `raccoong_deserialize_signature`).
+  z packed as 9·256·7 little-endian bytes mod q; h packed as 9·256·2 LE
+  bytes mod q_w (= q >> 38 = 2048), centered to [-q_w/2, q_w/2) on read.
+  Byte-exact gated against upstream `serialize_signature`; round-trip
+  and out-of-range coefficient reject covered.
+- [ ] (Session 7f.2) `thrc.c`: deterministic sign / verify (Algorithm 2/3
+  with unrounded `t̂`, BUFF `mu`, challenge poly); tampered-signature
+  reject; wrong-pk reject.
 - [ ] (Session 7g) `test/data/raccoong_kat.json` + `test/raccoong_kat.c`
   driver wired into the `tests` binary.
 - [ ] (Session 7h) CI matrix entry exercising `--enable-raccoon-g`.

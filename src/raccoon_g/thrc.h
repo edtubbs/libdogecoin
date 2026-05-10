@@ -191,6 +191,72 @@ dogecoin_bool raccoong_keygen_t_unrounded(const uint8_t key[32],
 /* Upstream `lg_st = 7` ⇒ sigma_t² = 2^14. */
 #define RACCOONG_LG_SIGMA_T2 14u
 
+/*
+ * Signature wire format (mirrors upstream `serialize_signature`).
+ *
+ *   nu_w = 38, q_w = q >> nu_w = 2048 (12-bit), so each h coefficient packs
+ *   into 2 little-endian bytes. nu_t / q_t are unused on the wire because the
+ *   HD-wallet variant signs against the unrounded `t` (preserves additive
+ *   linearity). z coefficients use the full 7-byte modulo-q encoding.
+ *
+ *   sig = c_hash (32 B)
+ *      || z (ell * n * 7 B = 16128 B)
+ *      || h (k   * n * 2 B =  4608 B)
+ *      = 20768 B  fixed.
+ *
+ * Pinned in src/raccoon_g/raccoong.c::raccoong_sig_max_len(); a static
+ * assertion in test/raccoong_signature_serialize_tests.c keeps the macros
+ * locked to the upstream Python constants via the byte-exact fixture.
+ */
+#define RACCOONG_NU_W 38u
+#define RACCOONG_Q_W ((uint64_t)RACCOONG_Q >> RACCOONG_NU_W)   /* 2048 */
+#define RACCOONG_H_COEFF_BYTES 2u
+#define RACCOONG_C_HASH_BYTES 32u
+#define RACCOONG_SIG_BYTES \
+    (RACCOONG_C_HASH_BYTES \
+     + (size_t)RACCOONG_ELL * 256u * RACCOONG_COEFF_BYTES \
+     + (size_t)RACCOONG_K   * 256u * RACCOONG_H_COEFF_BYTES)
+
+/*
+ * `raccoong_serialize_signature` — pack a Raccoon-G signature tuple
+ * `(c_hash, z, h)` into `RACCOONG_SIG_BYTES` of canonical bytes.
+ *
+ * Inputs:
+ *   c_hash   - challenge digest (32 bytes).
+ *   z        - ell polynomials in [0, q).  Aliasing with sig_out is illegal.
+ *   h_signed - k polynomials of centered hint coefficients in
+ *              [-q_w/2, q_w/2).  Each coefficient is reduced modulo q_w
+ *              before being written, so the signed and unsigned representa-
+ *              tions encode to the same bytes.
+ *
+ * Returns false on null inputs / sig_len_inout < RACCOONG_SIG_BYTES, or if
+ * any z coefficient is out of [0, q).  On success `*sig_len_inout` is set
+ * to RACCOONG_SIG_BYTES.
+ */
+dogecoin_bool raccoong_serialize_signature(
+    uint8_t* sig_out, size_t* sig_len_inout,
+    const uint8_t c_hash[RACCOONG_C_HASH_BYTES],
+    const polyr z[RACCOONG_ELL],
+    const int16_t h_signed[RACCOONG_K][256]);
+
+/*
+ * `raccoong_deserialize_signature` — unpack a canonical Raccoon-G
+ * signature.  Mirrors upstream `deserialize_signature`:
+ *   - z coefficients are read as little-endian 7-byte unsigned values in
+ *     [0, q); a value >= q is rejected (returns false).
+ *   - h coefficients are read as little-endian 2-byte unsigned values in
+ *     [0, q_w); a value >= q_w is rejected.  They are then centered into
+ *     `h_signed_out` ∈ [-q_w/2, q_w/2).
+ *
+ * Returns false on null inputs, sig_len != RACCOONG_SIG_BYTES, or
+ * out-of-range coefficient.
+ */
+dogecoin_bool raccoong_deserialize_signature(
+    uint8_t c_hash_out[RACCOONG_C_HASH_BYTES],
+    polyr z_out[RACCOONG_ELL],
+    int16_t h_signed_out[RACCOONG_K][256],
+    const uint8_t* sig, size_t sig_len);
+
 LIBDOGECOIN_END_DECL
 
 #endif /* LIBDOGECOIN_RACCOON_G_THRC_H */
