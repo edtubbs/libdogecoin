@@ -74,7 +74,8 @@ the same numerics as the reference.
 |---------------|----------------------------------------------------|-------------|
 | `polyr.{c,h}` | `Z_q[X]/(X^n+1)` polynomial arithmetic             | Session 3 ✓ |
 | `ntt.{c,h}`   | Forward / inverse NTT, pointwise multiply          | Session 4 ✓ |
-| `gaussian.{c,h}` | MPFR-backed rounded Gaussian sampler            | Session 5 ✓ (math kernel) |
+| `gaussian.{c,h}` | MPFR-backed rounded Gaussian sampler            | Session 5 ✓ |
+| `shake256.{c,h}` | FIPS 202 SHAKE256 (Keccak-f[1600])              | Session 6 ✓ |
 | `thrc.{c,h}`  | Keygen, sign, verify, BIP-32 HMAC-SHA512 derive    | Sessions 6-7 |
 | `raccoong.{c,h}` | Public-shape glue called by `src/pqc_raccoon.c` | Stubs       |
 | `README.md`   | This file.                                         | —           |
@@ -132,10 +133,11 @@ they aren't silent:
   multiply, twiddle-SHA matched against upstream.
 - [x] (Session 5) `gaussian.c`: MPFR-backed Marsaglia polar method 1:1 from
   upstream `sample_rounded`; byte-exact gate against a recorded SHAKE256
-  prefix at σ² = 2⁴⁰ (256 samples).  The seed-driven entry point
-  (`gaussian_sample(out, n, seed[32])`) is still a stub returning `false` —
-  the SHAKE256 wrapper that drives it lands in Session 6 alongside the rest
-  of the upstream XOF construction.
+  prefix at σ² = 2⁴⁰ (256 samples).
+- [x] (Session 6) `shake256.c`: FIPS 202 SHAKE256 (Keccak-f[1600]); empty-
+  input + `"abc"` KATs; streaming/one-shot/multi-piece-absorb agreement;
+  flips `gaussian_sample(out, n, seed[32])` from stub-`false` to byte-exact
+  agreement with the recorded fixture seed.
 - [ ] (Session 6) `thrc.c`: seed-deterministic keygen, BIP-32 HMAC-SHA512
   derivation, child-SK SHA-256 gate against upstream digest.
 - [ ] (Session 7) `thrc.c`: deterministic sign / verify; tampered-signature

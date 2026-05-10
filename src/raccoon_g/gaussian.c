@@ -43,6 +43,7 @@
  */
 
 #include "gaussian.h"
+#include "shake256.h"
 
 #include <gmp.h>
 #include <mpfr.h>
@@ -196,11 +197,28 @@ fail:
     return false;
 }
 
+/*
+ * Seed-driven entry point.  Drives the kernel from `SHAKE256(seed)` at the
+ * default sigma^2 = 2^RACCOONG_GAUSS_LG_SIGMA2_DEFAULT.  Byte-exact against
+ * the recorded fixture (see test/raccoong_gaussian_tests.c::test_raccoong_
+ * gaussian_seed) because SHAKE256 itself is byte-exact against pycryptodome
+ * (FIPS 202 empty-input KAT + 8 KiB-of-fixture-seed agreement test).
+ */
 dogecoin_bool gaussian_sample(int64_t* out, size_t n, const uint8_t seed[32])
 {
-    /* SHAKE256 driver lands in Session 6.  Until then this stub ensures the
-     * downstream call sites in thrc.c that already reference this signature
-     * get a predictable failure rather than a partial computation. */
-    (void)out; (void)n; (void)seed;
-    return false;
+    if (!out || !seed || (n & 1u)) return false;
+
+    /* Pre-stream 8 KiB from SHAKE256 — sufficient for sigma = 2^20 over
+     * RACCOONG_N samples at the canonical rejection rate (~22%).  If a
+     * downstream caller ever needs a larger n or smaller sigma we will
+     * switch to streaming the XOF directly into the kernel; for now the
+     * batched form keeps this function side-effect-free on the SHAKE state
+     * and matches the way the Session-5 fixture is recorded. */
+    uint8_t xof[8192];
+    shake256(xof, sizeof(xof), seed, 32);
+
+    return gaussian_sample_rounded_from_xof(
+        out, n,
+        (uint32_t)RACCOONG_GAUSS_LG_SIGMA2_DEFAULT,
+        xof, sizeof(xof), /*xof_consumed_bytes=*/NULL);
 }

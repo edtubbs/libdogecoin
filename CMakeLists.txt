@@ -343,6 +343,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/raccoon_g/polyr.c
     src/raccoon_g/ntt.c
     src/raccoon_g/gaussian.c
+    src/raccoon_g/shake256.c
     src/raccoon_g/thrc.c
     src/raccoon_g/raccoong.c
 )

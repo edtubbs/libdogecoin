@@ -50,6 +50,15 @@ dogecoin_bool gaussian_sampler_init(void);
 void          gaussian_sampler_shutdown(void);
 
 /*
+ * Default sigma^2 exponent used by the seed-driven entry point.  Matches the
+ * sigma = 2^20 / sig^2 = 2^40 setting upstream `thrc_gauss.py` uses in its
+ * smoke test and that the Session-5 fixture is recorded at.  The threshold
+ * core (Session 7) will switch sigma per-call once the sigma_t / sigma_w
+ * parameters are wired in.
+ */
+#define RACCOONG_GAUSS_LG_SIGMA2_DEFAULT 40u
+
+/*
  * Drive the rounded-Gaussian sampler from a *pre-extracted* XOF byte stream
  * (i.e., the bytes that `SHAKE256(seed).read(xof_len)` would yield in the
  * upstream Python).  Produces `n` samples in `out`, returning false if:

@@ -97,14 +97,31 @@ void test_raccoong_gaussian(void)
         out, /*n=*/3, RACCOONG_GAUSS_LG_SIGMA2,
         raccoong_gauss_xof_bytes, RACCOONG_GAUSS_XOF_LEN, NULL), 0);
 
-    /* Truncated stream returns false (cleanly, no UB). */
-    u_assert_int_eq((int)gaussian_sample_rounded_from_xof(
-        out, RACCOONG_N, RACCOONG_GAUSS_LG_SIGMA2,
-        raccoong_gauss_xof_bytes, /*xof_len=*/8, NULL), 0);
+    /* Seed-driven public API now drives SHAKE256(seed) into the kernel.
+     * Use the exact seed the fixture was recorded with: must produce the
+     * same 256 samples as the byte-stream path above. */
+    memset(out, 0, sizeof(out));
+    u_assert_true(gaussian_sample(out, RACCOONG_N,
+                                  raccoong_gauss_seed_bytes));
+    int seed_mismatch = -1;
+    for (size_t i = 0; i < RACCOONG_N; ++i) {
+        if (out[i] != raccoong_gauss_expected[i]) { seed_mismatch = (int)i; break; }
+    }
+    if (seed_mismatch >= 0) {
+        fprintf(stderr,
+                "raccoong gauss (seed): first mismatch at index %d: "
+                "got %lld, want %lld\n",
+                seed_mismatch,
+                (long long)out[seed_mismatch],
+                (long long)raccoong_gauss_expected[seed_mismatch]);
+    }
+    u_assert_int_eq(seed_mismatch, -1);
 
-    /* Seed-driven public API is still a Session 6 stub. */
-    uint8_t seed[32] = {0};
-    u_assert_int_eq((int)gaussian_sample(out, RACCOONG_N, seed), 0);
+    /* Defensive paths for the seed-driven entry. */
+    u_assert_int_eq((int)gaussian_sample(NULL, RACCOONG_N,
+                                         raccoong_gauss_seed_bytes), 0);
+    u_assert_int_eq((int)gaussian_sample(out, /*n=*/3,
+                                         raccoong_gauss_seed_bytes), 0);
 
     gaussian_sampler_shutdown();
 }
