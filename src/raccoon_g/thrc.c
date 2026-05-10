@@ -33,6 +33,69 @@
 
 #include "thrc.h"
 
+#include "polyr.h"
+#include "shake256.h"
+
+void raccoong_hdr8(uint8_t out[8], char ds,
+                   uint8_t b1, uint8_t b2, uint8_t b3,
+                   uint8_t b4, uint8_t b5, uint8_t b6, uint8_t b7)
+{
+    out[0] = (uint8_t)ds;
+    out[1] = b1; out[2] = b2; out[3] = b3;
+    out[4] = b4; out[5] = b5; out[6] = b6; out[7] = b7;
+}
+
+void raccoong_hdr24(uint8_t out[8], char ds,
+                    uint32_t i, uint32_t j, uint8_t k)
+{
+    /* Upstream layout: bytes([ord(ds), k]) + i.to_bytes(3,'little')
+     *                                      + j.to_bytes(3,'little').
+     * The 3-byte little-endian fields are the low 3 bytes of i / j. */
+    out[0] = (uint8_t)ds;
+    out[1] = k;
+    out[2] = (uint8_t)(i      );
+    out[3] = (uint8_t)(i >> 8 );
+    out[4] = (uint8_t)(i >> 16);
+    out[5] = (uint8_t)(j      );
+    out[6] = (uint8_t)(j >> 8 );
+    out[7] = (uint8_t)(j >> 16);
+}
+
+dogecoin_bool raccoong_xof_sample_q(uint64_t out[/* RACCOONG_N */],
+                                    const uint8_t* seed, size_t seed_len)
+{
+    if (!out || (!seed && seed_len != 0)) return false;
+
+    /* q_bits = RACCOONG_LOG_Q = 50, blen = ceil(50/8) = 7. */
+    const unsigned blen = (RACCOONG_LOG_Q + 7u) / 8u;             /* 7 */
+    const uint64_t mask = (RACCOONG_LOG_Q >= 64)
+        ? (uint64_t)~0ULL
+        : (((uint64_t)1 << RACCOONG_LOG_Q) - 1ULL);               /* 2^50 - 1 */
+
+    shake128_ctx ctx;
+    shake128_init(&ctx);
+    shake128_absorb(&ctx, seed, seed_len);
+    shake128_finalize(&ctx);
+
+    size_t i = 0;
+    while (i < RACCOONG_N) {
+        uint8_t z[8] = {0};   /* read into low `blen` bytes; high zero */
+        shake128_squeeze(&ctx, z, blen);
+        uint64_t x = ((uint64_t)z[0]      ) |
+                     ((uint64_t)z[1] <<  8) |
+                     ((uint64_t)z[2] << 16) |
+                     ((uint64_t)z[3] << 24) |
+                     ((uint64_t)z[4] << 32) |
+                     ((uint64_t)z[5] << 40) |
+                     ((uint64_t)z[6] << 48);
+        x &= mask;
+        if (x < RACCOONG_Q) {
+            out[i++] = x;
+        }
+    }
+    return true;
+}
+
 dogecoin_bool thrc_keygen_from_seed(const uint8_t seed[32],
                                     uint8_t* pk_out, size_t pk_len,
                                     uint8_t* sk_out, size_t sk_len)

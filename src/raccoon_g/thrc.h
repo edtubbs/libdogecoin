@@ -66,6 +66,29 @@ dogecoin_bool thrc_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
                                  uint32_t index,
                                  uint8_t* child_pk_out, size_t child_pk_len);
 
+/*
+ * `_xof_sample_q` — uniform Z_q rejection sampler.  1:1 port of upstream
+ * `ThRc_Core._xof_sample_q` (thrc_core.py) at kappa=128 (SHAKE128).  Reads
+ * ceil(q_bits/8) = 7 bytes per attempt, masks to q_bits=50 bits, accepts
+ * if the masked value is in [0, q).  Deterministic given `seed`.
+ *
+ * `out` receives RACCOONG_N values, each in [0, RACCOONG_Q).  Returns
+ * false on null inputs.  Used by ExpandA and threshold-share generation.
+ */
+dogecoin_bool raccoong_xof_sample_q(uint64_t out[/* RACCOONG_N */],
+                                    const uint8_t* seed, size_t seed_len);
+
+/*
+ * Upstream domain-separation header constructors.  Verbatim ports of
+ * `_hdr8` / `_hdr24` from thrc_core.py.  Output buffer must be >= 8 / 16
+ * bytes respectively.
+ */
+void raccoong_hdr8(uint8_t out[8], char ds,
+                   uint8_t b1, uint8_t b2, uint8_t b3,
+                   uint8_t b4, uint8_t b5, uint8_t b6, uint8_t b7);
+void raccoong_hdr24(uint8_t out[8], char ds,
+                    uint32_t i, uint32_t j, uint8_t k);
+
 LIBDOGECOIN_END_DECL
 
 #endif /* LIBDOGECOIN_RACCOON_G_THRC_H */

@@ -51,6 +51,7 @@ LIBDOGECOIN_BEGIN_DECL
  */
 
 #define SHAKE256_RATE_BYTES 136u  /* (1600 - 2*256) / 8 */
+#define SHAKE128_RATE_BYTES 168u  /* (1600 - 2*128) / 8 */
 
 typedef struct {
     uint64_t state[25];      /* Keccak state lanes */
@@ -65,6 +66,24 @@ void shake256_squeeze(shake256_ctx* ctx, uint8_t* out, size_t len);
 
 /* One-shot helper: hash `in` to `out_len` bytes. */
 void shake256(uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len);
+
+/*
+ * SHAKE128 — same Keccak-f[1600] permutation, same 0x1f/0x80 SHAKE pad,
+ * differing only in the absorption/squeeze rate (168 bytes).  Upstream
+ * raccoon-g uses SHAKE128 by default for `_xof_sample_q` at kappa=128
+ * (the `ExpandA` rejection sampler), so we expose it alongside SHAKE256.
+ */
+typedef struct {
+    uint64_t state[25];
+    size_t   buf_pos;
+    int      finalized;
+} shake128_ctx;
+
+void shake128_init(shake128_ctx* ctx);
+void shake128_absorb(shake128_ctx* ctx, const uint8_t* data, size_t len);
+void shake128_finalize(shake128_ctx* ctx);
+void shake128_squeeze(shake128_ctx* ctx, uint8_t* out, size_t len);
+void shake128(uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len);
 
 LIBDOGECOIN_END_DECL
 

@@ -123,4 +123,51 @@ void test_raccoong_shake(void)
     uint8_t got[64];
     shake256_squeeze(&ctx, got, sizeof(got));
     u_assert_mem_eq(got, ref, sizeof(ref));
+
+    /* ---- SHAKE128: same KAT discipline at rate 168. -------------------- */
+
+    /* FIPS 202 SHAKE128 empty-input answer (first 32 bytes), pinned at
+     * `7f9c2ba4e88f827d616045507605853ed73b8093f6efbc88eb1a6eacfa66ef26`. */
+    static const uint8_t kat128_empty32[32] = {
+        0x7f, 0x9c, 0x2b, 0xa4, 0xe8, 0x8f, 0x82, 0x7d,
+        0x61, 0x60, 0x45, 0x50, 0x76, 0x05, 0x85, 0x3e,
+        0xd7, 0x3b, 0x80, 0x93, 0xf6, 0xef, 0xbc, 0x88,
+        0xeb, 0x1a, 0x6e, 0xac, 0xfa, 0x66, 0xef, 0x26,
+    };
+    /* SHAKE128("abc", 16) pinned at `5881092dd818bf5cf8a3ddb793fbcba7`. */
+    static const uint8_t kat128_abc16[16] = {
+        0x58, 0x81, 0x09, 0x2d, 0xd8, 0x18, 0xbf, 0x5c,
+        0xf8, 0xa3, 0xdd, 0xb7, 0x93, 0xfb, 0xcb, 0xa7,
+    };
+
+    uint8_t out128[64];
+    memset(out128, 0, sizeof(out128));
+    shake128(out128, 32, NULL, 0);
+    u_assert_mem_eq(out128, kat128_empty32, 32);
+
+    memset(out128, 0, sizeof(out128));
+    shake128(out128, 16, (const uint8_t*)"abc", 3);
+    u_assert_mem_eq(out128, kat128_abc16, 16);
+
+    /* Streaming/one-shot equivalence + cross-rate-block (168+) squeeze. */
+    shake128_ctx ctx128;
+    shake128_init(&ctx128);
+    shake128_absorb(&ctx128, big_msg, sizeof(big_msg));
+    shake128_finalize(&ctx128);
+    uint8_t long128_a[200];
+    shake128_squeeze(&ctx128, long128_a, sizeof(long128_a));
+
+    uint8_t long128_b[200];
+    shake128(long128_b, sizeof(long128_b), big_msg, sizeof(big_msg));
+    u_assert_mem_eq(long128_a, long128_b, sizeof(long128_a));
+
+    /* Piecewise absorb under SHAKE128 must equal one-shot. */
+    shake128_init(&ctx128);
+    shake128_absorb(&ctx128, big_msg,        100);
+    shake128_absorb(&ctx128, big_msg + 100,  150);
+    shake128_absorb(&ctx128, big_msg + 250,   50);
+    shake128_finalize(&ctx128);
+    uint8_t got128[64];
+    shake128_squeeze(&ctx128, got128, sizeof(got128));
+    u_assert_mem_eq(got128, long128_b, sizeof(got128));
 }

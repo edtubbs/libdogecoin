@@ -197,3 +197,73 @@ void shake256(uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len)
     shake256_finalize(&ctx);
     shake256_squeeze(&ctx, out, out_len);
 }
+
+/* ------------------------------------------------------------------------
+ * SHAKE128: identical structure with rate=168 bytes.  Sharing the same
+ * keccak_f1600 / absorb_block / extract_bytes helpers above so changes to
+ * the permutation flow through both variants.
+ * ------------------------------------------------------------------------ */
+
+void shake128_init(shake128_ctx* ctx)
+{
+    memset(ctx->state, 0, sizeof(ctx->state));
+    ctx->buf_pos = 0;
+    ctx->finalized = 0;
+}
+
+void shake128_absorb(shake128_ctx* ctx, const uint8_t* data, size_t len)
+{
+    if (ctx->finalized) return;
+    while (len > 0) {
+        size_t room = SHAKE128_RATE_BYTES - ctx->buf_pos;
+        size_t take = len < room ? len : room;
+        absorb_block(ctx->state, data, ctx->buf_pos, take);
+        ctx->buf_pos += take;
+        data += take;
+        len  -= take;
+        if (ctx->buf_pos == SHAKE128_RATE_BYTES) {
+            keccak_f1600(ctx->state);
+            ctx->buf_pos = 0;
+        }
+    }
+}
+
+void shake128_finalize(shake128_ctx* ctx)
+{
+    if (ctx->finalized) return;
+    uint8_t pad_first = 0x1f;
+    uint8_t pad_last  = 0x80;
+    absorb_block(ctx->state, &pad_first, ctx->buf_pos, 1);
+    absorb_block(ctx->state, &pad_last,  SHAKE128_RATE_BYTES - 1, 1);
+    keccak_f1600(ctx->state);
+    ctx->buf_pos = 0;
+    ctx->finalized = 1;
+}
+
+void shake128_squeeze(shake128_ctx* ctx, uint8_t* out, size_t len)
+{
+    if (!ctx->finalized) {
+        shake128_finalize(ctx);
+    }
+    while (len > 0) {
+        size_t avail = SHAKE128_RATE_BYTES - ctx->buf_pos;
+        size_t take = len < avail ? len : avail;
+        extract_bytes(ctx->state, out, ctx->buf_pos, take);
+        ctx->buf_pos += take;
+        out += take;
+        len -= take;
+        if (ctx->buf_pos == SHAKE128_RATE_BYTES) {
+            keccak_f1600(ctx->state);
+            ctx->buf_pos = 0;
+        }
+    }
+}
+
+void shake128(uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len)
+{
+    shake128_ctx ctx;
+    shake128_init(&ctx);
+    shake128_absorb(&ctx, in, in_len);
+    shake128_finalize(&ctx);
+    shake128_squeeze(&ctx, out, out_len);
+}

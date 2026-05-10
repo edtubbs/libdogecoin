@@ -89,6 +89,7 @@ extern void test_raccoong_polyr();
 extern void test_raccoong_ntt();
 extern void test_raccoong_gaussian();
 extern void test_raccoong_shake();
+extern void test_raccoong_xof_sample_q();
 #endif
 
 #ifdef WITH_LOGDB
@@ -184,6 +185,7 @@ int main()
     u_run_test(test_raccoong_polyr);
     u_run_test(test_raccoong_ntt);
     u_run_test(test_raccoong_shake);
+    u_run_test(test_raccoong_xof_sample_q);
     u_run_test(test_raccoong_gaussian);
 #endif
 
