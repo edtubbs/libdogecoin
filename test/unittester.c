@@ -97,6 +97,7 @@ extern void test_raccoong_hd_derive();
 extern void test_raccoong_signature_serialize();
 extern void test_raccoong_chal_poly();
 extern void test_raccoong_hash_vec();
+extern void test_raccoong_buff_mu();
 #endif
 
 #ifdef WITH_LOGDB
@@ -201,6 +202,7 @@ int main()
     u_run_test(test_raccoong_signature_serialize);
     u_run_test(test_raccoong_chal_poly);
     u_run_test(test_raccoong_hash_vec);
+    u_run_test(test_raccoong_buff_mu);
 #endif
 
 #ifdef WITH_LOGDB

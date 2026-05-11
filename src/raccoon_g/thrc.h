@@ -314,6 +314,43 @@ dogecoin_bool raccoong_hash_vec(uint8_t out[RACCOONG_C_HASH_BYTES],
                                 const uint8_t* dat, size_t dat_len,
                                 const uint64_t* v, size_t v_len);
 
+/*
+ * BUFF transcript hash `tr = H(vk)` (upstream `decode_vk` /
+ * `_buff_mu` first stage).
+ *
+ * Algorithm (byte-exact with upstream):
+ *   tr = SHAKE256(pk_bytes).read(crh)
+ *
+ * Where `pk_bytes` is the canonical serialized public key (length
+ * RACCOONG_PK_BYTES = 16144 B for Raccoon-G-44) and `crh` is
+ * RACCOONG_C_HASH_BYTES (32 B).  The `pk_len` parameter accepts any
+ * length so callers can pre-compute `tr` over fragments or test
+ * vectors, but production callers should pass the full serialized vk.
+ *
+ * Returns false only on null `out` or null `pk` (when pk_len > 0).
+ */
+dogecoin_bool raccoong_pk_hash(uint8_t out[RACCOONG_C_HASH_BYTES],
+                               const uint8_t* pk, size_t pk_len);
+
+/*
+ * BUFF message digest `mu = H(tr || msg)` (upstream `_buff_mu`).
+ *
+ * Algorithm (byte-exact with upstream `ThRc_Api._buff_mu`):
+ *   mu = SHAKE256(tr || msg).read(mu_sz)
+ *
+ * Where `tr` is the 32-byte transcript from `raccoong_pk_hash` and
+ * `mu_sz = crh = RACCOONG_C_HASH_BYTES = 32`.  Together these compose
+ * the BUFF (Binding Unforgeability Framework) input to the inner
+ * signature: callers should pass `mu` to `thrc_sign` / `thrc_verify`
+ * rather than the raw message.
+ *
+ * Returns false only on null `out` / null `tr` or null `msg`
+ * (when msg_len > 0).
+ */
+dogecoin_bool raccoong_buff_mu(uint8_t out[RACCOONG_C_HASH_BYTES],
+                               const uint8_t tr[RACCOONG_C_HASH_BYTES],
+                               const uint8_t* msg, size_t msg_len);
+
 LIBDOGECOIN_END_DECL
 
 #endif /* LIBDOGECOIN_RACCOON_G_THRC_H */

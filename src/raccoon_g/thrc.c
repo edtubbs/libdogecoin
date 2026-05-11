@@ -203,6 +203,42 @@ dogecoin_bool raccoong_hash_vec(uint8_t out[RACCOONG_C_HASH_BYTES],
     return true;
 }
 
+dogecoin_bool raccoong_pk_hash(uint8_t out[RACCOONG_C_HASH_BYTES],
+                               const uint8_t* pk, size_t pk_len)
+{
+    if (!out) return false;
+    if (pk_len != 0 && !pk) return false;
+
+    /* Upstream: tr = SHAKE256(vk_bytes).read(crh). */
+    shake256_ctx ctx;
+    shake256_init(&ctx);
+    if (pk_len > 0) {
+        shake256_absorb(&ctx, pk, pk_len);
+    }
+    shake256_finalize(&ctx);
+    shake256_squeeze(&ctx, out, RACCOONG_C_HASH_BYTES);
+    return true;
+}
+
+dogecoin_bool raccoong_buff_mu(uint8_t out[RACCOONG_C_HASH_BYTES],
+                               const uint8_t tr[RACCOONG_C_HASH_BYTES],
+                               const uint8_t* msg, size_t msg_len)
+{
+    if (!out || !tr) return false;
+    if (msg_len != 0 && !msg) return false;
+
+    /* Upstream: mu = SHAKE256(tr || msg).read(mu_sz = crh). */
+    shake256_ctx ctx;
+    shake256_init(&ctx);
+    shake256_absorb(&ctx, tr, RACCOONG_C_HASH_BYTES);
+    if (msg_len > 0) {
+        shake256_absorb(&ctx, msg, msg_len);
+    }
+    shake256_finalize(&ctx);
+    shake256_squeeze(&ctx, out, RACCOONG_C_HASH_BYTES);
+    return true;
+}
+
 dogecoin_bool raccoong_expand_a(polyr A[RACCOONG_K][RACCOONG_ELL],
                                 const uint8_t A_seed[RACCOONG_A_SEED_BYTES])
 {
