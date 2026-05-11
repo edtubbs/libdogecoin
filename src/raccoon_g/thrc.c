@@ -35,6 +35,7 @@
 
 #include <string.h>
 
+#include <dogecoin/mem.h>
 #include <dogecoin/sha2.h>
 
 #include "gaussian.h"
@@ -453,9 +454,11 @@ static dogecoin_bool keygen_t_unrounded_inner(const uint8_t key[32],
                                               polyr t_out[RACCOONG_K],
                                               polyr s_out[RACCOONG_ELL])
 {
+    dogecoin_bool ok = false;
+
     // --- 1b. A = ExpandA(A_seed)  (already in NTT domain). ---
     static polyr A[RACCOONG_K][RACCOONG_ELL];
-    if (!raccoong_expand_a(A, A_seed_in)) return false;
+    if (!raccoong_expand_a(A, A_seed_in)) goto cleanup;
 
     // --- 2. s ~ D_t^ell, e1 ~ D_t^k via sample_rounded(2^14, hdr8 + key).
     static polyr s_poly[RACCOONG_ELL];
@@ -470,7 +473,7 @@ static dogecoin_bool keygen_t_unrounded_inner(const uint8_t key[32],
         if (!gaussian_sample_seed(sample_buf, RACCOONG_N,
                                   RACCOONG_LG_SIGMA_T2,
                                   seed_buf, sizeof(seed_buf))) {
-            return false;
+            goto cleanup_locals;
         }
         polyr_load_signed(&s_poly[i], sample_buf);
     }
@@ -479,7 +482,7 @@ static dogecoin_bool keygen_t_unrounded_inner(const uint8_t key[32],
         if (!gaussian_sample_seed(sample_buf, RACCOONG_N,
                                   RACCOONG_LG_SIGMA_T2,
                                   seed_buf, sizeof(seed_buf))) {
-            return false;
+            goto cleanup_locals;
         }
         polyr_load_signed(&e1_poly[i], sample_buf);
     }
@@ -496,14 +499,29 @@ static dogecoin_bool keygen_t_unrounded_inner(const uint8_t key[32],
     for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
         polyr_copy(&s_ntt[i], &s_poly[i]);
     }
-    if (!raccoong_vec_ntt(s_ntt, RACCOONG_ELL)) return false;
+    if (!raccoong_vec_ntt(s_ntt, RACCOONG_ELL)) goto cleanup_with_sntt;
 
     static polyr t_ntt[RACCOONG_K];
-    if (!raccoong_mul_mat_vec_ntt(t_ntt, A, s_ntt)) return false;
+    if (!raccoong_mul_mat_vec_ntt(t_ntt, A, s_ntt)) goto cleanup_with_sntt;
 
-    if (!raccoong_vec_intt(t_ntt, RACCOONG_K)) return false;
+    if (!raccoong_vec_intt(t_ntt, RACCOONG_K)) goto cleanup_with_sntt;
 
-    return raccoong_vec_add(t_out, t_ntt, e1_poly, RACCOONG_K);
+    ok = raccoong_vec_add(t_out, t_ntt, e1_poly, RACCOONG_K);
+
+cleanup_with_sntt:
+    dogecoin_mem_zero(s_ntt, sizeof(s_ntt));
+    dogecoin_mem_zero(t_ntt, sizeof(t_ntt));
+cleanup_locals:
+    dogecoin_mem_zero(sample_buf, sizeof(sample_buf));
+    dogecoin_mem_zero(seed_buf, sizeof(seed_buf));
+cleanup:
+    // Wipe secret-derived BSS slots. A depends only on the public A_seed and
+    // is left intact. s_poly, e1_poly, s_ntt and t_ntt (the pre-addition
+    // intermediate A·s, which together with the public t reveals e1) are all
+    // secret-derived and must be cleared.
+    dogecoin_mem_zero(s_poly, sizeof(s_poly));
+    dogecoin_mem_zero(e1_poly, sizeof(e1_poly));
+    return ok;
 }
 
 /**
@@ -659,27 +677,28 @@ dogecoin_bool thrc_keygen_from_seed(const uint8_t seed[32],
 
     raccoong_nist_kat_drbg drbg;
     raccoong_nist_kat_drbg_init(&drbg, drbg_seed);
-    memset(drbg_seed, 0, sizeof(drbg_seed));
+    dogecoin_mem_zero(drbg_seed, sizeof(drbg_seed));
 
     uint8_t key[32];
     raccoong_nist_kat_drbg_random_bytes(&drbg, key, sizeof(key));
-    memset(&drbg, 0, sizeof(drbg));
+    dogecoin_mem_zero(&drbg, sizeof(drbg));
 
     uint8_t A_seed[RACCOONG_A_SEED_BYTES];
     static polyr t_vec[RACCOONG_K];
     static polyr s_vec[RACCOONG_ELL];
 
     if (!raccoong_keygen_t_unrounded(key, A_seed, t_vec, s_vec)) {
-        memset(key, 0, sizeof(key));
+        dogecoin_mem_zero(key, sizeof(key));
+        dogecoin_mem_zero(s_vec, sizeof(s_vec));
         return false;
     }
-    memset(key, 0, sizeof(key));
+    dogecoin_mem_zero(key, sizeof(key));
 
     raccoong_serialize_pk(pk_out, A_seed, t_vec);
     raccoong_serialize_sk(sk_out, A_seed, t_vec, s_vec);
 
     // Wipe the secret share; the caller now owns sk_out.
-    memset(s_vec, 0, sizeof(s_vec));
+    dogecoin_mem_zero(s_vec, sizeof(s_vec));
     return true;
 }
 
@@ -815,6 +834,21 @@ dogecoin_bool raccoong_deserialize_signature(
  *  All polynomials live in static storage so the working set stays off
  *  the stack (~165 KB for the matrix A alone); this mirrors the existing
  *  `raccoong_keygen_t_unrounded` style and is not thread safe.
+ *
+ *  Secret residue: the static buffers used by `thrc_sign_internal` (r_vec,
+ *  e2_vec, r_ntt, s_ntt, z_ntt, z_vec, w_vec, and the local challenge poly
+ *  c / c_ntt) are explicitly zeroized on every exit path via the `cleanup:`
+ *  label so that no secret-derived material persists in BSS between calls
+ *  (e.g. across a process-crash core dump or a /proc/<pid>/mem read). The
+ *  verify path's static buffers are derived from public inputs only and do
+ *  not require wiping.
+ *
+ *  Known limitation: the Marsaglia-polar Gaussian sampler reached via
+ *  `sample_w_gaussian` uses MPFR mpfr_log/mpfr_sqrt in a secret-dependent
+ *  rejection loop, so sign time is not constant in the seed bits. Replacing
+ *  that sampler is a deliberate follow-up because it would invalidate every
+ *  byte-exact KAT in test/raccoong_*; the KAT fixtures must be regenerated
+ *  together with the sampler swap.
  * ------------------------------------------------------------------ */
 
 #include <math.h>
@@ -992,33 +1026,35 @@ static dogecoin_bool thrc_sign_internal(uint8_t c_hash_out[RACCOONG_C_HASH_BYTES
                                         const uint8_t mu[RACCOONG_C_HASH_BYTES],
                                         const uint8_t master_random[32])
 {
+    dogecoin_bool ok = false;
+
     // --- 0. ExpandA.
     static polyr A_ntt[RACCOONG_K][RACCOONG_ELL];
-    if (!raccoong_expand_a(A_ntt, A_seed)) return false;
+    if (!raccoong_expand_a(A_ntt, A_seed)) goto cleanup;
 
     // --- 1. r ~ D_w^ell,  e2 ~ D_w^k  (sigma_w^2 = 2^80).
     static polyr r_vec[RACCOONG_ELL];
     static polyr e2_vec[RACCOONG_K];
     for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
         if (!sample_w_gaussian(&r_vec[i], 'r', (uint8_t)i, 0, master_random)) {
-            return false;
+            goto cleanup;
         }
     }
     for (unsigned i = 0; i < RACCOONG_K; ++i) {
         if (!sample_w_gaussian(&e2_vec[i], 'e', (uint8_t)i, 2, master_random)) {
-            return false;
+            goto cleanup;
         }
     }
 
     // --- 2. w = [A * r + e2]_nu_w   (mod q_w).
     static polyr r_ntt[RACCOONG_ELL];
     for (unsigned i = 0; i < RACCOONG_ELL; ++i) polyr_copy(&r_ntt[i], &r_vec[i]);
-    if (!raccoong_vec_ntt(r_ntt, RACCOONG_ELL)) return false;
+    if (!raccoong_vec_ntt(r_ntt, RACCOONG_ELL)) goto cleanup;
 
     static polyr w_vec[RACCOONG_K];
-    if (!raccoong_mul_mat_vec_ntt(w_vec, A_ntt, r_ntt)) return false;
-    if (!raccoong_vec_intt(w_vec, RACCOONG_K)) return false;
-    if (!raccoong_vec_add(w_vec, w_vec, e2_vec, RACCOONG_K)) return false;
+    if (!raccoong_mul_mat_vec_ntt(w_vec, A_ntt, r_ntt)) goto cleanup;
+    if (!raccoong_vec_intt(w_vec, RACCOONG_K)) goto cleanup;
+    if (!raccoong_vec_add(w_vec, w_vec, e2_vec, RACCOONG_K)) goto cleanup;
 
     static uint16_t w_qw[RACCOONG_K][RACCOONG_N];
     for (unsigned i = 0; i < RACCOONG_K; ++i) rshift_to_qw(w_qw[i], &w_vec[i]);
@@ -1028,43 +1064,89 @@ static dogecoin_bool thrc_sign_internal(uint8_t c_hash_out[RACCOONG_C_HASH_BYTES
     qw_vec_to_u64(hash_flat, w_qw);
     if (!raccoong_hash_vec(c_hash_out, 'H', mu, RACCOONG_C_HASH_BYTES,
                            hash_flat, (size_t)RACCOONG_K * RACCOONG_N)) {
-        return false;
+        goto cleanup;
     }
     int8_t c[RACCOONG_N];
-    if (!raccoong_chal_poly(c, c_hash_out)) return false;
+    if (!raccoong_chal_poly(c, c_hash_out)) {
+        dogecoin_mem_zero(c, sizeof(c));
+        goto cleanup;
+    }
     polyr c_ntt;
     chal_to_polyr(&c_ntt, c);
-    if (!ntt_forward(&c_ntt)) return false;
+    if (!ntt_forward(&c_ntt)) {
+        dogecoin_mem_zero(c, sizeof(c));
+        dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
+        goto cleanup;
+    }
 
     // --- 4. z_ntt = c_ntt * NTT(s) + r_ntt;  z = INTT(z_ntt).
     static polyr s_ntt[RACCOONG_ELL];
     for (unsigned i = 0; i < RACCOONG_ELL; ++i) polyr_copy(&s_ntt[i], &s[i]);
-    if (!raccoong_vec_ntt(s_ntt, RACCOONG_ELL)) return false;
+    if (!raccoong_vec_ntt(s_ntt, RACCOONG_ELL)) {
+        dogecoin_mem_zero(c, sizeof(c));
+        dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
+        goto cleanup;
+    }
 
     static polyr z_ntt[RACCOONG_ELL];
     for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
-        if (!polyr_mul_pointwise(&z_ntt[i], &c_ntt, &s_ntt[i])) return false;
-        if (!polyr_add(&z_ntt[i], &z_ntt[i], &r_ntt[i])) return false;
+        if (!polyr_mul_pointwise(&z_ntt[i], &c_ntt, &s_ntt[i])) {
+            dogecoin_mem_zero(c, sizeof(c));
+            dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
+            goto cleanup;
+        }
+        if (!polyr_add(&z_ntt[i], &z_ntt[i], &r_ntt[i])) {
+            dogecoin_mem_zero(c, sizeof(c));
+            dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
+            goto cleanup;
+        }
     }
     static polyr z_vec[RACCOONG_ELL];
     for (unsigned i = 0; i < RACCOONG_ELL; ++i) polyr_copy(&z_vec[i], &z_ntt[i]);
-    if (!raccoong_vec_intt(z_vec, RACCOONG_ELL)) return false;
+    if (!raccoong_vec_intt(z_vec, RACCOONG_ELL)) {
+        dogecoin_mem_zero(c, sizeof(c));
+        dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
+        goto cleanup;
+    }
 
     // --- 5. y = [A * z_ntt - 2^nu_t · c_ntt · NTT(t)]_nu_w.
     static polyr y_vec[RACCOONG_K];
-    if (!raccoong_mul_mat_vec_ntt(y_vec, A_ntt, z_ntt)) return false;
+    if (!raccoong_mul_mat_vec_ntt(y_vec, A_ntt, z_ntt)) {
+        dogecoin_mem_zero(c, sizeof(c));
+        dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
+        goto cleanup;
+    }
     static polyr t_shift[RACCOONG_K];
     // HD-wallet variant: round t to nu_t first, then shift back.
     for (unsigned i = 0; i < RACCOONG_K; ++i) {
         round_and_lshift_nu_t(&t_shift[i], &t[i]);
     }
-    if (!raccoong_vec_ntt(t_shift, RACCOONG_K)) return false;
+    if (!raccoong_vec_ntt(t_shift, RACCOONG_K)) {
+        dogecoin_mem_zero(c, sizeof(c));
+        dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
+        goto cleanup;
+    }
     polyr tmp;
     for (unsigned i = 0; i < RACCOONG_K; ++i) {
-        if (!polyr_mul_pointwise(&tmp, &c_ntt, &t_shift[i])) return false;
-        if (!polyr_sub(&y_vec[i], &y_vec[i], &tmp)) return false;
+        if (!polyr_mul_pointwise(&tmp, &c_ntt, &t_shift[i])) {
+            dogecoin_mem_zero(c, sizeof(c));
+            dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
+            dogecoin_mem_zero(&tmp, sizeof(tmp));
+            goto cleanup;
+        }
+        if (!polyr_sub(&y_vec[i], &y_vec[i], &tmp)) {
+            dogecoin_mem_zero(c, sizeof(c));
+            dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
+            dogecoin_mem_zero(&tmp, sizeof(tmp));
+            goto cleanup;
+        }
     }
-    if (!raccoong_vec_intt(y_vec, RACCOONG_K)) return false;
+    if (!raccoong_vec_intt(y_vec, RACCOONG_K)) {
+        dogecoin_mem_zero(c, sizeof(c));
+        dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
+        dogecoin_mem_zero(&tmp, sizeof(tmp));
+        goto cleanup;
+    }
     static uint16_t y_qw[RACCOONG_K][RACCOONG_N];
     for (unsigned i = 0; i < RACCOONG_K; ++i) rshift_to_qw(y_qw[i], &y_vec[i]);
 
@@ -1084,7 +1166,25 @@ static dogecoin_bool thrc_sign_internal(uint8_t c_hash_out[RACCOONG_C_HASH_BYTES
 
     // --- 7. emit z.
     for (unsigned i = 0; i < RACCOONG_ELL; ++i) polyr_copy(&z_out[i], &z_vec[i]);
-    return true;
+
+    // Wipe stack-resident challenge poly / local NTT scratch.
+    dogecoin_mem_zero(c, sizeof(c));
+    dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
+    dogecoin_mem_zero(&tmp, sizeof(tmp));
+    ok = true;
+
+cleanup:
+    // Wipe every BSS slot that may carry secret-derived residue. Buffers
+    // derived solely from public inputs (A_ntt, w_qw, y_vec, y_qw, t_shift,
+    // hash_flat) are not zeroized because they cannot leak the secret r/s.
+    dogecoin_mem_zero(r_vec, sizeof(r_vec));
+    dogecoin_mem_zero(e2_vec, sizeof(e2_vec));
+    dogecoin_mem_zero(r_ntt, sizeof(r_ntt));
+    dogecoin_mem_zero(w_vec, sizeof(w_vec));
+    dogecoin_mem_zero(s_ntt, sizeof(s_ntt));
+    dogecoin_mem_zero(z_ntt, sizeof(z_ntt));
+    dogecoin_mem_zero(z_vec, sizeof(z_vec));
+    return ok;
 }
 
 /**
@@ -1193,35 +1293,45 @@ dogecoin_bool thrc_sign_with_random(const uint8_t* sk, size_t sk_len,
     if (msg_len != 0 && !msg) return false;
     if (*sig_len_inout < RACCOONG_SIG_BYTES) return false;
 
+    dogecoin_bool ok = false;
+
     // Deserialize sk = (A_seed, t, s).
     uint8_t A_seed[RACCOONG_A_SEED_BYTES];
     static polyr t_vec[RACCOONG_K];
     static polyr s_vec[RACCOONG_ELL];
-    if (!deserialize_sk_into(sk, sk_len, A_seed, t_vec, s_vec)) return false;
+    if (!deserialize_sk_into(sk, sk_len, A_seed, t_vec, s_vec)) goto out;
 
     // BUFF: tr = H(pk); mu = H(tr || msg).  pk = first PK_BYTES of sk.
     uint8_t tr[RACCOONG_C_HASH_BYTES];
-    if (!raccoong_pk_hash(tr, sk, RACCOONG_PK_BYTES)) return false;
+    if (!raccoong_pk_hash(tr, sk, RACCOONG_PK_BYTES)) goto out;
     uint8_t mu[RACCOONG_C_HASH_BYTES];
-    if (!raccoong_buff_mu(mu, tr, msg, msg_len)) return false;
+    if (!raccoong_buff_mu(mu, tr, msg, msg_len)) goto out;
 
     uint8_t c_hash[RACCOONG_C_HASH_BYTES];
     static polyr z_vec[RACCOONG_ELL];
     static int16_t h_signed[RACCOONG_K][RACCOONG_N];
     if (!thrc_sign_internal(c_hash, z_vec, h_signed,
                             A_seed, t_vec, s_vec, mu, master_random)) {
-        memset(s_vec, 0, sizeof(s_vec));
-        return false;
+        goto out;
     }
-    memset(s_vec, 0, sizeof(s_vec));
 
     size_t out_len = *sig_len_inout;
     if (!raccoong_serialize_signature(sig_out, &out_len,
                                       c_hash, z_vec, h_signed)) {
-        return false;
+        goto out;
     }
     *sig_len_inout = out_len;
-    return true;
+    ok = true;
+
+out:
+    // s_vec is secret and must always be wiped. z_vec / h_signed are the
+    // public signature components; clearing them avoids leaving correlated
+    // intermediate material in BSS between calls. t_vec, A_seed, tr, mu and
+    // c_hash are all public.
+    dogecoin_mem_zero(s_vec, sizeof(s_vec));
+    dogecoin_mem_zero(z_vec, sizeof(z_vec));
+    dogecoin_mem_zero(h_signed, sizeof(h_signed));
+    return ok;
 }
 
 /**
@@ -1249,7 +1359,7 @@ dogecoin_bool thrc_sign(const uint8_t* sk, size_t sk_len,
     dogecoin_bool ok = thrc_sign_with_random(sk, sk_len, msg, msg_len,
                                              master_random,
                                              sig_out, sig_len_inout);
-    memset(master_random, 0, sizeof(master_random));
+    dogecoin_mem_zero(master_random, sizeof(master_random));
     return ok;
 }
 
@@ -1338,11 +1448,11 @@ dogecoin_bool thrc_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len
     }
     if (!deserialize_pk_into(parent_pk, parent_pk_len, parent_pk_A_seed,
                              /*t_out=*/NULL)) {
-        memset(parent_s, 0, sizeof(parent_s));
+        dogecoin_mem_zero(parent_s, sizeof(parent_s));
         return false;
     }
     if (memcmp(parent_A_seed, parent_pk_A_seed, RACCOONG_A_SEED_BYTES) != 0) {
-        memset(parent_s, 0, sizeof(parent_s));
+        dogecoin_mem_zero(parent_s, sizeof(parent_s));
         return false;
     }
 
@@ -1354,7 +1464,7 @@ dogecoin_bool thrc_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len
     if (!hd_derive_tweak_seed(tweak_seed, parent_pk, parent_pk_len,
                               parent_sk, parent_sk_len, chaincode,
                               index, hardened)) {
-        memset(parent_s, 0, sizeof(parent_s));
+        dogecoin_mem_zero(parent_s, sizeof(parent_s));
         return false;
     }
 
@@ -1363,42 +1473,43 @@ dogecoin_bool thrc_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len
     if (!raccoong_hkdf_sha256(drbg_seed, sizeof(drbg_seed),
                               tweak_seed, sizeof(tweak_seed),
                               NULL, 0, NULL, 0)) {
-        memset(tweak_seed, 0, sizeof(tweak_seed));
-        memset(parent_s, 0, sizeof(parent_s));
+        dogecoin_mem_zero(tweak_seed, sizeof(tweak_seed));
+        dogecoin_mem_zero(parent_s, sizeof(parent_s));
         return false;
     }
-    memset(tweak_seed, 0, sizeof(tweak_seed));
+    dogecoin_mem_zero(tweak_seed, sizeof(tweak_seed));
 
     raccoong_nist_kat_drbg drbg;
     raccoong_nist_kat_drbg_init(&drbg, drbg_seed);
-    memset(drbg_seed, 0, sizeof(drbg_seed));
+    dogecoin_mem_zero(drbg_seed, sizeof(drbg_seed));
 
     uint8_t key[32];
     raccoong_nist_kat_drbg_random_bytes(&drbg, key, sizeof(key));
-    memset(&drbg, 0, sizeof(drbg));
+    dogecoin_mem_zero(&drbg, sizeof(drbg));
 
     // 4. tweak keygen reusing parent A_seed.
     static polyr tweak_t[RACCOONG_K];
     static polyr tweak_s[RACCOONG_ELL];
     if (!raccoong_keygen_t_with_aseed(key, parent_A_seed, tweak_t, tweak_s)) {
-        memset(key, 0, sizeof(key));
-        memset(parent_s, 0, sizeof(parent_s));
+        dogecoin_mem_zero(key, sizeof(key));
+        dogecoin_mem_zero(parent_s, sizeof(parent_s));
+        dogecoin_mem_zero(tweak_s, sizeof(tweak_s));
         return false;
     }
-    memset(key, 0, sizeof(key));
+    dogecoin_mem_zero(key, sizeof(key));
 
     // 5. child_t = parent_t + tweak_t (mod q); child_s = parent_s + tweak_s (mod q).
     static polyr child_t[RACCOONG_K];
     static polyr child_s[RACCOONG_ELL];
     if (!raccoong_vec_add(child_t, parent_t, tweak_t, RACCOONG_K)) {
-        memset(parent_s, 0, sizeof(parent_s));
-        memset(tweak_s, 0, sizeof(tweak_s));
+        dogecoin_mem_zero(parent_s, sizeof(parent_s));
+        dogecoin_mem_zero(tweak_s, sizeof(tweak_s));
         return false;
     }
     if (!raccoong_vec_add(child_s, parent_s, tweak_s, RACCOONG_ELL)) {
-        memset(parent_s, 0, sizeof(parent_s));
-        memset(tweak_s, 0, sizeof(tweak_s));
-        memset(child_s, 0, sizeof(child_s));
+        dogecoin_mem_zero(parent_s, sizeof(parent_s));
+        dogecoin_mem_zero(tweak_s, sizeof(tweak_s));
+        dogecoin_mem_zero(child_s, sizeof(child_s));
         return false;
     }
 
@@ -1406,9 +1517,9 @@ dogecoin_bool thrc_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len
     raccoong_serialize_sk(child_sk_out, parent_A_seed, child_t, child_s);
 
     // Wipe transient secrets.
-    memset(parent_s, 0, sizeof(parent_s));
-    memset(tweak_s, 0, sizeof(tweak_s));
-    memset(child_s, 0, sizeof(child_s));
+    dogecoin_mem_zero(parent_s, sizeof(parent_s));
+    dogecoin_mem_zero(tweak_s, sizeof(tweak_s));
+    dogecoin_mem_zero(child_s, sizeof(child_s));
     return true;
 }
 
@@ -1453,25 +1564,25 @@ dogecoin_bool thrc_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
     if (!raccoong_hkdf_sha256(drbg_seed, sizeof(drbg_seed),
                               tweak_seed, sizeof(tweak_seed),
                               NULL, 0, NULL, 0)) {
-        memset(tweak_seed, 0, sizeof(tweak_seed));
+        dogecoin_mem_zero(tweak_seed, sizeof(tweak_seed));
         return false;
     }
-    memset(tweak_seed, 0, sizeof(tweak_seed));
+    dogecoin_mem_zero(tweak_seed, sizeof(tweak_seed));
 
     raccoong_nist_kat_drbg drbg;
     raccoong_nist_kat_drbg_init(&drbg, drbg_seed);
-    memset(drbg_seed, 0, sizeof(drbg_seed));
+    dogecoin_mem_zero(drbg_seed, sizeof(drbg_seed));
 
     uint8_t key[32];
     raccoong_nist_kat_drbg_random_bytes(&drbg, key, sizeof(key));
-    memset(&drbg, 0, sizeof(drbg));
+    dogecoin_mem_zero(&drbg, sizeof(drbg));
 
     static polyr tweak_t[RACCOONG_K];
     if (!raccoong_keygen_t_with_aseed(key, parent_A_seed, tweak_t, NULL)) {
-        memset(key, 0, sizeof(key));
+        dogecoin_mem_zero(key, sizeof(key));
         return false;
     }
-    memset(key, 0, sizeof(key));
+    dogecoin_mem_zero(key, sizeof(key));
 
     static polyr child_t[RACCOONG_K];
     if (!raccoong_vec_add(child_t, parent_t, tweak_t, RACCOONG_K)) {
