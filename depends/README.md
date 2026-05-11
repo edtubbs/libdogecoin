@@ -42,8 +42,6 @@ The following can be set when running make: make FOO=bar
     ANDROID_API_LEVEL: API level corresponding to the Android version targeted
     FALLBACK_DOWNLOAD_PATH: If a source file can't be fetched, try here before giving up
     NO_LIBOQS: set to skip building liboqs (PQC library). Leave empty to include it (e.g. NO_LIBOQS=)
-    LIBOQS_RACCOON: set to 'y' to build the Raccoon-G fork of liboqs (edtubbs/liboqs).
-                    When omitted or empty, upstream liboqs (open-quantum-safe/liboqs) is used.
     RACCOON_G: set to 'y' to build GMP and MPFR for the in-tree Raccoon-G
                implementation (--enable-raccoon-g). MPFR is the C analogue of
                Python's mpmath and is required to make the Raccoon-G Gaussian

@@ -35,7 +35,6 @@ SET(TEST_TPM_AUTO FALSE CACHE BOOL "disable TPM UI policy for automated tests")
 SET(USE_OPENENCLAVE FALSE CACHE BOOL "enable openenclave")
 SET(USE_YUBIKEY FALSE CACHE BOOL "enable yubikey")
 SET(USE_LIBOQS FALSE CACHE BOOL "enable liboqs")
-SET(USE_LIBOQS_RACCOON FALSE CACHE BOOL "enable liboqs raccoon fork")
 SET(USE_RACCOON_G FALSE CACHE BOOL "enable in-tree Raccoon-G-44 (experimental, requires GMP/MPFR)")
 string(RANDOM LENGTH 12 ALPHABET abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 PASSWD_STR)
 SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random data from")
@@ -214,17 +213,8 @@ IF(USE_YUBIKEY)
     FIND_LIBRARY(LIBYKPIV NAMES ykpiv REQUIRED HINTS /usr/lib/x86_64-linux-gnu)
     ADD_DEFINITIONS(-DUSE_YUBIKEY=1)
 ENDIF()
-IF(USE_LIBOQS_RACCOON)
-    SET(USE_LIBOQS TRUE)
-ENDIF()
 IF(USE_LIBOQS)
     ADD_DEFINITIONS(-DUSE_LIBOQS=1)
-ENDIF()
-IF(USE_LIBOQS_RACCOON)
-    ADD_DEFINITIONS(-DUSE_LIBOQS_RACCOON=1)
-ENDIF()
-IF(USE_RACCOON_G AND USE_LIBOQS_RACCOON)
-    MESSAGE(FATAL_ERROR "USE_RACCOON_G and USE_LIBOQS_RACCOON are mutually exclusive")
 ENDIF()
 IF(USE_RACCOON_G)
     FIND_LIBRARY(LIBGMP NAMES gmp REQUIRED)
@@ -259,7 +249,6 @@ MESSAGE(STATUS "")
 MESSAGE(STATUS "  openenclave    = ${USE_OPENENCLAVE}")
 MESSAGE(STATUS "  yubikey        = ${USE_YUBIKEY}")
 MESSAGE(STATUS "  liboqs         = ${USE_LIBOQS}")
-MESSAGE(STATUS "  liboqs_raccoon = ${USE_LIBOQS_RACCOON}")
 MESSAGE(STATUS "  raccoon_g      = ${USE_RACCOON_G} (experimental, in-tree)")
 MESSAGE(STATUS "")
 message(STATUS "  library type   = ${library_type}")
@@ -332,11 +321,6 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/pqc_falcon.c
 )
 ENDIF()
-IF(USE_LIBOQS_RACCOON)
-TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
-    src/pqc_raccoon.c
-)
-ENDIF()
 IF(USE_RACCOON_G)
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/pqc_raccoon.c
@@ -345,6 +329,7 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/raccoon_g/gaussian.c
     src/raccoon_g/shake256.c
     src/raccoon_g/thrc.c
+    src/raccoon_g/keygen_kdf.c
     src/raccoon_g/raccoong.c
 )
 TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBMPFR} ${LIBGMP})
