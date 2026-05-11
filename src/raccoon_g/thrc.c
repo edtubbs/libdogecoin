@@ -147,6 +147,62 @@ dogecoin_bool raccoong_chal_poly(int8_t out[256],
     return true;
 }
 
+dogecoin_bool raccoong_hash_vec(uint8_t out[RACCOONG_C_HASH_BYTES],
+                                char ds,
+                                const uint8_t* dat, size_t dat_len,
+                                const uint64_t* v, size_t v_len)
+{
+    if (!out) return false;
+    if (dat_len != 0 && !dat) return false;
+    if (v_len != 0 && !v) return false;
+
+    /* Upstream:
+     *   q_byt = (q_bits + 7) // 8                      # = 7 for Raccoon-G
+     *   xof   = SHAKE256(_hdr24(ds, len(dat), q_byt * len(v)) + dat)
+     *   for x in v: xof.update((x % q).to_bytes(q_byt, 'little'))
+     *   return xof.read(crh)                            # 32 bytes
+     *
+     * The `_hdr24` "i" and "j" fields are 3-byte little-endian, so the
+     * primitive only supports dat_len < 2^24 and v_len < 2^24 / 7 ≈ 2.4M
+     * — well above any Raccoon-G-44 call site (largest is k*n = 2304).
+     */
+    const unsigned q_byt = (RACCOONG_LOG_Q + 7u) / 8u;     /* 7 */
+    if (dat_len > 0xFFFFFFu) return false;
+    if (v_len   > 0xFFFFFFu / q_byt) return false;
+
+    uint8_t hdr[8];
+    raccoong_hdr24(hdr, ds,
+                   (uint32_t)dat_len,
+                   (uint32_t)(q_byt * v_len),
+                   0);
+
+    shake256_ctx ctx;
+    shake256_init(&ctx);
+    shake256_absorb(&ctx, hdr, sizeof(hdr));
+    if (dat_len > 0) {
+        shake256_absorb(&ctx, dat, dat_len);
+    }
+    for (size_t i = 0; i < v_len; ++i) {
+        /* `x % q` (Python semantics): for unsigned uint64 < 2^63 we can
+         * use a plain C `%`, which matches because both operands are
+         * non-negative.  Callers feeding centered representatives must
+         * reduce them to [0,q) beforehand. */
+        uint64_t x = v[i] % RACCOONG_Q;
+        uint8_t le[8] = {0};                              /* q_byt <= 7 */
+        le[0] = (uint8_t)(x      );
+        le[1] = (uint8_t)(x >>  8);
+        le[2] = (uint8_t)(x >> 16);
+        le[3] = (uint8_t)(x >> 24);
+        le[4] = (uint8_t)(x >> 32);
+        le[5] = (uint8_t)(x >> 40);
+        le[6] = (uint8_t)(x >> 48);
+        shake256_absorb(&ctx, le, q_byt);
+    }
+    shake256_finalize(&ctx);
+    shake256_squeeze(&ctx, out, RACCOONG_C_HASH_BYTES);
+    return true;
+}
+
 dogecoin_bool raccoong_expand_a(polyr A[RACCOONG_K][RACCOONG_ELL],
                                 const uint8_t A_seed[RACCOONG_A_SEED_BYTES])
 {

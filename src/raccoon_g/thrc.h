@@ -285,6 +285,35 @@ dogecoin_bool raccoong_deserialize_signature(
 dogecoin_bool raccoong_chal_poly(int8_t out[256],
                                  const uint8_t c_hash[RACCOONG_C_HASH_BYTES]);
 
+/*
+ * Vector hash (`_hash_vec` upstream).
+ *
+ * Hashes a domain-separating header, an arbitrary byte string `dat`, and a
+ * flat vector `v` of Z_q coefficients to a `RACCOONG_C_HASH_BYTES` (32-byte)
+ * digest.  Mirrors `ThRc_Core._hash_vec(dat, vec, ds)` for Raccoon-G-44
+ * (q_byt = 7), where nested vectors of polynomials are flattened before
+ * being fed in.
+ *
+ * Algorithm (byte-exact with upstream):
+ *   xof = SHAKE256(_hdr24(ds, len(dat), 7 * v_len) || dat)
+ *   for x in v:
+ *       xof.update((x mod q).to_bytes(7, 'little'))
+ *   out = xof.read(32)
+ *
+ * `ds` is a single ASCII byte ('H' for the canonical `Hash` use, but the
+ * primitive is parameterized to also serve `Hcom` ('H') and future glue).
+ * Coefficients are reduced mod RACCOONG_Q before encoding, matching the
+ * upstream `int(x % RACC_Q).to_bytes(...)` convention so signed/centered
+ * representatives round-trip cleanly.
+ *
+ * Returns false only on null `out`/`v` (when v_len > 0) or null `dat`
+ * (when dat_len > 0); `dat_len` and `v_len` are otherwise unconstrained.
+ */
+dogecoin_bool raccoong_hash_vec(uint8_t out[RACCOONG_C_HASH_BYTES],
+                                char ds,
+                                const uint8_t* dat, size_t dat_len,
+                                const uint64_t* v, size_t v_len);
+
 LIBDOGECOIN_END_DECL
 
 #endif /* LIBDOGECOIN_RACCOON_G_THRC_H */
