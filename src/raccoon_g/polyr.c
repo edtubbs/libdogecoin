@@ -243,6 +243,11 @@ dogecoin_bool polyr_rshift(polyr* r, const polyr* a, unsigned shift)
  *
  * @return True on success, false if any argument is NULL.
  */
+dogecoin_bool polyr_center(int64_t out[RACCOONG_N], const polyr* a)
+{
+    if (!out || !a) {
+        return false;
+    }
     const uint64_t mid = RACCOONG_Q >> 1;
     for (size_t i = 0; i < RACCOONG_N; ++i) {
         uint64_t v = a->coeffs[i];

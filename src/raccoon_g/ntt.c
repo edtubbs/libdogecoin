@@ -215,6 +215,11 @@ dogecoin_bool ntt_inverse(polyr* r)
  *
  * @return True on success, false if any argument is NULL.
  */
+dogecoin_bool ntt_pointwise(polyr* r, const polyr* a, const polyr* b)
+{
+    if (!r || !a || !b) {
+        return false;
+    }
     for (size_t i = 0; i < RACCOONG_N; ++i) {
         r->coeffs[i] = mul_mod_q(a->coeffs[i], b->coeffs[i]);
     }

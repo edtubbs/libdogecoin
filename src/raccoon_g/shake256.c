@@ -272,6 +272,7 @@ void shake128_squeeze(shake128_ctx* ctx, uint8_t* out, size_t len)
 }
 
 /** @brief One-shot SHAKE128: hash `in` to `out_len` bytes. */
+void shake128(uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len)
 {
     shake128_ctx ctx;
     shake128_init(&ctx);

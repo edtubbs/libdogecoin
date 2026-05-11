@@ -207,6 +207,9 @@ void raccoong_nist_kat_drbg_init(raccoong_nist_kat_drbg* ctx,
  * @param[out]    out       Output buffer.
  * @param[in]     num_bytes Number of bytes to generate.
  */
+void raccoong_nist_kat_drbg_random_bytes(raccoong_nist_kat_drbg* ctx,
+                                         uint8_t* out, size_t num_bytes)
+{
     if (out && num_bytes) {
         drbg_get_bytes(ctx->key, ctx->ctr, out, num_bytes);
     }

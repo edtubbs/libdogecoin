@@ -983,6 +983,14 @@ static void qw_vec_to_u64(uint64_t out[RACCOONG_K * RACCOONG_N],
  * @param[in] master_random Master randomness (32 bytes).
  * @return true on success, false on invalid inputs.
  */
+static dogecoin_bool thrc_sign_internal(uint8_t c_hash_out[RACCOONG_C_HASH_BYTES],
+                                        polyr z_out[RACCOONG_ELL],
+                                        int16_t h_signed_out[RACCOONG_K][RACCOONG_N],
+                                        const uint8_t A_seed[RACCOONG_A_SEED_BYTES],
+                                        const polyr t[RACCOONG_K],
+                                        const polyr s[RACCOONG_ELL],
+                                        const uint8_t mu[RACCOONG_C_HASH_BYTES],
+                                        const uint8_t master_random[32])
 {
     // --- 0. ExpandA.
     static polyr A_ntt[RACCOONG_K][RACCOONG_ELL];
@@ -1094,6 +1102,12 @@ static void qw_vec_to_u64(uint64_t out[RACCOONG_K * RACCOONG_N],
  * @param[in] mu Message digest (BUFF input).
  * @return true if signature is valid, false otherwise.
  */
+static dogecoin_bool thrc_verify_internal(const uint8_t A_seed[RACCOONG_A_SEED_BYTES],
+                                          const polyr t[RACCOONG_K],
+                                          const uint8_t c_hash[RACCOONG_C_HASH_BYTES],
+                                          const polyr z[RACCOONG_ELL],
+                                          const int16_t h_signed[RACCOONG_K][RACCOONG_N],
+                                          const uint8_t mu[RACCOONG_C_HASH_BYTES])
 {
     // --- 1. c = chal_poly(c_hash);  c_ntt = NTT(c).
     int8_t c[RACCOONG_N];
@@ -1532,6 +1546,22 @@ static dogecoin_bool deserialize_pk_into(const uint8_t* pk, size_t pk_len,
  * @param[out] s_out ell polynomials (can be NULL).
  * @return true on success, false on invalid parameters.
  */
+static dogecoin_bool deserialize_sk_into(const uint8_t* sk, size_t sk_len,
+                                         uint8_t A_seed_out[RACCOONG_A_SEED_BYTES],
+                                         polyr t_out[RACCOONG_K],
+                                         polyr s_out[RACCOONG_ELL])
+{
+    if (!sk || sk_len != RACCOONG_SK_BYTES) return false;
+    if (!deserialize_pk_into(sk, RACCOONG_PK_BYTES, A_seed_out, t_out)) {
+        return false;
+    }
+    if (!s_out) return true;
+    const uint8_t* p = sk + RACCOONG_PK_BYTES;
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+        if (!deserialize_poly_le7(&s_out[i], p)) return false;
+        p += (size_t)RACCOONG_N * RACCOONG_COEFF_BYTES;
+    }
+    return true;
 }
 
 /**

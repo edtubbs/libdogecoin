@@ -112,6 +112,7 @@ dogecoin_bool raccoong_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk
 }
 
 /** @brief Derive public child key (unhardened only). */
+dogecoin_bool raccoong_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
                                      const uint8_t chaincode[32],
                                      uint32_t index,
                                      uint8_t* child_pk_out, size_t child_pk_len)
