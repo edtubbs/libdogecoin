@@ -84,7 +84,9 @@ typedef struct {
 static benchmark_result results[MAX_BENCHMARKS];
 static int num_results = 0;
 
+#if defined(__GNUC__) || defined(__clang__)
 static void bench_require(int ok, const char* op) __attribute__((unused));
+#endif
 static void bench_require(int ok, const char* op) {
     if (!ok) {
         fprintf(stderr, "Benchmark fatal: %s failed\n", op);

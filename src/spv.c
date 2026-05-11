@@ -231,7 +231,9 @@ static void spv_pqc_add_pending(spv_pqc_pending_commit_t* entry) {
 }
 
 /* Helper: remove and free pending commit */
+#if defined(__GNUC__) || defined(__clang__)
 static void spv_pqc_remove_pending(spv_pqc_pending_commit_t* entry) __attribute__((unused));
+#endif
 static void spv_pqc_remove_pending(spv_pqc_pending_commit_t* entry) {
     HASH_DEL(g_pending_commits, entry);
     if (entry->txc_raw) dogecoin_free(entry->txc_raw);
