@@ -440,9 +440,63 @@ in-tree Raccoon-G-44 backend (<code>--enable-raccoon-g</code>, byte-exact
 against the upstream <code>p-11/lattice-hd-wallets</code> reference; see
 <code>src/raccoon_g/README.md</code>). The contrib runner is
 <code>contrib/mainnet_raccoong_test.sh</code> (also driven end-to-end by
-<code>contrib/mainnet_pq_cascade_test.sh</code>); on-chain TX_C / TX_R / SPV
-log artefacts will be inserted here once the cascade has been broadcast on
-mainnet against the in-tree backend.
+<code>contrib/mainnet_pq_cascade_test.sh</code>).
+
+Commitment transaction (TX_C) with OP_RETURN <code>RCG4</code> tag and 24
+P2SH <code>RCG4FULL</code> carrier outputs:
+
+<source>
+TX_C txid:   094520f6282ba31ef4bfca7da3879dd1c8c08e77091e51b7340231415d3aadcc
+Block:       6201551 (mainnet, confirmed 2026-05-11T02:36:57Z)
+OP_RETURN:   6a24 52434734 ac10a26b7685b020b2dd1f1e4654ab4d8f055bc354ee147bca12dfe44186d084
+Commitment:  ac10a26b7685b020b2dd1f1e4654ab4d8f055bc354ee147bca12dfe44186d084
+Carrier P2SH scriptPubKey: a9149b402803555511d15d81207d3e2cb3e6bc365e0e87
+Carrier outputs: 24 × 10000000 koinu (0.1 DOGE each)
+</source>
+
+Reveal transaction (TX_R) spending all 24 P2SH carrier outputs and embedding
+the 16144-byte Raccoon-G-44 public key and 20768-byte signature across 24
+<code>RCG4FULL</code> scriptSigs:
+
+<source>
+TX_R txid:   c7f00cd24b1049948ec94e96d999fb6cf995519abb2a66eebe7e8933dd092b8b
+Block:       6201557 (mainnet, confirmed 2026-05-11T02:41:48Z)
+vin count:   24 carrier vins (part_total=24, parts 0..23)
+pk_len:      16144 bytes (pk_prefix=ed329ae5ce2303a242c010158a95dcca)
+sig_len:     20768 bytes (sig_prefix=68f337202bd1adc1c50e1599445b8f17)
+sighash32:   dcd0bb61c52a78c124c2222d9a67f2d71d2b5e8d19a9725b53419f7c0df26424
+</source>
+
+SPV validation log produced by <code>spvnode</code> (built with
+<code>--enable-raccoon-g</code>) showing OP_RETURN commitment detection,
+cross-TX carrier match, and Phase 2 PQC signature verification:
+
+<source>
+[raccoong-commit] Pending at height=6201551 txpos=7 commit=ac10a26b7685b020b2dd1f1e4654ab4d8f055bc354ee147bca12dfe44186d084 source=op_return
+[raccoong-commit] Valid at height=6201557 txpos=40 commit=ac10a26b7685b020b2dd1f1e4654ab4d8f055bc354ee147bca12dfe44186d084 carrier_vin=0 source=carrier_scriptsig matched_txc_txpos=7 pk_len=16144 sig_len=20768 pk_prefix=ed329ae5ce2303a242c010158a95dcca sig_prefix=68f337202bd1adc1c50e1599445b8f17 txr_txid=c7f00cd24b1049948ec94e96d999fb6cf995519abb2a66eebe7e8933dd092b8b
+[raccoong-commit] PQC signature verification PASSED at height=6201557 txpos=40 sighash=dcd0bb61c52a78c124c2222d9a67f2d71d2b5e8d19a9725b53419f7c0df26424
+[raccoong-commit] Reveal validated: TX_R=c7f00cd24b1049948ec94e96d999fb6cf995519abb2a66eebe7e8933dd092b8b commit=ac10a26b7685b020b2dd1f1e4654ab4d8f055bc354ee147bca12dfe44186d084 pk_len=16144 sig_len=20768 height=6201557
+</source>
+
+The same on-chain pk, sig and reconstructed sighash were cross-validated
+against the upstream Python reference implementation (<code>p-11/lattice-hd-wallets</code>
+pinned at commit <code>461a5ed9b6d57e3bf8c381be3bb79325ab21d906</code>) by
+calling <code>raccoon_primitives._verify_with_unrounded_public_key</code> on
+<code>deserialize_public_key(pk)</code>, <code>deserialize_signature(sig)</code>,
+and the BUFF <code>mu = SHAKE256(SHAKE256(pk).read(32) || sighash32).read(32)</code>:
+
+<source>
+tr  = SHAKE256(pk).read(32)              = 9c4385eefb11280fc8a04af0a91bf5af4c3985b1146291015a7854c339e1d383
+mu  = SHAKE256(tr || sighash32).read(32) = 10ce4086395d0683be3f07bc42b9a5116a4003ac6e0d6ad0d3f3a583850f700d
+upstream raccoon-G-44 verify(vk, mu, sig) = PASS
+SHA256(pk || sig)                        = ac10a26b7685b020b2dd1f1e4654ab4d8f055bc354ee147bca12dfe44186d084
+                                           == on-chain TX_C OP_RETURN commitment ✓
+</source>
+
+This confirms that the libdogecoin Raccoon-G-44 backend produces public keys,
+signatures, BUFF binding (tr/mu), and commitments that are bit-exact
+compatible with the upstream reference implementation, and that SPV
+validation matches reference-implementation acceptance.
 
 The wire-format and SPV-side validation rules for Raccoon-G-44 are unchanged
 from the rest of this draft: the OP_RETURN tag is <code>"RCG4"</code>, the
@@ -452,7 +506,7 @@ commitment is <code>SHA256(pk || sig)</code>.
 
 ===SPV Commitment Validation Summary===
 
-The SPV scanner detected and validated the following PQC commitments during mainnet block scan (cascade run 2026-04-20):
+The SPV scanner detected and validated the following PQC commitments during mainnet block scan (Falcon/Dilithium2 cascade run 2026-04-20, Raccoon-G-44 run 2026-05-11):
 
 <source>
 Height   TxPos  Algorithm     Source              Commitment (first 16 hex)        Details
@@ -465,9 +519,11 @@ Height   TxPos  Algorithm     Source              Commitment (first 16 hex)     
 6173895  50     Falcon-512    carrier_scriptsig   e780b663d19966bc...              (pk_len=897, sig_len=655, PASSED)
 6173897  16     Dilithium2    op_return_only      f8dda58255...
 6173902  11     Dilithium2    carrier_scriptsig   f8dda58255...                    (pk_len=1312, sig_len=2420, PASSED)
+6201551  7      Raccoon-G-44  op_return_only      ac10a26b7685b020...
+6201557  40     Raccoon-G-44  carrier_scriptsig   ac10a26b7685b020...              (pk_len=16144, sig_len=20768, PASSED; upstream Python reference verify(vk,mu,sig)=PASS)
 </source>
 
-Note: Validated carrier_scriptsig entries demonstrate the two-transaction carrier pattern (TX_C + TX_R) with full Phase 2 PQC signature verification PASSED for Falcon-512 and Dilithium2. Raccoon-G-44 mainnet artefacts (built with <code>--enable-raccoon-g</code>) will be added once the cascade is broadcast.
+Note: Validated carrier_scriptsig entries demonstrate the two-transaction carrier pattern (TX_C + TX_R) with full Phase 2 PQC signature verification PASSED for Falcon-512, Dilithium2, and Raccoon-G-44. The Raccoon-G-44 entry was additionally cross-validated against the upstream <code>p-11/lattice-hd-wallets</code> Python reference implementation at pinned commit <code>461a5ed9b6d57e3bf8c381be3bb79325ab21d906</code>.
 
 ==Deployment==
 

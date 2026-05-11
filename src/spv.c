@@ -190,7 +190,7 @@ static const unsigned int BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM = 5;
 static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 
-#ifdef USE_LIBOQS
+#if defined(USE_LIBOQS) || defined(USE_RACCOON_G)
 /* Maximum number of pending PQC OP_RETURN commitments buffered per block
    for cross-TX carrier validation (TX_C has OP_RETURN, TX_R has scriptSig). */
 #define SPV_PQC_PENDING_MAX 16
@@ -237,7 +237,7 @@ static void spv_pqc_remove_pending(spv_pqc_pending_commit_t* entry) {
     dogecoin_free(entry);
 }
 
-#endif /* USE_LIBOQS */
+#endif /* USE_LIBOQS || USE_RACCOON_G (pqc pending) */
 
 static dogecoin_bool dogecoin_net_spv_node_timer_callback(dogecoin_node *node, uint64_t *now);
 void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, struct const_buffer *buf);
@@ -975,8 +975,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
                 if (client->sync_transaction) { client->sync_transaction(client->sync_transaction_ctx, tx, i, pindex); }
                 
-#ifdef USE_LIBOQS
+#if defined(USE_LIBOQS) || defined(USE_RACCOON_G)
                 /* --- Phase 1: Detect OP_RETURN commitments --- */
+#ifdef USE_LIBOQS
                 /* Falcon-512: buffer for cross-TX carrier match (TX_C → pending, TX_R validates) */
                 uint8_t falcon_commit_data[32];
                 if (dogecoin_tx_extract_falcon512_commit(tx, falcon_commit_data)) {
@@ -1020,6 +1021,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     }
                 }
                 /* Raccoon-G-44: buffer for cross-TX carrier match (TX_C → pending, TX_R validates via multi-part carrier) */
+#endif /* USE_LIBOQS Falcon/Dilithium Phase 1 */
 #ifdef USE_RACCOON_G
                 uint8_t raccoong_commit_data[32];
                 if (dogecoin_tx_extract_raccoong44_commit(tx, raccoong_commit_data)) {
@@ -1070,12 +1072,14 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 #endif
                                                  "unknown-pqc";
                         dogecoin_bool commit_ok = false;
+#ifdef USE_LIBOQS
                         if (carrier_algo == DOGECOIN_PQC_ALGO_FALCON)
                             commit_ok = dogecoin_falcon512_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
                         else if (carrier_algo == DOGECOIN_PQC_ALGO_DILITHIUM)
                             commit_ok = dogecoin_dilithium2_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
+#endif
 #ifdef USE_RACCOON_G
-                        else if (carrier_algo == DOGECOIN_PQC_ALGO_RACCOONG)
+                        if (carrier_algo == DOGECOIN_PQC_ALGO_RACCOONG)
                             commit_ok = dogecoin_raccoong44_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
 #endif
 

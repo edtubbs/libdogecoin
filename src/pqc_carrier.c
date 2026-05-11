@@ -419,7 +419,7 @@ dogecoin_bool dogecoin_tx_add_pqc_carrier_outputs(
     return true;
 }
 
-#ifdef USE_LIBOQS
+#if defined(USE_LIBOQS) || defined(USE_RACCOON_G)
 
 /**
  * @brief Extract PQC pubkey+sig from carrier-format scriptSigs in a transaction.
@@ -747,12 +747,14 @@ dogecoin_bool dogecoin_pqc_carrier_verify_reveal(
                         uint8_t sighash[32];
                         if (dogecoin_tx_sighash32(tx_base, spk, 0, SIGHASH_ALL, sighash)) {
                             if (out_sighash) memcpy(out_sighash, sighash, 32);
+#ifdef USE_LIBOQS
                             if (algo == DOGECOIN_PQC_ALGO_FALCON)
                                 verified = dogecoin_falcon512_verify(pk, pk_len, sighash, 32, sig, sig_len);
                             else if (algo == DOGECOIN_PQC_ALGO_DILITHIUM)
                                 verified = dogecoin_dilithium2_verify(pk, pk_len, sighash, 32, sig, sig_len);
+#endif
 #ifdef USE_RACCOON_G
-                            else if (algo == DOGECOIN_PQC_ALGO_RACCOONG)
+                            if (algo == DOGECOIN_PQC_ALGO_RACCOONG)
                                 verified = dogecoin_raccoong44_verify(pk, pk_len, sighash, 32, sig, sig_len);
 #endif
                         }
