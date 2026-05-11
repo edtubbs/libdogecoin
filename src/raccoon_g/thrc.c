@@ -628,19 +628,416 @@ dogecoin_bool raccoong_deserialize_signature(
     return true;
 }
 
+/* ------------------------------------------------------------------
+ *  Algorithm 2 (Sign) / Algorithm 3 (Verify) for Raccoon-G-44
+ *
+ *  1:1 ports of upstream `ThRc_Core.plain_sign` / `verify` (thrc_core.py).
+ *  All polynomials live in static storage so the working set stays off
+ *  the stack (~165 KB for the matrix A alone); this mirrors the existing
+ *  `raccoong_keygen_t_unrounded` style and is not thread safe.
+ * ------------------------------------------------------------------ */
+
+#include <math.h>
+#include <dogecoin/random.h>
+
+/* B2_z bound for kappa=128, max_derivation_depth=1000 (upstream
+ * `_compute_b2_bound`).  Computed at first use; the formula is purely
+ * deterministic so any caller observes the same value. */
+static double raccoong_b2_bound(void)
+{
+    static int initialized = 0;
+    static double b2;
+    if (!initialized) {
+        const double sqrt_depth = sqrt(1000.0);
+        const double sigma_t    = ldexp(1.0, RACCOONG_LG_ST);   /* 2^7  */
+        const double sigma_w    = ldexp(1.0, RACCOONG_LG_SWT);  /* 2^40 */
+        const double n_kp_ell   = (double)RACCOONG_N *
+                                  (double)(RACCOONG_K + RACCOONG_ELL);
+        const double n_k        = (double)RACCOONG_N * (double)RACCOONG_K;
+        const double term1      = exp(0.25) *
+            ((double)RACCOONG_TAU * sigma_t * sqrt_depth + sigma_w) *
+            sqrt(n_kp_ell);
+        const double term2      =
+            ((double)RACCOONG_TAU * ldexp(1.0, RACCOONG_NU_T) +
+             ldexp(1.0, RACCOONG_NU_W + 1u)) *
+            sqrt(n_k);
+        b2 = term1 + term2;
+        initialized = 1;
+    }
+    return b2;
+}
+
+/* Round-half-up shift to the q_w domain: out[i] = ((x + 2^(nu-1)) >> nu) % q_w. */
+static void rshift_to_qw(uint16_t out[RACCOONG_N], const polyr* in)
+{
+    const uint64_t mid = (uint64_t)1 << (RACCOONG_NU_W - 1u);
+    for (size_t i = 0; i < RACCOONG_N; ++i) {
+        uint64_t v = (in->coeffs[i] + mid) >> RACCOONG_NU_W;
+        out[i] = (uint16_t)(v % (uint64_t)RACCOONG_Q_W);
+    }
+}
+
+/* Centered representative in [-q/2, q/2] of an unsigned coefficient mod q. */
+static int64_t center_q(uint64_t x)
+{
+    int64_t v = (int64_t)x;
+    const int64_t Q = (int64_t)RACCOONG_Q;
+    const int64_t half = Q >> 1;
+    if (v > half) v -= Q;
+    return v;
+}
+
+/* Centered representative in [-q_w/2, q_w/2) of an unsigned coefficient mod q_w. */
+static int32_t center_qw(uint16_t x)
+{
+    int32_t v = (int32_t)x;
+    const int32_t Qw = (int32_t)RACCOONG_Q_W;
+    const int32_t half = Qw >> 1;
+    if (v > half) v -= Qw;
+    return v;
+}
+
+/* `_check_bounds(z, h)` from upstream: ||(z, 2^nu_w · h)||_2 <= B2_z. */
+static dogecoin_bool check_bounds(const polyr z[RACCOONG_ELL],
+                                  const uint16_t h[RACCOONG_K][RACCOONG_N])
+{
+    double s2z = 0.0;
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+        for (size_t j = 0; j < RACCOONG_N; ++j) {
+            const double v = (double)center_q(z[i].coeffs[j]);
+            s2z += v * v;
+        }
+    }
+    double s2h = 0.0;
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        for (size_t j = 0; j < RACCOONG_N; ++j) {
+            const double v = (double)center_qw(h[i][j]);
+            s2h += v * v;
+        }
+    }
+    /* sum + (2^nu_w)^2 · s2h, then sqrt and compare to B2. */
+    const double n2 = sqrt(s2z + ldexp(s2h, 2 * RACCOONG_NU_W));
+    return (n2 <= raccoong_b2_bound()) ? true : false;
+}
+
+/* HD-wallet sign/verify (upstream `_sign_with_unrounded_public_key`):
+ *
+ * Replace `lshift(t, nu_t)` with `lshift(round(t, nu_t), nu_t)`, i.e.
+ *   t̂ = (t + 2^(nu_t-1)) >> nu_t  (mod q_t),  then  t̂ << nu_t  (mod q).
+ *
+ * Since q_t = q >> nu_t = 16383 < 2^14 and nu_t = 35, the lshifted value is
+ * < 2^49 < q, so no further mod-q reduction is needed after the shift.
+ */
+static void round_and_lshift_nu_t(polyr* dst, const polyr* src)
+{
+    const uint64_t mid = (uint64_t)1 << (RACCOONG_NU_T - 1u);
+    const uint64_t q_t = (uint64_t)RACCOONG_Q >> RACCOONG_NU_T; /* 16383 */
+    for (size_t i = 0; i < RACCOONG_N; ++i) {
+        uint64_t rounded = ((src->coeffs[i] + mid) >> RACCOONG_NU_T) % q_t;
+        dst->coeffs[i] = rounded << RACCOONG_NU_T;
+    }
+}
+
+/* Sample r_i (i in [0, ell)) or e2_i (i in [0, k)) via gaussian_sample_seed
+ * at sigma_w^2 = 2^80, then reduce mod q into polyr storage. */
+static dogecoin_bool sample_w_gaussian(polyr* dst, char ds,
+                                       uint8_t idx, uint8_t b2,
+                                       const uint8_t key[32])
+{
+    uint8_t seed_buf[8 + 32];
+    raccoong_hdr8(seed_buf, ds, idx, b2, 0, 0, 0, 0, 0);
+    memcpy(seed_buf + 8, key, 32);
+    int64_t sample_buf[RACCOONG_N];
+    if (!gaussian_sample_seed(sample_buf, RACCOONG_N,
+                              RACCOONG_LG_SIGMA_W2,
+                              seed_buf, sizeof(seed_buf))) {
+        memset(seed_buf, 0, sizeof(seed_buf));
+        return false;
+    }
+    memset(seed_buf, 0, sizeof(seed_buf));
+    polyr_load_signed(dst, sample_buf);
+    memset(sample_buf, 0, sizeof(sample_buf));
+    return true;
+}
+
+/* Encode an `int8_t` challenge polynomial (values in {-1, 0, +1}^N) as a
+ * polyr in [0, q): -1 maps to q-1. */
+static void chal_to_polyr(polyr* dst, const int8_t c[RACCOONG_N])
+{
+    for (size_t i = 0; i < RACCOONG_N; ++i) {
+        int v = c[i];
+        if (v < 0) {
+            dst->coeffs[i] = (uint64_t)((int64_t)RACCOONG_Q + (int64_t)v);
+        } else {
+            dst->coeffs[i] = (uint64_t)v;
+        }
+    }
+}
+
+/* Flatten a `uint16_t v[K][N]` (q_w domain) into a `uint64_t[K*N]` for
+ * `raccoong_hash_vec`.  Coefficients in [0, q_w) are already < q so the
+ * 7-byte LE encoding agrees with `int(x % q).to_bytes(7, 'little')`. */
+static void qw_vec_to_u64(uint64_t out[RACCOONG_K * RACCOONG_N],
+                          const uint16_t v[RACCOONG_K][RACCOONG_N])
+{
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        for (size_t j = 0; j < RACCOONG_N; ++j) {
+            out[i * RACCOONG_N + j] = (uint64_t)v[i][j];
+        }
+    }
+}
+
+static dogecoin_bool thrc_sign_internal(uint8_t c_hash_out[RACCOONG_C_HASH_BYTES],
+                                        polyr z_out[RACCOONG_ELL],
+                                        int16_t h_signed_out[RACCOONG_K][RACCOONG_N],
+                                        const uint8_t A_seed[RACCOONG_A_SEED_BYTES],
+                                        const polyr t[RACCOONG_K],
+                                        const polyr s[RACCOONG_ELL],
+                                        const uint8_t mu[RACCOONG_C_HASH_BYTES],
+                                        const uint8_t master_random[32])
+{
+    /* --- 0. ExpandA. */
+    static polyr A_ntt[RACCOONG_K][RACCOONG_ELL];
+    if (!raccoong_expand_a(A_ntt, A_seed)) return false;
+
+    /* --- 1. r ~ D_w^ell,  e2 ~ D_w^k  (sigma_w^2 = 2^80). */
+    static polyr r_vec[RACCOONG_ELL];
+    static polyr e2_vec[RACCOONG_K];
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+        if (!sample_w_gaussian(&r_vec[i], 'r', (uint8_t)i, 0, master_random)) {
+            return false;
+        }
+    }
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        if (!sample_w_gaussian(&e2_vec[i], 'e', (uint8_t)i, 2, master_random)) {
+            return false;
+        }
+    }
+
+    /* --- 2. w = [A * r + e2]_nu_w   (mod q_w). */
+    static polyr r_ntt[RACCOONG_ELL];
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) polyr_copy(&r_ntt[i], &r_vec[i]);
+    if (!raccoong_vec_ntt(r_ntt, RACCOONG_ELL)) return false;
+
+    static polyr w_vec[RACCOONG_K];
+    if (!raccoong_mul_mat_vec_ntt(w_vec, A_ntt, r_ntt)) return false;
+    if (!raccoong_vec_intt(w_vec, RACCOONG_K)) return false;
+    if (!raccoong_vec_add(w_vec, w_vec, e2_vec, RACCOONG_K)) return false;
+
+    static uint16_t w_qw[RACCOONG_K][RACCOONG_N];
+    for (unsigned i = 0; i < RACCOONG_K; ++i) rshift_to_qw(w_qw[i], &w_vec[i]);
+
+    /* --- 3. c_hash = H(mu, w_qw);  c = chal_poly(c_hash);  c_ntt = NTT(c). */
+    static uint64_t hash_flat[RACCOONG_K * RACCOONG_N];
+    qw_vec_to_u64(hash_flat, w_qw);
+    if (!raccoong_hash_vec(c_hash_out, 'H', mu, RACCOONG_C_HASH_BYTES,
+                           hash_flat, (size_t)RACCOONG_K * RACCOONG_N)) {
+        return false;
+    }
+    int8_t c[RACCOONG_N];
+    if (!raccoong_chal_poly(c, c_hash_out)) return false;
+    polyr c_ntt;
+    chal_to_polyr(&c_ntt, c);
+    if (!ntt_forward(&c_ntt)) return false;
+
+    /* --- 4. z_ntt = c_ntt * NTT(s) + r_ntt;  z = INTT(z_ntt). */
+    static polyr s_ntt[RACCOONG_ELL];
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) polyr_copy(&s_ntt[i], &s[i]);
+    if (!raccoong_vec_ntt(s_ntt, RACCOONG_ELL)) return false;
+
+    static polyr z_ntt[RACCOONG_ELL];
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) {
+        if (!polyr_mul_pointwise(&z_ntt[i], &c_ntt, &s_ntt[i])) return false;
+        if (!polyr_add(&z_ntt[i], &z_ntt[i], &r_ntt[i])) return false;
+    }
+    static polyr z_vec[RACCOONG_ELL];
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) polyr_copy(&z_vec[i], &z_ntt[i]);
+    if (!raccoong_vec_intt(z_vec, RACCOONG_ELL)) return false;
+
+    /* --- 5. y = [A * z_ntt - 2^nu_t · c_ntt · NTT(t)]_nu_w. */
+    static polyr y_vec[RACCOONG_K];
+    if (!raccoong_mul_mat_vec_ntt(y_vec, A_ntt, z_ntt)) return false;
+    static polyr t_shift[RACCOONG_K];
+    /* HD-wallet variant: round t to nu_t first, then shift back. */
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        round_and_lshift_nu_t(&t_shift[i], &t[i]);
+    }
+    if (!raccoong_vec_ntt(t_shift, RACCOONG_K)) return false;
+    polyr tmp;
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        if (!polyr_mul_pointwise(&tmp, &c_ntt, &t_shift[i])) return false;
+        if (!polyr_sub(&y_vec[i], &y_vec[i], &tmp)) return false;
+    }
+    if (!raccoong_vec_intt(y_vec, RACCOONG_K)) return false;
+    static uint16_t y_qw[RACCOONG_K][RACCOONG_N];
+    for (unsigned i = 0; i < RACCOONG_K; ++i) rshift_to_qw(y_qw[i], &y_vec[i]);
+
+    /* --- 6. h = w_qw - y_qw  (mod q_w);  then center to [-q_w/2, q_w/2). */
+    const int32_t Qw = (int32_t)RACCOONG_Q_W;
+    const int32_t Qw_half = Qw >> 1;
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        for (size_t j = 0; j < RACCOONG_N; ++j) {
+            int32_t d = (int32_t)w_qw[i][j] - (int32_t)y_qw[i][j];
+            d %= Qw;
+            if (d < 0) d += Qw;
+            /* Centered for signature serialization (see signature wire fmt). */
+            if (d > Qw_half) d -= Qw;
+            h_signed_out[i][j] = (int16_t)d;
+        }
+    }
+
+    /* --- 7. emit z. */
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) polyr_copy(&z_out[i], &z_vec[i]);
+    return true;
+}
+
+static dogecoin_bool thrc_verify_internal(const uint8_t A_seed[RACCOONG_A_SEED_BYTES],
+                                          const polyr t[RACCOONG_K],
+                                          const uint8_t c_hash[RACCOONG_C_HASH_BYTES],
+                                          const polyr z[RACCOONG_ELL],
+                                          const int16_t h_signed[RACCOONG_K][RACCOONG_N],
+                                          const uint8_t mu[RACCOONG_C_HASH_BYTES])
+{
+    /* --- 1. c = chal_poly(c_hash);  c_ntt = NTT(c). */
+    int8_t c[RACCOONG_N];
+    if (!raccoong_chal_poly(c, c_hash)) return false;
+    polyr c_ntt;
+    chal_to_polyr(&c_ntt, c);
+    if (!ntt_forward(&c_ntt)) return false;
+
+    /* --- 2. w = [A z_ntt - 2^nu_t c_ntt NTT(t)]_nu_w + h  (mod q_w). */
+    static polyr A_ntt[RACCOONG_K][RACCOONG_ELL];
+    if (!raccoong_expand_a(A_ntt, A_seed)) return false;
+
+    static polyr z_ntt[RACCOONG_ELL];
+    for (unsigned i = 0; i < RACCOONG_ELL; ++i) polyr_copy(&z_ntt[i], &z[i]);
+    if (!raccoong_vec_ntt(z_ntt, RACCOONG_ELL)) return false;
+
+    static polyr w_vec[RACCOONG_K];
+    if (!raccoong_mul_mat_vec_ntt(w_vec, A_ntt, z_ntt)) return false;
+    static polyr t_shift[RACCOONG_K];
+    /* HD-wallet variant: round t to nu_t first, then shift back. */
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        round_and_lshift_nu_t(&t_shift[i], &t[i]);
+    }
+    if (!raccoong_vec_ntt(t_shift, RACCOONG_K)) return false;
+    polyr tmp;
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        if (!polyr_mul_pointwise(&tmp, &c_ntt, &t_shift[i])) return false;
+        if (!polyr_sub(&w_vec[i], &w_vec[i], &tmp)) return false;
+    }
+    if (!raccoong_vec_intt(w_vec, RACCOONG_K)) return false;
+
+    static uint16_t w_qw[RACCOONG_K][RACCOONG_N];
+    const int32_t Qw = (int32_t)RACCOONG_Q_W;
+    static uint16_t h_unsigned[RACCOONG_K][RACCOONG_N];
+    for (unsigned i = 0; i < RACCOONG_K; ++i) {
+        rshift_to_qw(w_qw[i], &w_vec[i]);
+        for (size_t j = 0; j < RACCOONG_N; ++j) {
+            int32_t hv = (int32_t)h_signed[i][j];
+            hv %= Qw;
+            if (hv < 0) hv += Qw;
+            h_unsigned[i][j] = (uint16_t)hv;
+            int32_t sum = (int32_t)w_qw[i][j] + hv;
+            if (sum >= Qw) sum -= Qw;
+            w_qw[i][j] = (uint16_t)sum;
+        }
+    }
+
+    static uint64_t hash_flat[RACCOONG_K * RACCOONG_N];
+    qw_vec_to_u64(hash_flat, w_qw);
+    uint8_t c_hash2[RACCOONG_C_HASH_BYTES];
+    if (!raccoong_hash_vec(c_hash2, 'H', mu, RACCOONG_C_HASH_BYTES,
+                           hash_flat, (size_t)RACCOONG_K * RACCOONG_N)) {
+        return false;
+    }
+
+    /* --- 3. accept iff c_hash matches and the norm bound holds. */
+    if (memcmp(c_hash, c_hash2, RACCOONG_C_HASH_BYTES) != 0) return false;
+    return check_bounds(z, h_unsigned);
+}
+
+dogecoin_bool thrc_sign_with_random(const uint8_t* sk, size_t sk_len,
+                                    const uint8_t* msg, size_t msg_len,
+                                    const uint8_t master_random[RACCOONG_KG_SEED_BYTES],
+                                    uint8_t* sig_out, size_t* sig_len_inout)
+{
+    if (!sk || !sig_out || !sig_len_inout || !master_random) return false;
+    if (msg_len != 0 && !msg) return false;
+    if (*sig_len_inout < RACCOONG_SIG_BYTES) return false;
+
+    /* Deserialize sk = (A_seed, t, s). */
+    uint8_t A_seed[RACCOONG_A_SEED_BYTES];
+    static polyr t_vec[RACCOONG_K];
+    static polyr s_vec[RACCOONG_ELL];
+    if (!deserialize_sk_into(sk, sk_len, A_seed, t_vec, s_vec)) return false;
+
+    /* BUFF: tr = H(pk); mu = H(tr || msg).  pk = first PK_BYTES of sk. */
+    uint8_t tr[RACCOONG_C_HASH_BYTES];
+    if (!raccoong_pk_hash(tr, sk, RACCOONG_PK_BYTES)) return false;
+    uint8_t mu[RACCOONG_C_HASH_BYTES];
+    if (!raccoong_buff_mu(mu, tr, msg, msg_len)) return false;
+
+    uint8_t c_hash[RACCOONG_C_HASH_BYTES];
+    static polyr z_vec[RACCOONG_ELL];
+    static int16_t h_signed[RACCOONG_K][RACCOONG_N];
+    if (!thrc_sign_internal(c_hash, z_vec, h_signed,
+                            A_seed, t_vec, s_vec, mu, master_random)) {
+        memset(s_vec, 0, sizeof(s_vec));
+        return false;
+    }
+    memset(s_vec, 0, sizeof(s_vec));
+
+    size_t out_len = *sig_len_inout;
+    if (!raccoong_serialize_signature(sig_out, &out_len,
+                                      c_hash, z_vec, h_signed)) {
+        return false;
+    }
+    *sig_len_inout = out_len;
+    return true;
+}
+
 dogecoin_bool thrc_sign(const uint8_t* sk, size_t sk_len,
                         const uint8_t* msg, size_t msg_len,
                         uint8_t* sig_out, size_t* sig_len_inout)
 {
-    (void)sk; (void)sk_len; (void)msg; (void)msg_len;
-    (void)sig_out; (void)sig_len_inout;
-    return false;
-}dogecoin_bool thrc_verify(const uint8_t* pk, size_t pk_len,
+    uint8_t master_random[RACCOONG_KG_SEED_BYTES];
+    if (!dogecoin_random_bytes(master_random, sizeof(master_random), 0)) {
+        return false;
+    }
+    dogecoin_bool ok = thrc_sign_with_random(sk, sk_len, msg, msg_len,
+                                             master_random,
+                                             sig_out, sig_len_inout);
+    memset(master_random, 0, sizeof(master_random));
+    return ok;
+}
+
+dogecoin_bool thrc_verify(const uint8_t* pk, size_t pk_len,
                           const uint8_t* msg, size_t msg_len,
                           const uint8_t* sig, size_t sig_len)
 {
-    (void)pk; (void)pk_len; (void)msg; (void)msg_len; (void)sig; (void)sig_len;
-    return false;
+    if (!pk || !sig) return false;
+    if (msg_len != 0 && !msg) return false;
+    if (sig_len != RACCOONG_SIG_BYTES) return false;
+
+    uint8_t A_seed[RACCOONG_A_SEED_BYTES];
+    static polyr t_vec[RACCOONG_K];
+    if (!deserialize_pk_into(pk, pk_len, A_seed, t_vec)) return false;
+
+    uint8_t c_hash[RACCOONG_C_HASH_BYTES];
+    static polyr z_vec[RACCOONG_ELL];
+    static int16_t h_signed[RACCOONG_K][RACCOONG_N];
+    if (!raccoong_deserialize_signature(c_hash, z_vec, h_signed,
+                                        sig, sig_len)) {
+        return false;
+    }
+
+    uint8_t tr[RACCOONG_C_HASH_BYTES];
+    if (!raccoong_pk_hash(tr, pk, pk_len)) return false;
+    uint8_t mu[RACCOONG_C_HASH_BYTES];
+    if (!raccoong_buff_mu(mu, tr, msg, msg_len)) return false;
+
+    return thrc_verify_internal(A_seed, t_vec, c_hash, z_vec, h_signed, mu);
 }
 
 dogecoin_bool thrc_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len,

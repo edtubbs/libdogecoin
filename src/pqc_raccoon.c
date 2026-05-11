@@ -31,6 +31,7 @@
 #include <dogecoin/sha2.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/pqc_raccoon.h>
+#include <dogecoin/random.h>
 
 #ifdef USE_LIBOQS
 #if defined(__GNUC__) || defined(__clang__)
@@ -571,16 +572,23 @@ dogecoin_bool dogecoin_raccoong44_keypair(uint8_t** pk, size_t* pk_len,
         return false;
     }
 
-    /* Seed-deterministic keygen requires a 32-byte seed; the public API takes
-     * none, so future revisions will source one from the libdogecoin RNG.
-     * Until raccoong_is_ready() returns true the call is short-circuited above
-     * and this path is unreachable. */
-    uint8_t seed[32] = {0};
-    if (!raccoong_keygen_from_seed(seed, pk_buf, pkl, sk_buf, skl)) {
+    /* Seed-deterministic keygen requires a 32-byte seed; the public API does
+     * not take one, so we draw it from the libdogecoin RNG.  Callers that
+     * need byte-deterministic keypairs should use `raccoong_keygen_from_seed`
+     * directly with a caller-supplied seed. */
+    uint8_t seed[32];
+    if (!dogecoin_random_bytes(seed, sizeof(seed), 0)) {
         dogecoin_free(pk_buf);
         dogecoin_free(sk_buf);
         return false;
     }
+    if (!raccoong_keygen_from_seed(seed, pk_buf, pkl, sk_buf, skl)) {
+        dogecoin_mem_zero(seed, sizeof(seed));
+        dogecoin_free(pk_buf);
+        dogecoin_free(sk_buf);
+        return false;
+    }
+    dogecoin_mem_zero(seed, sizeof(seed));
     *pk = pk_buf;
     *pk_len = pkl;
     *sk = sk_buf;

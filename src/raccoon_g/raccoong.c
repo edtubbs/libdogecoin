@@ -48,15 +48,20 @@
 
 dogecoin_bool raccoong_is_ready(void)
 {
-    /* The implementation is staged. Until Sessions 3-7 land and the upstream
-     * KATs pass byte-exactly, this function returns false and every public
-     * Raccoon-G-44 entry point routed through it must short-circuit. */
-    return false;
+    /* Sessions 3-7 (polyr, NTT, gaussian, SHAKE/XOF, expand_a, mul_mat_vec,
+     * keygen, HD-derive, BUFF-mu, hash_vec, chal_poly, sign/verify) have
+     * landed and every committed byte-exact KAT against upstream
+     * `lattice-hd-wallets` passes.  Routing is now live.
+     *
+     * NOTE: the in-tree backend is still marked experimental: it has not
+     * been third-party audited and the upstream protocol may evolve.
+     */
+    return true;
 }
 
-size_t raccoong_pk_len(void)      { return 0; }
-size_t raccoong_sk_len(void)      { return 0; }
-size_t raccoong_sig_max_len(void) { return 0; }
+size_t raccoong_pk_len(void)      { return RACCOONG_PK_BYTES; }
+size_t raccoong_sk_len(void)      { return RACCOONG_SK_BYTES; }
+size_t raccoong_sig_max_len(void) { return RACCOONG_SIG_BYTES; }
 
 dogecoin_bool raccoong_keygen_from_seed(const uint8_t seed[32],
                                         uint8_t* pk_out, size_t pk_len,

@@ -336,7 +336,8 @@ if test "x$use_raccoon_g" = xyes; then
   AC_CHECK_HEADER([mpfr.h],,[AC_MSG_ERROR([mpfr.h missing (required by --enable-raccoon-g; build via depends RACCOON_G=y or install libmpfr-dev)])])
   AC_CHECK_LIB([gmp],[__gmpz_init],[LIBGMP=-lgmp],AC_MSG_ERROR(libgmp missing))
   AC_CHECK_LIB([mpfr],[mpfr_init],[LIBMPFR=-lmpfr],AC_MSG_ERROR(libmpfr missing),[$LIBGMP])
-  LIBS="$LIBS $LIBMPFR $LIBGMP"
+  AC_CHECK_LIB([m],[sqrt],[LIBM=-lm],AC_MSG_ERROR(libm missing))
+  LIBS="$LIBS $LIBMPFR $LIBGMP $LIBM"
   AC_DEFINE(USE_RACCOON_G, 1, [Define this symbol to enable the in-tree Raccoon-G-44 backend])
 fi
 

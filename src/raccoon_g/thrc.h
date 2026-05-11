@@ -90,9 +90,27 @@ void raccoong_serialize_sk(uint8_t sk_out[/*RACCOONG_SK_BYTES*/],
                            const polyr t[RACCOONG_K],
                            const polyr s[RACCOONG_ELL]);
 
+/* Master randomness blob size for signing (kg_sz = 32 B in upstream). */
+#define RACCOONG_KG_SEED_BYTES 32u
+
 dogecoin_bool thrc_sign(const uint8_t* sk, size_t sk_len,
                         const uint8_t* msg, size_t msg_len,
                         uint8_t* sig_out, size_t* sig_len_inout);
+
+/*
+ * `thrc_sign_with_random` - deterministic signing for byte-exact KAT.
+ *
+ * Equivalent to `thrc_sign` but takes a caller-supplied 32-byte master
+ * randomness blob (`master_random`) instead of pulling from the
+ * libdogecoin RNG.  Mirrors upstream `ThRc_Core.plain_sign(vk, sk, mu)`
+ * where the `random_bytes(kg_sz)` call is replaced by a deterministic
+ * source.  Used by the byte-exact KAT in `test/raccoong_sign_tests.c`;
+ * production callers should prefer `thrc_sign`.
+ */
+dogecoin_bool thrc_sign_with_random(const uint8_t* sk, size_t sk_len,
+                                    const uint8_t* msg, size_t msg_len,
+                                    const uint8_t master_random[RACCOONG_KG_SEED_BYTES],
+                                    uint8_t* sig_out, size_t* sig_len_inout);
 
 dogecoin_bool thrc_verify(const uint8_t* pk, size_t pk_len,
                           const uint8_t* msg, size_t msg_len,
@@ -189,7 +207,15 @@ dogecoin_bool raccoong_keygen_t_unrounded(const uint8_t key[32],
                                           polyr s_out[RACCOONG_ELL]);
 
 /* Upstream `lg_st = 7` ⇒ sigma_t² = 2^14. */
+#define RACCOONG_LG_ST       7u
 #define RACCOONG_LG_SIGMA_T2 14u
+
+/* Upstream `lg_swt = 40` ⇒ sigma_w² = 2^80. */
+#define RACCOONG_LG_SWT      40u
+#define RACCOONG_LG_SIGMA_W2 80u
+
+/* Upstream `nu_t = 35`; q_t = q >> nu_t. */
+#define RACCOONG_NU_T        35u
 
 /*
  * Signature wire format (mirrors upstream `serialize_signature`).
