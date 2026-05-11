@@ -134,11 +134,6 @@ libdogecoin_la_SOURCES += \
     src/pqc_falcon.c
 endif
 
-if USE_LIBOQS_RACCOON
-libdogecoin_la_SOURCES += \
-    src/pqc_raccoon.c
-endif
-
 if USE_RACCOON_G
 libdogecoin_la_SOURCES += \
     src/pqc_raccoon.c \

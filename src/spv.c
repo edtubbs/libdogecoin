@@ -64,7 +64,7 @@
 #include <dogecoin/pqc_dilithium.h>
 #include <dogecoin/pqc_falcon.h>
 #include <dogecoin/rmd160.h>
-#ifdef USE_LIBOQS_RACCOON
+#ifdef USE_RACCOON_G
 #include <dogecoin/pqc_raccoon.h>
 #endif
 #include <event2/event.h>
@@ -326,7 +326,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
 #ifdef USE_LIBOQS
     // Log what PQC variants are present at runtime (minimal, no hard dependency).
     if (client->nodegroup && client->nodegroup->log_write_cb) {
-#ifdef USE_LIBOQS_RACCOON
+#ifdef USE_RACCOON_G
 #ifndef OQS_SIG_alg_raccoon_g_44
 #define OQS_SIG_alg_raccoon_g_44 "Raccoon-G-44"
 #endif
@@ -1020,7 +1020,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     }
                 }
                 /* Raccoon-G-44: buffer for cross-TX carrier match (TX_C → pending, TX_R validates via multi-part carrier) */
-#ifdef USE_LIBOQS_RACCOON
+#ifdef USE_RACCOON_G
                 uint8_t raccoong_commit_data[32];
                 if (dogecoin_tx_extract_raccoong44_commit(tx, raccoong_commit_data)) {
                     char raccoong_commit_hex[65];
@@ -1065,7 +1065,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         uint8_t computed_commit[32];
                         const char* algo_label = (carrier_algo == DOGECOIN_PQC_ALGO_FALCON) ? "falcon-commit" :
                                                  (carrier_algo == DOGECOIN_PQC_ALGO_DILITHIUM) ? "dilithium-commit" :
-#ifdef USE_LIBOQS_RACCOON
+#ifdef USE_RACCOON_G
                                                  (carrier_algo == DOGECOIN_PQC_ALGO_RACCOONG) ? "raccoong-commit" :
 #endif
                                                  "unknown-pqc";
@@ -1074,7 +1074,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             commit_ok = dogecoin_falcon512_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
                         else if (carrier_algo == DOGECOIN_PQC_ALGO_DILITHIUM)
                             commit_ok = dogecoin_dilithium2_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
-#ifdef USE_LIBOQS_RACCOON
+#ifdef USE_RACCOON_G
                         else if (carrier_algo == DOGECOIN_PQC_ALGO_RACCOONG)
                             commit_ok = dogecoin_raccoong44_commit_bytes(carrier_pk, carrier_pk_len, carrier_sig, carrier_sig_len, computed_commit);
 #endif

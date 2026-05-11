@@ -178,29 +178,14 @@ AC_ARG_ENABLE([liboqs],
   [use_liboqs=$enableval],
   [use_liboqs=no])
 
-AC_ARG_ENABLE([liboqs-raccoon],
-  [AS_HELP_STRING([--enable-liboqs-raccoon],
-  [Build with liboqs raccoon fork for Falcon-512, Dilithium2, and Raccoon-G-44 (default is no)])],
-  [use_liboqs_raccoon=$enableval],
-  [use_liboqs_raccoon=no])
-
-if test "x$use_liboqs_raccoon" = xyes; then
-  use_liboqs=yes
-fi
-
 dnl --enable-raccoon-g selects the in-tree Raccoon-G-44 backend. It is
 dnl experimental and gated; byte-exact agreement with the upstream Python
 dnl reference (p-11/lattice-hd-wallets) KATs is a release-blocking gate.
-dnl It is mutually exclusive with --enable-liboqs-raccoon.
 AC_ARG_ENABLE([raccoon-g],
   [AS_HELP_STRING([--enable-raccoon-g],
   [Build with the in-tree Raccoon-G-44 implementation backed by GMP/MPFR (default is no, experimental)])],
   [use_raccoon_g=$enableval],
   [use_raccoon_g=no])
-
-if test "x$use_raccoon_g" = xyes && test "x$use_liboqs_raccoon" = xyes; then
-  AC_MSG_ERROR([--enable-raccoon-g is mutually exclusive with --enable-liboqs-raccoon])
-fi
 
 
 AC_ARG_ENABLE(tests,
@@ -326,9 +311,6 @@ if test "x$use_liboqs" = xyes; then
   AC_CHECK_LIB([oqs],[main],[LIBOQS=-loqs],AC_MSG_ERROR(liboqs missing))
   LIBS="$LIBS $LIBOQS"
   AC_DEFINE(USE_LIBOQS, 1, [Define this symbol if liboqs works])
-  if test "x$use_liboqs_raccoon" = xyes; then
-    AC_DEFINE(USE_LIBOQS_RACCOON, 1, [Define this symbol if liboqs raccoon fork is used])
-  fi
 fi
 
 if test "x$use_raccoon_g" = xyes; then
@@ -364,7 +346,6 @@ AM_CONDITIONAL([USE_OPENENCLAVE], [test "x$use_openenclave" = "xyes"])
 AM_CONDITIONAL([USE_OPTEE], [test "x$use_optee" = "xyes"])
 AM_CONDITIONAL([USE_YUBIKEY], [test "x$use_yubikey" = "xyes"])
 AM_CONDITIONAL([USE_LIBOQS], [test "x$use_liboqs" = "xyes"])
-AM_CONDITIONAL([USE_LIBOQS_RACCOON], [test "x$use_liboqs_raccoon" = "xyes"])
 AM_CONDITIONAL([USE_RACCOON_G], [test "x$use_raccoon_g" = "xyes"])
 AM_CONDITIONAL([USE_ARMV8], [test "x$armv8_crypto" = "xyes"])
 AM_CONDITIONAL([USE_ARMV82], [test "x$armv82_crypto" = "xyes"])
@@ -400,7 +381,6 @@ echo "  openenclave     = $use_openenclave"
 echo "  optee           = $use_optee"
 echo "  Yubikey         = $use_yubikey"
 echo "  liboqs          = $use_liboqs"
-echo "  liboqs-raccoon  = $use_liboqs_raccoon"
 echo "  raccoon-g       = $use_raccoon_g (experimental, in-tree)"
 echo
 echo "  host            = $host"

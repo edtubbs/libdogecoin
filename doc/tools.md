@@ -49,14 +49,14 @@ The `such` tool can be used by simply running the command `./such` in the top le
 - dilithium2_commit (requires --enable-liboqs)
 - dilithium2_add_commit_tx (requires --enable-liboqs)
 - dilithium2_add_commit_and_carrier_tx (requires --enable-liboqs)
-- raccoong_keygen (requires --enable-liboqs-raccoon)
-- raccoong_sign (requires --enable-liboqs-raccoon)
-- raccoong_verify (requires --enable-liboqs-raccoon)
-- raccoong_commit (requires --enable-liboqs-raccoon)
-- raccoong_hd_derive (requires --enable-liboqs-raccoon)
-- raccoong_hd_derive_pub (requires --enable-liboqs-raccoon)
-- raccoong_add_commit_tx (requires --enable-liboqs-raccoon)
-- raccoong_add_commit_and_carrier_tx (requires --enable-liboqs-raccoon)
+- raccoong_keygen (requires --enable-raccoon-g)
+- raccoong_sign (requires --enable-raccoon-g)
+- raccoong_verify (requires --enable-raccoon-g)
+- raccoong_commit (requires --enable-raccoon-g)
+- raccoong_hd_derive (requires --enable-raccoon-g)
+- raccoong_hd_derive_pub (requires --enable-raccoon-g)
+- raccoong_add_commit_tx (requires --enable-raccoon-g)
+- raccoong_add_commit_and_carrier_tx (requires --enable-raccoon-g)
 
 So an example run of `such` could be something like this:
 ```
@@ -506,7 +506,7 @@ When using -n with a mnemonic, instead of main_wallet.db, spvnode will generate 
 
 ## Post-Quantum Cryptography (PQC) Commands
 
-> **Note**: Falcon-512, Dilithium2, and shared PQC carrier/utility commands require the `--enable-liboqs` configure flag. Raccoon-G-44 commands additionally require `--enable-liboqs-raccoon`.
+> **Note**: Falcon-512, Dilithium2, and shared PQC carrier/utility commands require the `--enable-liboqs` configure flag. Raccoon-G-44 commands additionally require `--enable-raccoon-g`.
 
 The `such` tool includes PQC commands for three signature algorithms — **Falcon-512**, **Dilithium2** (ML-DSA-44), and **Raccoon-G-44** — plus shared carrier infrastructure and transaction helpers.
 
@@ -546,7 +546,7 @@ The `such` tool includes PQC commands for three signature algorithms — **Falco
 | dilithium2_add_commit_tx | -x, -s | Appends an OP_RETURN output carrying `DIL2` ‖ commit32 to a raw transaction |
 | dilithium2_add_commit_and_carrier_tx | -x, -m, -k, -s | Appends both OP_RETURN commitment and P2SH carrier outputs to a raw transaction |
 
-#### Raccoon-G-44 Commands (requires `--enable-liboqs-raccoon`)
+#### Raccoon-G-44 Commands (requires `--enable-raccoon-g`)
 
 | Command | Required Flags | Description |
 | - | - | - |
@@ -684,7 +684,7 @@ OP_RETURN script (prefix 6a24 + tag 44494c32='DIL2'): 6a2444494c322935837d2f042a
 
 #### Raccoon-G-44
 
-> **Note**: Raccoon-G-44 keys and signatures are very large (pk: 16,144 bytes, sk: 32,272 bytes, sig: ~20,768 bytes). Full hex output is truncated in the examples below — only the first and last bytes are shown. Actual `such` output prints the complete hex strings.
+> **Note**: Raccoon-G-44 keys and signatures are very large (pk: 16,144 bytes, sk: 32,272 bytes, sig: 20,768 bytes). Full hex output is truncated in the examples below — only the first and last bytes are shown. Actual `such` output prints the complete hex strings. The example byte values were captured from the in-tree `--enable-raccoon-g` backend (byte-exact against the upstream `p-11/lattice-hd-wallets` reference; see `src/raccoon_g/README.md`). Raccoon-G public keys, secret keys and HD-derived children share the same 16-byte `A_seed` prefix (the first 32 hex characters); the differing bytes are in the remainder.
 
 ##### Generate a Raccoon-G-44 keypair:
 ```
@@ -692,25 +692,25 @@ OP_RETURN script (prefix 6a24 + tag 44494c32='DIL2'): 6a2444494c322935837d2f042a
 Generating Raccoon-G-44 keypair...
 
 === Raccoon-G-44 Keypair Generated ===
-public key:  e489c389ea3b61e9a1d4068cf2283cfc7909d6bf279100ce38eef0b63700e6dd...<32,288 hex chars total>...4f7a7500
-secret key:  e489c389ea3b61e9a1d4068cf2283cfc7909d6bf279100ce38eef0b63700e6dd...<64,544 hex chars total>...7b507d01
+public key:  5166c7c3ba5be0aa4da46150890f0b3d...<32,288 hex chars total>...e4019816454757dc014c450405f5b601
+secret key:  5166c7c3ba5be0aa4da46150890f0b3d...<64,544 hex chars total>...00029043000000000254000000000000
 pk length:   16144 bytes
 sk length:   32272 bytes
 ```
 
 ##### Sign a message with Raccoon-G-44:
 ```
-> ./such -c raccoong_sign -p <secret_key_hex> -x deadbeef...deadbeef
+> ./such -c raccoong_sign -p <secret_key_hex> -x deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef
 
 === Raccoon-G-44 Signature Generated ===
-signature:   1a0a27cc33a160141ccc090f17a8c3ef7fbeb157acdcc52ff8705234484caacb...<41,536 hex chars total>...6c004203
+signature:   7a6f30d5a0130a4c2e24a5481d0355fe...<41,536 hex chars total>...ff070300fe0702000600fd0707000100
 sig length:  20768 bytes
 msg length:  32 bytes
 ```
 
 ##### Verify a Raccoon-G-44 signature:
 ```
-> ./such -c raccoong_verify -k <public_key_hex> -x deadbeef...deadbeef -s <signature_hex>
+> ./such -c raccoong_verify -k <public_key_hex> -x deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef -s <signature_hex>
 
 === Raccoon-G-44 Verification Result ===
 ✓ VERIFIED: Signature is valid!
@@ -721,11 +721,11 @@ msg length:  32 bytes
 > ./such -c raccoong_commit -k <public_key_hex> -s <signature_hex>
 
 === Raccoon-G-44 Commitment Generated ===
-commitment:  fc83de81d0790fd8148c2bf84493a2e4b1c0311c053f283410113c9c6a5ebe9d
+commitment:  b36140f6a30ac6fa0742bcae1704c81f7a584e89ce5bd60cac989275e94e4c3e
 length:      32 bytes
 
 This commitment can be included in an OP_RETURN output:
-OP_RETURN script (prefix 6a24 + tag 52434734='RCG4'): 6a2452434734fc83de81d0790fd8148c2bf84493a2e4b1c0311c053f283410113c9c6a5ebe9d
+OP_RETURN script (prefix 6a24 + tag 52434734='RCG4'): 6a2452434734b36140f6a30ac6fa0742bcae1704c81f7a584e89ce5bd60cac989275e94e4c3e
 ```
 
 ##### Derive a child key from a Raccoon-G-44 parent key (HD derivation):
@@ -735,24 +735,26 @@ OP_RETURN script (prefix 6a24 + tag 52434734='RCG4'): 6a2452434734fc83de81d0790f
 
 === Raccoon-G-44 HD Child Key (Private Derivation) ===
 child index: 0
-child public key:  7ae1192dff39e6...  (16144 bytes)
-child secret key:  7ae1192dff39e6...  (32272 bytes)
+child public key:  5166c7c3ba5be0aa4da46150890f0b3d...<32,288 hex chars total>...b500ccffe7b0a4fc01c4c5f2efd83400
+child secret key:  5166c7c3ba5be0aa4da46150890f0b3d...<64,544 hex chars total>...00028c4300000000021a000000000000
 
 > ./such -c raccoong_hd_derive -p <secret_key_hex> -k <public_key_hex> \
     -s 0000000000000000000000000000000000000000000000000000000000000001 -i 0 -g 1
 
 === Raccoon-G-44 HD Child Key (Private Derivation) ===
 child index: 0 (hardened)
-child public key:  ...  (16144 bytes)
-child secret key:  ...  (32272 bytes)
+child public key:  5166c7c3ba5be0aa4da46150890f0b3d...<32,288 hex chars total>...df01a1ba860cfbaf008048af21713200
+child secret key:  5166c7c3ba5be0aa4da46150890f0b3d...<64,544 hex chars total>...0002ee4200000000029d430000000002
 
 > ./such -c raccoong_hd_derive_pub -k <public_key_hex> \
     -s 0000000000000000000000000000000000000000000000000000000000000001 -i 0
 
 === Raccoon-G-44 HD Child Key (Public Derivation) ===
 child index: 0
-child public key:  ...  (16144 bytes)
+child public key:  5166c7c3ba5be0aa4da46150890f0b3d...<32,288 hex chars total>...b500ccffe7b0a4fc01c4c5f2efd83400
 ```
+
+The non-hardened private-derivation child public key matches the public-only-derivation child public key (same chaincode and index), demonstrating BIP-32-style HD consistency for Raccoon-G-44.
 
 ##### Add Raccoon-G-44 commitment and carrier to a transaction:
 ```bash

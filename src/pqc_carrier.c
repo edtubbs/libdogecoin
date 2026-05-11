@@ -50,7 +50,7 @@
 #include <dogecoin/pqc_falcon.h>
 #include <dogecoin/pqc_dilithium.h>
 #endif
-#ifdef USE_LIBOQS_RACCOON
+#ifdef USE_RACCOON_G
 #include <dogecoin/pqc_raccoon.h>
 #endif
 
@@ -484,7 +484,7 @@ dogecoin_bool dogecoin_pqc_carrier_extract_scriptsig(
             algo = DOGECOIN_PQC_ALGO_FALCON;
         else if (memcmp(tag8, "DIL2FULL", 8) == 0)
             algo = DOGECOIN_PQC_ALGO_DILITHIUM;
-#ifdef USE_LIBOQS_RACCOON
+#ifdef USE_RACCOON_G
         else if (memcmp(tag8, "RCG4FULL", 8) == 0)
             algo = DOGECOIN_PQC_ALGO_RACCOONG;
 #endif
@@ -751,7 +751,7 @@ dogecoin_bool dogecoin_pqc_carrier_verify_reveal(
                                 verified = dogecoin_falcon512_verify(pk, pk_len, sighash, 32, sig, sig_len);
                             else if (algo == DOGECOIN_PQC_ALGO_DILITHIUM)
                                 verified = dogecoin_dilithium2_verify(pk, pk_len, sighash, 32, sig, sig_len);
-#ifdef USE_LIBOQS_RACCOON
+#ifdef USE_RACCOON_G
                             else if (algo == DOGECOIN_PQC_ALGO_RACCOONG)
                                 verified = dogecoin_raccoong44_verify(pk, pk_len, sighash, 32, sig, sig_len);
 #endif

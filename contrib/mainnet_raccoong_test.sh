@@ -3,7 +3,7 @@
 # Raccoon-G-44 Mainnet Integration Test Script
 #
 # Prerequisites:
-#   - libdogecoin built with --enable-liboqs
+#   - libdogecoin built with --enable-raccoon-g
 #   - such, sendtx, and spvnode binaries in PATH or current directory
 #
 
@@ -173,7 +173,7 @@ check_tools() {
         error "curl not found. Required for REST tx monitoring."
     fi
     if ! ./such -c help 2>&1 | grep -q raccoong_keygen; then
-        error "libdogecoin not built with Raccoon-G support. Rebuild with --enable-liboqs"
+        error "libdogecoin not built with Raccoon-G support. Rebuild with --enable-raccoon-g"
     fi
     if [ "$SPV_REQUIRE_VALIDATION" -ne 1 ]; then
         info "SPV_REQUIRE_VALIDATION=0 — SPV validation will be skipped (broadcast-only mode)"
