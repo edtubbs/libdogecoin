@@ -80,11 +80,19 @@ static const uint64_t RACCOONG_W[RACCOONG_N] = {
     419642897253790ULL, 307218422705703ULL, 534306751173139ULL, 30412449240137ULL, 392781217659613ULL, 15316548626552ULL, 21923346096342ULL, 320756038422460ULL,
 };
 
-/*
+/**
+ * @brief Stateless init stub.
+ *
  * Stateless. ntt_init/ntt_shutdown are kept to honor the public stub API but
  * are no-ops because the twiddle table is a static const at link time.
+ *
+ * @return Always returns true.
  */
 dogecoin_bool ntt_init(void)    { return true; }
+
+/**
+ * @brief Stateless shutdown stub.
+ */
 void          ntt_shutdown(void) {}
 
 /* Modular helpers: a, b in [0, q); a*b uses 128-bit accumulator. */
@@ -96,33 +104,40 @@ static inline uint64_t mul_mod_q(uint64_t a, uint64_t b)
 
 static inline uint64_t add_mod_q(uint64_t a, uint64_t b)
 {
-    uint64_t s = a + b; /* a + b < 2q < 2^51, no overflow */
+    uint64_t s = a + b; // a + b < 2q < 2^51, no overflow
     return s >= RACCOONG_Q ? s - RACCOONG_Q : s;
 }
 
 static inline uint64_t sub_mod_q(uint64_t a, uint64_t b)
 {
-    /* a + q - b < 2q < 2^51 */
+    // a + q - b < 2q < 2^51
     uint64_t s = a + RACCOONG_Q - b;
     return s >= RACCOONG_Q ? s - RACCOONG_Q : s;
 }
 
+/**
+ * @brief Forward NTT transform on a polynomial.
+ *
+ * Mirrors upstream:
+ *   l = n//2; wi = 0
+ *   while l > 0:
+ *       for i in range(0, n, 2*l):
+ *           wi += 1; z = w[wi]
+ *           for j in range(i, i + l):
+ *               x = f[j]; y = (f[j + l] * z) % q
+ *               f[j]     = (x + y) % q
+ *               f[j + l] = (x - y) % q
+ *       l >>= 1
+ *
+ * @param[in,out] r Polynomial to transform in-place.
+ *
+ * @return True on success, false if r is NULL.
+ */
 dogecoin_bool ntt_forward(polyr* r)
 {
     if (!r) {
         return false;
     }
-    /* Mirrors upstream:
-     *   l = n//2; wi = 0
-     *   while l > 0:
-     *       for i in range(0, n, 2*l):
-     *           wi += 1; z = w[wi]
-     *           for j in range(i, i + l):
-     *               x = f[j]; y = (f[j + l] * z) % q
-     *               f[j]     = (x + y) % q
-     *               f[j + l] = (x - y) % q
-     *       l >>= 1
-     */
     uint64_t* f = r->coeffs;
     size_t l = RACCOONG_N / 2;
     size_t wi = 0;
@@ -142,23 +157,30 @@ dogecoin_bool ntt_forward(polyr* r)
     return true;
 }
 
+/**
+ * @brief Inverse NTT transform on a polynomial.
+ *
+ * Mirrors upstream:
+ *   l = 1; wi = n
+ *   while l < n:
+ *       for i in range(0, n, 2*l):
+ *           wi -= 1; z = w[wi]
+ *           for j in range(i, i + l):
+ *               x = f[j]; y = f[j + l]
+ *               f[j]     = (x + y) % q
+ *               f[j + l] = (z * (y - x)) % q
+ *       l <<= 1
+ *   for i in range(n): f[i] = (ni * f[i]) % q
+ *
+ * @param[in,out] r Polynomial to transform in-place.
+ *
+ * @return True on success, false if r is NULL.
+ */
 dogecoin_bool ntt_inverse(polyr* r)
 {
     if (!r) {
         return false;
     }
-    /* Mirrors upstream:
-     *   l = 1; wi = n
-     *   while l < n:
-     *       for i in range(0, n, 2*l):
-     *           wi -= 1; z = w[wi]
-     *           for j in range(i, i + l):
-     *               x = f[j]; y = f[j + l]
-     *               f[j]     = (x + y) % q
-     *               f[j + l] = (z * (y - x)) % q
-     *       l <<= 1
-     *   for i in range(n): f[i] = (ni * f[i]) % q
-     */
     uint64_t* f = r->coeffs;
     size_t l = 1;
     size_t wi = RACCOONG_N;
@@ -181,13 +203,18 @@ dogecoin_bool ntt_inverse(polyr* r)
     return true;
 }
 
-dogecoin_bool ntt_pointwise(polyr* r, const polyr* a, const polyr* b)
-{
-    if (!r || !a || !b) {
-        return false;
-    }
-    /* Identical to polyr_mul_pointwise: kept as part of the NTT API for
-     * call-site readability (callers that already work in NTT domain). */
+/**
+ * @brief Pointwise multiplication of two polynomials in NTT domain.
+ *
+ * Identical to polyr_mul_pointwise: kept as part of the NTT API for
+ * call-site readability (callers that already work in NTT domain).
+ *
+ * @param[out] r Result polynomial.
+ * @param[in]  a First operand.
+ * @param[in]  b Second operand.
+ *
+ * @return True on success, false if any argument is NULL.
+ */
     for (size_t i = 0; i < RACCOONG_N; ++i) {
         r->coeffs[i] = mul_mod_q(a->coeffs[i], b->coeffs[i]);
     }

@@ -34,17 +34,26 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-/*
- * Forward / inverse NTT for the Raccoon-G-44 ring R_q = Z_q[X]/(X^n + 1).
+/**
+ * @brief Forward / inverse NTT for the Raccoon-G-44 ring R_q = Z_q[X]/(X^n + 1).
+ *
  * The twiddle table is generated at init and its SHA-256 must match the value
  * recorded in src/raccoon_g/README.md (filled in Session 4).
  */
 
+/** @brief Initialize NTT (no-op; twiddle table is static). */
 dogecoin_bool ntt_init(void);
+
+/** @brief Shut down NTT (no-op). */
 void          ntt_shutdown(void);
 
+/** @brief Apply forward NTT transform in-place. */
 dogecoin_bool ntt_forward(polyr* r);
+
+/** @brief Apply inverse NTT transform in-place. */
 dogecoin_bool ntt_inverse(polyr* r);
+
+/** @brief Pointwise multiplication in NTT domain. */
 dogecoin_bool ntt_pointwise(polyr* r, const polyr* a, const polyr* b);
 
 LIBDOGECOIN_END_DECL

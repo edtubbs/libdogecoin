@@ -35,8 +35,8 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-/*
- * Raccoon-G-44 parameter set.
+/**
+ * @brief Raccoon-G-44 parameter set.
  *
  * These constants must agree byte-for-byte with the upstream Python reference
  * (p-11/lattice-hd-wallets, see src/raccoon_g/README.md for the pinned commit).
@@ -49,34 +49,25 @@ LIBDOGECOIN_BEGIN_DECL
  * in include/dogecoin/pqc_raccoon.h) are unchanged.
  */
 
-/*
- * Backend availability probe. Returns true once the in-tree implementation is
- * complete and self-tested against the upstream KATs; returns false otherwise.
- */
+/** @brief Backend availability probe. Returns true once the in-tree implementation is complete. */
 dogecoin_bool raccoong_is_ready(void);
 
-/*
- * Seed-deterministic keypair generation. seed must be 32 bytes.
- * pk_out, sk_out are caller-allocated buffers of size pk_len, sk_len.
- * The required sizes are reported by raccoong_pk_len() / raccoong_sk_len().
- */
+/** @brief Seed-deterministic keypair generation. seed must be 32 bytes. */
 dogecoin_bool raccoong_keygen_from_seed(const uint8_t seed[32],
                                         uint8_t* pk_out, size_t pk_len,
                                         uint8_t* sk_out, size_t sk_len);
 
+/** @brief Sign a message. */
 dogecoin_bool raccoong_sign(const uint8_t* sk, size_t sk_len,
                             const uint8_t* msg, size_t msg_len,
                             uint8_t* sig_out, size_t* sig_len_inout);
 
+/** @brief Verify a signature. */
 dogecoin_bool raccoong_verify(const uint8_t* pk, size_t pk_len,
                               const uint8_t* msg, size_t msg_len,
                               const uint8_t* sig, size_t sig_len);
 
-/*
- * BIP-32 style hierarchical derivation per the Raccoon-G-44 reference
- * (HMAC-SHA512 keyed by the chaincode). Replaces the SHA-256-chain placeholder
- * in src/pqc_raccoon.c.
- */
+/** @brief BIP-32 style hierarchical derivation (HMAC-SHA512 keyed by chaincode). */
 dogecoin_bool raccoong_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len,
                                       const uint8_t* parent_pk, size_t parent_pk_len,
                                       const uint8_t chaincode[32],
@@ -84,14 +75,13 @@ dogecoin_bool raccoong_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk
                                       uint8_t* child_sk_out, size_t child_sk_len,
                                       uint8_t* child_pk_out, size_t child_pk_len);
 
+/** @brief Derive public child key (unhardened only). */
 dogecoin_bool raccoong_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
                                      const uint8_t chaincode[32],
                                      uint32_t index,
                                      uint8_t* child_pk_out, size_t child_pk_len);
 
-/*
- * Reported wire sizes. Return 0 until the parameter set is finalized.
- */
+/** @brief Reported wire sizes. Return 0 until the parameter set is finalized. */
 size_t raccoong_pk_len(void);
 size_t raccoong_sk_len(void);
 size_t raccoong_sig_max_len(void);

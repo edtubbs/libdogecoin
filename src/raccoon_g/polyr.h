@@ -35,8 +35,8 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-/*
- * Z_q polynomial arithmetic for Raccoon-G-44.
+/**
+ * @brief Z_q polynomial arithmetic for Raccoon-G-44.
  *
  * Parameters are pinned to the upstream p-11/lattice-hd-wallets reference,
  * src/raccoon/thrc-py/polyr.py at commit 461a5ed9b6d57e3bf8c381be3bb79325ab21d906.
@@ -48,22 +48,24 @@ LIBDOGECOIN_BEGIN_DECL
  * lands in Session 6.
  */
 
-#define RACCOONG_N     256                    /* ring degree */
-#define RACCOONG_Q     562949953438721ULL     /* 50-bit prime, q = 1 (mod 512) */
-#define RACCOONG_NI    560750930183101ULL     /* n^-1 mod q */
-#define RACCOONG_LOG_Q 50                     /* ceil(log2(q)) */
+#define RACCOONG_N     256                    // ring degree
+#define RACCOONG_Q     562949953438721ULL     // 50-bit prime, q = 1 (mod 512)
+#define RACCOONG_NI    560750930183101ULL     // n^-1 mod q
+#define RACCOONG_LOG_Q 50                     // ceil(log2(q))
 
-/*
+/**
+ * @brief Transparent struct so that callers (and tests) can allocate on the stack.
+ *
  * Transparent struct so that callers (and tests) can allocate on the stack
  * or in arrays of polynomials without paying a heap allocation per coeff
  * vector. polyr_alloc/free are provided for cases where heap is preferred.
  */
 typedef struct polyr {
-    uint64_t coeffs[RACCOONG_N]; /* each in [0, RACCOONG_Q) after normalization */
+    uint64_t coeffs[RACCOONG_N]; // each in [0, RACCOONG_Q) after normalization
 } polyr;
 
-/*
- * Heap helpers.
+/**
+ * @brief Heap helpers.
  *
  * polyr_alloc allocates a zero-initialized polynomial. Returns false on OOM
  * (in which case *out is set to NULL).
@@ -71,19 +73,17 @@ typedef struct polyr {
 dogecoin_bool polyr_alloc(polyr** out);
 void          polyr_free(polyr* p);
 
-/*
- * Initialization / equality.
- */
+/** @brief Initialization / equality. */
 void          polyr_set_zero(polyr* r);
 void          polyr_copy(polyr* r, const polyr* a);
 dogecoin_bool polyr_equal(const polyr* a, const polyr* b);
 
-/*
- * Validate that all coefficients lie in [0, RACCOONG_Q). Returns true if so.
- */
+/** @brief Validate that all coefficients lie in [0, RACCOONG_Q). Returns true if so. */
 dogecoin_bool polyr_is_normalized(const polyr* a);
 
-/*
+/**
+ * @brief Modular arithmetic mirroring upstream polyr.py.
+ *
  * Modular arithmetic mirroring upstream polyr.py:
  *   polyr_add           <-> poly_add
  *   polyr_sub           <-> poly_sub
@@ -104,7 +104,9 @@ dogecoin_bool polyr_scale(polyr* r, uint64_t c, const polyr* a);
 dogecoin_bool polyr_lshift(polyr* r, const polyr* a, unsigned shift);
 dogecoin_bool polyr_rshift(polyr* r, const polyr* a, unsigned shift);
 
-/*
+/**
+ * @brief Center: out[i] = ((a[i] + q/2) mod q) - q/2, signed.
+ *
  * Center: out[i] = ((a[i] + q/2) mod q) - q/2, signed.
  * The output range is [-q/2, q/2). Output array is signed and lives
  * separately from polyr because callers may need raw int64_t access.

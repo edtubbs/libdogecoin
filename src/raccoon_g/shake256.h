@@ -35,8 +35,8 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-/*
- * Minimal FIPS 202 SHAKE256 used by the in-tree Raccoon-G port.
+/**
+ * @brief Minimal FIPS 202 SHAKE256 used by the in-tree Raccoon-G port.
  *
  * Compiled only when USE_RACCOON_G is enabled — libdogecoin's default builds
  * do not need SHAKE / Keccak-f[1600], and we deliberately avoid linking it
@@ -50,24 +50,34 @@ LIBDOGECOIN_BEGIN_DECL
  *   shake256_squeeze(&c, out, out_len);   // may be called repeatedly
  */
 
-#define SHAKE256_RATE_BYTES 136u  /* (1600 - 2*256) / 8 */
-#define SHAKE128_RATE_BYTES 168u  /* (1600 - 2*128) / 8 */
+#define SHAKE256_RATE_BYTES 136u  // (1600 - 2*256) / 8
+#define SHAKE128_RATE_BYTES 168u  // (1600 - 2*128) / 8
 
+/** @brief SHAKE256 context. */
 typedef struct {
-    uint64_t state[25];      /* Keccak state lanes */
-    size_t   buf_pos;        /* bytes absorbed/squeezed into current block */
-    int      finalized;      /* 0 absorbing, 1 squeezing */
+    uint64_t state[25];      // Keccak state lanes
+    size_t   buf_pos;        // bytes absorbed/squeezed into current block
+    int      finalized;      // 0 absorbing, 1 squeezing
 } shake256_ctx;
 
+/** @brief Initialize SHAKE256 context. */
 void shake256_init(shake256_ctx* ctx);
+
+/** @brief Absorb data into SHAKE256 context. */
 void shake256_absorb(shake256_ctx* ctx, const uint8_t* data, size_t len);
+
+/** @brief Finalize absorption phase, prepare for squeezing. */
 void shake256_finalize(shake256_ctx* ctx);
+
+/** @brief Squeeze output from SHAKE256 context. */
 void shake256_squeeze(shake256_ctx* ctx, uint8_t* out, size_t len);
 
-/* One-shot helper: hash `in` to `out_len` bytes. */
+/** @brief One-shot helper: hash `in` to `out_len` bytes. */
 void shake256(uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len);
 
-/*
+/**
+ * @brief SHAKE128 — same Keccak-f[1600] permutation, same 0x1f/0x80 SHAKE pad.
+ *
  * SHAKE128 — same Keccak-f[1600] permutation, same 0x1f/0x80 SHAKE pad,
  * differing only in the absorption/squeeze rate (168 bytes).  Upstream
  * raccoon-g uses SHAKE128 by default for `_xof_sample_q` at kappa=128
@@ -79,10 +89,19 @@ typedef struct {
     int      finalized;
 } shake128_ctx;
 
+/** @brief Initialize SHAKE128 context. */
 void shake128_init(shake128_ctx* ctx);
+
+/** @brief Absorb data into SHAKE128 context. */
 void shake128_absorb(shake128_ctx* ctx, const uint8_t* data, size_t len);
+
+/** @brief Finalize absorption phase, prepare for squeezing. */
 void shake128_finalize(shake128_ctx* ctx);
+
+/** @brief Squeeze output from SHAKE128 context. */
 void shake128_squeeze(shake128_ctx* ctx, uint8_t* out, size_t len);
+
+/** @brief One-shot helper: hash `in` to `out_len` bytes. */
 void shake128(uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len);
 
 LIBDOGECOIN_END_DECL

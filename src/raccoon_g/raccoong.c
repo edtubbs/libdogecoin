@@ -46,23 +46,34 @@
 
 #include "thrc.h"
 
+/**
+ * @brief Check if the Raccoon-G backend is ready.
+ *
+ * Sessions 3-7 (polyr, NTT, gaussian, SHAKE/XOF, expand_a, mul_mat_vec,
+ * keygen, HD-derive, BUFF-mu, hash_vec, chal_poly, sign/verify) have
+ * landed and every committed byte-exact KAT against upstream
+ * `lattice-hd-wallets` passes.  Routing is now live.
+ *
+ * NOTE: the in-tree backend is still marked experimental: it has not
+ * been third-party audited and the upstream protocol may evolve.
+ *
+ * @return True if backend is ready, false otherwise.
+ */
 dogecoin_bool raccoong_is_ready(void)
 {
-    /* Sessions 3-7 (polyr, NTT, gaussian, SHAKE/XOF, expand_a, mul_mat_vec,
-     * keygen, HD-derive, BUFF-mu, hash_vec, chal_poly, sign/verify) have
-     * landed and every committed byte-exact KAT against upstream
-     * `lattice-hd-wallets` passes.  Routing is now live.
-     *
-     * NOTE: the in-tree backend is still marked experimental: it has not
-     * been third-party audited and the upstream protocol may evolve.
-     */
     return true;
 }
 
+/** @brief Return public key length in bytes. */
 size_t raccoong_pk_len(void)      { return RACCOONG_PK_BYTES; }
+
+/** @brief Return secret key length in bytes. */
 size_t raccoong_sk_len(void)      { return RACCOONG_SK_BYTES; }
+
+/** @brief Return maximum signature length in bytes. */
 size_t raccoong_sig_max_len(void) { return RACCOONG_SIG_BYTES; }
 
+/** @brief Generate keypair from 32-byte seed. */
 dogecoin_bool raccoong_keygen_from_seed(const uint8_t seed[32],
                                         uint8_t* pk_out, size_t pk_len,
                                         uint8_t* sk_out, size_t sk_len)
@@ -70,6 +81,7 @@ dogecoin_bool raccoong_keygen_from_seed(const uint8_t seed[32],
     return thrc_keygen_from_seed(seed, pk_out, pk_len, sk_out, sk_len);
 }
 
+/** @brief Sign a message. */
 dogecoin_bool raccoong_sign(const uint8_t* sk, size_t sk_len,
                             const uint8_t* msg, size_t msg_len,
                             uint8_t* sig_out, size_t* sig_len_inout)
@@ -77,6 +89,7 @@ dogecoin_bool raccoong_sign(const uint8_t* sk, size_t sk_len,
     return thrc_sign(sk, sk_len, msg, msg_len, sig_out, sig_len_inout);
 }
 
+/** @brief Verify a signature. */
 dogecoin_bool raccoong_verify(const uint8_t* pk, size_t pk_len,
                               const uint8_t* msg, size_t msg_len,
                               const uint8_t* sig, size_t sig_len)
@@ -84,6 +97,7 @@ dogecoin_bool raccoong_verify(const uint8_t* pk, size_t pk_len,
     return thrc_verify(pk, pk_len, msg, msg_len, sig, sig_len);
 }
 
+/** @brief Derive private child key (hardened or unhardened). */
 dogecoin_bool raccoong_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len,
                                       const uint8_t* parent_pk, size_t parent_pk_len,
                                       const uint8_t chaincode[32],
@@ -97,7 +111,7 @@ dogecoin_bool raccoong_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk
                                child_pk_out, child_pk_len);
 }
 
-dogecoin_bool raccoong_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
+/** @brief Derive public child key (unhardened only). */
                                      const uint8_t chaincode[32],
                                      uint32_t index,
                                      uint8_t* child_pk_out, size_t child_pk_len)

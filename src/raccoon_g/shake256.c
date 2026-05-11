@@ -67,16 +67,18 @@ static const unsigned keccak_rho[25] = {
     18,  2, 61, 56, 14,
 };
 
+/** @brief 64-bit left rotation. */
 static inline uint64_t rotl64(uint64_t x, unsigned n)
 {
     return (x << n) | (x >> ((64u - n) & 63u));
 }
 
+/** @brief Keccak-f[1600] permutation (24 rounds). */
 static void keccak_f1600(uint64_t s[25])
 {
     for (int round = 0; round < 24; ++round) {
         uint64_t C[5], D[5], B[25];
-        /* theta */
+        // theta
         for (int x = 0; x < 5; ++x) {
             C[x] = s[x] ^ s[x + 5] ^ s[x + 10] ^ s[x + 15] ^ s[x + 20];
         }
@@ -86,7 +88,7 @@ static void keccak_f1600(uint64_t s[25])
         for (int i = 0; i < 25; ++i) {
             s[i] ^= D[i % 5];
         }
-        /* rho + pi */
+        // rho + pi
         for (int x = 0; x < 5; ++x) {
             for (int y = 0; y < 5; ++y) {
                 int idx_src = x + 5 * y;
@@ -94,7 +96,7 @@ static void keccak_f1600(uint64_t s[25])
                 B[idx_dst] = rotl64(s[idx_src], keccak_rho[idx_src]);
             }
         }
-        /* chi */
+        // chi
         for (int y = 0; y < 5; ++y) {
             for (int x = 0; x < 5; ++x) {
                 s[x + 5 * y] =
@@ -102,12 +104,12 @@ static void keccak_f1600(uint64_t s[25])
                     ((~B[((x + 1) % 5) + 5 * y]) & B[((x + 2) % 5) + 5 * y]);
             }
         }
-        /* iota */
+        // iota
         s[0] ^= keccak_rc[round];
     }
 }
 
-/* XOR `len` bytes from `data` into the state at byte offset `off`. */
+/** @brief XOR `len` bytes from `data` into the state at byte offset `off`. */
 static void absorb_block(uint64_t state[25], const uint8_t* data,
                          size_t off, size_t len)
 {
@@ -119,6 +121,7 @@ static void absorb_block(uint64_t state[25], const uint8_t* data,
     }
 }
 
+/** @brief Extract `len` bytes from state at byte offset `off` into `out`. */
 static void extract_bytes(const uint64_t state[25], uint8_t* out,
                           size_t off, size_t len)
 {
@@ -130,6 +133,7 @@ static void extract_bytes(const uint64_t state[25], uint8_t* out,
     }
 }
 
+/** @brief Initialize SHAKE256 context. */
 void shake256_init(shake256_ctx* ctx)
 {
     memset(ctx->state, 0, sizeof(ctx->state));
@@ -137,9 +141,10 @@ void shake256_init(shake256_ctx* ctx)
     ctx->finalized = 0;
 }
 
+/** @brief Absorb data into SHAKE256. */
 void shake256_absorb(shake256_ctx* ctx, const uint8_t* data, size_t len)
 {
-    /* Reject misuse: absorbing after finalize is undefined per FIPS 202. */
+    // Reject misuse: absorbing after finalize is undefined per FIPS 202.
     if (ctx->finalized) return;
 
     while (len > 0) {
@@ -156,6 +161,7 @@ void shake256_absorb(shake256_ctx* ctx, const uint8_t* data, size_t len)
     }
 }
 
+/** @brief Finalize absorption phase of SHAKE256. */
 void shake256_finalize(shake256_ctx* ctx)
 {
     if (ctx->finalized) return;
@@ -170,6 +176,7 @@ void shake256_finalize(shake256_ctx* ctx)
     ctx->finalized = 1;
 }
 
+/** @brief Squeeze output from SHAKE256. */
 void shake256_squeeze(shake256_ctx* ctx, uint8_t* out, size_t len)
 {
     if (!ctx->finalized) {
@@ -189,6 +196,7 @@ void shake256_squeeze(shake256_ctx* ctx, uint8_t* out, size_t len)
     }
 }
 
+/** @brief One-shot SHAKE256: hash `in` to `out_len` bytes. */
 void shake256(uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len)
 {
     shake256_ctx ctx;
@@ -198,12 +206,13 @@ void shake256(uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len)
     shake256_squeeze(&ctx, out, out_len);
 }
 
-/* ------------------------------------------------------------------------
+/*
  * SHAKE128: identical structure with rate=168 bytes.  Sharing the same
  * keccak_f1600 / absorb_block / extract_bytes helpers above so changes to
  * the permutation flow through both variants.
- * ------------------------------------------------------------------------ */
+ */
 
+/** @brief Initialize SHAKE128 context. */
 void shake128_init(shake128_ctx* ctx)
 {
     memset(ctx->state, 0, sizeof(ctx->state));
@@ -211,6 +220,7 @@ void shake128_init(shake128_ctx* ctx)
     ctx->finalized = 0;
 }
 
+/** @brief Absorb data into SHAKE128. */
 void shake128_absorb(shake128_ctx* ctx, const uint8_t* data, size_t len)
 {
     if (ctx->finalized) return;
@@ -228,6 +238,7 @@ void shake128_absorb(shake128_ctx* ctx, const uint8_t* data, size_t len)
     }
 }
 
+/** @brief Finalize absorption phase of SHAKE128. */
 void shake128_finalize(shake128_ctx* ctx)
 {
     if (ctx->finalized) return;
@@ -240,6 +251,7 @@ void shake128_finalize(shake128_ctx* ctx)
     ctx->finalized = 1;
 }
 
+/** @brief Squeeze output from SHAKE128. */
 void shake128_squeeze(shake128_ctx* ctx, uint8_t* out, size_t len)
 {
     if (!ctx->finalized) {
@@ -259,7 +271,7 @@ void shake128_squeeze(shake128_ctx* ctx, uint8_t* out, size_t len)
     }
 }
 
-void shake128(uint8_t* out, size_t out_len, const uint8_t* in, size_t in_len)
+/** @brief One-shot SHAKE128: hash `in` to `out_len` bytes. */
 {
     shake128_ctx ctx;
     shake128_init(&ctx);

@@ -37,16 +37,12 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-/*
- * Raccoon-G-44 threshold core dimensions (mirrors upstream `ThRc_Core` defaults
- * for HD-wallet sigs at #sigs 2^60: k = ell = 9).
- */
+// Raccoon-G-44 threshold core dimensions (mirrors upstream `ThRc_Core` defaults
+// for HD-wallet sigs at #sigs 2^60: k = ell = 9).
 #define RACCOONG_K   9u
 #define RACCOONG_ELL 9u
 
-/*
- * Size of `A_seed` (the public-matrix seed, "as_sz" upstream).
- */
+// Size of `A_seed` (the public-matrix seed, "as_sz" upstream).
 #define RACCOONG_A_SEED_BYTES 16u
 
 /*
@@ -90,7 +86,7 @@ void raccoong_serialize_sk(uint8_t sk_out[/*RACCOONG_SK_BYTES*/],
                            const polyr t[RACCOONG_K],
                            const polyr s[RACCOONG_ELL]);
 
-/* Master randomness blob size for signing (kg_sz = 32 B in upstream). */
+// Master randomness blob size for signing (kg_sz = 32 B in upstream).
 #define RACCOONG_KG_SEED_BYTES 32u
 
 dogecoin_bool thrc_sign(const uint8_t* sk, size_t sk_len,
@@ -170,8 +166,8 @@ dogecoin_bool raccoong_expand_a(polyr A[RACCOONG_K][RACCOONG_ELL],
  * return false on null inputs.  Aliasing rules match the underlying
  * `polyr_*` and `ntt_*` calls.
  */
-dogecoin_bool raccoong_vec_ntt(polyr* v, size_t n);    /* in-place forward */
-dogecoin_bool raccoong_vec_intt(polyr* v, size_t n);   /* in-place inverse */
+dogecoin_bool raccoong_vec_ntt(polyr* v, size_t n);    // in-place forward
+dogecoin_bool raccoong_vec_intt(polyr* v, size_t n);   // in-place inverse
 
 dogecoin_bool raccoong_vec_add(polyr* r, const polyr* a, const polyr* b,
                                size_t n);
@@ -206,15 +202,15 @@ dogecoin_bool raccoong_keygen_t_unrounded(const uint8_t key[32],
                                           polyr t_out[RACCOONG_K],
                                           polyr s_out[RACCOONG_ELL]);
 
-/* Upstream `lg_st = 7` ⇒ sigma_t² = 2^14. */
+// Upstream `lg_st = 7` ⇒ sigma_t² = 2^14.
 #define RACCOONG_LG_ST       7u
 #define RACCOONG_LG_SIGMA_T2 14u
 
-/* Upstream `lg_swt = 40` ⇒ sigma_w² = 2^80. */
+// Upstream `lg_swt = 40` ⇒ sigma_w² = 2^80.
 #define RACCOONG_LG_SWT      40u
 #define RACCOONG_LG_SIGMA_W2 80u
 
-/* Upstream `nu_t = 35`; q_t = q >> nu_t. */
+// Upstream `nu_t = 35`; q_t = q >> nu_t.
 #define RACCOONG_NU_T        35u
 
 /*
@@ -235,7 +231,7 @@ dogecoin_bool raccoong_keygen_t_unrounded(const uint8_t key[32],
  * locked to the upstream Python constants via the byte-exact fixture.
  */
 #define RACCOONG_NU_W 38u
-#define RACCOONG_Q_W ((uint64_t)RACCOONG_Q >> RACCOONG_NU_W)   /* 2048 */
+#define RACCOONG_Q_W ((uint64_t)RACCOONG_Q >> RACCOONG_NU_W)   // 2048
 #define RACCOONG_H_COEFF_BYTES 2u
 #define RACCOONG_C_HASH_BYTES 32u
 #define RACCOONG_SIG_BYTES \

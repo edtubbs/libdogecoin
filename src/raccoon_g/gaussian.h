@@ -35,8 +35,8 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-/*
- * Rounded Gaussian sampler for Raccoon-G-44.
+/**
+ * @brief Rounded Gaussian sampler for Raccoon-G-44.
  *
  * Mirrors `sample_rounded` from upstream `thrc_gauss.py` (Marsaglia polar
  * method) at mpmath/MPFR precision = 256 bits.  The math kernel is exposed
@@ -46,7 +46,10 @@ LIBDOGECOIN_BEGIN_DECL
  * from a 32-byte seed lands in Session 6).
  */
 
+/** @brief Initialize the Gaussian sampler. */
 dogecoin_bool gaussian_sampler_init(void);
+
+/** @brief Shut down the Gaussian sampler and free MPFR caches. */
 void          gaussian_sampler_shutdown(void);
 
 /*
@@ -58,10 +61,10 @@ void          gaussian_sampler_shutdown(void);
  */
 #define RACCOONG_GAUSS_LG_SIGMA2_DEFAULT 40u
 
-/*
- * Drive the rounded-Gaussian sampler from a *pre-extracted* XOF byte stream
- * (i.e., the bytes that `SHAKE256(seed).read(xof_len)` would yield in the
- * upstream Python).  Produces `n` samples in `out`, returning false if:
+/**
+ * @brief Drive the rounded-Gaussian sampler from a pre-extracted XOF byte stream.
+ *
+ * Produces `n` samples in `out`, returning false if:
  *   - any pointer is NULL;
  *   - sigma^2 = 2^lg_sigma2 cannot be represented as an MPFR value (always
  *     false in practice for lg_sigma2 in [0, 60]);
@@ -72,6 +75,15 @@ void          gaussian_sampler_shutdown(void);
  * On success, `*xof_consumed_bytes` (if non-NULL) receives the number of
  * stream bytes actually consumed; this lets callers / tests confirm they
  * stayed within the recorded prefix.
+ *
+ * @param[out] out                 Array to receive n samples.
+ * @param[in]  n                   Number of samples (must be even).
+ * @param[in]  lg_sigma2           Log base 2 of sigma squared.
+ * @param[in]  xof_bytes           Pre-extracted XOF byte stream.
+ * @param[in]  xof_len             Length of XOF byte stream.
+ * @param[out] xof_consumed_bytes  Optional pointer to receive bytes consumed.
+ *
+ * @return True on success, false on error or insufficient stream.
  */
 dogecoin_bool gaussian_sample_rounded_from_xof(int64_t* out,
                                                size_t n,
@@ -80,21 +92,37 @@ dogecoin_bool gaussian_sample_rounded_from_xof(int64_t* out,
                                                size_t xof_len,
                                                size_t* xof_consumed_bytes);
 
-/*
- * Public seed-driven entry point.  Returns false until Session 6 wires the
- * SHAKE256 byte source.  Kept here so the downstream `thrc.c` call sites
- * (Session 6 and 7) can be written against the final shape today.
+/**
+ * @brief Public seed-driven entry point at default sigma.
+ *
+ * Returns false until Session 6 wires the SHAKE256 byte source.  Kept here so
+ * the downstream `thrc.c` call sites (Session 6 and 7) can be written against
+ * the final shape today.
+ *
+ * @param[out] out  Array to receive n samples.
+ * @param[in]  n    Number of samples (must be even).
+ * @param[in]  seed 32-byte seed.
+ *
+ * @return True on success, false on error.
  */
 dogecoin_bool gaussian_sample(int64_t* out, size_t n, const uint8_t seed[32]);
 
-/*
- * Generalized seed-driven entry point.  Accepts an arbitrary-length `seed`
- * (the upstream `sample_rounded(sig2, seed, n)` opens SHAKE256 on whatever
- * bytes it is given) and an explicit `lg_sigma2` so callers can hit the
- * sigma_t² = 2^14 and sigma_w² = 2^80 settings used by Raccoon-G keygen and
- * sign.  Pre-extracts 8 KiB from SHAKE256(seed) — sufficient for n=256 at
- * the canonical ~21.5% rejection rate (≈ 7.27 bytes/sample); returns false
+/**
+ * @brief Generalized seed-driven entry point with explicit sigma.
+ *
+ * Accepts an arbitrary-length `seed` (the upstream `sample_rounded(sig2, seed, n)` opens SHAKE256
+ * on whatever bytes it is given) and an explicit `lg_sigma2` so callers can hit the sigma_t² = 2^14
+ * and sigma_w² = 2^80 settings used by Raccoon-G keygen and sign.  Pre-extracts 8 KiB from SHAKE256(seed)
+ * — sufficient for n=256 at the canonical ~21.5% rejection rate (≈ 7.27 bytes/sample); returns false
  * if the kernel exhausts that prefix before n samples are produced.
+ *
+ * @param[out] out        Array to receive n samples.
+ * @param[in]  n          Number of samples (must be even).
+ * @param[in]  lg_sigma2  Log base 2 of sigma squared.
+ * @param[in]  seed       Arbitrary-length seed bytes.
+ * @param[in]  seed_len   Length of seed.
+ *
+ * @return True on success, false on error.
  */
 dogecoin_bool gaussian_sample_seed(int64_t* out, size_t n,
                                    uint32_t lg_sigma2,
