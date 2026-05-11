@@ -502,7 +502,9 @@ static dogecoin_bool keygen_t_unrounded_inner(const uint8_t key[32],
     if (!raccoong_vec_ntt(s_ntt, RACCOONG_ELL)) goto cleanup_with_sntt;
 
     static polyr t_ntt[RACCOONG_K];
-    if (!raccoong_mul_mat_vec_ntt(t_ntt, A, s_ntt)) goto cleanup_with_sntt;
+    if (!raccoong_mul_mat_vec_ntt(t_ntt,
+                                  (const polyr (*)[RACCOONG_ELL])A,
+                                  s_ntt)) goto cleanup_with_sntt;
 
     if (!raccoong_vec_intt(t_ntt, RACCOONG_K)) goto cleanup_with_sntt;
 
@@ -1052,7 +1054,9 @@ static dogecoin_bool thrc_sign_internal(uint8_t c_hash_out[RACCOONG_C_HASH_BYTES
     if (!raccoong_vec_ntt(r_ntt, RACCOONG_ELL)) goto cleanup;
 
     static polyr w_vec[RACCOONG_K];
-    if (!raccoong_mul_mat_vec_ntt(w_vec, A_ntt, r_ntt)) goto cleanup;
+    if (!raccoong_mul_mat_vec_ntt(w_vec,
+                                  (const polyr (*)[RACCOONG_ELL])A_ntt,
+                                  r_ntt)) goto cleanup;
     if (!raccoong_vec_intt(w_vec, RACCOONG_K)) goto cleanup;
     if (!raccoong_vec_add(w_vec, w_vec, e2_vec, RACCOONG_K)) goto cleanup;
 
@@ -1061,7 +1065,7 @@ static dogecoin_bool thrc_sign_internal(uint8_t c_hash_out[RACCOONG_C_HASH_BYTES
 
     // --- 3. c_hash = H(mu, w_qw);  c = chal_poly(c_hash);  c_ntt = NTT(c).
     static uint64_t hash_flat[RACCOONG_K * RACCOONG_N];
-    qw_vec_to_u64(hash_flat, w_qw);
+    qw_vec_to_u64(hash_flat, (const uint16_t (*)[RACCOONG_N])w_qw);
     if (!raccoong_hash_vec(c_hash_out, 'H', mu, RACCOONG_C_HASH_BYTES,
                            hash_flat, (size_t)RACCOONG_K * RACCOONG_N)) {
         goto cleanup;
@@ -1111,7 +1115,9 @@ static dogecoin_bool thrc_sign_internal(uint8_t c_hash_out[RACCOONG_C_HASH_BYTES
 
     // --- 5. y = [A * z_ntt - 2^nu_t · c_ntt · NTT(t)]_nu_w.
     static polyr y_vec[RACCOONG_K];
-    if (!raccoong_mul_mat_vec_ntt(y_vec, A_ntt, z_ntt)) {
+    if (!raccoong_mul_mat_vec_ntt(y_vec,
+                                  (const polyr (*)[RACCOONG_ELL])A_ntt,
+                                  z_ntt)) {
         dogecoin_mem_zero(c, sizeof(c));
         dogecoin_mem_zero(&c_ntt, sizeof(c_ntt));
         goto cleanup;
@@ -1225,7 +1231,9 @@ static dogecoin_bool thrc_verify_internal(const uint8_t A_seed[RACCOONG_A_SEED_B
     if (!raccoong_vec_ntt(z_ntt, RACCOONG_ELL)) return false;
 
     static polyr w_vec[RACCOONG_K];
-    if (!raccoong_mul_mat_vec_ntt(w_vec, A_ntt, z_ntt)) return false;
+    if (!raccoong_mul_mat_vec_ntt(w_vec,
+                                  (const polyr (*)[RACCOONG_ELL])A_ntt,
+                                  z_ntt)) return false;
     static polyr t_shift[RACCOONG_K];
     // HD-wallet variant: round t to nu_t first, then shift back.
     for (unsigned i = 0; i < RACCOONG_K; ++i) {
@@ -1256,7 +1264,7 @@ static dogecoin_bool thrc_verify_internal(const uint8_t A_seed[RACCOONG_A_SEED_B
     }
 
     static uint64_t hash_flat[RACCOONG_K * RACCOONG_N];
-    qw_vec_to_u64(hash_flat, w_qw);
+    qw_vec_to_u64(hash_flat, (const uint16_t (*)[RACCOONG_N])w_qw);
     uint8_t c_hash2[RACCOONG_C_HASH_BYTES];
     if (!raccoong_hash_vec(c_hash2, 'H', mu, RACCOONG_C_HASH_BYTES,
                            hash_flat, (size_t)RACCOONG_K * RACCOONG_N)) {
@@ -1265,7 +1273,7 @@ static dogecoin_bool thrc_verify_internal(const uint8_t A_seed[RACCOONG_A_SEED_B
 
     // --- 3. accept iff c_hash matches and the norm bound holds.
     if (memcmp(c_hash, c_hash2, RACCOONG_C_HASH_BYTES) != 0) return false;
-    return check_bounds(z, h_unsigned);
+    return check_bounds(z, (const uint16_t (*)[RACCOONG_N])h_unsigned);
 }
 
 /**
@@ -1317,7 +1325,8 @@ dogecoin_bool thrc_sign_with_random(const uint8_t* sk, size_t sk_len,
 
     size_t out_len = *sig_len_inout;
     if (!raccoong_serialize_signature(sig_out, &out_len,
-                                      c_hash, z_vec, h_signed)) {
+                                      c_hash, z_vec,
+                                      (const int16_t (*)[256])h_signed)) {
         goto out;
     }
     *sig_len_inout = out_len;
@@ -1401,7 +1410,8 @@ dogecoin_bool thrc_verify(const uint8_t* pk, size_t pk_len,
     uint8_t mu[RACCOONG_C_HASH_BYTES];
     if (!raccoong_buff_mu(mu, tr, msg, msg_len)) return false;
 
-    return thrc_verify_internal(A_seed, t_vec, c_hash, z_vec, h_signed, mu);
+    return thrc_verify_internal(A_seed, t_vec, c_hash, z_vec,
+                                (const int16_t (*)[RACCOONG_N])h_signed, mu);
 }
 
 /**

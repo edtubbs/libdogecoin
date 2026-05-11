@@ -47,13 +47,18 @@
 #include "src/raccoon_g/thrc.h"
 #include "test/data/raccoong_signature_serialize_vectors.h"
 
-/* Compile-time agreement between the public C macro and the fixture. */
-_Static_assert(RACCOONG_SIG_BYTES == RACCOONG_SIG_FIXTURE_BYTES,
-               "RACCOONG_SIG_BYTES must match upstream fixture");
-_Static_assert(RACCOONG_ELL == RACCOONG_SIG_FIXTURE_ELL,
-               "RACCOONG_ELL must match upstream fixture");
-_Static_assert(RACCOONG_K == RACCOONG_SIG_FIXTURE_K,
-               "RACCOONG_K must match upstream fixture");
+/* Compile-time agreement between the public C macro and the fixture.
+ *
+ * `_Static_assert` is C11 only and trips `-pedantic` under `-std=gnu99`;
+ * use a typedef trick that is portable down to C89 and accepted by
+ * `-pedantic`.  An invalid array size silences when the predicate holds. */
+#define RACCOONG_SIG_STATIC_ASSERT2(cond, line) \
+    typedef char raccoong_sig_static_assert_##line[(cond) ? 1 : -1]
+#define RACCOONG_SIG_STATIC_ASSERT1(cond, line) RACCOONG_SIG_STATIC_ASSERT2(cond, line)
+#define RACCOONG_SIG_STATIC_ASSERT(cond) RACCOONG_SIG_STATIC_ASSERT1(cond, __LINE__)
+RACCOONG_SIG_STATIC_ASSERT(RACCOONG_SIG_BYTES == RACCOONG_SIG_FIXTURE_BYTES);
+RACCOONG_SIG_STATIC_ASSERT(RACCOONG_ELL == RACCOONG_SIG_FIXTURE_ELL);
+RACCOONG_SIG_STATIC_ASSERT(RACCOONG_K == RACCOONG_SIG_FIXTURE_K);
 
 static void load_fixture(uint8_t c_hash[RACCOONG_C_HASH_BYTES],
                          polyr z[RACCOONG_ELL],
@@ -84,7 +89,8 @@ void test_raccoong_signature_serialize()
     uint8_t out[RACCOONG_SIG_BYTES];
     size_t out_len = sizeof(out);
     u_assert_int_eq(raccoong_serialize_signature(
-                        out, &out_len, c_hash, z, h_signed),
+                        out, &out_len, c_hash, z,
+                        (const int16_t (*)[256])h_signed),
                     1);
     u_assert_int_eq((int)out_len, (int)RACCOONG_SIG_BYTES);
     u_assert_int_eq(memcmp(out, kRaccoongSigFixtureSerialized,
@@ -155,15 +161,19 @@ void test_raccoong_signature_serialize()
     /* (4) null-arg guards. */
     out_len = sizeof(out);
     u_assert_int_eq(raccoong_serialize_signature(
-                        NULL, &out_len, c_hash, z, h_signed), 0);
+                        NULL, &out_len, c_hash, z,
+                        (const int16_t (*)[256])h_signed), 0);
     u_assert_int_eq(raccoong_serialize_signature(
-                        out, NULL, c_hash, z, h_signed), 0);
+                        out, NULL, c_hash, z,
+                        (const int16_t (*)[256])h_signed), 0);
     u_assert_int_eq(raccoong_serialize_signature(
-                        out, &out_len, NULL, z, h_signed), 0);
+                        out, &out_len, NULL, z,
+                        (const int16_t (*)[256])h_signed), 0);
     /* Insufficient buffer. */
     out_len = RACCOONG_SIG_BYTES - 1;
     u_assert_int_eq(raccoong_serialize_signature(
-                        out, &out_len, c_hash, z, h_signed), 0);
+                        out, &out_len, c_hash, z,
+                        (const int16_t (*)[256])h_signed), 0);
 
     u_assert_int_eq(raccoong_deserialize_signature(
                         NULL, z3, h3, kRaccoongSigFixtureSerialized,

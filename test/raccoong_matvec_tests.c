@@ -98,7 +98,9 @@ void test_raccoong_matvec(void)
 
     /* --- Full matrix-vector gate. --- */
     static polyr t[RACCOONG_K];
-    u_assert_true(raccoong_mul_mat_vec_ntt(t, A, v));
+    u_assert_true(raccoong_mul_mat_vec_ntt(t,
+                                           (const polyr (*)[RACCOONG_ELL])A,
+                                           v));
 
     int mismatch_row = -1, mismatch_col = -1;
     for (unsigned i = 0; i < RACCOONG_K && mismatch_row < 0; ++i) {
@@ -127,9 +129,13 @@ void test_raccoong_matvec(void)
     /* Defensive paths. */
     u_assert_int_eq((int)raccoong_expand_a(NULL, raccoong_matvec_A_seed), 0);
     u_assert_int_eq((int)raccoong_expand_a(A, NULL), 0);
-    u_assert_int_eq((int)raccoong_mul_mat_vec_ntt(NULL, A, v), 0);
+    u_assert_int_eq((int)raccoong_mul_mat_vec_ntt(NULL,
+                                                  (const polyr (*)[RACCOONG_ELL])A,
+                                                  v), 0);
     u_assert_int_eq((int)raccoong_mul_mat_vec_ntt(t, NULL, v), 0);
-    u_assert_int_eq((int)raccoong_mul_mat_vec_ntt(t, A, NULL), 0);
+    u_assert_int_eq((int)raccoong_mul_mat_vec_ntt(t,
+                                                  (const polyr (*)[RACCOONG_ELL])A,
+                                                  NULL), 0);
 
     /* `vec_add` and `vec_rshift` smoke: t' = (t + t) right-shifted by 1
      * must equal t (mod q) since (2t + 1) >> 1 = t when low bit of t is 1

@@ -47,10 +47,13 @@
 #include "src/raccoon_g/thrc.h"
 #include "test/data/raccoong_chal_poly_vectors.h"
 
-_Static_assert(RACCOONG_TAU == RACCOONG_CHAL_POLY_FIXTURE_TAU,
-               "RACCOONG_TAU must match upstream fixture");
-_Static_assert(256 == RACCOONG_CHAL_POLY_FIXTURE_N,
-               "polynomial length must match upstream n=256");
+/* `_Static_assert` is C11 only; use a -pedantic-friendly typedef trick. */
+#define RACCOONG_CHAL_STATIC_ASSERT2(cond, line) \
+    typedef char raccoong_chal_static_assert_##line[(cond) ? 1 : -1]
+#define RACCOONG_CHAL_STATIC_ASSERT1(cond, line) RACCOONG_CHAL_STATIC_ASSERT2(cond, line)
+#define RACCOONG_CHAL_STATIC_ASSERT(cond) RACCOONG_CHAL_STATIC_ASSERT1(cond, __LINE__)
+RACCOONG_CHAL_STATIC_ASSERT(RACCOONG_TAU == RACCOONG_CHAL_POLY_FIXTURE_TAU);
+RACCOONG_CHAL_STATIC_ASSERT(256 == RACCOONG_CHAL_POLY_FIXTURE_N);
 
 void test_raccoong_chal_poly()
 {

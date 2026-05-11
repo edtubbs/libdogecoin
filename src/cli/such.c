@@ -769,6 +769,7 @@ static dogecoin_bool such_hex_payload_chunks(const char* payload_hex, size_t max
 }
 
 #if defined(USE_LIBOQS) || defined(USE_RACCOON_G)
+static dogecoin_bool such_tag4_hex_to_tag8(const char* tag4_hex, char out_tag8[8]) __attribute__((unused));
 static dogecoin_bool such_tag4_hex_to_tag8(const char* tag4_hex, char out_tag8[8])
 {
     if (!tag4_hex || !out_tag8 || strlen(tag4_hex) != 8) {
