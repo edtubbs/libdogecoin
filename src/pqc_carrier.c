@@ -414,6 +414,10 @@ dogecoin_bool dogecoin_tx_add_pqc_carrier_outputs(
         out->value = value;
         if (out->script_pubkey) cstr_free(out->script_pubkey, true);
         out->script_pubkey = cstr_new_buf((const uint8_t*)carrier_spk->str, carrier_spk->len);
+        if (!out->script_pubkey) {
+            dogecoin_tx_out_free(out);
+            return false;
+        }
         vector_add(tx->vout, out);
     }
     return true;
@@ -673,11 +677,25 @@ dogecoin_bool dogecoin_pqc_carrier_verify_reveal(
     for (size_t vi = 0; vi < txc->vin->len; vi++) {
         dogecoin_tx_in* orig = vector_idx(txc->vin, vi);
         dogecoin_tx_in* copy = dogecoin_tx_in_new();
+        if (!copy) {
+            dogecoin_tx_free(tx_base);
+            dogecoin_tx_free(txc);
+            return false;
+        }
         memcpy(copy->prevout.hash, orig->prevout.hash, sizeof(copy->prevout.hash));
         copy->prevout.n = orig->prevout.n;
         copy->sequence = orig->sequence;
         if (orig->script_sig && orig->script_sig->len > 0) {
+            /* Free the default empty cstring that dogecoin_tx_in_new()
+               allocates before overwriting, then propagate OOM on failure. */
+            if (copy->script_sig) cstr_free(copy->script_sig, true);
             copy->script_sig = cstr_new_buf(orig->script_sig->str, orig->script_sig->len);
+            if (!copy->script_sig) {
+                dogecoin_tx_in_free(copy);
+                dogecoin_tx_free(tx_base);
+                dogecoin_tx_free(txc);
+                return false;
+            }
         }
         vector_add(tx_base->vin, copy);
     }
@@ -697,9 +715,21 @@ dogecoin_bool dogecoin_pqc_carrier_verify_reveal(
             continue;
         }
         dogecoin_tx_out* copy = dogecoin_tx_out_new();
+        if (!copy) {
+            dogecoin_tx_free(tx_base);
+            dogecoin_tx_free(txc);
+            return false;
+        }
         copy->value = orig->value;
         if (orig->script_pubkey && orig->script_pubkey->len > 0) {
+            if (copy->script_pubkey) cstr_free(copy->script_pubkey, true);
             copy->script_pubkey = cstr_new_buf(orig->script_pubkey->str, orig->script_pubkey->len);
+            if (!copy->script_pubkey) {
+                dogecoin_tx_out_free(copy);
+                dogecoin_tx_free(tx_base);
+                dogecoin_tx_free(txc);
+                return false;
+            }
         }
         vector_add(tx_base->vout, copy);
     }
@@ -738,27 +768,31 @@ dogecoin_bool dogecoin_pqc_carrier_verify_reveal(
                         rmd160(sha_out, 32, h160);
                         /* Build P2PKH scriptPubKey */
                         cstring* spk = cstr_new_sz(25);
-                        uint8_t p2pkh_prefix[] = {0x76, 0xa9, 0x14};
-                        uint8_t p2pkh_suffix[] = {0x88, 0xac};
-                        cstr_append_buf(spk, p2pkh_prefix, 3);
-                        cstr_append_buf(spk, h160, 20);
-                        cstr_append_buf(spk, p2pkh_suffix, 2);
+                        if (spk) {
+                            uint8_t p2pkh_prefix[] = {0x76, 0xa9, 0x14};
+                            uint8_t p2pkh_suffix[] = {0x88, 0xac};
+                            cstr_append_buf(spk, p2pkh_prefix, 3);
+                            cstr_append_buf(spk, h160, 20);
+                            cstr_append_buf(spk, p2pkh_suffix, 2);
 
-                        uint8_t sighash[32];
-                        if (dogecoin_tx_sighash32(tx_base, spk, 0, SIGHASH_ALL, sighash)) {
-                            if (out_sighash) memcpy(out_sighash, sighash, 32);
+                            uint8_t sighash[32];
+                            if (dogecoin_tx_sighash32(tx_base, spk, 0, SIGHASH_ALL, sighash)) {
+                                if (out_sighash) memcpy(out_sighash, sighash, 32);
 #ifdef USE_LIBOQS
-                            if (algo == DOGECOIN_PQC_ALGO_FALCON)
-                                verified = dogecoin_falcon512_verify(pk, pk_len, sighash, 32, sig, sig_len);
-                            else if (algo == DOGECOIN_PQC_ALGO_DILITHIUM)
-                                verified = dogecoin_dilithium2_verify(pk, pk_len, sighash, 32, sig, sig_len);
+                                if (algo == DOGECOIN_PQC_ALGO_FALCON)
+                                    verified = dogecoin_falcon512_verify(pk, pk_len, sighash, 32, sig, sig_len);
+                                else if (algo == DOGECOIN_PQC_ALGO_DILITHIUM)
+                                    verified = dogecoin_dilithium2_verify(pk, pk_len, sighash, 32, sig, sig_len);
 #endif
 #ifdef USE_RACCOON_G
-                            if (algo == DOGECOIN_PQC_ALGO_RACCOONG)
-                                verified = dogecoin_raccoong44_verify(pk, pk_len, sighash, 32, sig, sig_len);
+                                if (algo == DOGECOIN_PQC_ALGO_RACCOONG)
+                                    verified = dogecoin_raccoong44_verify(pk, pk_len, sighash, 32, sig, sig_len);
 #endif
+                            }
+                            cstr_free(spk, true);
                         }
-                        cstr_free(spk, true);
+                        /* If spk allocation failed, verified remains false — safer
+                           than dereferencing a NULL cstring in cstr_append_buf. */
                     }
                 }
             }

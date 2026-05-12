@@ -693,6 +693,24 @@ void test_transaction()
     u_assert_true(child_pk_len == child_pubonly_len);
     u_assert_true(memcmp(child_pk, child_pubonly, child_pk_len) == 0);
 
+    /* Sign with the derived child secret key and verify against the derived
+       child public key. This is a critical regression test for the additive
+       lattice HD scheme: derive_priv and derive_pub agreeing on pk_bytes is
+       NOT sufficient — the matching (sk, pk) pair must also produce a sig
+       that verifies. The previous (now-removed) implementation passed the
+       pk-equality check while silently producing non-matching keys. */
+    uint8_t *child_sig = NULL;
+    size_t child_sig_len = 0;
+    u_assert_true(dogecoin_raccoong44_sign(child_sk, child_sk_len, msg, sizeof msg, &child_sig, &child_sig_len));
+    u_assert_true(dogecoin_raccoong44_verify(child_pk, child_pk_len, msg, sizeof msg, child_sig, child_sig_len));
+
+    /* Key-isolation: signing with the PARENT secret must NOT verify against
+       the CHILD public key, otherwise the derivation collapses domains. */
+    uint8_t *parent_sig = NULL;
+    size_t parent_sig_len = 0;
+    u_assert_true(dogecoin_raccoong44_sign(rsk, rsk_len, msg, sizeof msg, &parent_sig, &parent_sig_len));
+    u_assert_true(dogecoin_raccoong44_verify(child_pk, child_pk_len, msg, sizeof msg, parent_sig, parent_sig_len) == false);
+
     dogecoin_tx_free(rtxc);
     dogecoin_free(rpk);
     dogecoin_free(rsk);
@@ -700,6 +718,8 @@ void test_transaction()
     dogecoin_free(child_sk);
     dogecoin_free(child_pk);
     dogecoin_free(child_pubonly);
+    dogecoin_free(child_sig);
+    dogecoin_free(parent_sig);
 #endif /* USE_RACCOON_G */
 
     cstring* carrier_redeem = NULL;

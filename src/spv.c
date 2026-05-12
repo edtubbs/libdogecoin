@@ -191,8 +191,10 @@ static const unsigned int BLOCKS_DELTA_IN_S = 60;
 static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 
 #if defined(USE_LIBOQS) || defined(USE_RACCOON_G)
-/* Maximum number of pending PQC OP_RETURN commitments buffered per block
-   for cross-TX carrier validation (TX_C has OP_RETURN, TX_R has scriptSig). */
+/* Maximum number of pending PQC OP_RETURN commitments buffered per client
+   for cross-TX carrier validation (TX_C has OP_RETURN, TX_R has scriptSig).
+   Cap enforced via LRU eviction in spv_pqc_add_pending so a peer flooding
+   cheap OP_RETURN commits cannot balloon SPV node memory. */
 #define SPV_PQC_PENDING_MAX 16
 
 typedef struct spv_pqc_pending_commit {
@@ -205,39 +207,59 @@ typedef struct spv_pqc_pending_commit {
     UT_hash_handle hh;            /* makes this structure hashable */
 } spv_pqc_pending_commit_t;
 
-/* Hash table for pending OP_RETURN commitments awaiting carrier TX_R match.
-   TX_C (commitment) may be in one block and TX_R (reveal) in a later block.
-   Key: 32-byte commit hash, provides O(1) lookup when TX_R arrives. */
-static spv_pqc_pending_commit_t* g_pending_commits = NULL;
+/* Per-client pending-commit table accessor. Stored as an opaque void* in
+   dogecoin_spv_client so the header does not need to expose uthash types.
+   uthash tracks insertion order in its hh.next/hh.prev chain, which gives
+   us O(1) LRU eviction of the oldest entry without an extra linked list. */
+static inline spv_pqc_pending_commit_t* spv_pqc_table(const dogecoin_spv_client* client) {
+    return client ? (spv_pqc_pending_commit_t*)client->pqc_pending_commits : NULL;
+}
 
-/* Helper: find pending commit by commit hash */
-static spv_pqc_pending_commit_t* spv_pqc_find_pending(const uint8_t* commit) {
+/* Helper: find pending commit by commit hash within this client's table. */
+static spv_pqc_pending_commit_t* spv_pqc_find_pending(dogecoin_spv_client* client, const uint8_t* commit) {
+    spv_pqc_pending_commit_t* head = spv_pqc_table(client);
     spv_pqc_pending_commit_t* found = NULL;
-    HASH_FIND(hh, g_pending_commits, commit, 32, found);
+    if (!head || !commit) return NULL;
+    HASH_FIND(hh, head, commit, 32, found);
     return found;
 }
 
-/* Helper: add pending commit to hash table */
-static void spv_pqc_add_pending(spv_pqc_pending_commit_t* entry) {
-    /* Check for duplicate before adding */
-    spv_pqc_pending_commit_t* existing = spv_pqc_find_pending(entry->commit);
+/* Helper: add pending commit to this client's hash table. De-duplicates by
+   commit hash and enforces SPV_PQC_PENDING_MAX via LRU eviction of the
+   oldest insertion (uthash's iteration order is insertion order). */
+static void spv_pqc_add_pending(dogecoin_spv_client* client, spv_pqc_pending_commit_t* entry) {
+    if (!client || !entry) return;
+    spv_pqc_pending_commit_t* head = spv_pqc_table(client);
+    /* Replace existing entry with the same commit hash to avoid stale state. */
+    spv_pqc_pending_commit_t* existing = NULL;
+    if (head) HASH_FIND(hh, head, entry->commit, 32, existing);
     if (existing) {
-        /* Replace existing entry */
-        HASH_DEL(g_pending_commits, existing);
+        HASH_DEL(head, existing);
         if (existing->txc_raw) dogecoin_free(existing->txc_raw);
         dogecoin_free(existing);
     }
-    HASH_ADD(hh, g_pending_commits, commit, 32, entry);
+    /* Enforce cap: evict oldest entries until there is room for the new one. */
+    while (head && HASH_COUNT(head) >= SPV_PQC_PENDING_MAX) {
+        spv_pqc_pending_commit_t* oldest = head; /* uthash head == first inserted still alive */
+        HASH_DEL(head, oldest);
+        if (oldest->txc_raw) dogecoin_free(oldest->txc_raw);
+        dogecoin_free(oldest);
+    }
+    HASH_ADD(hh, head, commit, 32, entry);
+    client->pqc_pending_commits = head;
 }
 
-/* Helper: remove and free pending commit */
+/* Helper: remove and free pending commit from this client's table. */
 #if defined(__GNUC__) || defined(__clang__)
-static void spv_pqc_remove_pending(spv_pqc_pending_commit_t* entry) __attribute__((unused));
+static void spv_pqc_remove_pending(dogecoin_spv_client* client, spv_pqc_pending_commit_t* entry) __attribute__((unused));
 #endif
-static void spv_pqc_remove_pending(spv_pqc_pending_commit_t* entry) {
-    HASH_DEL(g_pending_commits, entry);
+static void spv_pqc_remove_pending(dogecoin_spv_client* client, spv_pqc_pending_commit_t* entry) {
+    if (!client || !entry) return;
+    spv_pqc_pending_commit_t* head = spv_pqc_table(client);
+    HASH_DEL(head, entry);
     if (entry->txc_raw) dogecoin_free(entry->txc_raw);
     dogecoin_free(entry);
+    client->pqc_pending_commits = head;
 }
 
 #endif /* USE_LIBOQS || USE_RACCOON_G (pqc pending) */
@@ -349,7 +371,8 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     }
 #endif
 
-    if (params == &dogecoin_chainparams_main || params == &dogecoin_chainparams_test) {
+    if (params && (strcmp(params->chainname, "main") == 0 ||
+                   strcmp(params->chainname, "testnet3") == 0)) {
         client->use_checkpoints = use_checkpoints;
     }
     client->headers_db = &dogecoin_headers_db_interface_file;
@@ -505,14 +528,20 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
         client->nodegroup = NULL;
     }
 
-#ifdef USE_LIBOQS
-    /* Release any pending PQC carrier commits that were never matched by a TX_R */
+#if defined(USE_LIBOQS) || defined(USE_RACCOON_G)
+    /* Release any pending PQC carrier commits that were never matched by a TX_R.
+       Only the table owned by this client is freed — other live clients keep
+       their own per-client tables intact. */
     {
+        spv_pqc_pending_commit_t* head = spv_pqc_table(client);
         spv_pqc_pending_commit_t* entry;
         spv_pqc_pending_commit_t* tmp;
-        HASH_ITER(hh, g_pending_commits, entry, tmp) {
-            spv_pqc_remove_pending(entry);
+        HASH_ITER(hh, head, entry, tmp) {
+            HASH_DEL(head, entry);
+            if (entry->txc_raw) dogecoin_free(entry->txc_raw);
+            dogecoin_free(entry);
         }
+        client->pqc_pending_commits = NULL;
     }
 #endif
 
@@ -630,10 +659,11 @@ void dogecoin_net_spv_fill_block_locator(dogecoin_spv_client *client, vector_t *
     int64_t min_timestamp = client->oldest_item_of_interest - BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S; /* ensure we going back ~300 blocks */
     if (client->headers_db->getchaintip(client->headers_db_ctx)->height == 0) {
         if (client->use_checkpoints && client->oldest_item_of_interest > BLOCK_GAP_TO_DEDUCT_TO_START_SCAN_FROM * BLOCKS_DELTA_IN_S) {
-            const dogecoin_checkpoint *checkpoint = (client->chainparams == &dogecoin_chainparams_main) ? dogecoin_mainnet_checkpoint_array : dogecoin_testnet_checkpoint_array;
+            dogecoin_bool is_main = (client->chainparams && strcmp(client->chainparams->chainname, "main") == 0);
+            const dogecoin_checkpoint *checkpoint = is_main ? dogecoin_mainnet_checkpoint_array : dogecoin_testnet_checkpoint_array;
             size_t mainnet_checkpoint_size = sizeof(dogecoin_mainnet_checkpoint_array) / sizeof(dogecoin_mainnet_checkpoint_array[0]);
             size_t testnet_checkpoint_size = sizeof(dogecoin_testnet_checkpoint_array) / sizeof(dogecoin_testnet_checkpoint_array[0]);
-            size_t length = (client->chainparams == &dogecoin_chainparams_main) ? mainnet_checkpoint_size : testnet_checkpoint_size;
+            size_t length = is_main ? mainnet_checkpoint_size : testnet_checkpoint_size;
             int i;
             for (i = (int)length - 1; i >= 0; i--) {
                 if (checkpoint[i].timestamp < min_timestamp) {
@@ -999,7 +1029,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             memcpy(entry->txc_raw, tx_raw, consumedlength);
                             entry->txc_raw_len = consumedlength;
                         }
-                        spv_pqc_add_pending(entry);
+                        spv_pqc_add_pending(client, entry);
                     }
                 }
                 /* Dilithium2: buffer for cross-TX carrier match (TX_C → pending, TX_R validates via multi-part carrier) */
@@ -1020,7 +1050,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             memcpy(entry->txc_raw, tx_raw, consumedlength);
                             entry->txc_raw_len = consumedlength;
                         }
-                        spv_pqc_add_pending(entry);
+                        spv_pqc_add_pending(client, entry);
                     }
                 }
                 /* Raccoon-G-44: buffer for cross-TX carrier match (TX_C → pending, TX_R validates via multi-part carrier) */
@@ -1043,7 +1073,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             memcpy(entry->txc_raw, tx_raw, consumedlength);
                             entry->txc_raw_len = consumedlength;
                         }
-                        spv_pqc_add_pending(entry);
+                        spv_pqc_add_pending(client, entry);
                     }
                 }
 #endif
@@ -1097,7 +1127,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             utils_bin_to_hex((unsigned char*)carrier_sig, sig_prefix_len, sig_prefix_hex);
 
                             /* Cross-validate: O(1) hash table lookup for matching OP_RETURN commitment */
-                            spv_pqc_pending_commit_t* matched_entry = spv_pqc_find_pending(computed_commit);
+                            spv_pqc_pending_commit_t* matched_entry = spv_pqc_find_pending(client, computed_commit);
                             dogecoin_bool matched = (matched_entry != NULL && matched_entry->algo == carrier_algo);
                             uint32_t matched_txpos = 0;
                             uint8_t* matched_txc_raw = NULL;
@@ -1108,7 +1138,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                 matched_txc_raw_len = matched_entry->txc_raw_len;
                                 /* Remove from hash table but don't free txc_raw yet (used below) */
                                 matched_entry->txc_raw = NULL;
-                                HASH_DEL(g_pending_commits, matched_entry);
+                                {
+                                    spv_pqc_pending_commit_t* head = spv_pqc_table(client);
+                                    HASH_DEL(head, matched_entry);
+                                    client->pqc_pending_commits = head;
+                                }
                                 dogecoin_free(matched_entry);
                             }
 

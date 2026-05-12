@@ -112,6 +112,13 @@ dogecoin_bool thrc_verify(const uint8_t* pk, size_t pk_len,
                           const uint8_t* msg, size_t msg_len,
                           const uint8_t* sig, size_t sig_len);
 
+/*
+ * Thread safety note for the HD derivation routines below: each call uses
+ * only heap-allocated, per-call scratch for secret-key polynomials. Two
+ * concurrent invocations on different (parent_sk, parent_pk) pairs are
+ * race-free with respect to each other. Callers must still serialize
+ * concurrent calls that share an output buffer.
+ */
 dogecoin_bool thrc_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len,
                                   const uint8_t* parent_pk, size_t parent_pk_len,
                                   const uint8_t chaincode[32],

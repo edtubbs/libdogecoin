@@ -615,6 +615,8 @@ void main_menu() {
 static struct option long_options[] =
     {
         {"privkey", required_argument, NULL, 'p'},
+        {"sk_file", required_argument, NULL, 0x100},
+        {"sk-file", required_argument, NULL, 0x100},
         {"pubkey", required_argument, NULL, 'k'},
         {"derived_path", required_argument, NULL, 'm'},
         {"chunks", required_argument, NULL, 'm'},
@@ -682,20 +684,20 @@ static void print_usage()
     printf("transaction,\n");
 #ifdef USE_LIBOQS
     printf("falcon_keygen (generates Falcon-512 keypair),\n");
-    printf("falcon_sign (requires -p <falcon_secret_key_hex> -x <message_hex|tx_sighash_hex>),\n");
+    printf("falcon_sign (requires -p <falcon_secret_key_hex>|--sk-file <path> and -x <message_hex|tx_sighash_hex>),\n");
     printf("falcon_verify (requires -k <falcon_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
     printf("falcon_commit (requires -k <falcon_public_key_hex> -s <signature_hex>),\n");
     printf("dilithium2_keygen (generates Dilithium2 keypair),\n");
-    printf("dilithium2_sign (requires -p <dilithium2_secret_key_hex> -x <message_hex|tx_sighash_hex>),\n");
+    printf("dilithium2_sign (requires -p <dilithium2_secret_key_hex>|--sk-file <path> and -x <message_hex|tx_sighash_hex>),\n");
     printf("dilithium2_verify (requires -k <dilithium2_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
     printf("dilithium2_commit (requires -k <dilithium2_public_key_hex> -s <signature_hex>),\n");
 #endif
 #ifdef USE_RACCOON_G
     printf("raccoong_keygen (generates Raccoon-G-44 keypair),\n");
-    printf("raccoong_sign (requires -p <raccoong_secret_key_hex> -x <message_hex|tx_sighash_hex>),\n");
+    printf("raccoong_sign (requires -p <raccoong_secret_key_hex>|--sk-file <path> and -x <message_hex|tx_sighash_hex>),\n");
     printf("raccoong_verify (requires -k <raccoong_public_key_hex> -x <message_hex|tx_sighash_hex> -s <signature_hex>),\n");
     printf("raccoong_commit (requires -k <raccoong_public_key_hex> -s <signature_hex>),\n");
-    printf("raccoong_hd_derive (requires -p <raccoong_secret_key_hex> -s <chaincode_hex> -i <child_index>, optional -g <0|1 hardened>),\n");
+    printf("raccoong_hd_derive (requires -p <raccoong_secret_key_hex>|--sk-file <path>, -s <chaincode_hex>, -i <child_index>, optional -g <0|1 hardened>),\n");
     printf("raccoong_hd_derive_pub (requires -k <raccoong_public_key_hex> -s <chaincode_hex> -i <child_index>),\n");
 #endif
 #ifdef USE_LIBOQS
@@ -804,6 +806,104 @@ static dogecoin_bool such_commit_hex_to_bytes32(const char* commit_hex, uint8_t 
     size_t commit_len = 0;
     utils_hex_to_bin(commit_hex, out_commit32, 64, &commit_len);
     return commit_len == 32;
+}
+
+/* Read a PQC secret key (hex) from a file. Caller owns the returned heap
+   buffer and must release it with dogecoin_mem_zero() + dogecoin_free().
+   Whitespace (newlines, spaces, tabs, CR) inside the file is ignored so a
+   trailing newline from `echo "...hex..." > sk.hex` is accepted. Reading
+   from a file avoids exposing secret bytes through argv / /proc/<pid>/cmdline.
+   Returns a NUL-terminated hex string on success, NULL on any error. */
+static char* such_read_sk_hex_from_file(const char* path)
+{
+    if (!path) return NULL;
+    FILE* f = fopen(path, "rb");
+    if (!f) return NULL;
+    if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return NULL; }
+    long raw_len = ftell(f);
+    if (raw_len < 0 || raw_len > (1L << 22) /* 4 MiB hard cap */) {
+        fclose(f);
+        return NULL;
+    }
+    rewind(f);
+    char* raw = (char*)dogecoin_malloc((size_t)raw_len + 1);
+    if (!raw) { fclose(f); return NULL; }
+    size_t got = fread(raw, 1, (size_t)raw_len, f);
+    fclose(f);
+    if (got != (size_t)raw_len) {
+        dogecoin_mem_zero(raw, (size_t)raw_len);
+        dogecoin_free(raw);
+        return NULL;
+    }
+    raw[raw_len] = '\0';
+
+    char* out = (char*)dogecoin_malloc((size_t)raw_len + 1);
+    if (!out) {
+        dogecoin_mem_zero(raw, (size_t)raw_len);
+        dogecoin_free(raw);
+        return NULL;
+    }
+    size_t w = 0;
+    for (long i = 0; i < raw_len; i++) {
+        unsigned char c = (unsigned char)raw[i];
+        if (c == '\n' || c == '\r' || c == ' ' || c == '\t') continue;
+        if (!isxdigit(c)) {
+            dogecoin_mem_zero(raw, (size_t)raw_len);
+            dogecoin_free(raw);
+            dogecoin_mem_zero(out, (size_t)raw_len + 1);
+            dogecoin_free(out);
+            return NULL;
+        }
+        out[w++] = (char)c;
+    }
+    out[w] = '\0';
+    dogecoin_mem_zero(raw, (size_t)raw_len);
+    dogecoin_free(raw);
+    if (w == 0 || (w % 2) != 0) {
+        dogecoin_mem_zero(out, w);
+        dogecoin_free(out);
+        return NULL;
+    }
+    return out;
+}
+
+/* Resolve which secret-key hex string the PQC sign/derive commands should
+   use. Prefers --sk-file (safer: not visible in /proc/<pid>/cmdline) over
+   -p. On success returns a heap buffer the caller must release via
+   such_release_sk_hex(); on failure returns NULL. If both -p and --sk-file
+   are supplied -p wins for backward compatibility but a warning is printed
+   so users know the argv path leaks the secret. */
+static char* such_resolve_sk_hex(const char* pkey, const char* sk_file, dogecoin_bool* out_owned)
+{
+    if (out_owned) *out_owned = false;
+    if (pkey) {
+        if (sk_file) {
+            fprintf(stderr,
+                    "warning: both -p and --sk-file supplied; using -p. "
+                    "Note: secret bytes passed on argv are visible to other "
+                    "users via /proc/<pid>/cmdline — prefer --sk-file.\n");
+        } else {
+            fprintf(stderr,
+                    "warning: PQC secret key passed via -p is visible to other "
+                    "users via /proc/<pid>/cmdline. Prefer --sk-file <path>.\n");
+        }
+        return (char*)pkey;
+    }
+    if (sk_file) {
+        char* loaded = such_read_sk_hex_from_file(sk_file);
+        if (!loaded) return NULL;
+        if (out_owned) *out_owned = true;
+        return loaded;
+    }
+    return NULL;
+}
+
+static void such_release_sk_hex(char* sk_hex, dogecoin_bool owned)
+{
+    if (owned && sk_hex) {
+        dogecoin_mem_zero(sk_hex, strlen(sk_hex));
+        dogecoin_free(sk_hex);
+    }
 }
 
 static dogecoin_bool such_tx_add_commit_and_carrier_outputs(
@@ -927,6 +1027,11 @@ int main(int argc, char* argv[])
     int long_index = 0;
     int opt = 0;
     char* pkey = 0;
+    /* Path to a file containing the PQC secret key as hex (one line). Used by
+       PQC sign/derive commands as a safer alternative to -p, which exposes
+       secret bytes through /proc/<pid>/cmdline on multi-user hosts and in CI
+       runners. Mutually exclusive with passing the secret directly via -p. */
+    char* sk_file = 0;
     char* pubkey = 0;
     char* cmd = 0;
     char* derived_path = 0;
@@ -956,6 +1061,9 @@ int main(int argc, char* argv[])
         switch (opt) {
                 case 'p':
                     pkey = optarg;
+                    break;
+                case 0x100:
+                    sk_file = optarg;
                     break;
                 case 'c':
                     cmd = optarg;
@@ -2121,22 +2229,28 @@ int main(int argc, char* argv[])
         }
     else if (strcmp(cmd, "falcon_sign") == 0) {
         // ./such -c falcon_sign -p <secret_key_hex> -x <message_hex>
-        if (!pkey) {
-            return showError("Missing secret key (use -p)\n");
+        // or:    -c falcon_sign --sk-file <path> -x <message_hex>
+        dogecoin_bool sk_hex_owned = false;
+        char* sk_hex = such_resolve_sk_hex(pkey, sk_file, &sk_hex_owned);
+        if (!sk_hex) {
+            return showError("Missing secret key (use -p <hex> or --sk-file <path>)\n");
         }
         if (!txhex) {
+            such_release_sk_hex(sk_hex, sk_hex_owned);
             return showError("Missing message (use -x)\n");
         }
         
         printf("Signing message with Falcon-512...\n");
         
-        if ((strlen(pkey) % 2) != 0) {
+        if ((strlen(sk_hex) % 2) != 0) {
+            such_release_sk_hex(sk_hex, sk_hex_owned);
             return showError("Invalid secret key hex\n");
         }
-        size_t sk_len = strlen(pkey) / 2;
+        size_t sk_len = strlen(sk_hex) / 2;
         uint8_t* sk = dogecoin_malloc(sk_len);
         size_t sk_outlen = 0;
-        utils_hex_to_bin(pkey, sk, strlen(pkey), &sk_outlen);
+        utils_hex_to_bin(sk_hex, sk, strlen(sk_hex), &sk_outlen);
+        such_release_sk_hex(sk_hex, sk_hex_owned);
         if (sk_outlen != sk_len) {
             dogecoin_free(sk);
             return showError("Invalid secret key hex\n");
@@ -2346,13 +2460,16 @@ int main(int argc, char* argv[])
         dogecoin_free(sk);
     }
     else if (strcmp(cmd, "dilithium2_sign") == 0) {
-        if (!pkey) return showError("Missing secret key (use -p)\n");
-        if (!txhex) return showError("Missing message (use -x)\n");
-        if ((strlen(pkey) % 2) != 0) return showError("Invalid secret key hex\n");
-        size_t sk_len = strlen(pkey) / 2;
+        dogecoin_bool sk_hex_owned = false;
+        char* sk_hex = such_resolve_sk_hex(pkey, sk_file, &sk_hex_owned);
+        if (!sk_hex) return showError("Missing secret key (use -p <hex> or --sk-file <path>)\n");
+        if (!txhex) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Missing message (use -x)\n"); }
+        if ((strlen(sk_hex) % 2) != 0) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Invalid secret key hex\n"); }
+        size_t sk_len = strlen(sk_hex) / 2;
         uint8_t* sk = dogecoin_malloc(sk_len);
         size_t sk_outlen = 0;
-        utils_hex_to_bin(pkey, sk, strlen(pkey), &sk_outlen);
+        utils_hex_to_bin(sk_hex, sk, strlen(sk_hex), &sk_outlen);
+        such_release_sk_hex(sk_hex, sk_hex_owned);
         if (sk_outlen != sk_len) { dogecoin_free(sk); return showError("Invalid secret key hex\n"); }
         if ((strlen(txhex) % 2) != 0) { dogecoin_free(sk); return showError("Invalid message hex\n"); }
         size_t msg_len = strlen(txhex) / 2;
@@ -2459,13 +2576,16 @@ int main(int argc, char* argv[])
         dogecoin_free(sk);
     }
     else if (strcmp(cmd, "raccoong_sign") == 0) {
-        if (!pkey) return showError("Missing secret key (use -p)\n");
-        if (!txhex) return showError("Missing message (use -x)\n");
-        if ((strlen(pkey) % 2) != 0) return showError("Invalid secret key hex\n");
-        size_t sk_len = strlen(pkey) / 2;
+        dogecoin_bool sk_hex_owned = false;
+        char* sk_hex = such_resolve_sk_hex(pkey, sk_file, &sk_hex_owned);
+        if (!sk_hex) return showError("Missing secret key (use -p <hex> or --sk-file <path>)\n");
+        if (!txhex) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Missing message (use -x)\n"); }
+        if ((strlen(sk_hex) % 2) != 0) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Invalid secret key hex\n"); }
+        size_t sk_len = strlen(sk_hex) / 2;
         uint8_t* sk = dogecoin_malloc(sk_len);
         size_t sk_outlen = 0;
-        utils_hex_to_bin(pkey, sk, strlen(pkey), &sk_outlen);
+        utils_hex_to_bin(sk_hex, sk, strlen(sk_hex), &sk_outlen);
+        such_release_sk_hex(sk_hex, sk_hex_owned);
         if (sk_outlen != sk_len) { dogecoin_free(sk); return showError("Invalid secret key hex\n"); }
         if ((strlen(txhex) % 2) != 0) { dogecoin_free(sk); return showError("Invalid message hex\n"); }
         size_t msg_len = strlen(txhex) / 2;
@@ -2542,16 +2662,19 @@ int main(int argc, char* argv[])
         dogecoin_free(pk); dogecoin_free(sig);
     }
     else if (strcmp(cmd, "raccoong_hd_derive") == 0) {
-        if (!pkey) return showError("Missing parent secret key (use -p)\n");
-        if (!pubkey) return showError("Missing parent public key (use -k)\n");
-        if (!scripthex) return showError("Missing chaincode hex (use -s)\n");
-        if ((strlen(scripthex) % 2) != 0 || strlen(scripthex) != 64) return showError("Chaincode must be 32 bytes (64 hex)\n");
-        if ((strlen(pkey) % 2) != 0) return showError("Invalid parent secret key hex\n");
-        if ((strlen(pubkey) % 2) != 0) return showError("Invalid parent public key hex\n");
-        size_t psk_len = strlen(pkey) / 2;
+        dogecoin_bool sk_hex_owned = false;
+        char* sk_hex = such_resolve_sk_hex(pkey, sk_file, &sk_hex_owned);
+        if (!sk_hex) return showError("Missing parent secret key (use -p <hex> or --sk-file <path>)\n");
+        if (!pubkey) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Missing parent public key (use -k)\n"); }
+        if (!scripthex) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Missing chaincode hex (use -s)\n"); }
+        if ((strlen(scripthex) % 2) != 0 || strlen(scripthex) != 64) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Chaincode must be 32 bytes (64 hex)\n"); }
+        if ((strlen(sk_hex) % 2) != 0) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Invalid parent secret key hex\n"); }
+        if ((strlen(pubkey) % 2) != 0) { such_release_sk_hex(sk_hex, sk_hex_owned); return showError("Invalid parent public key hex\n"); }
+        size_t psk_len = strlen(sk_hex) / 2;
         uint8_t* psk = dogecoin_malloc(psk_len);
         size_t psk_outlen = 0;
-        utils_hex_to_bin(pkey, psk, strlen(pkey), &psk_outlen);
+        utils_hex_to_bin(sk_hex, psk, strlen(sk_hex), &psk_outlen);
+        such_release_sk_hex(sk_hex, sk_hex_owned);
         if (psk_outlen != psk_len) { dogecoin_free(psk); return showError("Invalid parent secret key hex\n"); }
         size_t ppk_len = strlen(pubkey) / 2;
         uint8_t* ppk = dogecoin_malloc(ppk_len);

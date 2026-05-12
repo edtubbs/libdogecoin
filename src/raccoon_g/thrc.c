@@ -1448,34 +1448,45 @@ dogecoin_bool thrc_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len
     if (child_pk_len != RACCOONG_PK_BYTES) return false;
 
     // 1. Deserialize parent sk = (A_seed, t, s); cross-check A_seed against pk.
+    // NOTE: these vectors hold secret-key material. They MUST NOT be marked
+    // `static` (the previous implementation did, racing two callers and
+    // leaking `s` across calls). Allocate on the heap so we own a fresh,
+    // private copy per call and can explicitly zeroize it on every exit path.
     uint8_t parent_A_seed[RACCOONG_A_SEED_BYTES];
     uint8_t parent_pk_A_seed[RACCOONG_A_SEED_BYTES];
-    static polyr parent_t[RACCOONG_K];
-    static polyr parent_s[RACCOONG_ELL];
+    polyr* parent_t = (polyr*)dogecoin_calloc(RACCOONG_K, sizeof(polyr));
+    polyr* parent_s = (polyr*)dogecoin_calloc(RACCOONG_ELL, sizeof(polyr));
+    polyr* tweak_t  = (polyr*)dogecoin_calloc(RACCOONG_K, sizeof(polyr));
+    polyr* tweak_s  = (polyr*)dogecoin_calloc(RACCOONG_ELL, sizeof(polyr));
+    polyr* child_t  = (polyr*)dogecoin_calloc(RACCOONG_K, sizeof(polyr));
+    polyr* child_s  = (polyr*)dogecoin_calloc(RACCOONG_ELL, sizeof(polyr));
+    dogecoin_bool ok = false;
+    if (!parent_t || !parent_s || !tweak_t || !tweak_s || !child_t || !child_s) {
+        goto cleanup;
+    }
     if (!deserialize_sk_into(parent_sk, parent_sk_len, parent_A_seed,
                              parent_t, parent_s)) {
-        return false;
+        goto cleanup;
     }
     if (!deserialize_pk_into(parent_pk, parent_pk_len, parent_pk_A_seed,
                              /*t_out=*/NULL)) {
-        dogecoin_mem_zero(parent_s, sizeof(parent_s));
-        return false;
+        goto cleanup;
     }
     if (memcmp(parent_A_seed, parent_pk_A_seed, RACCOONG_A_SEED_BYTES) != 0) {
-        dogecoin_mem_zero(parent_s, sizeof(parent_s));
-        return false;
+        goto cleanup;
     }
 
     // 2. tweak_seed = HMAC-SHA512(chaincode, tag || sha256(parent_key) || idx_BE)[:32]
     //    tag is 'p' for non-hardened (uses parent_pk hash) or 'S' for hardened
     //    (uses parent_sk hash). This mirrors the liboqs-side derive_hd_bytes
     //    domain separator tags.
+    {
     uint8_t tweak_seed[32];
     if (!hd_derive_tweak_seed(tweak_seed, parent_pk, parent_pk_len,
                               parent_sk, parent_sk_len, chaincode,
                               index, hardened)) {
-        dogecoin_mem_zero(parent_s, sizeof(parent_s));
-        return false;
+        dogecoin_mem_zero(tweak_seed, sizeof(tweak_seed));
+        goto cleanup;
     }
 
     // 3. drbg_seed = HKDF-SHA256(tweak_seed, 48); drbg.random_bytes(32) = key.
@@ -1484,8 +1495,8 @@ dogecoin_bool thrc_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len
                               tweak_seed, sizeof(tweak_seed),
                               NULL, 0, NULL, 0)) {
         dogecoin_mem_zero(tweak_seed, sizeof(tweak_seed));
-        dogecoin_mem_zero(parent_s, sizeof(parent_s));
-        return false;
+        dogecoin_mem_zero(drbg_seed, sizeof(drbg_seed));
+        goto cleanup;
     }
     dogecoin_mem_zero(tweak_seed, sizeof(tweak_seed));
 
@@ -1498,39 +1509,36 @@ dogecoin_bool thrc_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len
     dogecoin_mem_zero(&drbg, sizeof(drbg));
 
     // 4. tweak keygen reusing parent A_seed.
-    static polyr tweak_t[RACCOONG_K];
-    static polyr tweak_s[RACCOONG_ELL];
     if (!raccoong_keygen_t_with_aseed(key, parent_A_seed, tweak_t, tweak_s)) {
         dogecoin_mem_zero(key, sizeof(key));
-        dogecoin_mem_zero(parent_s, sizeof(parent_s));
-        dogecoin_mem_zero(tweak_s, sizeof(tweak_s));
-        return false;
+        goto cleanup;
     }
     dogecoin_mem_zero(key, sizeof(key));
+    }
 
     // 5. child_t = parent_t + tweak_t (mod q); child_s = parent_s + tweak_s (mod q).
-    static polyr child_t[RACCOONG_K];
-    static polyr child_s[RACCOONG_ELL];
     if (!raccoong_vec_add(child_t, parent_t, tweak_t, RACCOONG_K)) {
-        dogecoin_mem_zero(parent_s, sizeof(parent_s));
-        dogecoin_mem_zero(tweak_s, sizeof(tweak_s));
-        return false;
+        goto cleanup;
     }
     if (!raccoong_vec_add(child_s, parent_s, tweak_s, RACCOONG_ELL)) {
-        dogecoin_mem_zero(parent_s, sizeof(parent_s));
-        dogecoin_mem_zero(tweak_s, sizeof(tweak_s));
-        dogecoin_mem_zero(child_s, sizeof(child_s));
-        return false;
+        goto cleanup;
     }
 
     raccoong_serialize_pk(child_pk_out, parent_A_seed, child_t);
     raccoong_serialize_sk(child_sk_out, parent_A_seed, child_t, child_s);
+    ok = true;
 
-    // Wipe transient secrets.
-    dogecoin_mem_zero(parent_s, sizeof(parent_s));
-    dogecoin_mem_zero(tweak_s, sizeof(tweak_s));
-    dogecoin_mem_zero(child_s, sizeof(child_s));
-    return true;
+cleanup:
+    /* Wipe transient secrets on EVERY exit path (success or any failure). */
+    if (parent_s) { dogecoin_mem_zero(parent_s, RACCOONG_ELL * sizeof(polyr)); dogecoin_free(parent_s); }
+    if (parent_t) { dogecoin_mem_zero(parent_t, RACCOONG_K   * sizeof(polyr)); dogecoin_free(parent_t); }
+    if (tweak_s)  { dogecoin_mem_zero(tweak_s,  RACCOONG_ELL * sizeof(polyr)); dogecoin_free(tweak_s); }
+    if (tweak_t)  { dogecoin_mem_zero(tweak_t,  RACCOONG_K   * sizeof(polyr)); dogecoin_free(tweak_t); }
+    if (child_s)  { dogecoin_mem_zero(child_s,  RACCOONG_ELL * sizeof(polyr)); dogecoin_free(child_s); }
+    if (child_t)  { dogecoin_mem_zero(child_t,  RACCOONG_K   * sizeof(polyr)); dogecoin_free(child_t); }
+    dogecoin_mem_zero(parent_A_seed, sizeof(parent_A_seed));
+    dogecoin_mem_zero(parent_pk_A_seed, sizeof(parent_pk_A_seed));
+    return ok;
 }
 
 /**
@@ -1558,16 +1566,24 @@ dogecoin_bool thrc_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
     if (index & 0x80000000U) return false;
 
     uint8_t parent_A_seed[RACCOONG_A_SEED_BYTES];
-    static polyr parent_t[RACCOONG_K];
+    polyr* parent_t = (polyr*)dogecoin_calloc(RACCOONG_K, sizeof(polyr));
+    polyr* tweak_t  = (polyr*)dogecoin_calloc(RACCOONG_K, sizeof(polyr));
+    polyr* child_t  = (polyr*)dogecoin_calloc(RACCOONG_K, sizeof(polyr));
+    dogecoin_bool ok = false;
+    if (!parent_t || !tweak_t || !child_t) {
+        goto cleanup_pub;
+    }
     if (!deserialize_pk_into(parent_pk, parent_pk_len, parent_A_seed, parent_t)) {
-        return false;
+        goto cleanup_pub;
     }
 
+    {
     uint8_t tweak_seed[32];
     if (!hd_derive_tweak_seed(tweak_seed, parent_pk, parent_pk_len,
                               /*parent_sk=*/NULL, 0, chaincode,
                               index, /*hardened=*/false)) {
-        return false;
+        dogecoin_mem_zero(tweak_seed, sizeof(tweak_seed));
+        goto cleanup_pub;
     }
 
     uint8_t drbg_seed[48];
@@ -1575,7 +1591,8 @@ dogecoin_bool thrc_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
                               tweak_seed, sizeof(tweak_seed),
                               NULL, 0, NULL, 0)) {
         dogecoin_mem_zero(tweak_seed, sizeof(tweak_seed));
-        return false;
+        dogecoin_mem_zero(drbg_seed, sizeof(drbg_seed));
+        goto cleanup_pub;
     }
     dogecoin_mem_zero(tweak_seed, sizeof(tweak_seed));
 
@@ -1587,20 +1604,26 @@ dogecoin_bool thrc_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
     raccoong_nist_kat_drbg_random_bytes(&drbg, key, sizeof(key));
     dogecoin_mem_zero(&drbg, sizeof(drbg));
 
-    static polyr tweak_t[RACCOONG_K];
     if (!raccoong_keygen_t_with_aseed(key, parent_A_seed, tweak_t, NULL)) {
         dogecoin_mem_zero(key, sizeof(key));
-        return false;
+        goto cleanup_pub;
     }
     dogecoin_mem_zero(key, sizeof(key));
+    }
 
-    static polyr child_t[RACCOONG_K];
     if (!raccoong_vec_add(child_t, parent_t, tweak_t, RACCOONG_K)) {
-        return false;
+        goto cleanup_pub;
     }
 
     raccoong_serialize_pk(child_pk_out, parent_A_seed, child_t);
-    return true;
+    ok = true;
+
+cleanup_pub:
+    if (parent_t) { dogecoin_mem_zero(parent_t, RACCOONG_K * sizeof(polyr)); dogecoin_free(parent_t); }
+    if (tweak_t)  { dogecoin_mem_zero(tweak_t,  RACCOONG_K * sizeof(polyr)); dogecoin_free(tweak_t); }
+    if (child_t)  { dogecoin_mem_zero(child_t,  RACCOONG_K * sizeof(polyr)); dogecoin_free(child_t); }
+    dogecoin_mem_zero(parent_A_seed, sizeof(parent_A_seed));
+    return ok;
 }
 
 /*
