@@ -25,5 +25,6 @@ define $(package)_stage_cmds
   mkdir -p $($(package)_staging_prefix_dir)/lib && \
   mkdir -p $($(package)_staging_prefix_dir)/include && \
   cp lib/libmcl.a $($(package)_staging_prefix_dir)/lib/ && \
-  cp -R include/mcl $($(package)_staging_prefix_dir)/include/
+  cp -R include/mcl $($(package)_staging_prefix_dir)/include/ && \
+  cp -R include/cybozu $($(package)_staging_prefix_dir)/include/
 endef
