@@ -255,18 +255,11 @@ static void spv_pqc_add_pending(dogecoin_spv_client* client, spv_pqc_pending_com
     client->pqc_pending_commits = head;
 }
 
-/* Helper: remove and free pending commit from this client's table. */
-#if defined(__GNUC__) || defined(__clang__)
-static void spv_pqc_remove_pending(dogecoin_spv_client* client, spv_pqc_pending_commit_t* entry) __attribute__((unused));
-#endif
-static void spv_pqc_remove_pending(dogecoin_spv_client* client, spv_pqc_pending_commit_t* entry) {
-    if (!client || !entry) return;
-    spv_pqc_pending_commit_t* head = spv_pqc_table(client);
-    HASH_DEL(head, entry);
-    if (entry->txc_raw) dogecoin_free(entry->txc_raw);
-    dogecoin_free(entry);
-    client->pqc_pending_commits = head;
-}
+/* Note: a removal helper used to live here but every call site needs
+   special-case logic (the TX_R match path moves out `txc_raw` before
+   freeing, the free-all path runs inside a HASH_ITER), so HASH_DEL is
+   inlined at the call sites and the helper was removed to avoid dead
+   code. */
 
 #endif /* USE_LIBOQS || USE_RACCOON_G (pqc pending) */
 

@@ -47,8 +47,12 @@ INCLUDE_SCRIPTSIG_PQC="${INCLUDE_SCRIPTSIG_PQC:-1}"
 # CARRIER_ENABLED=0 → commitment-only mode (OP_RETURN only, guaranteed standard relay)
 # CARRIER_ENABLED=1 → commitment + P2SH carrier outputs (embeds PQC pubkey+sig on-chain)
 CARRIER_ENABLED="${CARRIER_ENABLED:-0}"
-FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
-FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
+# NOTE: FUNDED_WIF and FUNDED_ADDR must be supplied via the environment.
+# Historical defaults referenced a real mainnet WIF used during PR validation
+# and are intentionally removed: shipping a funded mainnet private key in a
+# public repository would publish that key. Set both env vars before running.
+FUNDED_WIF="${FUNDED_WIF:?FUNDED_WIF must be set (mainnet WIF of the funding key)}"
+FUNDED_ADDR="${FUNDED_ADDR:?FUNDED_ADDR must be set (mainnet address corresponding to FUNDED_WIF)}"
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-${CHAINED_UTXO_TXID:-b47b271ff454ce93e93f723b52959f9d14f44313c61706453c1a85aaced93031}}"
 FUNDED_UTXO_VOUT="${FUNDED_UTXO_VOUT:-${CHAINED_UTXO_VOUT:-0}}"
 AUTO_PREPARE_TX_FROM_UTXO="${AUTO_PREPARE_TX_FROM_UTXO:-1}"

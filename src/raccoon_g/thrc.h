@@ -113,11 +113,21 @@ dogecoin_bool thrc_verify(const uint8_t* pk, size_t pk_len,
                           const uint8_t* sig, size_t sig_len);
 
 /*
- * Thread safety note for the HD derivation routines below: each call uses
- * only heap-allocated, per-call scratch for secret-key polynomials. Two
- * concurrent invocations on different (parent_sk, parent_pk) pairs are
- * race-free with respect to each other. Callers must still serialize
- * concurrent calls that share an output buffer.
+ * Thread safety note for the HD derivation routines below: the per-call
+ * scratch for secret-key polynomials in these routines is heap-allocated
+ * and wiped on every exit, so the HD derive wrappers do not themselves
+ * leak parent-secret material across concurrent calls on different
+ * (parent_sk, parent_pk) pairs.
+ *
+ * However, these routines internally invoke `raccoong_keygen_t_with_aseed`
+ * (and, for verification paths, the keygen / sign primitives in this
+ * translation unit) which still use file-scope `static polyr` scratch for
+ * lattice keygen and signing state. As a result the guarantee above only
+ * holds provided no other thread is concurrently calling any other thrc
+ * primitive (HD derive, keygen, sign, or verify) in this process. Callers
+ * that may run thrc primitives from multiple threads MUST serialize all
+ * such calls with an external lock; the same applies to any shared output
+ * buffer.
  */
 dogecoin_bool thrc_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len,
                                   const uint8_t* parent_pk, size_t parent_pk_len,
