@@ -1032,6 +1032,12 @@ int main(int argc, char* argv[])
        secret bytes through /proc/<pid>/cmdline on multi-user hosts and in CI
        runners. Mutually exclusive with passing the secret directly via -p. */
     char* sk_file = 0;
+#if !defined(USE_LIBOQS) && !defined(USE_RACCOON_G)
+    /* sk_file is consumed by PQC sign/derive command branches only; mark it
+       read here so default builds without a PQC backend do not warn about
+       a set-but-not-used variable. */
+    (void)sk_file;
+#endif
     char* pubkey = 0;
     char* cmd = 0;
     char* derived_path = 0;
