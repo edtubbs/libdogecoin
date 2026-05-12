@@ -238,9 +238,15 @@ static void spv_pqc_add_pending(dogecoin_spv_client* client, spv_pqc_pending_com
         if (existing->txc_raw) dogecoin_free(existing->txc_raw);
         dogecoin_free(existing);
     }
-    /* Enforce cap: evict oldest entries until there is room for the new one. */
+    /* Enforce cap: evict oldest entries until there is room for the new one.
+       uthash links entries in insertion order via `hh.next` with a tail
+       pointer for O(1) append (see UT_hash_table::tail / "tail hh in app
+       order, for fast append" in uthash.h). HASH_ITER walks head→tail in
+       insertion order, so the table head is always the oldest still-alive
+       entry — exact LRU under our usage where we only add and (on TX_R
+       match) delete by key. */
     while (head && HASH_COUNT(head) >= SPV_PQC_PENDING_MAX) {
-        spv_pqc_pending_commit_t* oldest = head; /* uthash head == first inserted still alive */
+        spv_pqc_pending_commit_t* oldest = head; /* head == oldest insertion */
         HASH_DEL(head, oldest);
         if (oldest->txc_raw) dogecoin_free(oldest->txc_raw);
         dogecoin_free(oldest);
