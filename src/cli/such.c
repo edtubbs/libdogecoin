@@ -619,7 +619,6 @@ static struct option long_options[] =
         {"sk-file", required_argument, NULL, 0x100},
         {"pubkey", required_argument, NULL, 'k'},
         {"derived_path", required_argument, NULL, 'm'},
-        {"chunks", required_argument, NULL, 'm'},
         {"sighash", required_argument, NULL, 'h'},
         {"script", required_argument, NULL, 's'},
         {"input_index", required_argument, NULL, 'i'},
@@ -1172,6 +1171,8 @@ int main(int argc, char* argv[])
 
         if (!pkey)
             return showError(pkey_error);
+        if (strlen(pkey) < 50)
+            return showError("Private key must be WIF encoded");
         if (!pubkey_from_privatekey(chain, pkey, pubkey_hex, &sizeout))
             return showError("attempt to generate pubkey from privatekey failed");
 
@@ -2169,6 +2170,11 @@ int main(int argc, char* argv[])
         if (strlen(txhex) > 1024 * 100) { //don't accept tx larger then 100kb
             return showError("tx too large (max 100kb)\n");
             }
+
+        if (!pkey)
+            return showError("Missing private key (use -p)");
+        if (strlen(pkey) < 50)
+            return showError("Private key must be WIF encoded");
 
         eckey* key = new_eckey_from_privkey(pkey);
         char* sig = sign_message(key->private_key_wif, txhex);
