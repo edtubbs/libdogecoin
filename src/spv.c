@@ -275,6 +275,21 @@ static void spv_pqc_add_pending(dogecoin_spv_client* client, spv_pqc_pending_com
    identical and to make the LRU semantics easy to audit. */
 #define SPV_ZK_PENDING_MAX 16
 
+/* Per-entry cap on the cached TX_C serialised bytes (txc_raw).  The pending
+   table count is already bounded by SPV_ZK_PENDING_MAX, but without a
+   per-entry cap a peer could still push the table to
+   16 * (P2P-message-cap ≈ 32 MiB) of RAM by claiming oversize transactions.
+   100 KiB is comfortably above any legitimate TX_C — the on-chain TX_C
+   carries only a single 39-byte OP_RETURN nulldata output plus the signer's
+   normal payment, so it is typically <1 KiB.  When the candidate TX_C
+   exceeds the cap the commit is still tracked (the entry is inserted with
+   `txc_raw = NULL`); the downstream tx_binding recompute path in
+   `dogecoin_zk_compute_tx_base_sighash` already gates on
+   `matched_txc_raw && matched_txc_raw_len > 0`, so it simply skips the
+   binding check and the reveal is logged unmatched-binding rather than
+   accepted with a forged binding. */
+#define SPV_ZK_PENDING_TXC_RAW_MAX (100u * 1024u)
+
 /* Hash table of pending TX_C OP_RETURN commitments awaiting their TX_R
    reveal.  Mirrors the PQC per-client pending table (key: 32-byte commit)
    so the SPV validator can cross-validate ZK carriers in O(1) when the
@@ -1329,10 +1344,20 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             entry->mode = zk_mode;
                             entry->txpos = i;
                             entry->height = pindex->height;
-                            entry->txc_raw = dogecoin_malloc(consumedlength);
-                            if (entry->txc_raw) {
-                                memcpy(entry->txc_raw, tx_raw, consumedlength);
-                                entry->txc_raw_len = consumedlength;
+                            /* Per-entry txc_raw cap (SPV_ZK_PENDING_TXC_RAW_MAX):
+                               skip the cache if the candidate TX_C is larger than
+                               any plausible carrier-bearing transaction.  The
+                               commit itself is still tracked (so a TX_R match is
+                               still detected), only the tx_binding recompute is
+                               disabled — the verifier downstream falls back to
+                               "matched but binding-not-checked" rather than
+                               accepting a forged binding. */
+                            if (consumedlength > 0 && consumedlength <= SPV_ZK_PENDING_TXC_RAW_MAX) {
+                                entry->txc_raw = dogecoin_malloc(consumedlength);
+                                if (entry->txc_raw) {
+                                    memcpy(entry->txc_raw, tx_raw, consumedlength);
+                                    entry->txc_raw_len = consumedlength;
+                                }
                             }
                             spv_zk_add_pending(client, entry);
                         }
