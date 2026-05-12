@@ -192,6 +192,14 @@ redeemScript_carrier:
   OP_DROP repeated 5 times (TAG8,HDR8,CHUNK0,CHUNK1,CHUNK2), then OP_TRUE.
 </source>
 
+The 23-byte canonical carrier scriptPubKey (<code>OP_HASH160 <h160> OP_EQUAL</code>) is identical across all PQ algorithms and is also shared with any other carrier scheme that reuses the same fixed 5×OP_DROP + OP_TRUE redeem template (for example a ZK-carrier reveal). Disambiguation is performed exclusively by the leading 8-byte TAG8 push inside the reveal scriptSig (<code>FLC1FULL</code> / <code>DIL2FULL</code> / <code>RCG4FULL</code> here, and other prefixes for non-PQ carriers). Implementations MUST therefore:
+
+* select the carrier type from TAG8, not from the redeemScript or the P2SH spk;
+* treat any new TAG8 prefix as a distinct carrier and reject reuse of an existing prefix for a different payload schema;
+* refuse to interpret a reveal scriptSig whose TAG8 does not match a known carrier prefix.
+
+Future carriers reusing this redeem template MUST register a distinct 8-byte TAG8 to avoid collision with the PQ prefixes defined above.
+
 ====Phase 1: Verification using on-chain data only====
 
 Given TX_R:

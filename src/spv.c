@@ -350,23 +350,19 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
 #ifdef USE_LIBOQS
     // Log what PQC variants are present at runtime (minimal, no hard dependency).
     if (client->nodegroup && client->nodegroup->log_write_cb) {
-#ifdef USE_RACCOON_G
-#ifndef OQS_SIG_alg_raccoon_g_44
-#define OQS_SIG_alg_raccoon_g_44 "Raccoon-G-44"
-#endif
-        client->nodegroup->log_write_cb(
-            "[oqs] falcon_512=%s falcon_1024=%s ml_dsa_44=%s raccoon_g_44=%s (liboqs)\n",
-            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_512) ? "enabled" : "disabled",
-            OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_1024) ? "enabled" : "disabled",
-            OQS_SIG_alg_is_enabled(OQS_SIG_alg_ml_dsa_44) ? "enabled" : "disabled",
-            OQS_SIG_alg_is_enabled(OQS_SIG_alg_raccoon_g_44) ? "enabled" : "disabled");
-#else
         client->nodegroup->log_write_cb(
             "[oqs] falcon_512=%s falcon_1024=%s ml_dsa_44=%s (liboqs)\n",
             OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_512) ? "enabled" : "disabled",
             OQS_SIG_alg_is_enabled(OQS_SIG_alg_falcon_1024) ? "enabled" : "disabled",
             OQS_SIG_alg_is_enabled(OQS_SIG_alg_ml_dsa_44) ? "enabled" : "disabled");
+    }
 #endif
+#ifdef USE_RACCOON_G
+    /* Raccoon-G is provided by the in-tree src/raccoon_g/ implementation,
+       not by the liboqs fork (which no longer ships Raccoon-G). Log it on
+       its own line so the source of the backend is unambiguous. */
+    if (client->nodegroup && client->nodegroup->log_write_cb) {
+        client->nodegroup->log_write_cb("[raccoon_g] raccoon_g_44=enabled (in-tree)\n");
     }
 #endif
 
