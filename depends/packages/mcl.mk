@@ -16,8 +16,8 @@ define $(package)_build_cmds
   $(MAKE) -C . lib/libmcl.a \
     CC='$(host_CC)' CXX='$(host_CXX)' \
     AR='$(host_AR)' RANLIB='$(host_RANLIB)' \
-    CFLAGS='$(host_CFLAGS) -O2 -Iinclude' \
-    CXXFLAGS='$(host_CXXFLAGS) -O2 -std=c++14 -Iinclude' \
+    CFLAGS='$(host_CFLAGS) -O2 -fPIC -Iinclude' \
+    CXXFLAGS='$(host_CXXFLAGS) -O2 -fPIC -std=c++14 -Iinclude' \
     MCL_USE_VINT=1 MCL_VINT_FIXED_BUFFER=1
 endef
 

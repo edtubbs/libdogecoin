@@ -1,0 +1,51 @@
+===============================================================================
+spvnode mcl+rapidsnark ZK rescan — curated [zk-vkey]/[zk-commit] lines only
+  date:       2026-05-12T20:37:48Z
+  binary:     Version: libdogecoin 0.1.5-pre
+  flags:      -h headers.db -w wallet.db -c -d -p -q -b -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+              -V contrib/zk_carrier/circuits/build/verification_key.json
+  chain:      mainnet, baked-in checkpoint 6191600 selected via -q (index 32 of 33);
+              the most recent baked checkpoint is now 6201360 which lies past the
+              ZK pairs at 6191613/6191616, so -p alone would skip them — hence -q.
+  depends:    make -j 4 RACCOON_G=y ZK_CARRIER=1 (mcl rebuilt with -fPIC and cybozu/ staged)
+  configure:  --enable-zk-carrier --with-rapidsnark --with-mcl
+              -> HAVE_MCL=1 HAVE_RAPIDSNARK=1; configure summary now lists 'mcl = yes'
+  tip:        Sync completed at height 6203938
+  full log:   mainnet_zk_carrier_mcl_rapidsnark_20260512_203748.txt (50507 lines)
+
+Key results vs the previously committed reference run
+(test-logs/spvnode_zk_rescan_PASSED_20260503-191415.txt, mcl/rapidsnark NOT linked):
+  reference -> [zk-commit] ZK verification DELEGATED ... mode=0 err=-7  (Groth16 farmed out)
+  this run  -> [zk-commit] ZK verification PASSED    ... mode=0 err=0   (Groth16 verified by in-tree mcl)
+              [zk-commit] ZK verification DELEGATED ... mode=1 err=-7  (PLONK still delegated, by design — no native PLONK verifier)
+              Both reveals decode successfully from on-chain ZKP1 bytes:
+                * v1 self-contained payload (vk embedded inline) at both heights
+                * proof + vk + public inputs extracted, commitment SHA256d match,
+                  carrier scriptSig -> OP_RETURN binding matched (matched_txc_txpos)
+              Both reveals are REJECTED after passing/being-delegated, because the
+              third public input (tx_binding) is 0 on-chain whereas the SPV scanner
+              recomputes a non-zero binding from the spending TX_C inputs — this is
+              by design (libdogecoin's stricter tx_binding policy on top of the
+              vanilla snark verify) and is independent of the mcl/rapidsnark path.
+===============================================================================
+
+[zk-vkey] loaded 3293 bytes from contrib/zk_carrier/circuits/build/verification_key.json
+DEBUG: [zk-commit] Pending at height=6191613 txpos=25 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=op_return
+DEBUG: [zk-commit] Valid at height=6191613 txpos=27 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=carrier_scriptsig matched_txc_txpos=25 payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=805 vk_len=3293 total_payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=26 hex=5b0a202230222c0a202231303030303030222c0a202230220a5d ascii="[  "0",  "1000000",  "0" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=805 hex_head=7b0a202270695f61223a205b0a202022313631323534383935323233353937323930323733383634333034373430363435393732343036393832363832343737 hex_tail=3936303635343532222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "pi_a": [   "16125489522359729027386430474064597240698268247786523731965471582666125052928", "
+DEBUG: [zk-commit] reveal_decoded.vk: len=3293 hex_head=7b0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022766b hex_tail=30333530373731383231373634333139393435363434373538363231333839343031333835343631313035363734222c0a2020202231220a20205d0a205d0a7d ascii_head="{  "protocol": "groth16",  "curve": "bn128",  "nPublic": 3,  "vk_alpha_1": [   "1564531949608914"
+DEBUG: [zk-commit] tx_binding mismatch txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7 recomputed=0062ece3b9b0605c7c2912b7630636a7f4674d562d2d91c3a2c9e35caeee354f public_input[2]=0000000000000000000000000000000000000000000000000000000000000000
+DEBUG: [zk-commit] ZK verification PASSED at height=6191613 txpos=27 mode=0 err=0
+DEBUG: [zk-commit] Reveal REJECTED (tx_binding mismatch): TX_R=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e payload_len=4144 mode=0 height=6191613
+DEBUG: [zk-commit] Pending at height=6191616 txpos=18 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d mode=1 source=op_return
+DEBUG: [zk-commit] Valid at height=6191616 txpos=32 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d mode=1 source=carrier_scriptsig matched_txc_txpos=18 payload_len=4336 txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=1(plonk) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=2249 vk_len=2041 total_payload_len=4336 txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+DEBUG: [zk-commit] reveal_decoded.public_inputs: len=26 hex=5b0a202230222c0a202231303030303030222c0a202230220a5d ascii="[  "0",  "1000000",  "0" ]"
+DEBUG: [zk-commit] reveal_decoded.proof: len=2249 hex_head=7b0a202241223a205b0a202022313736303839323935333433323339323338363834373635323433333332303430363937343833323831303130383531373430 hex_tail=3738323630323933313631323635373334323832222c0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "A": [   "17608929534323923868476524333204069748328101085174028579785990727169368000378",   ""
+DEBUG: [zk-commit] reveal_decoded.vk: len=2041 hex_head=7b0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022706f7765 hex_tail=36303931353230323837383134313831313735343330303837313639303237393734323436373531363130353036393432323134383432373031373734220a7d ascii_head="{  "protocol": "plonk",  "curve": "bn128",  "nPublic": 3,  "power": 9,  "k1": "2",  "k2": "3",  "
+DEBUG: [zk-commit] tx_binding mismatch txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5 recomputed=007abb866bbbeb98967d9e8e2c8f683cc64978698acd55e8ed3b63ccb1ecfa98 public_input[2]=0000000000000000000000000000000000000000000000000000000000000000
+DEBUG: [zk-commit] ZK verification DELEGATED at height=6191616 txpos=32 mode=1 err=-7
+DEBUG: [zk-commit] Reveal REJECTED (tx_binding mismatch): TX_R=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d payload_len=4336 mode=1 height=6191616
+Sync completed, at height 6203938

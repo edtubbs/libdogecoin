@@ -476,6 +476,7 @@ echo "  liboqs          = $use_liboqs"
 echo "  raccoon-g       = $use_raccoon_g (experimental, in-tree)"
 echo "  zk-carrier      = $use_zk_carrier"
 echo "  rapidsnark      = $use_rapidsnark"
+echo "  mcl             = $have_mcl"
 echo
 echo "  host            = $host"
 echo "  target os       = $TARGET_OS"
