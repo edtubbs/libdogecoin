@@ -72,6 +72,7 @@ const char* dogecoin_zk_strerror(dogecoin_zk_err_t err)
     case DOGECOIN_ZK_ERR_NOT_IMPLEMENTED: return "not implemented in this build";
     case DOGECOIN_ZK_ERR_DELEGATED:       return "operation delegated to host (use snarkjs/rapidsnark)";
     case DOGECOIN_ZK_ERR_VERIFY_FAIL:     return "proof verification failed";
+    case DOGECOIN_ZK_ERR_BAD_VERSION:     return "unknown ZK payload version";
     default:                              break;
     }
     return "unknown ZK carrier error";
@@ -251,10 +252,16 @@ dogecoin_zk_err_t dogecoin_zk_decode_payload(
     size_t off = DOGECOIN_ZK_CARRIER_MAGIC_LEN;
     uint8_t mode_byte = payload[off++];
     uint8_t version = payload[off++];
-    if (version != DOGECOIN_ZK_PAYLOAD_VERSION_V0 &&
-        version != DOGECOIN_ZK_PAYLOAD_VERSION_V1) {
+    /* Reject payloads whose version byte is not in the documented set.
+       The mask is intentionally permissive (the version field is a single
+       byte today and v0/v1 are the only assignments), but applying it
+       up-front isolates "unknown version" from "truncated buffer" so the
+       error code returned to callers actually describes the failure. */
+    if ((version & ~DOGECOIN_ZK_PAYLOAD_VERSION_MASK) != 0 ||
+        (version != DOGECOIN_ZK_PAYLOAD_VERSION_V0 &&
+         version != DOGECOIN_ZK_PAYLOAD_VERSION_V1)) {
         /* Unknown version — refuse rather than silently accept. */
-        return DOGECOIN_ZK_ERR_TRUNCATED;
+        return DOGECOIN_ZK_ERR_BAD_VERSION;
     }
     dogecoin_zk_mode_t mode = (dogecoin_zk_mode_t)mode_byte;
     if (!zk_mode_is_known(mode)) return DOGECOIN_ZK_ERR_BAD_MODE;

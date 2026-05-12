@@ -267,8 +267,16 @@ static void spv_pqc_add_pending(dogecoin_spv_client* client, spv_pqc_pending_com
 #endif /* USE_LIBOQS || USE_RACCOON_G (pqc pending) */
 
 #ifdef USE_ZK_CARRIER
+/* Maximum number of pending ZK OP_RETURN commitments buffered per client
+   for cross-TX carrier validation (TX_C has OP_RETURN, TX_R has scriptSig).
+   Cap enforced via LRU eviction in spv_zk_add_pending so a peer flooding
+   cheap OP_RETURN commits cannot balloon SPV node memory. Mirrors the
+   PQC SPV_PQC_PENDING_MAX cap to keep both carriers' memory ceilings
+   identical and to make the LRU semantics easy to audit. */
+#define SPV_ZK_PENDING_MAX 16
+
 /* Hash table of pending TX_C OP_RETURN commitments awaiting their TX_R
-   reveal.  Mirrors the PQC g_pending_commits table (key: 32-byte commit)
+   reveal.  Mirrors the PQC per-client pending table (key: 32-byte commit)
    so the SPV validator can cross-validate ZK carriers in O(1) when the
    reveal arrives in a later block.  Kept separate from the PQC table to
    minimise blast radius — the two key spaces are independent and combining
@@ -283,28 +291,52 @@ typedef struct spv_zk_pending_commit {
     UT_hash_handle hh;
 } spv_zk_pending_commit_t;
 
-static spv_zk_pending_commit_t* g_zk_pending_commits = NULL;
+/* Per-client pending-commit table accessor.  Stored as an opaque void* in
+   dogecoin_spv_client so the header does not need to expose uthash types. */
+static inline spv_zk_pending_commit_t* spv_zk_table(const dogecoin_spv_client* client) {
+    return client ? (spv_zk_pending_commit_t*)client->zk_pending_commits : NULL;
+}
 
-static spv_zk_pending_commit_t* spv_zk_find_pending(const uint8_t* commit) {
+static spv_zk_pending_commit_t* spv_zk_find_pending(dogecoin_spv_client* client, const uint8_t* commit) {
+    spv_zk_pending_commit_t* head = spv_zk_table(client);
     spv_zk_pending_commit_t* found = NULL;
-    HASH_FIND(hh, g_zk_pending_commits, commit, 32, found);
+    if (!head || !commit) return NULL;
+    HASH_FIND(hh, head, commit, 32, found);
     return found;
 }
 
-static void spv_zk_add_pending(spv_zk_pending_commit_t* entry) {
-    spv_zk_pending_commit_t* existing = spv_zk_find_pending(entry->commit);
+/* Add pending commit to this client's hash table.  De-duplicates by commit
+   hash and enforces SPV_ZK_PENDING_MAX via LRU eviction of the oldest
+   insertion (uthash's iteration order is insertion order — see the matching
+   note on spv_pqc_add_pending above). */
+static void spv_zk_add_pending(dogecoin_spv_client* client, spv_zk_pending_commit_t* entry) {
+    if (!client || !entry) return;
+    spv_zk_pending_commit_t* head = spv_zk_table(client);
+    /* Replace existing entry with the same commit hash to avoid stale state. */
+    spv_zk_pending_commit_t* existing = NULL;
+    if (head) HASH_FIND(hh, head, entry->commit, 32, existing);
     if (existing) {
-        HASH_DEL(g_zk_pending_commits, existing);
+        HASH_DEL(head, existing);
         if (existing->txc_raw) dogecoin_free(existing->txc_raw);
         dogecoin_free(existing);
     }
-    HASH_ADD(hh, g_zk_pending_commits, commit, 32, entry);
+    while (head && HASH_COUNT(head) >= SPV_ZK_PENDING_MAX) {
+        spv_zk_pending_commit_t* oldest = head; /* head == oldest insertion */
+        HASH_DEL(head, oldest);
+        if (oldest->txc_raw) dogecoin_free(oldest->txc_raw);
+        dogecoin_free(oldest);
+    }
+    HASH_ADD(hh, head, commit, 32, entry);
+    client->zk_pending_commits = head;
 }
 
-static void spv_zk_remove_pending(spv_zk_pending_commit_t* entry) {
-    HASH_DEL(g_zk_pending_commits, entry);
+static void spv_zk_remove_pending(dogecoin_spv_client* client, spv_zk_pending_commit_t* entry) {
+    if (!client || !entry) return;
+    spv_zk_pending_commit_t* head = spv_zk_table(client);
+    HASH_DEL(head, entry);
     if (entry->txc_raw) dogecoin_free(entry->txc_raw);
     dogecoin_free(entry);
+    client->zk_pending_commits = head;
 }
 
 #endif /* USE_ZK_CARRIER */
@@ -596,13 +628,19 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
 #endif
 
 #ifdef USE_ZK_CARRIER
-    /* Release any pending ZK carrier commits that were never matched by a TX_R */
+    /* Release any pending ZK carrier commits that were never matched by a TX_R.
+       Only the table owned by this client is freed — other live clients keep
+       their own per-client tables intact. */
     {
+        spv_zk_pending_commit_t* head = spv_zk_table(client);
         spv_zk_pending_commit_t* entry;
         spv_zk_pending_commit_t* tmp;
-        HASH_ITER(hh, g_zk_pending_commits, entry, tmp) {
-            spv_zk_remove_pending(entry);
+        HASH_ITER(hh, head, entry, tmp) {
+            HASH_DEL(head, entry);
+            if (entry->txc_raw) dogecoin_free(entry->txc_raw);
+            dogecoin_free(entry);
         }
+        client->zk_pending_commits = NULL;
     }
 #endif
 
@@ -1296,7 +1334,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                 memcpy(entry->txc_raw, tx_raw, consumedlength);
                                 entry->txc_raw_len = consumedlength;
                             }
-                            spv_zk_add_pending(entry);
+                            spv_zk_add_pending(client, entry);
                         }
                     }
                 }
@@ -1320,7 +1358,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             char commit_hex[65];
                             utils_bin_to_hex(computed_commit, 32, commit_hex);
 
-                            spv_zk_pending_commit_t* matched_entry = spv_zk_find_pending(computed_commit);
+                            spv_zk_pending_commit_t* matched_entry = spv_zk_find_pending(client, computed_commit);
                             if (matched_entry) {
                                 uint32_t matched_txpos = matched_entry->txpos;
                                 dogecoin_zk_mode_t matched_mode = matched_entry->mode;
@@ -1333,7 +1371,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                 size_t   matched_txc_raw_len = matched_entry->txc_raw_len;
                                 matched_entry->txc_raw = NULL;
                                 matched_entry->txc_raw_len = 0;
-                                spv_zk_remove_pending(matched_entry);
+                                spv_zk_remove_pending(client, matched_entry);
                                 matched_entry = NULL; /* poison: do NOT dereference past this point. */
 
                                 client->nodegroup->log_write_cb("[zk-commit] Valid at height=%d txpos=%u commit=%s mode=%u source=carrier_scriptsig matched_txc_txpos=%u payload_len=%zu txr_txid=%s\n",

@@ -114,7 +114,8 @@ typedef enum {
     DOGECOIN_ZK_ERR_OOM           = -5,
     DOGECOIN_ZK_ERR_NOT_IMPLEMENTED = -6, /* PLONK / STARK / disabled prover  */
     DOGECOIN_ZK_ERR_DELEGATED     = -7,   /* prover lives outside libdogecoin */
-    DOGECOIN_ZK_ERR_VERIFY_FAIL   = -8
+    DOGECOIN_ZK_ERR_VERIFY_FAIL   = -8,
+    DOGECOIN_ZK_ERR_BAD_VERSION   = -9    /* unrecognised payload version    */
 } dogecoin_zk_err_t;
 
 /*

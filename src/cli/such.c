@@ -622,7 +622,6 @@ static struct option long_options[] =
         {"sk-file", required_argument, NULL, 0x100},
         {"pubkey", required_argument, NULL, 'k'},
         {"derived_path", required_argument, NULL, 'm'},
-        {"chunks", required_argument, NULL, 'm'},
         {"sighash", required_argument, NULL, 'h'},
         {"script", required_argument, NULL, 's'},
         {"input_index", required_argument, NULL, 'i'},
@@ -1164,6 +1163,30 @@ int main(int argc, char* argv[])
 
     /* start ECC context */
     dogecoin_ecc_start();
+
+    /* WIF / extended-key length sanity check for commands that consume -p as
+       a base58-encoded private key.  PQC carrier and PQC signing commands
+       reuse -p for raw hex of much larger keys (>>50 chars), so they are
+       excluded.  Replaces the global guard that previously lived in
+       `case 'p':` (removed when -p was repurposed for raw PQC hex).  Per-
+       command rather than per-option so the semantics match the consumer. */
+    {
+        static const char* const pkey_raw_hex_cmds[] = {
+            "pqc_carrier_mkpart",
+            "falcon_sign", "falcon_verify", "falcon_commit",
+            "dilithium2_sign", "dilithium2_verify", "dilithium2_commit",
+            "raccoong_sign", "raccoong_verify", "raccoong_commit",
+            "raccoong_hd_derive", "raccoong_hd_derive_pub",
+            NULL
+        };
+        dogecoin_bool pkey_is_raw_hex = false;
+        for (size_t i = 0; pkey_raw_hex_cmds[i] != NULL; i++) {
+            if (strcmp(cmd, pkey_raw_hex_cmds[i]) == 0) { pkey_is_raw_hex = true; break; }
+        }
+        if (pkey && !pkey_is_raw_hex && strlen(pkey) < 50) {
+            return showError("Private key must be WIF encoded");
+        }
+    }
 
     const char* pkey_error = "missing extended key (use -p)";
 
