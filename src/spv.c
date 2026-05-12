@@ -197,6 +197,14 @@ static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
    cheap OP_RETURN commits cannot balloon SPV node memory. */
 #define SPV_PQC_PENDING_MAX 16
 
+/* Per-entry cap on the retained serialized TX_C used later for signature
+   verification when the matching TX_R arrives. A legitimate carrier TX_C
+   is tiny (one or two outputs plus a 39-byte OP_RETURN), but the wire
+   limit on a Dogecoin transaction is the standard-tx ceiling. Refuse to
+   buffer anything larger so a peer cannot pin 16 × (block-sized) TX
+   blobs per client by emitting oversized TX_C carriers. */
+#define SPV_PQC_PENDING_TXC_RAW_MAX 100000u
+
 typedef struct spv_pqc_pending_commit {
     uint8_t commit[32];           /* 32-byte commit hash - used as hash key */
     dogecoin_pqc_algo_t algo;
@@ -1011,6 +1019,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 if (dogecoin_tx_extract_falcon512_commit(tx, falcon_commit_data)) {
                     char falcon_commit_hex[65];
                     utils_bin_to_hex(falcon_commit_data, 32, falcon_commit_hex);
+                    if ((size_t)consumedlength > SPV_PQC_PENDING_TXC_RAW_MAX) {
+                        client->nodegroup->log_write_cb("[falcon-commit] Refusing oversized TX_C at height=%d txpos=%u commit=%s raw_len=%zu max=%u\n",
+                                                         pindex->height, i, falcon_commit_hex,
+                                                         (size_t)consumedlength,
+                                                         (unsigned)SPV_PQC_PENDING_TXC_RAW_MAX);
+                    } else {
                     client->nodegroup->log_write_cb("[falcon-commit] Pending at height=%d txpos=%u commit=%s source=op_return\n",
                                                      pindex->height, i, falcon_commit_hex);
                     spv_pqc_pending_commit_t* entry = dogecoin_calloc(1, sizeof(spv_pqc_pending_commit_t));
@@ -1026,12 +1040,19 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         }
                         spv_pqc_add_pending(client, entry);
                     }
+                    }
                 }
                 /* Dilithium2: buffer for cross-TX carrier match (TX_C → pending, TX_R validates via multi-part carrier) */
                 uint8_t dilithium_commit_data[32];
                 if (dogecoin_tx_extract_dilithium2_commit(tx, dilithium_commit_data)) {
                     char dilithium_commit_hex[65];
                     utils_bin_to_hex(dilithium_commit_data, 32, dilithium_commit_hex);
+                    if ((size_t)consumedlength > SPV_PQC_PENDING_TXC_RAW_MAX) {
+                        client->nodegroup->log_write_cb("[dilithium-commit] Refusing oversized TX_C at height=%d txpos=%u commit=%s raw_len=%zu max=%u\n",
+                                                         pindex->height, i, dilithium_commit_hex,
+                                                         (size_t)consumedlength,
+                                                         (unsigned)SPV_PQC_PENDING_TXC_RAW_MAX);
+                    } else {
                     client->nodegroup->log_write_cb("[dilithium-commit] Pending at height=%d txpos=%u commit=%s source=op_return\n",
                                                      pindex->height, i, dilithium_commit_hex);
                     spv_pqc_pending_commit_t* entry = dogecoin_calloc(1, sizeof(spv_pqc_pending_commit_t));
@@ -1047,6 +1068,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                         }
                         spv_pqc_add_pending(client, entry);
                     }
+                    }
                 }
                 /* Raccoon-G-44: buffer for cross-TX carrier match (TX_C → pending, TX_R validates via multi-part carrier) */
 #endif /* USE_LIBOQS Falcon/Dilithium Phase 1 */
@@ -1055,6 +1077,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                 if (dogecoin_tx_extract_raccoong44_commit(tx, raccoong_commit_data)) {
                     char raccoong_commit_hex[65];
                     utils_bin_to_hex(raccoong_commit_data, 32, raccoong_commit_hex);
+                    if ((size_t)consumedlength > SPV_PQC_PENDING_TXC_RAW_MAX) {
+                        client->nodegroup->log_write_cb("[raccoong-commit] Refusing oversized TX_C at height=%d txpos=%u commit=%s raw_len=%zu max=%u\n",
+                                                         pindex->height, i, raccoong_commit_hex,
+                                                         (size_t)consumedlength,
+                                                         (unsigned)SPV_PQC_PENDING_TXC_RAW_MAX);
+                    } else {
                     client->nodegroup->log_write_cb("[raccoong-commit] Pending at height=%d txpos=%u commit=%s source=op_return\n",
                                                      pindex->height, i, raccoong_commit_hex);
                     spv_pqc_pending_commit_t* entry = dogecoin_calloc(1, sizeof(spv_pqc_pending_commit_t));
@@ -1069,6 +1097,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                             entry->txc_raw_len = consumedlength;
                         }
                         spv_pqc_add_pending(client, entry);
+                    }
                     }
                 }
 #endif
