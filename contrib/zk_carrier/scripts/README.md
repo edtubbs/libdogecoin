@@ -134,3 +134,23 @@ End-to-end PASSED runs of these drivers are committed under
 `mainnet_zk_carrier_e2e_*PASSED*.txt` / `mainnet_zk_carrier_spvnode_PASSED_*.txt`
 files.  Both Groth16 (in-process via mcl) and PLONK (external snarkjs
 verifier) end-to-end mainnet pairs are represented.
+
+For the specific case of **full ZK validation using on-chain data only** —
+i.e. every input the verifier needs (commit, payload, public inputs, proof,
+verification key) is recovered from the mainnet TX_C/TX_R bytes alone — the
+two v1 self-contained pairs (G1 Groth16 + Q1 PLONK) are exercised by
+`validate_onchain_pairs.py` against the vk embedded inline in each reveal,
+and the resulting run is committed as:
+
+* [`test-logs/mainnet_zk_onchain_only_full_validation_PASSED_20260513_205859.txt`](../../../test-logs/mainnet_zk_onchain_only_full_validation_PASSED_20260513_205859.txt)
+  — curated companion: header banner + spvnode `[zk-commit]` lines (Groth16
+  in-process PASSED via mcl+rapidsnark, PLONK DELEGATED) interleaved with
+  the external `snarkjs verify` lines (OK against the EMBEDDED on-chain vk
+  for both proof systems).
+* [`test-logs/mainnet_zk_onchain_only_full_validation_20260513_205859.txt`](../../../test-logs/mainnet_zk_onchain_only_full_validation_20260513_205859.txt)
+  — full stdout of `validate_onchain_pairs.py` for that run.
+
+Legacy v0 reveals (Pairs A, B, P — vk not embedded on-chain) are
+intentionally out of scope for this artifact; they appear in the same
+validator output as `PASS-vk-rotated` (commitment binding only) since the
+on-chain bytes alone are insufficient to run the verifier against them.

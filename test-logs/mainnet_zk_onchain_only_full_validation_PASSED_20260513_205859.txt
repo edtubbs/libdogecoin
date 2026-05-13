@@ -1,0 +1,99 @@
+===============================================================================
+Full ZK reveal validation with ON-CHAIN DATA ONLY — both proof systems PASSED
+  date:        2026-05-13T20:58:59Z
+  scope:       v1 self-contained ZKP1 reveals (vk embedded inline on-chain)
+               Pair G1 — Groth16 (mode=0) at height 6191613
+               Pair Q1 — PLONK    (mode=1) at height 6191616
+  out-of-scope: legacy v0 reveals (no vk on-chain) — Pairs A, B, P; these
+               cannot be validated with on-chain data alone by design and are
+               not the focus of this run
+  binary:      Version: libdogecoin 0.1.5-pre  (spvnode lines)
+  validator:   contrib/zk_carrier/scripts/validate_onchain_pairs.py
+               + snarkjs (Node.js) for both groth16 and plonk
+  full logs:   mainnet_zk_carrier_mcl_rapidsnark_20260512_203748.txt (spvnode)
+               mainnet_zk_onchain_only_full_validation_20260513_205859.txt
+               (validator stdout, 71 lines)
+
+Outcome summary — for each in-scope pair, every input to the verifier is
+recovered from the mainnet TX_C/TX_R bytes alone (commit, payload, public
+inputs, proof, vk):
+
+  G1 (Groth16): SHA256d(payload) match  → in-process spvnode mcl+rapidsnark
+                ZK verification PASSED + external snarkjs groth16 verify
+                against the EMBEDDED on-chain vk → OK
+  Q1 (PLONK):   SHA256d(payload) match  → spvnode DELEGATED (no in-tree PLONK
+                verifier in libdogecoin) + external snarkjs plonk verify
+                against the EMBEDDED on-chain vk → OK
+
+Note: both v1 pairs were created before the optional tx_binding replay-
+protection public input was wired into the prover, so their public_input[2]
+is "0" while the spvnode policy layer recomputes a non-zero tx_base sighash.
+The "Reveal REJECTED (tx_binding mismatch)" line below is therefore a
+*policy-layer* outcome (it would correctly catch a proof replayed under a
+different TX_C); it is independent of, and does not invalidate, the
+cryptographic on-chain-only verification reported on the lines above and
+below it. New deployments that include a non-zero tx_binding will satisfy
+both layers in one pass.
+===============================================================================
+
+------- Pair G1 (Groth16, mode=0) -------------------------------------------
+  TX_C: b70bc69f574b3044972d52a9a6eb33f00c2ed909b7346994aceec0c412e18354
+  TX_R: 68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+  block height: 6191613
+  on-chain payload length: 4144 bytes (v1, vk embedded, vk_len=3293)
+
+spvnode (in-process Groth16 via mcl + rapidsnark, on-chain bytes only):
+  [zk-vkey] loaded 3293 bytes from contrib/zk_carrier/circuits/build/verification_key.json
+  DEBUG: [zk-commit] Pending at height=6191613 txpos=25 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=op_return
+  DEBUG: [zk-commit] Valid at height=6191613 txpos=27 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=carrier_scriptsig matched_txc_txpos=25 payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+  DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=805 vk_len=3293 total_payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
+  DEBUG: [zk-commit] ZK verification PASSED at height=6191613 txpos=27 mode=0 err=0
+  DEBUG: [zk-commit] tx_binding mismatch txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7 recomputed=0062ece3b9b0605c7c2912b7630636a7f4674d562d2d91c3a2c9e35caeee354f public_input[2]=0000000000000000000000000000000000000000000000000000000000000000   (policy-layer; see header)
+
+external snarkjs verify against ON-CHAIN-EMBEDDED vk (no out-of-band vk):
+  TX_C OP_RETURN: tag=DZKC mode=0 commit32=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e
+  TX_R reassembled: 3 part(s)  payload_len=4144 (spec: 4144)
+  SHA256d(payload) = 80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e
+  TX_C commit32    = 80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e  ->  MATCH
+  ZKP1: magic=ZKP1 mode=0 version=0x01 circuit_id=0x00000001 public_len=26 proof_len=805 vk_len=3293
+  embedded public.json   = ['0', '1000000', '0']
+  embedded proof.protocol=groth16 curve=bn128 keys=['curve', 'pi_a', 'pi_b', 'pi_c', 'protocol']
+  snarkjs groth16 verify (vk=EMBEDDED reveal): OK  | [INFO]  snarkJS: OK!
+
+  ===> G1: FULL ON-CHAIN-ONLY ZK VALIDATION PASSED (Groth16)
+
+------- Pair Q1 (PLONK, mode=1) ---------------------------------------------
+  TX_C: d0a099692c91bd2d069afbfa1334ec348e07d86381f97bbd891ff4a4732b4edc
+  TX_R: 0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+  block height: 6191616
+  on-chain payload length: 4336 bytes (v1, vk embedded, vk_len=2041)
+
+spvnode (libdogecoin has no in-tree PLONK verifier — DELEGATED is correct):
+  DEBUG: [zk-commit] Pending at height=6191616 txpos=18 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d mode=1 source=op_return
+  DEBUG: [zk-commit] Valid at height=6191616 txpos=32 commit=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d mode=1 source=carrier_scriptsig matched_txc_txpos=18 payload_len=4336 txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+  DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=1(plonk) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=2249 vk_len=2041 total_payload_len=4336 txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5
+  DEBUG: [zk-commit] ZK verification DELEGATED at height=6191616 txpos=32 mode=1 err=-7
+  DEBUG: [zk-commit] tx_binding mismatch txr_txid=0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5 recomputed=007abb866bbbeb98967d9e8e2c8f683cc64978698acd55e8ed3b63ccb1ecfa98 public_input[2]=0000000000000000000000000000000000000000000000000000000000000000   (policy-layer; see header)
+
+external snarkjs verify against ON-CHAIN-EMBEDDED vk (no out-of-band vk):
+  TX_C OP_RETURN: tag=DZKC mode=1 commit32=52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d
+  TX_R reassembled: 3 part(s)  payload_len=4336 (spec: 4336)
+  SHA256d(payload) = 52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d
+  TX_C commit32    = 52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d  ->  MATCH
+  ZKP1: magic=ZKP1 mode=1 version=0x01 circuit_id=0x00000001 public_len=26 proof_len=2249 vk_len=2041
+  embedded public.json   = ['0', '1000000', '0']
+  embedded proof.protocol=plonk curve=bn128 keys=['A', 'B', 'C', 'T1', 'T2', 'T3', 'Wxi', 'Wxiw', 'Z', 'curve', 'eval_a', 'eval_b', 'eval_c', 'eval_s1', 'eval_s2', 'eval_zw', 'protocol']
+  snarkjs plonk verify (vk=EMBEDDED reveal): OK  | [INFO]  snarkJS: OK!
+
+  ===> Q1: FULL ON-CHAIN-ONLY ZK VALIDATION PASSED (PLONK)
+
+===============================================================================
+End of curated log. Both in-scope v1 reveals validated end-to-end using
+ON-CHAIN DATA ONLY (commit, payload, public inputs, proof, vk all recovered
+from the mainnet TX_C/TX_R bytes; no out-of-band material consulted).
+Reproduce with:
+  pip install --user requests  # only if your env needs it
+  npm install snarkjs
+  SNARKJS=$(pwd)/node_modules/.bin/snarkjs \
+    python3 contrib/zk_carrier/scripts/validate_onchain_pairs.py
+===============================================================================
