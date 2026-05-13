@@ -91,9 +91,39 @@ external snarkjs verify against ON-CHAIN-EMBEDDED vk (no out-of-band vk):
 End of curated log. Both in-scope v1 reveals validated end-to-end using
 ON-CHAIN DATA ONLY (commit, payload, public inputs, proof, vk all recovered
 from the mainnet TX_C/TX_R bytes; no out-of-band material consulted).
-Reproduce with:
-  pip install --user requests  # only if your env needs it
+
+Reproduction commands (same recipe is documented in
+doc/spec/bip-zk-carrier-commitments.mediawiki §"Reproducing the on-chain-only
+validation"):
+
+  # 0. Build libdogecoin with the ZK carrier enabled. Add --with-mcl /
+  #    --with-rapidsnark if you want in-process Groth16 verification
+  #    ("ZK verification PASSED" vs. "DELEGATED" in the spvnode log).
+  ./autogen.sh
+  ./configure --enable-zk-carrier   # optionally: --with-mcl --with-rapidsnark
+  make -j
+
+  # 1. spvnode mainnet rescan against the funded carrier address
+  #    (-p uses the baked-in checkpoint at height 6191600 so only the final
+  #    ~30 headers are synced before reaching Pairs G1/Q1):
+  ./spvnode -l -p -b -d \
+      -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr \
+      --zk-vkey contrib/zk_carrier/circuits/build/verification_key.json \
+      scan 2>&1 | tee /tmp/spvnode_zk_rescan.log
+  grep -E '\[zk-vkey\]|\[zk-commit\] (Pending|Valid|reveal_decoded|ZK verification|Reveal validated)' \
+      /tmp/spvnode_zk_rescan.log
+
+  # 2. Independent on-chain audit (fetches raw tx hex from
+  #    api.blockchair.com/dogecoin, reassembles ZKP1, extracts the embedded
+  #    vk, then invokes snarkjs verify against the recovered files):
   npm install snarkjs
-  SNARKJS=$(pwd)/node_modules/.bin/snarkjs \
-    python3 contrib/zk_carrier/scripts/validate_onchain_pairs.py
+  SNARKJS="$PWD/node_modules/.bin/snarkjs" \
+      python3 contrib/zk_carrier/scripts/validate_onchain_pairs.py \
+      2>&1 | tee /tmp/validate_onchain_pairs.log
+
+  # 2a. The per-pair snarkjs invocation the script issues (so an auditor can
+  #     re-run it by hand against the recovered files) is:
+  #       snarkjs groth16 verify recovered_vk.json recovered_public.json recovered_proof.json   # G1
+  #       snarkjs plonk   verify recovered_vk.json recovered_public.json recovered_proof.json   # Q1
+  #     Both calls MUST exit 0 and print "[INFO]  snarkJS: OK!".
 ===============================================================================

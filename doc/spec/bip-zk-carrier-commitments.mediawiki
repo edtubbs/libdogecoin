@@ -709,6 +709,59 @@ Independent on-chain audit (<code>contrib/zk_carrier/scripts/validate_onchain_pa
 
 The <code>PASS</code> line for Pair G1 / Pair Q1 is the strongest possible on-chain claim this BIP can make: every byte that the verifier consumes — <code>public_inputs</code>, <code>proof</code>, AND <code>vk</code> — was recovered from a single TX_R reveal and bound back to the matching TX_C commit by <code>SHA256d</code>; no out-of-band file or registry was consulted at any step. <code>snarkjs</code> is the canonical reference verifier for both Groth16 and PLONK proofs; an equivalent <code>spvnode</code> verdict can be obtained by rebuilding libdogecoin with <code>HAVE_RAPIDSNARK</code> and the <code>--zk-vkey-from-reveal</code> mode (planned for the next phase).
 
+===Reproducing the on-chain-only validation===
+
+The two outputs above (the <code>spvnode --zk-vkey</code> rescan log and the independent <code>validate_onchain_pairs.py</code> summary) are produced by the following exact command sequence. Anyone with a Linux/macOS host, <code>node</code>, and a libdogecoin checkout can re-run it; the committed run is preserved at <code>test-logs/mainnet_zk_onchain_only_full_validation_PASSED_20260513_205859.txt</code> (curated, with banner) and <code>test-logs/mainnet_zk_onchain_only_full_validation_20260513_205859.txt</code> (raw validator stdout).
+
+<source lang="bash">
+# 0. Build libdogecoin with the ZK carrier enabled. Add --with-mcl (and/or
+#    --with-rapidsnark) here if you want spvnode to report
+#    "ZK verification PASSED" in-process instead of "DELEGATED" for Groth16;
+#    PLONK always reports DELEGATED because libdogecoin has no in-tree PLONK
+#    verifier (rapidsnark v0.0.8 upstream is Groth16-only).
+./autogen.sh
+./configure --enable-zk-carrier   # optionally: --with-mcl --with-rapidsnark
+make -j
+
+# 1. spvnode mainnet rescan against the funded carrier address. The -p flag
+#    consumes the baked-in checkpoint at height 6191600 so the rescan only
+#    syncs the final ~30 headers before reaching Pairs G1 and Q1.
+./spvnode -l -p -b -d \
+    -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr \
+    --zk-vkey contrib/zk_carrier/circuits/build/verification_key.json \
+    scan 2>&1 | tee /tmp/spvnode_zk_rescan.log
+
+#    Grep only the consensus-relevant carrier lines for the curated log:
+grep -E '\[zk-vkey\]|\[zk-commit\] (Pending|Valid|reveal_decoded|ZK verification|Reveal validated)' \
+    /tmp/spvnode_zk_rescan.log
+
+# 2. Independent on-chain audit — fetches each TX_C/TX_R as raw hex from
+#    api.blockchair.com/dogecoin, reassembles the ZKP1 payload, recomputes
+#    SHA256d(payload) against the OP_RETURN commit, extracts the embedded
+#    (public_inputs, proof, vk) tuple, writes the recovered vk to a temp
+#    file, and invokes the canonical snarkjs verifier against it.
+npm install snarkjs                              # one-time, vendored locally
+SNARKJS="$PWD/node_modules/.bin/snarkjs" \
+    python3 contrib/zk_carrier/scripts/validate_onchain_pairs.py \
+    2>&1 | tee /tmp/validate_onchain_pairs.log
+
+#    The underlying per-pair invocation the script issues — emitted verbatim
+#    so an auditor can run it by hand on the recovered files — is:
+#
+#      snarkjs groth16 verify recovered_vk.json recovered_public.json recovered_proof.json   # Pair G1
+#      snarkjs plonk   verify recovered_vk.json recovered_public.json recovered_proof.json   # Pair Q1
+#
+#    Both calls MUST exit 0 and print "[INFO]  snarkJS: OK!" — that line plus
+#    "PASS  (full end-to-end verification (v1 self-contained reveal))" is the
+#    on-chain-only validation success indicator for the respective proof
+#    system.
+
+# 3. (Optional) Combine the two transcripts into a single curated artifact in
+#    the same layout as test-logs/mainnet_zk_onchain_only_full_validation_PASSED_*.txt.
+</source>
+
+The validator and spvnode read complementary slices of the on-chain bytes — spvnode walks the chain locally and emits the <code>[zk-commit] reveal_decoded</code> trace, while <code>validate_onchain_pairs.py</code> pulls the same TX_C/TX_R raw hex from a public block explorer and runs the cryptographic verify — so a passing run with the commands above demonstrates the property end-to-end from two independent code paths.
+
 
 ==Deployment==
 
