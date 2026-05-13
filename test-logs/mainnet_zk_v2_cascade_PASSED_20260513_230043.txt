@@ -1,0 +1,121 @@
+==================================================================================
+Mainnet ZK-carrier v2 (replay-resistant: tx_binding) cascade — PASSED
+Date (UTC): 2026-05-13T23:00:43+00:00
+Funded address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+Funded WIF:     QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w   (provided by operator)
+Explorer:       https://chain.so/address/DOGE/DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+
+Mainnet checkpoint added in this PR (used for fast-sync by spvnode):
+  height: 6205422
+  hash:   7ed56f838dfec9048942250c08e37101f650f1934f95bdd15311805a4e4b78df
+  time:   1778711881  (2026-05-13T22:38:01Z)
+  bits:   0x197fb0b1
+
+Build artefacts:
+  ./such       : Version: libdogecoin 0.1.5-pre
+  ./spvnode    : Version: libdogecoin 0.1.5-pre  (built with --enable-zk-carrier)
+  vk_groth16   sha256: 1e8c04b470673517f2b72a335e78b5b5d19ab75b82ae6954dc671abc3d5de157
+  vk_plonk     sha256: 7896236acf663659a035c9d247ed846bf83032cecffc080ceddb3c72191eafd8
+  zkey_groth16 sha256: 23429021dc53da8b6bcf3757513ebcb3058edd12600c851ae0c00dc068f048c5
+  zkey_plonk   sha256: 3740751e32acdad36856c2492747c52645464e8639b413028c68445b46603290
+
+v2 differs from v1 by binding each proof to the funding tx via a third
+public input  tx_binding == tx_base_sighash(TX_C)  (top byte zeroed to fit BN254).
+spvnode recomputes the same hash from on-chain bytes and enforces equality:
+  *  match   → [zk-commit] Reveal validated
+  *  mismatch → [zk-commit] tx_binding mismatch  (the proof becomes unspendable on a different funding tx)
+
+Manifests:
+  test-logs/zk_v2_groth16_20260513_224705/manifest.tsv :
+    iter	tx_c_txid	tx_r_txid	commit	payload_bytes	utc_iso
+    1	c7058e419eadfbc5127df9a7c4f731c9bf4df0742cabc04760bab1e109b537d8	5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad	52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3	4219	2026-05-13T22:47:42Z
+  test-logs/zk_v2_plonk_20260513_224822/manifest.tsv :
+    iter	tx_c_txid	tx_r_txid	commit	payload_bytes	utc_iso
+    1	af37e7b812b5d8779b31669b2979dd3c50f665b4cc70216083e0134f71077f60	e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42	b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867	4408	2026-05-13T22:49:30Z
+
+==================================================================================
+Pair G2 — Groth16 (mode=0) at height 6205433
+==================================================================================
+  TX_C: c7058e419eadfbc5127df9a7c4f731c9bf4df0742cabc04760bab1e109b537d8
+  TX_R: 5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad
+  block height: 6205433   confirmed: 2026-05-13T22:50:09Z
+  on-chain payload length: 4219 bytes (v1, vk embedded, vk_len=3293)
+  tx_binding (recomputed by spvnode): 00d0caabc545a08db62920f5c3b2621a5e000eb040659c3c110bb65a109a7d48
+
+  spvnode --zk-vkey verification_key.json scan — relevant lines:
+    [zk-vkey] loaded 3293 bytes from /home/runner/work/libdogecoin/libdogecoin/contrib/zk_carrier/circuits/build/verification_key.json
+    DEBUG: [zk-commit] Pending at height=6205433 txpos=20 commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 mode=0 source=op_return
+    DEBUG: [zk-commit] Pending at height=6205433 txpos=21 commit=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867 mode=1 source=op_return
+    DEBUG: [zk-commit] Valid at height=6205433 txpos=32 commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 mode=0 source=carrier_scriptsig matched_txc_txpos=20 payload_len=4219 txr_txid=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad
+    DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x01 circuit_id=0x00000001 public_len=100 proof_len=806 vk_len=3293 total_payload_len=4219 txr_txid=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad
+    DEBUG: [zk-commit] reveal_decoded.public_inputs: len=100 hex=5b0a202230222c0a202231303030303030222c0a2022333638393032393733313632303030313239313432333431363637323132383638363133313532383938313139373637333935313232343036383833373335383034373338393630373132220a5d ascii="[  "0",  "1000000",  "368902973162000129142341667212868613152898119767395122406883735804738960712" ]"
+    DEBUG: [zk-commit] reveal_decoded.proof: len=806 hex_head=7b0a202270695f61223a205b0a202022313339393338363439393539313134383031373332323733373536313234383931313336383032343936383537383037 hex_tail=3537373334383339222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "pi_a": [   "13993864995911480173227375612489113680249685780708322949211098961313159174544", "
+    DEBUG: [zk-commit] reveal_decoded.vk: len=3293 hex_head=7b0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022766b hex_tail=30333530373731383231373634333139393435363434373538363231333839343031333835343631313035363734222c0a2020202231220a20205d0a205d0a7d ascii_head="{  "protocol": "groth16",  "curve": "bn128",  "nPublic": 3,  "vk_alpha_1": [   "1564531949608914"
+    DEBUG: [zk-commit] tx_binding match txr_txid=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad recomputed=00d0caabc545a08db62920f5c3b2621a5e000eb040659c3c110bb65a109a7d48 public_input[2]=00d0caabc545a08db62920f5c3b2621a5e000eb040659c3c110bb65a109a7d48
+    DEBUG: [zk-commit] ZK verification DELEGATED at height=6205433 txpos=32 mode=0 err=-7
+    DEBUG: [zk-commit] Reveal validated: TX_R=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 payload_len=4219 mode=0 height=6205433
+    DEBUG: [zk-commit] Valid at height=6205433 txpos=33 commit=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867 mode=1 source=carrier_scriptsig matched_txc_txpos=21 payload_len=4408 txr_txid=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42
+    DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=1(plonk) version=0x01 circuit_id=0x00000001 public_len=100 proof_len=2247 vk_len=2041 total_payload_len=4408 txr_txid=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42
+    DEBUG: [zk-commit] reveal_decoded.public_inputs: len=100 hex=5b0a202230222c0a202231303030303030222c0a2022333338353532333736353539333337383432323534303436383739333833383331303434323738323434353836383432373934383437313836333734363638373033343838393038393836220a5d ascii="[  "0",  "1000000",  "338552376559337842254046879383831044278244586842794847186374668703488908986" ]"
+    DEBUG: [zk-commit] reveal_decoded.proof: len=2247 hex_head=7b0a202241223a205b0a202022383538303438333733363131363735343039303733313436323033383739313935333738353338333034323937343337393538 hex_tail=3233313839323134303934383836363431343633222c0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "A": [   "8580483736116754090731462038791953785383042974379589411794230416818607097025",   "4"
+    DEBUG: [zk-commit] reveal_decoded.vk: len=2041 hex_head=7b0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022706f7765 hex_tail=36303931353230323837383134313831313735343330303837313639303237393734323436373531363130353036393432323134383432373031373734220a7d ascii_head="{  "protocol": "plonk",  "curve": "bn128",  "nPublic": 3,  "power": 9,  "k1": "2",  "k2": "3",  "
+    DEBUG: [zk-commit] tx_binding match txr_txid=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42 recomputed=00bf9d25931b6fc41e34d9b7f2d35ed657c27004280e073ee5df9ddd7ff19eba public_input[2]=00bf9d25931b6fc41e34d9b7f2d35ed657c27004280e073ee5df9ddd7ff19eba
+    DEBUG: [zk-commit] ZK verification DELEGATED at height=6205433 txpos=33 mode=1 err=-7
+    DEBUG: [zk-commit] Reveal validated: TX_R=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42 commit=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867 payload_len=4408 mode=1 height=6205433
+
+  Explorer:  https://blockchair.com/dogecoin/transaction/c7058e419eadfbc5127df9a7c4f731c9bf4df0742cabc04760bab1e109b537d8
+             https://blockchair.com/dogecoin/transaction/5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad
+
+==================================================================================
+Pair Q2 — PLONK (mode=1) at height 6205433
+==================================================================================
+  TX_C: af37e7b812b5d8779b31669b2979dd3c50f665b4cc70216083e0134f71077f60
+  TX_R: e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42
+  block height: 6205433   confirmed: 2026-05-13T22:50:09Z
+  on-chain payload length: 4408 bytes (v1, vk embedded, vk_len=2041)
+  tx_binding (recomputed by spvnode): 00bf9d25931b6fc41e34d9b7f2d35ed657c27004280e073ee5df9ddd7ff19eba
+
+  spvnode --zk-vkey verification_key_plonk.json scan — relevant lines:
+    [zk-vkey] loaded 2041 bytes from /home/runner/work/libdogecoin/libdogecoin/contrib/zk_carrier/circuits/build/verification_key_plonk.json
+    DEBUG: [zk-commit] Pending at height=6205433 txpos=20 commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 mode=0 source=op_return
+    DEBUG: [zk-commit] Pending at height=6205433 txpos=21 commit=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867 mode=1 source=op_return
+    DEBUG: [zk-commit] Valid at height=6205433 txpos=32 commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 mode=0 source=carrier_scriptsig matched_txc_txpos=20 payload_len=4219 txr_txid=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad
+    DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x01 circuit_id=0x00000001 public_len=100 proof_len=806 vk_len=3293 total_payload_len=4219 txr_txid=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad
+    DEBUG: [zk-commit] reveal_decoded.public_inputs: len=100 hex=5b0a202230222c0a202231303030303030222c0a2022333638393032393733313632303030313239313432333431363637323132383638363133313532383938313139373637333935313232343036383833373335383034373338393630373132220a5d ascii="[  "0",  "1000000",  "368902973162000129142341667212868613152898119767395122406883735804738960712" ]"
+    DEBUG: [zk-commit] reveal_decoded.proof: len=806 hex_head=7b0a202270695f61223a205b0a202022313339393338363439393539313134383031373332323733373536313234383931313336383032343936383537383037 hex_tail=3537373334383339222c0a20202231220a205d2c0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "pi_a": [   "13993864995911480173227375612489113680249685780708322949211098961313159174544", "
+    DEBUG: [zk-commit] reveal_decoded.vk: len=3293 hex_head=7b0a202270726f746f636f6c223a202267726f74683136222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022766b hex_tail=30333530373731383231373634333139393435363434373538363231333839343031333835343631313035363734222c0a2020202231220a20205d0a205d0a7d ascii_head="{  "protocol": "groth16",  "curve": "bn128",  "nPublic": 3,  "vk_alpha_1": [   "1564531949608914"
+    DEBUG: [zk-commit] tx_binding match txr_txid=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad recomputed=00d0caabc545a08db62920f5c3b2621a5e000eb040659c3c110bb65a109a7d48 public_input[2]=00d0caabc545a08db62920f5c3b2621a5e000eb040659c3c110bb65a109a7d48
+    DEBUG: [zk-commit] ZK verification DELEGATED at height=6205433 txpos=32 mode=0 err=-7
+    DEBUG: [zk-commit] Reveal validated: TX_R=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 payload_len=4219 mode=0 height=6205433
+    DEBUG: [zk-commit] Valid at height=6205433 txpos=33 commit=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867 mode=1 source=carrier_scriptsig matched_txc_txpos=21 payload_len=4408 txr_txid=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42
+    DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=1(plonk) version=0x01 circuit_id=0x00000001 public_len=100 proof_len=2247 vk_len=2041 total_payload_len=4408 txr_txid=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42
+    DEBUG: [zk-commit] reveal_decoded.public_inputs: len=100 hex=5b0a202230222c0a202231303030303030222c0a2022333338353532333736353539333337383432323534303436383739333833383331303434323738323434353836383432373934383437313836333734363638373033343838393038393836220a5d ascii="[  "0",  "1000000",  "338552376559337842254046879383831044278244586842794847186374668703488908986" ]"
+    DEBUG: [zk-commit] reveal_decoded.proof: len=2247 hex_head=7b0a202241223a205b0a202022383538303438333733363131363735343039303733313436323033383739313935333738353338333034323937343337393538 hex_tail=3233313839323134303934383836363431343633222c0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238220a7d ascii_head="{  "A": [   "8580483736116754090731462038791953785383042974379589411794230416818607097025",   "4"
+    DEBUG: [zk-commit] reveal_decoded.vk: len=2041 hex_head=7b0a202270726f746f636f6c223a2022706c6f6e6b222c0a20226375727665223a2022626e313238222c0a20226e5075626c6963223a20332c0a2022706f7765 hex_tail=36303931353230323837383134313831313735343330303837313639303237393734323436373531363130353036393432323134383432373031373734220a7d ascii_head="{  "protocol": "plonk",  "curve": "bn128",  "nPublic": 3,  "power": 9,  "k1": "2",  "k2": "3",  "
+    DEBUG: [zk-commit] tx_binding match txr_txid=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42 recomputed=00bf9d25931b6fc41e34d9b7f2d35ed657c27004280e073ee5df9ddd7ff19eba public_input[2]=00bf9d25931b6fc41e34d9b7f2d35ed657c27004280e073ee5df9ddd7ff19eba
+    DEBUG: [zk-commit] ZK verification DELEGATED at height=6205433 txpos=33 mode=1 err=-7
+    DEBUG: [zk-commit] Reveal validated: TX_R=e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42 commit=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867 payload_len=4408 mode=1 height=6205433
+
+  Explorer:  https://blockchair.com/dogecoin/transaction/af37e7b812b5d8779b31669b2979dd3c50f665b4cc70216083e0134f71077f60
+             https://blockchair.com/dogecoin/transaction/e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42
+
+==================================================================================
+Independent on-chain-only validator (validate_onchain_pairs.py) — SUMMARY
+==================================================================================
+
+========= INDEPENDENT ON-CHAIN VALIDATION SUMMARY =========
+  Pair A: PASS-vk-rotated    (commitment binding + real proof bytes; vk rotated since publication)
+  Pair B: PASS-vk-rotated    (commitment binding + real proof bytes; vk rotated since publication)
+  Pair P: PASS-vk-rotated    (commitment binding + real proof bytes; vk rotated since publication)
+  Pair G1: PASS               (full end-to-end verification (v1 self-contained reveal))
+  Pair Q1: PASS               (full end-to-end verification (v1 self-contained reveal))
+  Pair G2: PASS               (full end-to-end verification (v1 self-contained reveal))
+  Pair Q2: PASS               (full end-to-end verification (v1 self-contained reveal))
+validate_onchain_pairs exit_rc=0
+
+Reproduce with:
+  ./autogen.sh && ./configure --enable-zk-carrier --enable-test-passwd --disable-shared && make -j$(nproc)
+  npm install snarkjs && export PATH="$PWD/node_modules/.bin:$PATH"
+  CARRIER_VALUE_KOINU=50000000 PROOF_SYSTEM=groth16 N=1 contrib/zk_carrier/scripts/broadcast_set.sh
+  CARRIER_VALUE_KOINU=50000000 PROOF_SYSTEM=plonk   N=1 contrib/zk_carrier/scripts/broadcast_set.sh
+  python3 contrib/zk_carrier/scripts/validate_onchain_pairs.py

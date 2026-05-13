@@ -288,6 +288,17 @@ PAIRS = [
         "mode": 0, "payload_len": 4144,
         "vk_rotated_ok": False,  # v1: vk embedded inline; verify must pass against the embedded vk
     },
+    # v2 replay-resistant cascade — fresh run 2026-05-13 against funded
+    # address DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr.  Differs from v1 (G1/Q1)
+    # in that each proof commits to `tx_binding == tx_base_sighash(TX_C)` as
+    # its 3rd public input (witness_helper.py was invoked with
+    # `--tx-binding-hex 00<31 bytes>` derived from `such tx_sighash32`
+    # against the carrier-stripped TX_C), so lifting the (vk, proof) tuple
+    # onto an unrelated funding tx makes spvnode emit
+    # `[zk-commit] tx_binding mismatch` instead of `Reveal validated`.
+    # On-chain confirmation: both TX_C/TX_R landed in mainnet block 6205433
+    # at 2026-05-13T22:50:09Z; spvnode rescan reported
+    # `tx_binding match` + `Reveal validated` for both pairs.
     {
         "tag": "Q1", "system": "plonk",
         "tx_c": "d0a099692c91bd2d069afbfa1334ec348e07d86381f97bbd891ff4a4732b4edc",
@@ -295,6 +306,22 @@ PAIRS = [
         "commit32": "52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d",
         "mode": 1, "payload_len": 4336,
         "vk_rotated_ok": False,  # v1: vk embedded inline; verify must pass against the embedded vk
+    },
+    {
+        "tag": "G2", "system": "groth16",
+        "tx_c": "c7058e419eadfbc5127df9a7c4f731c9bf4df0742cabc04760bab1e109b537d8",
+        "tx_r": "5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad",
+        "commit32": "52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3",
+        "mode": 0, "payload_len": 4219,
+        "vk_rotated_ok": False,  # v2: vk embedded inline; tx_binding-bound; verify against embedded vk
+    },
+    {
+        "tag": "Q2", "system": "plonk",
+        "tx_c": "af37e7b812b5d8779b31669b2979dd3c50f665b4cc70216083e0134f71077f60",
+        "tx_r": "e963a3f3b41be04790caf4c12023c41754f552789a98d2fe4f2bd40ae7af0a42",
+        "commit32": "b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867",
+        "mode": 1, "payload_len": 4408,
+        "vk_rotated_ok": False,  # v2: vk embedded inline; tx_binding-bound; verify against embedded vk
     },
 ]
 

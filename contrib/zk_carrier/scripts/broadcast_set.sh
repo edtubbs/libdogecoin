@@ -470,6 +470,24 @@ for ((iter=1; iter<=N; iter++)); do
     ITER_DIR="$WORK/iter_${iter}"
     mkdir -p "$ITER_DIR"
 
+    # 1a. Compute tx_base_sighash for replay-resistant binding.  spvnode's
+    #     dogecoin_zk_compute_tx_base_sighash strips OP_RETURN + carrier
+    #     P2SH outputs from TX_C and restores carrier_total to the first
+    #     remaining output, then SIGHASH_ALLs input 0 against the signer's
+    #     P2PKH spk.  The reconstruction is byte-equivalent to a 1-input /
+    #     1-P2PKH-output tx with value = PREV_VAL - TX_FEE_KOINU.  Top byte
+    #     is zeroed so the result fits the BN254 scalar field (248 bits of
+    #     domain remain — comfortably collision-resistant for a tx tag).
+    SIGHASH_CHANGE_KOINU=$(( PREV_VAL - TX_FEE_KOINU ))
+    SIGHASH_BASE_TX=$(build_base_unsigned "$PREV_TXID" "$PREV_VOUT" "$SIGHASH_CHANGE_KOINU" "$PREV_SPK")
+    TX_BINDING_RAW=$("$SUCH" $NETWORK_FLAG -c tx_sighash32 -x "$SIGHASH_BASE_TX" \
+                     -s "$PREV_SPK" -i 0 -h 1 2>&1 \
+                     | awk -F': ' '/^tx_sighash32:/ {print $2; exit}' | tr -d ' ')
+    [ -n "$TX_BINDING_RAW" ] && [ "${#TX_BINDING_RAW}" -eq 64 ] \
+        || die "iter $iter: failed to derive tx_base_sighash (got '$TX_BINDING_RAW')"
+    TX_BINDING_HEX="00${TX_BINDING_RAW:2:62}"
+    info "tx_binding: $TX_BINDING_HEX  (top byte zeroed for BN254 field)"
+
     # 1. Generate a fresh proof.  Vary --amount per iteration so each commit differs.
     AMT=$(( 42000 + iter * 1000 ))
     PAYLOAD_HEX_FILE="$ITER_DIR/payload.hex"
@@ -481,6 +499,7 @@ for ((iter=1; iter<=N; iter++)); do
         --wasm "$WASM" --zkey "$ZKEY" --vkey "$VKEY" \
         --circuit-id "$CIRCUIT_ID" \
         --low "$RANGE_LOW" --high "$RANGE_HIGH" --amount "$AMT" \
+        --tx-binding-hex "$TX_BINDING_HEX" \
         --save-proof  "$PROOF_JSON_FILE" \
         --save-public "$PUBLIC_JSON_FILE" \
         --out-payload "$PAYLOAD_HEX_FILE"
