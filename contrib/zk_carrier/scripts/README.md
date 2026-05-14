@@ -120,8 +120,8 @@ Loops `N` times.  For each iteration it:
    manifest.  Chains the next iteration off TX_C's change vout.
 
 After the loop, optionally launches one `spvnode --zk-vkey` scan over the
-whole height range and tees the resulting `[zk-commit] PASSED` lines (one
-triple per pair) to `test-logs/`.
+whole height range, producing the `[zk-commit] PASSED` lines (one triple
+per pair).
 
 See the script's own header comment block for the full prerequisite and
 environment-variable reference; the same `ZK_CARRIER_WIF` /
@@ -129,26 +129,33 @@ environment-variable reference; the same `ZK_CARRIER_WIF` /
 
 ## Run history
 
-End-to-end PASSED runs of these drivers are committed under
-[`test-logs/`](../../../test-logs/), specifically the
-`mainnet_zk_carrier_e2e_*PASSED*.txt` / `mainnet_zk_carrier_spvnode_PASSED_*.txt`
-files.  Both Groth16 (in-process via mcl) and PLONK (external snarkjs
-verifier) end-to-end mainnet pairs are represented.
+End-to-end mainnet runs of these drivers are auditable directly from
+on-chain data — both Groth16 (in-process via mcl) and PLONK (external
+snarkjs verifier) end-to-end mainnet pairs are represented. The canonical
+TX_C / TX_R pairs are listed in
+[`doc/spec/bip-zk-carrier-commitments.mediawiki`](../../../doc/spec/bip-zk-carrier-commitments.mediawiki)
+(see the "Mainnet v1 cascade" and "Mainnet v2 cascade" sections); fetching
+those txids from any Dogecoin node or block explorer reproduces every line
+of evidence.
 
 For the specific case of **full ZK validation using on-chain data only** —
 i.e. every input the verifier needs (commit, payload, public inputs, proof,
 verification key) is recovered from the mainnet TX_C/TX_R bytes alone — the
 two v1 self-contained pairs (G1 Groth16 + Q1 PLONK) are exercised by
-`validate_onchain_pairs.py` against the vk embedded inline in each reveal,
-and the resulting run is committed as:
+`validate_onchain_pairs.py` against the vk embedded inline in each reveal:
 
-* [`test-logs/mainnet_zk_onchain_only_full_validation_PASSED_20260513_205859.txt`](../../../test-logs/mainnet_zk_onchain_only_full_validation_PASSED_20260513_205859.txt)
-  — curated companion: header banner + spvnode `[zk-commit]` lines (Groth16
-  in-process PASSED via mcl+rapidsnark, PLONK DELEGATED) interleaved with
-  the external `snarkjs verify` lines (OK against the EMBEDDED on-chain vk
-  for both proof systems).
-* [`test-logs/mainnet_zk_onchain_only_full_validation_20260513_205859.txt`](../../../test-logs/mainnet_zk_onchain_only_full_validation_20260513_205859.txt)
-  — full stdout of `validate_onchain_pairs.py` for that run.
+* Pair G1 (Groth16, ZKP1 v1) — TX_C `b70bc69f574b3044972d52a9a6eb33f00c2ed909b7346994aceec0c412e18354`,
+  TX_R `68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7`
+  at block height 6191613 (commit32 `80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e`).
+* Pair Q1 (PLONK, ZKP1 v1) — TX_C `d0a099692c91bd2d069afbfa1334ec348e07d86381f97bbd891ff4a4732b4edc`,
+  TX_R `0033342456d866cc66d9b3b647a7ac0cb7a55200138a54ff68b89683c47d82b5`
+  at block height 6191616 (commit32 `52d47f210f4e185f11c4c28f71dc346b1b87a0ab5a69dcb84423e46239a34a5d`).
+
+Run `validate_onchain_pairs.py` against these txids (the script fetches the
+raw TX_C/TX_R hex from a public block explorer) and you get spvnode's
+`[zk-commit]` cross-walk (Groth16 in-process PASSED via mcl+rapidsnark,
+PLONK DELEGATED) plus the external `snarkjs verify` OK lines against the
+EMBEDDED on-chain vk for both proof systems.
 
 Legacy v0 reveals (Pairs A, B, P — vk not embedded on-chain) are
 intentionally out of scope for this artifact; they appear in the same
