@@ -793,6 +793,13 @@ The committed curated transcript of the v2 cascade — including the full broadc
 
 The two outputs above (the <code>spvnode --zk-vkey</code> rescan log and the independent <code>validate_onchain_pairs.py</code> summary) are produced by the following exact command sequence. Anyone with a Linux/macOS host, <code>node</code>, and a libdogecoin checkout can re-run it; the committed run is preserved at <code>test-logs/mainnet_zk_onchain_only_full_validation_PASSED_20260513_205859.txt</code> (curated, with banner) and <code>test-logs/mainnet_zk_onchain_only_full_validation_20260513_205859.txt</code> (raw validator stdout).
 
+The two steps cover complementary slices of the verification and must be read together:
+
+* '''Step 1 (spvnode rescan)''' is the chain-walker side. From chain bytes alone it (a) reassembles the chunked <code>ZKP1FULL</code> payload from each TX_R's carrier scriptSigs, (b) checks <code>SHA256d(payload) == commit32</code> against the matching TX_C OP_RETURN, and (c) recomputes <code>tx_binding == dogecoin_zk_compute_tx_base_sighash(TX_C)</code> for v2 cascade pairs. The <code>--zk-vkey contrib/zk_carrier/circuits/build/verification_key.json</code> argument here is '''not''' part of the on-chain-only claim — it is a locally pinned convenience input consumed only by the optional in-process Groth16 verifier (the path enabled by <code>--with-mcl</code> / <code>--with-rapidsnark</code>). In the default <code>--enable-zk-carrier</code> build spvnode emits <code>[zk-commit] ZK verification DELEGATED</code> for every pair and the file content is never fed to a cryptographic check; it is loaded purely so the <code>[zk-vkey] loaded N bytes</code> banner appears in the curated log alongside the consensus-relevant lines.
+* '''Step 2 (<code>validate_onchain_pairs.py</code>)''' is what actually backs the "on-chain only" claim cryptographically. It pulls the raw TX_C/TX_R hex from a public block explorer, extracts the embedded <code>(public_inputs, proof, vk)</code> tuple from the reassembled reveal, writes the '''recovered''' vk to a temp file, and invokes <code>snarkjs … verify recovered_vk.json …</code> against it — i.e. the vk it verifies under was decoded from the TX_R bytes, not from any file on disk, exactly as described in the "Per-pair on-chain decomposition" section above (<code>vk=EMBEDDED reveal</code>). No local <code>verification_key.json</code> is consulted in Step 2.
+
+A future libdogecoin build with <code>HAVE_RAPIDSNARK</code> and the planned <code>--zk-vkey-from-reveal</code> mode (referenced above) will let Step 1 do the cryptographic proof check against the inlined vk in-process, at which point both steps will independently satisfy the on-chain-only property. Until then, the <code>--zk-vkey</code> argument in Step 1 should be read as a logging/forward-compat hook, '''not''' as an out-of-band input to the on-chain-only verdict.
+
 <source lang="bash">
 # 0. Build libdogecoin with the ZK carrier enabled. Add --with-mcl (and/or
 #    --with-rapidsnark) here if you want spvnode to report
@@ -818,8 +825,12 @@ grep -E '\[zk-vkey\]|\[zk-commit\] (Pending|Valid|reveal_decoded|ZK verification
 # 2. Independent on-chain audit — fetches each TX_C/TX_R as raw hex from
 #    api.blockchair.com/dogecoin, reassembles the ZKP1 payload, recomputes
 #    SHA256d(payload) against the OP_RETURN commit, extracts the embedded
-#    (public_inputs, proof, vk) tuple, writes the recovered vk to a temp
-#    file, and invokes the canonical snarkjs verifier against it.
+#    (public_inputs, proof, vk) tuple from the reveal bytes themselves, writes
+#    the recovered vk to a temp file, and invokes the canonical snarkjs
+#    verifier against it. The on-chain-only cryptographic verdict comes from
+#    THIS step: the vk fed to snarkjs is the one decoded out of TX_R, not the
+#    local contrib/zk_carrier/circuits/build/verification_key.json file used
+#    by Step 1's --zk-vkey banner.
 npm install snarkjs                              # one-time, vendored locally
 SNARKJS="$PWD/node_modules/.bin/snarkjs" \
     python3 contrib/zk_carrier/scripts/validate_onchain_pairs.py \
@@ -840,7 +851,7 @@ SNARKJS="$PWD/node_modules/.bin/snarkjs" \
 #    the same layout as test-logs/mainnet_zk_onchain_only_full_validation_PASSED_*.txt.
 </source>
 
-The validator and spvnode read complementary slices of the on-chain bytes — spvnode walks the chain locally and emits the <code>[zk-commit] reveal_decoded</code> trace, while <code>validate_onchain_pairs.py</code> pulls the same TX_C/TX_R raw hex from a public block explorer and runs the cryptographic verify — so a passing run with the commands above demonstrates the property end-to-end from two independent code paths.
+The validator and spvnode read complementary slices of the on-chain bytes — spvnode walks the chain locally and emits the <code>[zk-commit] reveal_decoded</code> trace (commitment binding and <code>tx_binding</code> equality, both from chain bytes alone), while <code>validate_onchain_pairs.py</code> pulls the same TX_C/TX_R raw hex from a public block explorer, recovers the <code>vk</code> from the embedded reveal, and runs the cryptographic <code>snarkjs verify</code> against that recovered vk. The local <code>verification_key.json</code> path passed to <code>spvnode --zk-vkey</code> in Step 1 is '''not''' consulted by Step 2 and is not part of the on-chain-only verdict; a passing run with the commands above demonstrates the property end-to-end from two independent code paths.
 
 
 ==Deployment==
