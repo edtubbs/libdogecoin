@@ -787,11 +787,11 @@ Independent on-chain audit — same <code>validate_onchain_pairs.py</code> tool 
   Pair Q2: PASS              (full end-to-end verification (v1 self-contained reveal, tx_binding-bound))
 </pre>
 
-The committed curated transcript of the v2 cascade — including the full broadcast manifest, both <code>spvnode --zk-vkey</code> rescan tails, and the validator summary above — lives at <code>test-logs/mainnet_zk_v2_cascade_PASSED_20260513_230043.txt</code>; the raw validator stdout it cites is preserved at <code>test-logs/mainnet_zk_v2_onchain_only_full_validation_20260513_225955.txt</code>.
+Every byte cited in the v2 cascade transcript above (the broadcast manifest, the two <code>spvnode --zk-vkey</code> rescan tails, and the <code>validate_onchain_pairs.py</code> summary) is reproducible from Dogecoin mainnet alone: the canonical references are the two TX_C / TX_R pairs at block height 6205433 — <code>TX_C=c7058e41…b537d8</code> + <code>TX_R=5288fb5c…d892ad</code> (Pair G2, commit32 <code>52e6242f…3e3bf3</code>) and <code>TX_C=af37e7b8…077f60</code> + <code>TX_R=e963a3f3…f0a42</code> (Pair Q2, commit32 <code>b24f93f9…11867</code>). Fetching those four txids from any Dogecoin full node or block explorer and re-running the steps in "Reproducing the on-chain-only validation" below yields a bit-identical trace.
 
 ===Reproducing the on-chain-only validation===
 
-The two outputs above (the <code>spvnode --zk-vkey</code> rescan log and the independent <code>validate_onchain_pairs.py</code> summary) are produced by the following exact command sequence. Anyone with a Linux/macOS host, <code>node</code>, and a libdogecoin checkout can re-run it; the committed run is preserved at <code>test-logs/mainnet_zk_onchain_only_full_validation_PASSED_20260513_205859.txt</code> (curated, with banner) and <code>test-logs/mainnet_zk_onchain_only_full_validation_20260513_205859.txt</code> (raw validator stdout).
+The two outputs above (the <code>spvnode --zk-vkey</code> rescan log and the independent <code>validate_onchain_pairs.py</code> summary) are produced by the following exact command sequence. Anyone with a Linux/macOS host, <code>node</code>, and a libdogecoin checkout can re-run it against the same Dogecoin mainnet artifacts cited above — the v1 pairs at block heights 6191613 / 6191616 (<code>TX_C=b70bc69f…e18354</code> + <code>TX_R=68e6d111…cf14d7</code> for Pair G1, <code>TX_C=d0a09969…2b4edc</code> + <code>TX_R=00333424…d82b5</code> for Pair Q1) and the v2 pairs at block 6205433 (<code>TX_C=c7058e41…b537d8</code> + <code>TX_R=5288fb5c…d892ad</code> for Pair G2, <code>TX_C=af37e7b8…077f60</code> + <code>TX_R=e963a3f3…f0a42</code> for Pair Q2) — and obtain a bit-identical trace; no local snapshot file is required.
 
 The two steps cover complementary slices of the verification and must be read together:
 
@@ -847,8 +847,10 @@ SNARKJS="$PWD/node_modules/.bin/snarkjs" \
 #    on-chain-only validation success indicator for the respective proof
 #    system.
 
-# 3. (Optional) Combine the two transcripts into a single curated artifact in
-#    the same layout as test-logs/mainnet_zk_onchain_only_full_validation_PASSED_*.txt.
+# 3. (Optional) Combine the two transcripts into a single curated artifact
+#    keyed by the on-chain identifiers cited above (TX_C/TX_R txids, block
+#    heights, commit32) so a reviewer can re-fetch the same chain bytes and
+#    reproduce every line independently.
 </source>
 
 The validator and spvnode read complementary slices of the on-chain bytes — spvnode walks the chain locally and emits the <code>[zk-commit] reveal_decoded</code> trace (commitment binding and <code>tx_binding</code> equality, both from chain bytes alone), while <code>validate_onchain_pairs.py</code> pulls the same TX_C/TX_R raw hex from a public block explorer, recovers the <code>vk</code> from the embedded reveal, and runs the cryptographic <code>snarkjs verify</code> against that recovered vk. The local <code>verification_key.json</code> path passed to <code>spvnode --zk-vkey</code> in Step 1 is '''not''' consulted by Step 2 and is not part of the on-chain-only verdict; a passing run with the commands above demonstrates the property end-to-end from two independent code paths.
