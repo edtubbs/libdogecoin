@@ -617,7 +617,21 @@ int main(int argc, char* argv[]) {
                     uint8_t* buf = (uint8_t*)dogecoin_malloc((size_t)sz);
                     if (buf && fread(buf, 1, (size_t)sz, fp) == (size_t)sz) {
                         if (dogecoin_spv_client_set_zk_vkey(client, buf, (size_t)sz)) {
-                            printf("[zk-vkey] loaded %ld bytes from %s\n", sz, zk_vkey_path);
+#if defined(HAVE_MCL) || defined(HAVE_RAPIDSNARK)
+                            /* In-process Groth16 verifier is compiled in:
+                               the vkey bytes WILL feed a cryptographic check
+                               on every reassembled ZKP1 reveal. */
+                            printf("[zk-vkey] loaded %ld bytes from %s — in-process Groth16 verification ENABLED\n",
+                                   sz, zk_vkey_path);
+#else
+                            /* No in-process verifier compiled in: the vkey
+                               bytes are accepted by the SPV client but the
+                               reveal-time verifier always returns DELEGATED,
+                               so this banner is informational only and is
+                               NOT a cryptographic-check signal. */
+                            printf("[zk-vkey] loaded %ld bytes from %s — no in-process Groth16 verifier compiled in, every reveal will be DELEGATED (rebuild with --with-mcl or --with-rapidsnark to enable in-process verification)\n",
+                                   sz, zk_vkey_path);
+#endif
                         } else {
                             fprintf(stderr, "[zk-vkey] WARN: install failed — verification will be DELEGATED\n");
                         }
