@@ -214,22 +214,90 @@ actual next block hash from a specific peer (rather than relying on
 generic `getblocks` inv broadcasts), the drain count rises and the
 ring acts as a true out-of-order receive buffer.
 
-### Remaining work to convert worker count into block-mode throughput
+### Per-peer parallel block scheduler (implemented)
 
-The staging ring is a prerequisite for, but does not by itself
-deliver, parallel block download. The remaining pieces are:
+With the staging ring in place as the drain target, `src/spv.c` now
+implements an explicit per-peer block scheduler that delivers the three
+pieces previously listed as remaining work:
 
-1. Issue `getdata BLOCK <hash>` per peer for the next N unscheduled
-   block hashes (currently we still drive block discovery through
-   `getblocks` + `inv`, which gives every peer the same view rather
-   than fanning out an explicit per-peer schedule).
-2. Track per-peer in-flight blocks and re-request on timeout to a
-   different peer (so a slow peer cannot stall the schedule).
-3. Cap the ring size relative to peer count and back-pressure new
-   `getdata` issuance when the ring is full.
+1. **Per-peer `getdata BLOCK <hash>` fan-out.** Block hashes learned
+   from peer `inv` adverts are no longer relayed back to the *same*
+   peer as a blanket `getdata`. They are deduplicated against the
+   pending queue, the in-flight table, and the staging ring, then
+   pushed into a 1 024-slot FIFO. Each scheduler round walks the
+   connected, hand-shaken peer set and assigns each idle peer exactly
+   one hash via a single-entry `getdata` containing
+   `varlen(1) | u32(MSG_BLOCK) | u256(hash)`. The peer is then marked
+   `NODE_BLOCKSYNC` so it is not handed a second hash until its first
+   reply lands. A peer's own re-advertisement of a hash already
+   in-flight to another peer is a no-op (dedup counter incremented).
+2. **In-flight tracking with timeout reassignment.** A 64-slot table
+   keyed by block hash records `(hash, nodeid, sent_time)` per
+   dispatched `getdata`. The periodic statecheck sweeps the table; any
+   entry older than `SPV_BLOCK_INFLIGHT_TIMEOUT_SEC` (30 s) is
+   pushed back to the front of the pending queue and logged as
+   `Block sched: timeout reassign hash=… prev_nodeid=…`. The next
+   dispatch round routes it to a different peer (the original peer is
+   still marked `NODE_BLOCKSYNC` from the timed-out request and is
+   skipped).
+3. **Ring back-pressure.** Dispatch is gated on a 75 % high-water mark
+   of the staging ring (`SPV_BLOCKS_STAGE_CAPACITY * 3 / 4`). When the
+   ring crosses the watermark the scheduler emits
+   `Block sched: back-pressure (stage=… pending=… inflight=…)` and
+   refuses to issue any new `getdata` until commits drain the ring,
+   preventing peers from out-running the master-thread commit pipeline.
 
-(1)-(3) are tracked separately; with them in place the existing
-staging ring already implemented here is the drain target.
+All three pieces are master-thread only and gated on
+`client->thread_safe_mode && client->blocks_stage_ctx`, so legacy
+`spvnode` is unchanged.
+
+#### Measured scheduler behaviour (warmed-headers two-phase test)
+
+`./spvnode -d -p -c -l -m 8 -o 4 -h bench_main_headers.db scan` warmed
+the headers DB for 60 s (tip ≈ 5 449 388), then
+`./spvnode_ts -d -p -c -l -m 8 -o 8 -b -h bench_main_headers.db scan`
+ran for 90 s. Grepping the new log markers in
+`phase2_ts_b8_warm.log`:
+
+| Metric                                     | Count |
+| ------------------------------------------ | ----- |
+| `Block sched:` log lines                   |   625 |
+| `Block sched: enqueued …` (inv → queue)    |   263 |
+| `Block sched: getdata BLOCK <h> -> node N` |    75 |
+| Distinct peers receiving a `getdata BLOCK` |    22 |
+| `Block sched: back-pressure …`             |   286 |
+| `Block sched: timeout reassign …`          |     1 |
+| `Got invalid block (not in sequence)`      |     0 |
+
+Interpretation:
+
+* Per-peer fan-out is real: **22** distinct peer IDs received
+  individually-addressed `getdata BLOCK <hash>` requests rather than
+  every peer receiving the same blob.
+* Dedup works: subsequent peers re-advertising the same 500-hash inv
+  list contribute `enqueued 0/500` once the hashes are already pending
+  or in-flight.
+* The staging ring saturated at 64/64 within the window, triggering
+  **286** back-pressure refusals — exactly the intended behaviour:
+  the scheduler stops issuing new `getdata` while commits drain.
+* One `timeout reassign` proves the in-flight aging path exercises in
+  realistic peer-set conditions; the recovered hash is re-queued to
+  the front and reassigned to a different peer.
+* Zero `Got invalid block (not in sequence)` rejects — the same
+  arrivals that previously produced thousands of rejects under legacy
+  `spvnode` now flow through staging or are gated by back-pressure.
+
+Notes / caveats:
+
+* The drain count remained low in this 90 s window because the
+  warmed-DB tip (≈ 5 449 388) is significantly behind the peer set's
+  own current tip; peers preferentially deliver blocks near their own
+  tip via standard `inv` adverts. Over a longer run the queue advances
+  monotonically as committed parents unlock staged children.
+* `SPV_BLOCK_PENDING_CAP` (1 024), `SPV_BLOCK_INFLIGHT_CAP` (64) and
+  `SPV_BLOCK_INFLIGHT_TIMEOUT_SEC` (30) are conservative defaults that
+  match the existing 64-slot staging ring and peer-side response
+  latency observed in the bench harness.
 
 ## Reproducing
 

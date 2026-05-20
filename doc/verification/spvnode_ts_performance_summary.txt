@@ -1,15 +1,15 @@
 === legacy_w1 : spvnode -o 1  (90s) ===
-  elapsed=90s  mode=headers  connected=68000  rate=755.6/s  batches=1431  staged=0  invalid=1396  anchors=35  blocks=0  final_tip=5468000
+  elapsed=90s  mode=headers  connected=80000  rate=888.9/s  batches=2217  staged=0  invalid=2176  anchors=41  blocks=0  final_tip=5480000
 === legacy_w4 : spvnode -o 4  (90s) ===
-  elapsed=91s  mode=headers  connected=74000  rate=813.2/s  batches=1958  staged=0  invalid=1920  anchors=38  blocks=0  final_tip=5474000
+  elapsed=90s  mode=headers  connected=84000  rate=933.3/s  batches=1686  staged=0  invalid=1643  anchors=43  blocks=0  final_tip=5484000
 === ts_w1 : spvnode_ts -o 1  (90s) ===
-  elapsed=90s  mode=headers  connected=74000  rate=822.2/s  batches=1156  staged=1118  invalid=0  anchors=38  blocks=0  final_tip=5474000
+  elapsed=90s  mode=headers  connected=86000  rate=955.6/s  batches=1063  staged=1019  invalid=0  anchors=44  blocks=0  final_tip=5486000
 === ts_w2 : spvnode_ts -o 2  (90s) ===
-  elapsed=90s  mode=headers  connected=78000  rate=866.7/s  batches=1597  staged=1557  invalid=0  anchors=40  blocks=0  final_tip=5478000
+  elapsed=90s  mode=headers  connected=76000  rate=844.4/s  batches=2193  staged=2154  invalid=0  anchors=39  blocks=0  final_tip=5476000
 === ts_w4 : spvnode_ts -o 4  (90s) ===
-  elapsed=90s  mode=headers  connected=76000  rate=844.4/s  batches=1201  staged=1162  invalid=0  anchors=39  blocks=0  final_tip=5476000
+  elapsed=90s  mode=headers  connected=78000  rate=866.7/s  batches=2027  staged=1987  invalid=0  anchors=40  blocks=0  final_tip=5478000
 === ts_w8 : spvnode_ts -o 8  (90s) ===
-  elapsed=90s  mode=headers  connected=74000  rate=822.2/s  batches=2154  staged=2116  invalid=0  anchors=38  blocks=0  final_tip=5474000
+  elapsed=90s  mode=headers  connected=78000  rate=866.7/s  batches=1714  staged=1674  invalid=0  anchors=40  blocks=0  final_tip=5478000
 === legacy_b1 : spvnode -o 1 -b (90s) ===
   elapsed=90s  mode=blocks  connected=0  rate=0.0/s  batches=0  staged=0  invalid=0  anchors=0  blocks=0  final_tip=0
 === legacy_b4 : spvnode -o 4 -b (90s) ===
@@ -21,6 +21,11 @@
 === ts_b8 : spvnode_ts -o 8 -b (90s) ===
   elapsed=90s  mode=blocks  connected=0  rate=0.0/s  batches=0  staged=0  invalid=0  anchors=0  blocks=0  final_tip=0
 
-=== Block-mode warmed-headers staging (90s each) ===
-  ts_b1_warm: block_msgs=0 staged=0 drained=0 invalid=0
-  ts_b8_warm: block_msgs=98834 staged=93913 drained=0 invalid=0
+=== Per-peer block scheduler (warmed-headers two-phase, ts_b8) ===
+  block sched markers: 625
+  getdata BLOCK <h> dispatched: 75
+  distinct peers dispatched-to: 22
+  enqueue lines: 263
+  back-pressure events: 286
+  timeout reassigns: 1
+  invalid block rejects: 0
