@@ -1,7 +1,0 @@
-tag,bin,workers,mode,elapsed_s,connected_headers,headers_per_s,batches_2000,staged,invalid_rejects,distinct_locator_hashes,blocks_received
-legacy_w1,spvnode,1,headers,90,80000,888.9,1029,0,988,41,0
-legacy_w4,spvnode,4,headers,90,80000,888.9,1199,0,1158,41,0
-ts_w1,spvnode_ts,1,headers,90,82000,911.1,1002,960,0,42,0
-ts_w2,spvnode_ts,2,headers,90,84000,933.3,993,950,0,43,0
-ts_w4,spvnode_ts,4,headers,90,84000,933.3,823,780,0,43,0
-ts_w8,spvnode_ts,8,headers,90,86000,955.6,1201,1157,0,44,0

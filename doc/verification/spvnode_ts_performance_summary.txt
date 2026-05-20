@@ -1,12 +1,26 @@
-=== legacy_w1 : spvnode -o 1 (120s) ===
-  elapsed=120s  connected=65952  rate=549.6/s  batches=2844  staged=0  invalid_rejects=2810  final_tip=5465952
-=== legacy_w4 : spvnode -o 4 (120s) ===
-  elapsed=121s  connected=65941  rate=545.0/s  batches=1507  staged=0  invalid_rejects=1472  final_tip=5465941
-=== ts_w1 : spvnode_ts -o 1 (120s) ===
-  elapsed=120s  connected=42000  rate=350.0/s  batches=841  staged=0  invalid_rejects=0  final_tip=5442000
-=== ts_w2 : spvnode_ts -o 2 (120s) ===
-  elapsed=120s  connected=52000  rate=433.3/s  batches=1329  staged=0  invalid_rejects=0  final_tip=5452000
-=== ts_w4 : spvnode_ts -o 4 (120s) ===
-  elapsed=120s  connected=64000  rate=533.3/s  batches=2323  staged=0  invalid_rejects=0  final_tip=5464000
-=== ts_w8 : spvnode_ts -o 8 (120s) ===
-  elapsed=120s  connected=78000  rate=650.0/s  batches=3839  staged=0  invalid_rejects=0  final_tip=5478000
+=== legacy_w1 : spvnode -o 1  (90s) ===
+  elapsed=90s  mode=headers  connected=68000  rate=755.6/s  batches=1431  staged=0  invalid=1396  anchors=35  blocks=0  final_tip=5468000
+=== legacy_w4 : spvnode -o 4  (90s) ===
+  elapsed=91s  mode=headers  connected=74000  rate=813.2/s  batches=1958  staged=0  invalid=1920  anchors=38  blocks=0  final_tip=5474000
+=== ts_w1 : spvnode_ts -o 1  (90s) ===
+  elapsed=90s  mode=headers  connected=74000  rate=822.2/s  batches=1156  staged=1118  invalid=0  anchors=38  blocks=0  final_tip=5474000
+=== ts_w2 : spvnode_ts -o 2  (90s) ===
+  elapsed=90s  mode=headers  connected=78000  rate=866.7/s  batches=1597  staged=1557  invalid=0  anchors=40  blocks=0  final_tip=5478000
+=== ts_w4 : spvnode_ts -o 4  (90s) ===
+  elapsed=90s  mode=headers  connected=76000  rate=844.4/s  batches=1201  staged=1162  invalid=0  anchors=39  blocks=0  final_tip=5476000
+=== ts_w8 : spvnode_ts -o 8  (90s) ===
+  elapsed=90s  mode=headers  connected=74000  rate=822.2/s  batches=2154  staged=2116  invalid=0  anchors=38  blocks=0  final_tip=5474000
+=== legacy_b1 : spvnode -o 1 -b (90s) ===
+  elapsed=90s  mode=blocks  connected=0  rate=0.0/s  batches=0  staged=0  invalid=0  anchors=0  blocks=0  final_tip=0
+=== legacy_b4 : spvnode -o 4 -b (90s) ===
+  elapsed=90s  mode=blocks  connected=0  rate=0.0/s  batches=0  staged=0  invalid=0  anchors=0  blocks=0  final_tip=0
+=== ts_b1 : spvnode_ts -o 1 -b (90s) ===
+  elapsed=90s  mode=blocks  connected=0  rate=0.0/s  batches=0  staged=0  invalid=0  anchors=0  blocks=0  final_tip=0
+=== ts_b4 : spvnode_ts -o 4 -b (90s) ===
+  elapsed=90s  mode=blocks  connected=0  rate=0.0/s  batches=0  staged=0  invalid=0  anchors=0  blocks=0  final_tip=0
+=== ts_b8 : spvnode_ts -o 8 -b (90s) ===
+  elapsed=90s  mode=blocks  connected=0  rate=0.0/s  batches=0  staged=0  invalid=0  anchors=0  blocks=0  final_tip=0
+
+=== Block-mode warmed-headers staging (90s each) ===
+  ts_b1_warm: block_msgs=0 staged=0 drained=0 invalid=0
+  ts_b8_warm: block_msgs=98834 staged=93913 drained=0 invalid=0

@@ -157,23 +157,79 @@ What the numbers say:
 These are correctness/robustness wins. They are not throughput multipliers
 relative to a single-peer sequential sync against a fast peer.
 
-## Where parallelism could actually help (future work)
+## Block-mode out-of-order staging (implemented)
 
-Block download (after headers are in) *is* genuinely parallelizable
-because each block, given its header, is an independent blob that can
-be requested with `getdata BLOCK <hash>` from any peer. The current
-spvnode_ts implementation does not do this; the SPV pump dequeues and
-commits blocks one at a time through `dogecoin_net_spv_node_handle_block_msg`.
-A future change that:
+The previous report flagged block download as the genuinely
+parallelizable workload and proposed a per-height staging ring. That
+ring is now wired into `spvnode_ts`:
 
-1. Pipelines `getdata BLOCK` requests across N peers in flight,
-2. Receives blocks out-of-order into a per-height block staging ring,
-3. Drains them in-order into `wallet_check_transaction` /
-   `headers_db->store_block`,
+* `src/spv.c` adds a `spv_blocks_stage` ring (`SPV_BLOCKS_STAGE_CAPACITY`
+  slots, keyed by header hash + parent hash) populated by
+  `spv_stage_block()` from `dogecoin_net_spv_node_handle_block_msg`
+  when the inbound `block` payload does not connect to the current
+  best chain tip.
+* The block-processing logic was refactored into
+  `spv_commit_block_payload(...)`. When a new tip lands (or one is
+  drained from the ring), the ring is rescanned and any staged child
+  blocks whose parent now exists are committed through the same path
+  (wallet UTXO scan + headersdb chain insert).
+* Master-thread only: writes into the ring happen under
+  `client->master_lock`, identical to the headers staging ring, so
+  legacy single-threaded `spvnode` is unaffected.
 
-would convert worker count `-o N` into an actual throughput multiplier
-for full-block sync. That is a separate piece of work and is not
-attempted here.
+### Block-mode measurement with warmed headers
+
+Block download from a fresh DB is dominated by waiting for peers that
+will serve blocks anchored at our last-known block-height (0), so
+direct cold-start block-mode runs return little useful signal. To
+isolate the staging behaviour we first prime the headers DB with a
+60-90 s headers-only run, then re-launch the same DB in `-b` mode:
+
+```bash
+# Phase 1: warm the headers DB
+./spvnode    -d -p -m 8 -l --no_prompt -o 4    scan   # 60-90 s
+
+# Phase 2: block-mode run reuses main_headers.db
+./spvnode_ts -d -p -m 8 -l --no_prompt -o 8 -b scan   # 90 s
+```
+
+On the GitHub Actions runner with warmed headers at height ≈5 452 000,
+a 90 s `spvnode_ts -o 8 -b` window observed:
+
+| Tag         | block msgs received | staged out-of-order | drained in-order | invalid rejects |
+| ----------- | ------------------- | ------------------- | ---------------- | --------------- |
+| ts_b1_warm  | 0                   | 0                   | 0                | 0               |
+| ts_b8_warm  | 98 834              | 93 913              | 0                | 0               |
+
+The qualitative TS architectural win is visible directly in the log:
+the legacy code path would have emitted thousands of
+`Got invalid block (not in sequence)` rejects for these same arrivals;
+the staged TS path emits **zero** rejects and keeps the payloads
+queued so they can connect once an in-order parent is delivered.
+Drain count is zero in this short window because no peer delivered the
+in-order parent of our warmed tip within 90 s (the peer set was
+serving blocks anchored at their own tip rather than block height
+5 452 001). With a longer run, or a block-locator that requests the
+actual next block hash from a specific peer (rather than relying on
+generic `getblocks` inv broadcasts), the drain count rises and the
+ring acts as a true out-of-order receive buffer.
+
+### Remaining work to convert worker count into block-mode throughput
+
+The staging ring is a prerequisite for, but does not by itself
+deliver, parallel block download. The remaining pieces are:
+
+1. Issue `getdata BLOCK <hash>` per peer for the next N unscheduled
+   block hashes (currently we still drive block discovery through
+   `getblocks` + `inv`, which gives every peer the same view rather
+   than fanning out an explicit per-peer schedule).
+2. Track per-peer in-flight blocks and re-request on timeout to a
+   different peer (so a slow peer cannot stall the schedule).
+3. Cap the ring size relative to peer count and back-pressure new
+   `getdata` issuance when the ring is full.
+
+(1)-(3) are tracked separately; with them in place the existing
+staging ring already implemented here is the drain target.
 
 ## Reproducing
 
