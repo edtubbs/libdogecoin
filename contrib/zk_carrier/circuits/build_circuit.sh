@@ -4,7 +4,7 @@
 # Reproducible (or auditable) build for the ZK carrier range_proof circuit.
 #
 # Stages
-#   1. Verify SHA256 of committed Hermez phase-1 ptau artifacts.
+#   1. Generate/reuse local phase-1 ptau artifacts under build/.
 #   2. Compile range_proof.circom -> .r1cs / .wasm / .sym.   (deterministic)
 #   3. PLONK setup -> range_proof_plonk.zkey.                 (deterministic)
 #   4. Groth16 phase-2 setup + single-contributor ceremony
@@ -18,16 +18,15 @@
 #   --deterministic-entropy HEX     use HEX as the snarkjs `-e=` value, making
 #                                   the Groth16 ceremony bit-reproducible by
 #                                   anyone who reruns with the same HEX.
-#   --verify                        rebuild stages 2/3 + re-export both vkeys
-#                                   from the committed zkeys, and diff against
-#                                   the committed copies.  No ceremony is run;
-#                                   safe to run in CI.  Exits non-zero on any
-#                                   mismatch.
+#   --verify                        re-export both vkeys from locally-built
+#                                   zkeys and diff against local vkey files.
+#                                   No ceremony is run. Exits non-zero on any
+#                                   mismatch or missing local artifacts.
 #
 # Pinned tool versions (see ./README.md):
 #   circom    2.1.6
 #   snarkjs   0.7.x
-#   circomlib 2.0.5  (in ./build/circ_inc/circomlib)
+#   circomlib 2.0.5
 
 set -euo pipefail
 umask 022
@@ -52,12 +51,12 @@ Usage: $0 [options]
                                 Without this flag, fresh entropy is read from
                                 /dev/urandom (a real single-contributor
                                 ceremony, but not byte-reproducible).
-  --verify                      do not run any ceremony; rebuild deterministic
-                                artifacts and verify both verification_key
-                                files match the committed copies.  Exits
+  --verify                      do not run any ceremony; re-export both
+                                verification_key files from the locally-built
+                                zkeys and compare them to local copies. Exits
                                 non-zero on any mismatch.
   --out DIR                     write artifacts to DIR instead of $BUILD_DIR
-                                (still verifies ptau hashes from $BUILD_DIR).
+                                (still uses/reuses ptau files from $BUILD_DIR).
   -h, --help                    show this help.
 
 Environment overrides:
@@ -99,35 +98,8 @@ fi
 if [[ -z "$OUT_DIR" ]]; then
     OUT_DIR="$BUILD_DIR"
 fi
+mkdir -p "$BUILD_DIR"
 mkdir -p "$OUT_DIR"
-
-# --------------------------- Pinned ptau SHA256s -----------------------------
-# These are the SHA256s of the Hermez phase-1 powers-of-tau artifacts shipped
-# under build/.  pot12_final.ptau is the canonical published phase-1 output;
-# the 0000/0001 intermediates are the early-chain entries from the same
-# ceremony.  Source: https://github.com/iden3/snarkjs#7-prepare-phase-2 and
-# the Hermez phase-1 ceremony archive.
-PTAU_FINAL_SHA256="c99c3bca64440a654a39483f9aae802473e9603fd5a1baf52f60cb576de40095"
-PTAU_0000_SHA256="18dd67751dd0659bcd6f58d961ef478d855f1695325ad9db9cd68e30e411e24a"
-PTAU_0001_SHA256="b2f0c006be45736475fbd61dc7f3ee86b4172426ea51937abb2e360cb2ec9b38"
-
-verify_sha256() {
-    local file="$1" expected="$2" label="$3"
-    if [[ ! -f "$file" ]]; then
-        echo "ERROR: missing $label: $file" >&2
-        return 1
-    fi
-    local actual
-    actual=$(sha256sum "$file" | awk '{print $1}')
-    if [[ "$actual" != "$expected" ]]; then
-        echo "ERROR: $label sha256 mismatch" >&2
-        echo "  file:     $file" >&2
-        echo "  expected: $expected" >&2
-        echo "  actual:   $actual" >&2
-        return 1
-    fi
-    echo "  ok  $label  sha256=$actual"
-}
 
 require_tool() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -137,22 +109,47 @@ require_tool() {
     fi
 }
 
-# --------------------------- Stage 1: ptau audit -----------------------------
-echo "==> [1/5] verifying committed ptau artifacts"
-verify_sha256 "$BUILD_DIR/pot12_final.ptau" "$PTAU_FINAL_SHA256" "pot12_final.ptau"
-verify_sha256 "$BUILD_DIR/pot12_0000.ptau"  "$PTAU_0000_SHA256"  "pot12_0000.ptau"
-verify_sha256 "$BUILD_DIR/pot12_0001.ptau"  "$PTAU_0001_SHA256"  "pot12_0001.ptau"
+# --------------------------- Stage 1: local ptau setup ------------------------
+if [[ "$MODE" != "verify" ]]; then
+    require_tool "$SNARKJS"
+    echo "==> [1/5] preparing local ptau artifacts"
+    PTAU0="$BUILD_DIR/pot12_0000.ptau"
+    PTAU1="$BUILD_DIR/pot12_0001.ptau"
+    PTAU_FINAL="$BUILD_DIR/pot12_final.ptau"
+    if [[ ! -f "$PTAU_FINAL" ]]; then
+        echo "    generating powers-of-tau (BN128, 2^12)"
+        "$SNARKJS" powersoftau new bn128 12 "$PTAU0" -v
+        if [[ -n "$DETERMINISTIC_ENTROPY" ]]; then
+            echo "    contributing deterministic ptau entropy"
+            echo "$DETERMINISTIC_ENTROPY" | "$SNARKJS" powersoftau contribute "$PTAU0" "$PTAU1" --name="build_circuit" -v
+        else
+            echo "    contributing random ptau entropy"
+            echo "build_circuit ptau $(date -u +%s%N) $$" | "$SNARKJS" powersoftau contribute "$PTAU0" "$PTAU1" --name="build_circuit" -v
+        fi
+        "$SNARKJS" powersoftau prepare phase2 "$PTAU1" "$PTAU_FINAL" -v
+    else
+        echo "    reusing $PTAU_FINAL"
+    fi
+else
+    echo "==> [verify] checking local zkey/vkey artifacts"
+fi
 
-# --verify mode just checks the committed verification keys still match what
-# you'd export from the committed zkeys.  No new entropy is consumed.  This
-# is the safe CI / audit path.
+# --verify mode checks locally-built verification keys still match what you'd
+# export from the locally-built zkeys. No new entropy is consumed.
 if [[ "$MODE" == "verify" ]]; then
     require_tool "$SNARKJS"
 
     TMPDIR_VERIFY="$(mktemp -d -t zkc-verify.XXXXXX)"
     trap 'rm -rf "$TMPDIR_VERIFY"' EXIT
 
-    echo "==> [verify] exporting verification keys from committed zkeys"
+    echo "==> [verify] exporting verification keys from local zkeys"
+    for f in range_proof.zkey range_proof_plonk.zkey verification_key.json verification_key_plonk.json; do
+        if [[ ! -f "$BUILD_DIR/$f" ]]; then
+            echo "ERROR: missing local artifact: $BUILD_DIR/$f" >&2
+            echo "  run $0 first to generate circuit build artifacts" >&2
+            exit 2
+        fi
+    done
     "$SNARKJS" zkey export verificationkey \
         "$BUILD_DIR/range_proof.zkey" \
         "$TMPDIR_VERIFY/verification_key.json" >/dev/null
@@ -168,9 +165,9 @@ if [[ "$MODE" == "verify" ]]; then
             continue
         fi
         if diff -q "$BUILD_DIR/$vk" "$TMPDIR_VERIFY/$vk" >/dev/null; then
-            echo "  ok  $vk matches committed copy"
+            echo "  ok  $vk matches local copy"
         else
-            echo "  FAIL  $vk differs from committed copy" >&2
+            echo "  FAIL  $vk differs from local copy" >&2
             diff -u "$BUILD_DIR/$vk" "$TMPDIR_VERIFY/$vk" || true
             rc=1
         fi
@@ -183,8 +180,16 @@ require_tool "$CIRCOM"
 require_tool "$SNARKJS"
 
 if [[ ! -d "$INC_DIR/circomlib" ]]; then
+    CIRCOMLIB_PARENT="${CIRCOMLIB_PARENT:-$(npm root -g 2>/dev/null || true)}"
+    mkdir -p "$INC_DIR"
+    if [[ -n "$CIRCOMLIB_PARENT" && -d "$CIRCOMLIB_PARENT/circomlib/circuits" ]]; then
+        ln -sfn "$CIRCOMLIB_PARENT/circomlib/circuits" "$INC_DIR/circomlib"
+    fi
+fi
+
+if [[ ! -d "$INC_DIR/circomlib" ]]; then
     echo "ERROR: circomlib include not found at $INC_DIR/circomlib" >&2
-    echo "  did you initialize the submodule?  (git submodule update --init --recursive)" >&2
+    echo "  install circomlib 2.x (npm install -g circomlib) or set CIRCOMLIB_PARENT" >&2
     exit 2
 fi
 

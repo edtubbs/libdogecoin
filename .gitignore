@@ -167,3 +167,6 @@ store/*
 node_modules/
 package.json
 package-lock.json
+
+# Generated ZK carrier circuit/proving artifacts
+/contrib/zk_carrier/circuits/build/
