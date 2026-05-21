@@ -44,6 +44,7 @@
 #include <stdio.h>   /* printf */
 #include <stdlib.h>  /* atoi, malloc */
 #include <string.h>  /* strcpy */
+#include <wchar.h>   /* wprintf */
 
 #include <dogecoin/uthash.h>
 
@@ -1263,12 +1264,10 @@ int main(int argc, char* argv[])
             return showError("failed to list encryption keys in TPM\n");
             }
 
-#if defined (_WIN64) && !defined(__MINGW64__)
         /* display encryption key names */
         for (size_t i = 0; i < count; i++) {
             wprintf(L"%ls\n", names[i]);
             }
-#endif
         /* free memory */
         for (size_t i = 0; i < count; i++) {
             dogecoin_free(names[i]);

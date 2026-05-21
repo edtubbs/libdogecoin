@@ -36,6 +36,11 @@ LIBDOGECOIN_API
 /* define the maximum size of an Encrypted BLOB */
 #define MAX_ENCRYPTED_BLOB_SIZE 2048
 
+/* format string for seed object names */
+/* e.g. seed 000, seed 001, seed 002, etc. */
+#define SEED_OBJECT_NAME_FORMAT_STR "dogecoin_seed_%03d"
+#define SEED_OBJECT_NAME_FORMAT L"dogecoin_seed_%03d"
+
 /*
  * Typedefs
  */

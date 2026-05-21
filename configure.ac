@@ -124,6 +124,12 @@ AC_ARG_ENABLE([debug],
   [enable_debug=$enableval],
   [enable_debug=no])
 
+AC_ARG_ENABLE([test-passwd],
+  [AS_HELP_STRING([--enable-test-passwd],
+                  [use a fixed TPM test password to avoid interactive prompts (default is no)])],
+  [enable_test_passwd=$enableval],
+  [enable_test_passwd=no])
+
 AC_ARG_ENABLE([bench],
   [AS_HELP_STRING([--disable-bench],
   [disable benchmark functions])],
@@ -178,10 +184,22 @@ AC_ARG_ENABLE([liboqs],
   [use_liboqs=$enableval],
   [use_liboqs=no])
 
+AC_ARG_ENABLE([tss2],
+  [AS_HELP_STRING([--enable-tss2],
+  [enable tss2 functions])],
+  [with_tss2=$enableval],
+  [with_tss2=no])
+
 AC_ARG_ENABLE(tests,
   AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
   [use_tests=$enableval],
   [use_tests=yes])
+
+AC_ARG_ENABLE([test-passwd],
+  [AS_HELP_STRING([--enable-test-passwd],
+  [enable test password for encrypt/decrypt (default is no)])],
+  [test_passwd=$enableval],
+  [test_passwd=no])
 
 AC_MSG_CHECKING([for __builtin_expect])
 AC_COMPILE_IFELSE([AC_LANG_SOURCE([[void myfunc() {__builtin_expect(0,0);}]])],
@@ -263,7 +281,8 @@ if test "x$enable_debug" = xyes; then
   AC_DEFINE_UNQUOTED([ENABLE_DEBUG],[1],[Define to 1 to enable debug output])
 fi
 
-if test "x$use_tests" = xyes; then
+if test "x$enable_test_passwd" = xyes; then
+  AC_DEFINE_UNQUOTED([TEST_PASSWD],[1],[Define to 1 to enable test password])
   PASSWD_STR=`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 12`
   AC_DEFINE_UNQUOTED([PASSWD_STR],["$PASSWD_STR"],[Define to set test password])
 fi
@@ -303,6 +322,27 @@ if test "x$use_liboqs" = xyes; then
   AC_DEFINE(USE_LIBOQS, 1, [Define this symbol if liboqs works])
 fi
 
+if test "x$with_tss2" = xyes; then
+  # Minimum recommended libtss2-esys version: 2.4.0
+  # Prefer pkg-config (handles dependency libs and version), fall back to a
+  # plain library check. Require the public Esys header so a misconfigured
+  # libtss2-dev install fails loudly at configure time rather than at link.
+  m4_ifdef([PKG_CHECK_MODULES], [
+    PKG_CHECK_MODULES([TSS2_ESYS], [tss2-esys >= 2.4.0],
+      [LIBTSS2="$TSS2_ESYS_LIBS"
+       CFLAGS="$CFLAGS $TSS2_ESYS_CFLAGS"],
+      [AC_CHECK_LIB([tss2-esys],[Esys_Initialize],[LIBTSS2=-ltss2-esys],
+        [AC_MSG_ERROR([libtss2-esys missing or too old (need >= 2.4.0); install libtss2-dev])])])
+  ], [
+    AC_CHECK_LIB([tss2-esys],[Esys_Initialize],[LIBTSS2=-ltss2-esys],
+      [AC_MSG_ERROR([libtss2-esys missing; install libtss2-dev])])
+  ])
+  AC_CHECK_HEADER([tss2/tss2_esys.h], [],
+    [AC_MSG_ERROR([tss2/tss2_esys.h missing; install libtss2-dev])])
+  LIBS="$LIBS $LIBTSS2"
+  AC_DEFINE(USE_TSS2, 1, [Define this symbol if libtss2 works])
+fi
+
 AC_CONFIG_HEADERS([config/libdogecoin-config.h])
 AC_CONFIG_FILES([Makefile libdogecoin.pc])
 AC_SUBST(LIBTOOL_APP_LDFLAGS)
@@ -311,6 +351,8 @@ AC_SUBST(EVENT_LIBS)
 AC_SUBST(EVENT_CORE_LIBS)
 AC_SUBST(EVENT_EXTRA_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
+AC_SUBST(LIBUNISTRING)
+AC_SUBST(LIBTSS2)
 AC_SUBST(LIBYKPIV)
 AC_SUBST(NASMFLAGS)
 AM_CONDITIONAL([USE_TESTS], [test x"$use_tests" != x"no"])
@@ -345,6 +387,8 @@ echo "  with tools      = $with_tools"
 echo "  with net        = $with_net"
 echo "  with logdb      = $with_logdb"
 echo "  with wallet     = $with_wallet"
+echo "  with unistring  = $with_unistring"
+echo "  with TSS2       = $with_tss2"
 echo
 echo "  Intel AVX2      = $use_intel_avx2"
 echo "  Intel SSE       = $use_intel_sse"
@@ -352,8 +396,9 @@ echo "  SSE2 Scrypt     = $use_scrypt_sse2"
 echo "  ARMv8 crypto    = $armv8_crypto"
 echo "  ARMv8.2 crypto  = $armv82_crypto"
 echo
-if test "x$use_tests" = xyes; then
-echo "  test password   = $PASSWD_STR"
+echo "  test password   = $enable_test_passwd"
+if test "x$enable_test_passwd" = xyes; then
+echo "                    $PASSWD_STR"
 fi
 echo
 echo "  openenclave     = $use_openenclave"
