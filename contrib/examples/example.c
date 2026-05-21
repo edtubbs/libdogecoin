@@ -429,8 +429,7 @@ int main() {
 	// PQC EXAMPLE (Falcon-512, Dilithium2)
 	printf("\n\nBEGIN PQC EXAMPLE:\n\n");
 
-	// Falcon-512: generate keypair, sign a 32-byte message, verify, and
-	// derive the 32-byte SHA256(pk||sig) commitment used by the carrier flow.
+	// Falcon-512: keypair + sign + verify + 32-byte carrier commitment.
 	uint8_t *falcon_pk = NULL, *falcon_sk = NULL, *falcon_sig = NULL;
 	size_t falcon_pk_len = 0, falcon_sk_len = 0, falcon_sig_len = 0;
 	uint8_t pqc_msg[32];
@@ -454,7 +453,7 @@ int main() {
 	dogecoin_free(falcon_sk);
 	dogecoin_free(falcon_sig);
 
-	// Dilithium2: same flow as Falcon-512 using the Dilithium2 entry points.
+	// Dilithium2: keypair + sign + verify + 32-byte carrier commitment.
 	uint8_t *dil_pk = NULL, *dil_sk = NULL, *dil_sig = NULL;
 	size_t dil_pk_len = 0, dil_sk_len = 0, dil_sig_len = 0;
 
@@ -495,21 +494,21 @@ int main() {
 		return -1;
 	}
 
-	// BIP32-style HD derivation: derive_priv and derive_pub must agree on
-	// the child public key, and signing with the child sk must verify.
+	// BIP32-style HD derivation (non-hardened): pub-only derive_pub must
+	// match pk from derive_priv, and the child sk must sign+verify.
 	uint8_t rac_chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN];
 	memset(rac_chaincode, 0x42, sizeof rac_chaincode);
 	uint8_t *rac_child_sk = NULL, *rac_child_pk = NULL, *rac_child_pubonly = NULL;
 	size_t rac_child_sk_len = 0, rac_child_pk_len = 0, rac_child_pubonly_len = 0;
 	if (dogecoin_raccoong44_hd_derive_priv(rac_sk, rac_sk_len, rac_pk, rac_pk_len,
-	                                       rac_chaincode, 7, false,
+	                                       rac_chaincode, 7, /*hardened=*/false,
 	                                       &rac_child_sk, &rac_child_sk_len,
 	                                       &rac_child_pk, &rac_child_pk_len)
 	    && dogecoin_raccoong44_hd_derive_pub(rac_pk, rac_pk_len, rac_chaincode, 7,
 	                                         &rac_child_pubonly, &rac_child_pubonly_len)
 	    && rac_child_pk_len == rac_child_pubonly_len
 	    && memcmp(rac_child_pk, rac_child_pubonly, rac_child_pk_len) == 0) {
-		printf("Raccoon-G-44 HD child pk derived from sk matches pub-only derivation.\n");
+		printf("Raccoon-G-44 non-hardened pub-only derivation matches derive_priv.\n");
 
 		uint8_t *rac_child_sig = NULL;
 		size_t rac_child_sig_len = 0;
@@ -539,8 +538,7 @@ int main() {
 	// ZK CARRIER EXAMPLE (Groth16 payload encode/decode + commitment)
 	printf("\n\nBEGIN ZK CARRIER EXAMPLE:\n\n");
 
-	// Synthetic public inputs and proof bytes; in practice these come from
-	// snarkjs / rapidsnark and are JSON.
+	// Synthetic public inputs / proof bytes (real input comes from snarkjs).
 	const uint8_t zk_pub[]   = {0x01, 0x02, 0x03, 0x04, 0x05};
 	const uint8_t zk_proof[] = "{\"pi_a\":[\"1\",\"2\"],\"pi_b\":[],\"pi_c\":[]}";
 
