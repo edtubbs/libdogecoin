@@ -605,15 +605,8 @@ void hmac_sha1(const uint8_t* key, const size_t keylen, const uint8_t* msg, cons
 
 void sha256_raw(const uint8_t*, size_t, uint8_t[SHA256_DIGEST_LENGTH]);
 
-/* Post-Quantum Cryptography (PQC) API
---------------------------------------------------------------------------
-   These APIs wrap the PQC carrier flow (P2SH multi-part scriptSig reveal +
-   OP_RETURN commit) and the individual NIST PQC signature schemes used by
-   libdogecoin: Falcon-512, Dilithium2 (both via liboqs), and Raccoon-G-44
-   (lattice HD-wallet friendly signature, built in-tree).  Symbol
-   availability depends on build flags: Falcon/Dilithium require
-   USE_LIBOQS, Raccoon-G-44 requires USE_RACCOON_G.
-*/
+/* Post-Quantum Cryptography (PQC) API: PQC carrier helpers and Falcon-512 /
+   Dilithium2 (USE_LIBOQS) / Raccoon-G-44 (USE_RACCOON_G) signature schemes. */
 
 /* PQC carrier sizing / wire-format constants. */
 #define DOGECOIN_PQC_CARRIER_MAX_CHUNKS 3
@@ -752,15 +745,8 @@ dogecoin_bool dogecoin_raccoong44_hd_derive_pub(const uint8_t* parent_pk, size_t
                                                 uint32_t index,
                                                 uint8_t** child_pk, size_t* child_pk_len);
 
-
-/* Zero-Knowledge Proof (ZK) Carrier API
---------------------------------------------------------------------------
-   Extends the PQC carrier flow so succinct zero-knowledge proofs (Groth16
-   today, PLONK/STARK in future) can be committed and revealed on-chain
-   using the same TX_C (commitment) + TX_R (reveal) pattern.  The library
-   only packages and verifies; proof generation lives in the wallet/UI
-   (snarkjs) or in a host-side rapidsnark CLI.
-*/
+/* Zero-Knowledge Proof (ZK) Carrier API: Groth16 / PLONK / STARK payload
+   encode/decode, commit hashing, TX_C / TX_R helpers (USE_ZK_CARRIER). */
 
 #define DOGECOIN_ZK_CARRIER_MAGIC      "ZKP1"
 #define DOGECOIN_ZK_CARRIER_MAGIC_LEN  4
