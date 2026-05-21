@@ -1,5 +1,5 @@
 ===============================================================================
-spvnode mcl+rapidsnark ZK rescan — curated [zk-vkey]/[zk-commit] lines only
+spvnode ZK rescan — curated [zk-commit] lines only
   date:       2026-05-12T20:37:48Z
   binary:     Version: libdogecoin 0.1.5-pre
   flags:      -h headers.db -w wallet.db -c -d -p -q -b -a DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
@@ -29,7 +29,6 @@ Key results vs the previously committed reference run
               vanilla snark verify) and is independent of the mcl/rapidsnark path.
 ===============================================================================
 
-[zk-vkey] loaded 3293 bytes from contrib/zk_carrier/circuits/build/verification_key.json
 DEBUG: [zk-commit] Pending at height=6191613 txpos=25 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=op_return
 DEBUG: [zk-commit] Valid at height=6191613 txpos=27 commit=80e2858dc6e584db6bd2c035e8156b9807f8b983590c6efaae08a82d85729d1e mode=0 source=carrier_scriptsig matched_txc_txpos=25 payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7
 DEBUG: [zk-commit] reveal_decoded: magic="ZKP1" mode=0(groth16-bn254) version=0x01 circuit_id=0x00000001 public_len=26 proof_len=805 vk_len=3293 total_payload_len=4144 txr_txid=68e6d111e5a5071f206e7933954fc60d9247201963b8bb7443b87e55dbcf14d7

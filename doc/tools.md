@@ -438,7 +438,6 @@ To choose a checkpoint start manually (all available checkpoints shown), apply t
 | `-x`, `--smpv` | Enable SMPV | No | Enabled SMPV: `./spvnode -x scan` |
 | `-g`, `--filtered_blocks` | Filtered Blocks | No | Enable BIP37 filtered blocks: `./spvnode -g scan` |
 | `-q`, `--select_checkpoint` | Select Checkpoint | No | Prompt for checkpoint start (defaults to latest when used with `-l`): `./spvnode -q scan` |
-| `-V`, `--zk-vkey` | ZK Verification Key | Yes | Path to a Groth16 verification key JSON; enables in-process ZK reveal verification (requires `--enable-zk-carrier` and `--with-rapidsnark` or `--with-mcl`). Without this flag, verification is delegated and reveals are logged but not cryptographically checked: `./spvnode -V ./verification_key.json scan` |
 
 ### Commands
 
@@ -997,7 +996,7 @@ Summary: 17 total validations (12 op_return_only TX_C, 5 carrier_scriptsig TX_R,
 
 The `such` tool exposes the on-chain side of the ZK carrier flow — a canonical `ZKP1` payload (Groth16 / PLONK / STARK), a 32-byte `SHA256d(payload)` commitment broadcast in a tagged `OP_RETURN DZKC` output, and a P2SH data-carrier reveal that publishes the full proof bytes on-chain.  The transaction shape is the same `OP_DROP×5 OP_TRUE` redeem script used by the PQC carrier — only the 8-byte tag differs (`ZKP1FULL` vs `FLC1FULL` / `DIL2FULL` / `RCG4FULL`).
 
-The `spvnode` tool exposes the verifying side via `-V, --zk-vkey <verification_key.json>`.
+The `spvnode` tool exposes the on-chain reveal-scanning side of the ZK carrier flow.
 
 For the protocol-level encoding and rationale, see [`doc/spec/bip-zk-carrier-commitments.mediawiki`](spec/bip-zk-carrier-commitments.mediawiki); for the C API and module layout, see [`doc/zk.md`](zk.md); for end-to-end driver scripts, see [`contrib/zk_carrier/scripts/`](../contrib/zk_carrier/scripts/).
 
@@ -1089,13 +1088,13 @@ zk_public_inputs_len: 20
 zk_proof_len: 804
 ```
 
-#### Verify ZK reveals during SPV scan:
+#### Validate ZK reveals during SPV scan:
 
 ```
-./spvnode --zk-vkey ./verification_key.json -d -p -b scan
+./spvnode -d -p -b scan
 ```
 
-When built `--with-mcl=…` or `--with-rapidsnark`, this loads the verification key into the SPV client and runs `groth16_verify` in-process against every reassembled `ZKP1` reveal that matches a previously seen `OP_RETURN DZKC` commitment, emitting deterministic `[zk-commit]` log lines (`Pending` → `Valid` → `ZK verification PASSED` → `Reveal validated`).  Without the flag, the reveal is reassembled and logged but the proof check is left to an external verifier.
+This reassembles every `ZKP1` reveal that matches a previously seen `OP_RETURN DZKC` commitment and emits deterministic `[zk-commit]` log lines (`Pending` → `Valid` → `Reveal validated`). Cryptographic proof checks use the verification key embedded in the reveal payload when an in-process verifier is available; otherwise the proof check is delegated to external tooling such as `snarkjs`.
 
 ### End-to-end mainnet runs
 

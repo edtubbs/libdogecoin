@@ -524,11 +524,6 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     client->smpv_ctx = NULL;
     client->smpv_enabled = false;
 
-    // ZK carrier verification key (off by default; install via
-    // dogecoin_spv_client_set_zk_vkey or spvnode --zk-vkey)
-    client->zk_vkey_blob = NULL;
-    client->zk_vkey_blob_len = 0;
-
     return client;
 }
 
@@ -659,39 +654,7 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
     }
 #endif
 
-    if (client->zk_vkey_blob) {
-        dogecoin_mem_zero(client->zk_vkey_blob, client->zk_vkey_blob_len);
-        dogecoin_free(client->zk_vkey_blob);
-        client->zk_vkey_blob = NULL;
-    }
-    client->zk_vkey_blob_len = 0;
-
     dogecoin_free(client);
-}
-
-dogecoin_bool dogecoin_spv_client_set_zk_vkey(
-    dogecoin_spv_client* client,
-    const uint8_t* vkey_blob,
-    size_t vkey_blob_len)
-{
-    if (!client) return false;
-    /* Free any previous vkey before installing a new one. */
-    if (client->zk_vkey_blob) {
-        dogecoin_mem_zero(client->zk_vkey_blob, client->zk_vkey_blob_len);
-        dogecoin_free(client->zk_vkey_blob);
-        client->zk_vkey_blob = NULL;
-        client->zk_vkey_blob_len = 0;
-    }
-    if (!vkey_blob || vkey_blob_len == 0) {
-        /* Caller asked to clear. */
-        return true;
-    }
-    uint8_t* copy = (uint8_t*)dogecoin_malloc(vkey_blob_len);
-    if (!copy) return false;
-    memcpy(copy, vkey_blob, vkey_blob_len);
-    client->zk_vkey_blob = copy;
-    client->zk_vkey_blob_len = vkey_blob_len;
-    return true;
 }
 
 /**
@@ -1583,13 +1546,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                                     }
                                 }
 
-                                /* In-process proof verification when libdogecoin was built with
-                                   rapidsnark (HAVE_RAPIDSNARK).  Without it, the verifier returns
-                                   DOGECOIN_ZK_ERR_NOT_IMPLEMENTED / DELEGATED — log that explicitly
-                                   so the demo script can detect either outcome. */
+                                /* In-process proof verification uses only bytes carried by the
+                                   reveal payload (v1 embedded vk). Without a compiled verifier
+                                   this returns DOGECOIN_ZK_ERR_NOT_IMPLEMENTED / DELEGATED. */
                                 dogecoin_zk_err_t verify_e = dogecoin_zk_verify_proof(
-                                    zk_payload, zk_payload_len,
-                                    client->zk_vkey_blob, client->zk_vkey_blob_len);
+                                    zk_payload, zk_payload_len, NULL, 0);
                                 const char* verify_status =
                                     (verify_e == DOGECOIN_ZK_OK) ? "PASSED" :
                                     (verify_e == DOGECOIN_ZK_ERR_VERIFY_FAIL) ? "FAILED" :

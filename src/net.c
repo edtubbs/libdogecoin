@@ -511,17 +511,6 @@ void dogecoin_node_group_shutdown(dogecoin_node_group *group) {
     if (group->http_server) {
         dogecoin_http_server_shutdown(group);
     }
-
-    /* Disconnecting nodes / shutting down the http server only releases the
-     * libevent events that were owned by those subsystems.  Any other pending
-     * event (e.g. a stdin watcher installed by the CLI, or platform-specific
-     * deferred callbacks observed on aarch64-linux-gnu) can keep
-     * event_base_dispatch() spinning indefinitely.  Issue a loopbreak here so
-     * the event loop terminates promptly for every caller — matching what
-     * handle_sigint and the 'q'-on-stdin path in spv.c already do explicitly. */
-    if (group->event_base) {
-        event_base_loopbreak(group->event_base);
-    }
 }
 
 /**
@@ -1067,7 +1056,7 @@ dogecoin_bool broadcast_tx(const dogecoin_chainparams* chain, const dogecoin_tx*
     ctx.tx = tx;
     ctx.debuglevel = debug;
     ctx.timeout = timeout;
-    ctx.max_peers_to_inv = maxpeers;
+    ctx.max_peers_to_inv = 2;
     ctx.found_on_non_inved_peers = 0;
     ctx.getdata_from_peers = 0;
     ctx.inved_to_peers = 0;

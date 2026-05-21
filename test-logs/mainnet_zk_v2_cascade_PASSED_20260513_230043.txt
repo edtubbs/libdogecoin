@@ -6,8 +6,8 @@ Funded WIF:     QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w   (provided
 Explorer:       https://chain.so/address/DOGE/DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
 
 Mainnet checkpoint added in this PR (used for fast-sync by spvnode):
-  height: 6205422
-  hash:   7ed56f838dfec9048942250c08e37101f650f1934f95bdd15311805a4e4b78df
+  height: 6201360
+  hash:   0bb1dbb971969f89f1c4c6305396042de1d6a390d71a44b066255c844da9256c
   time:   1778711881  (2026-05-13T22:38:01Z)
   bits:   0x197fb0b1
 
@@ -42,8 +42,7 @@ Pair G2 — Groth16 (mode=0) at height 6205433
   on-chain payload length: 4219 bytes (v1, vk embedded, vk_len=3293)
   tx_binding (recomputed by spvnode): 00d0caabc545a08db62920f5c3b2621a5e000eb040659c3c110bb65a109a7d48
 
-  spvnode --zk-vkey verification_key.json scan — relevant lines:
-    [zk-vkey] loaded 3293 bytes from /home/runner/work/libdogecoin/libdogecoin/contrib/zk_carrier/circuits/build/verification_key.json
+  spvnode scan — relevant lines:
     DEBUG: [zk-commit] Pending at height=6205433 txpos=20 commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 mode=0 source=op_return
     DEBUG: [zk-commit] Pending at height=6205433 txpos=21 commit=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867 mode=1 source=op_return
     DEBUG: [zk-commit] Valid at height=6205433 txpos=32 commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 mode=0 source=carrier_scriptsig matched_txc_txpos=20 payload_len=4219 txr_txid=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad
@@ -75,8 +74,7 @@ Pair Q2 — PLONK (mode=1) at height 6205433
   on-chain payload length: 4408 bytes (v1, vk embedded, vk_len=2041)
   tx_binding (recomputed by spvnode): 00bf9d25931b6fc41e34d9b7f2d35ed657c27004280e073ee5df9ddd7ff19eba
 
-  spvnode --zk-vkey verification_key_plonk.json scan — relevant lines:
-    [zk-vkey] loaded 2041 bytes from /home/runner/work/libdogecoin/libdogecoin/contrib/zk_carrier/circuits/build/verification_key_plonk.json
+  spvnode scan — relevant lines:
     DEBUG: [zk-commit] Pending at height=6205433 txpos=20 commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 mode=0 source=op_return
     DEBUG: [zk-commit] Pending at height=6205433 txpos=21 commit=b24f93f90d0ff132b4b1ea35dc3845daf258284b77e8ac1c382ac2135ec11867 mode=1 source=op_return
     DEBUG: [zk-commit] Valid at height=6205433 txpos=32 commit=52e6242fcdc890ee08ef13191c9daf5de2bb7c9e01a137a9f963a7b0243e3bf3 mode=0 source=carrier_scriptsig matched_txc_txpos=20 payload_len=4219 txr_txid=5288fb5cb31e377f738c2a1eb8097075e21a0390a61aa76e2f2c572b00d892ad

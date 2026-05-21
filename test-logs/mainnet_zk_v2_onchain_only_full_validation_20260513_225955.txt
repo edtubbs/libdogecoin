@@ -4,7 +4,7 @@ Date (UTC): 2026-05-13T22:59:55+00:00
 snarkjs version: snarkjs@0.7.6
 vk_groth16 sha256: 1e8c04b470673517f2b72a335e78b5b5d19ab75b82ae6954dc671abc3d5de157
 vk_plonk   sha256: 7896236acf663659a035c9d247ed846bf83032cecffc080ceddb3c72191eafd8
-Mainnet checkpoint used: 6205422  7ed56f838dfec9048942250c08e37101f650f1934f95bdd15311805a4e4b78df  bits=0x197fb0b1  time=2026-05-13T22:38:01Z
+Mainnet checkpoint used: 6201360  0bb1dbb971969f89f1c4c6305396042de1d6a390d71a44b066255c844da9256c  bits=0x19555f03  time=2026-05-13T01:53:55Z
 Funded address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
 
 v2 cascade end-to-end commands used (reproducible):

@@ -119,9 +119,9 @@ Loops `N` times.  For each iteration it:
 6. Appends `tx_c.txid<TAB>tx_r.txid<TAB>commit<TAB>height_estimate` to a
    manifest.  Chains the next iteration off TX_C's change vout.
 
-After the loop, optionally launches one `spvnode --zk-vkey` scan over the
-whole height range, producing the `[zk-commit] PASSED` lines (one triple
-per pair).
+After the loop, optionally launches one `spvnode` scan over the whole height
+range, producing the `[zk-commit]` on-chain validation lines (one triple per
+pair).
 
 See the script's own header comment block for the full prerequisite and
 environment-variable reference; the same `ZK_CARRIER_WIF` /

@@ -9,7 +9,6 @@ spvnode mcl+rapidsnark ZK rescan — mainnet, checkpoint 6191600 (index 29 via -
   config:     --enable-zk-carrier --with-rapidsnark --with-mcl (HAVE_MCL=1 HAVE_RAPIDSNARK=1)
 ===============================================================================
 
-[zk-vkey] loaded 3293 bytes from contrib/zk_carrier/circuits/build/verification_key.json
 address: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
 Filtered block mode disabled (use -g/--filtered_blocks to enable)
 

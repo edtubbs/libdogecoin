@@ -168,11 +168,9 @@ dogecoin_zk_err_t dogecoin_zk_verify_groth16(
     const uint8_t* proof_json,
     size_t proof_json_len)
 {
-    /* No verification key configured (e.g. spvnode invoked without
-     * --zk-vkey) — the caller cannot do an in-process check.  Return
-     * DELEGATED so the SPV reveal still emits "Reveal validated" on
-     * commit-match alone, mirroring the documented mobile-friendly
-     * behaviour described at the top of this file. */
+    /* No verification key was supplied or embedded in the reveal, so the caller
+     * cannot do an in-process check.  Return DELEGATED so the SPV reveal can
+     * still rely on the on-chain commitment/binding checks. */
     if (!vk_json || vk_json_len == 0) {
         return DOGECOIN_ZK_ERR_DELEGATED;
     }

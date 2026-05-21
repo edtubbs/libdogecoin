@@ -175,8 +175,7 @@ All proof generation for all systems occurs off-box (snarkjs / rapidsnark CLI / 
   the in-process Groth16 verifier in `src/zk_carrier/zk_groth16_mcl.cpp`.
   This is the in-tree natively-buildable Groth16 verifier (vendored via
   `depends/packages/mcl.mk` when `ZK_CARRIER=1`) and is what the
-  published mainnet PASSED runs use for in-process verification
-  (`spvnode --zk-vkey verification_key.json`).
+  published mainnet PASSED runs use for in-process verification.
 * `ZK_CARRIER=1` on the `depends/` invocation vendors herumi/mcl *and*
   iden3/rapidsnark v0.0.8 into the depends staging tree so `--with-mcl`
   and `--with-rapidsnark` find them without any system package install

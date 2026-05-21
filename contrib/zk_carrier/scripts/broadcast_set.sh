@@ -20,7 +20,7 @@
 #   6. Appends "tx_c.txid<TAB>tx_r.txid<TAB>commit<TAB>height_estimate"
 #      to a manifest.  Chains the next iteration off TX_C's change vout.
 #
-# After the loop, optionally launches one spvnode --zk-vkey scan over the
+# After the loop, optionally launches one spvnode scan over the
 # whole height range and tees the resulting [zk-commit] PASSED lines (one
 # triple per pair) to test-logs/.
 #
@@ -36,8 +36,7 @@
 #   - $FUNDED_WIF holds koinu in $FUNDED_ADDR; default WIF/ADDR mirror
 #     contrib/mainnet_dilithium2_test.sh so a single funded wallet covers
 #     both PQC and ZK runs.
-#   - Range-proof circuit artifacts: $WASM and $ZKEY (and optionally
-#     $VKEY for in-process spvnode verification).
+#   - Range-proof circuit artifacts: $WASM, $ZKEY, and $VKEY.
 #
 # Usage:
 #   # fully repeatable single entry point (auto-bootstraps everything):
@@ -65,9 +64,8 @@
 #   * loops N times over (witness → such → sendtx → wait → set_scriptsig →
 #     sendtx → wait), recording (iter, tx_c, tx_r, commit, payload_bytes, utc)
 #     into manifest.tsv;
-#   * launches one spvnode --zk-vkey rescan over the full height range, which
-#     emits the fully-decoded ZKP1 reveal fields and "ZK verification PASSED"
-#     / "Reveal validated" lines into the log.
+#   * launches one spvnode rescan over the full height range, which emits the
+#     fully-decoded ZKP1 reveal fields and "Reveal validated" lines into the log.
 #
 # Honest deferred operations: the script never silently fakes confirmations —
 # if an explorer poll times out or sendtx returns a non-relay status, that
@@ -612,12 +610,10 @@ if [ -n "${SKIP_SPV:-}" ]; then
     exit 0
 fi
 [ -x "$SPVNODE" ] || { warn "spvnode not built; skipping rescan."; exit 0; }
-[ -f "$VKEY" ]    || { warn "VKEY $VKEY missing; skipping rescan."; exit 0; }
 
 SPV_LOG="$WORK/spvnode_zk_set.log"
-info "Launching spvnode --zk-vkey $VKEY for full-set verification → $SPV_LOG"
-"$SPVNODE" $NETWORK_FLAG -l -c -d -p -b -a "$FUNDED_ADDR" \
-    --zk-vkey "$VKEY" scan > "$SPV_LOG" 2>&1 &
+info "Launching spvnode for on-chain full-set validation → $SPV_LOG"
+"$SPVNODE" $NETWORK_FLAG -l -c -d -p -b -a "$FUNDED_ADDR" scan > "$SPV_LOG" 2>&1 &
 SPV_PID=$!
 echo "$SPV_PID" > "$WORK/spvnode.pid"
 
@@ -719,9 +715,9 @@ FINAL_LOG="$REPO_DIR/test-logs/mainnet_zk_carrier_e2e_set_PASSED_${TS}.txt"
     cat "$MANIFEST"
     echo
     echo "==============================================================================="
-    echo "spvnode [zk-commit] / [zk-vkey] lines:"
+    echo "spvnode [zk-commit] lines:"
     echo "==============================================================================="
-    grep -E "zk-vkey|zk-commit" "$SPV_LOG" || echo "(none captured)"
+    grep -E "zk-commit" "$SPV_LOG" || echo "(none captured)"
     echo
     echo "==============================================================================="
     echo "Post-spvnode external verifier transcript (snarkjs $PROOF_SYSTEM verify):"
@@ -745,7 +741,7 @@ echo "  - $LOG (full run log: ceremony stdout, every such/sendtx call, decoded r
 echo "  - $MANIFEST (iter,tx_c,tx_r,commit,payload_bytes,utc per pair)"
 echo "  - $WORK/iter_*/payload.hex (per-iteration ZKP1 payload hex)"
 echo "  - $SPV_LOG (raw spvnode stdout/stderr with full [zk-commit] event stream)"
-echo "  - $FINAL_LOG (curated log: manifest + filtered [zk-commit]/[zk-vkey] lines)"
+echo "  - $FINAL_LOG (curated log: manifest + filtered [zk-commit] lines)"
 echo "  - $VKEY  (sha256 logged above; full JSON dumped earlier in this log)"
 echo "  - $ZKEY  (Groth16 proving key; sha256 logged above)"
 echo "  - $WASM  (circuit witness wasm; sha256 logged above)"
