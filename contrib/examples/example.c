@@ -8,6 +8,8 @@
 // (or in the case of this project's directory structure, and if you want to build statically):
 // (after build, from the /libdogecoin project root directory)
 // gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include/dogecoin -L./.libs -ldogecoin -o example
+// To include the ZK carrier section (requires --enable-zk-carrier at configure time):
+// gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include/dogecoin -L./.libs -ldogecoin -DUSE_ZK_CARRIER -o example
 // then run 'example'.
 
 //  for windows, from the command line: (after build, from the /libdogecoin project root directory) run:
