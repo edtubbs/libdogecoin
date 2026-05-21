@@ -157,11 +157,6 @@ qrtest.jpg
 store/*
 .store/*
 
-# Encrypted blobs produced by TPM tests
-encrypted_seed_*
-encrypted_mnemonic_*
-encrypted_hdnode_*
-
 # OPTEE
 !/src/optee/Makefile
 !/src/optee/host/Makefile
