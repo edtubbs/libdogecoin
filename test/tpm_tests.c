@@ -188,12 +188,7 @@ void test_tpm()
 
     sha512_raw(&random[0], 32, seed);
 
-    // Define a test password
-#ifdef TEST_PASSWD
     char* test_password = PASSWD_STR;
-#else
-    char* test_password = NULL;
-#endif
 
     // Encrypt a random seed with software
     u_assert_true (dogecoin_encrypt_seed_with_sw (seed, sizeof(SEED), TEST_FILE, true, test_password, NULL, NULL));
@@ -309,8 +304,7 @@ void test_tpm()
 
 #endif
 
-#if defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2)
-
+#if defined (_WIN64) && !defined(__MINGW64__) && defined(USE_TPM2) && !defined(TEST_TPM_AUTO)
     // Create TBS context (TPM2)
     TBS_HCONTEXT hContext = 0;
     TBS_CONTEXT_PARAMS2 params;

@@ -7,9 +7,9 @@
 # software TPM emulator. Modelled after contrib/testnet_dilithium2_test.sh.
 #
 # Prerequisites:
-#   - libdogecoin built with --enable-tss2 --enable-test-passwd
-#     so that linux_tpm_get_password() returns the compiled-in test password
-#     instead of prompting.
+#   - libdogecoin built with --enable-tss2 and tests enabled (which auto-
+#     defines PASSWD_STR) so that linux_tpm_get_password() returns the
+#     compiled-in test password instead of prompting.
 #   - swtpm, tpm2-tools, libtss2-{esys,mu} present on the host.
 #   - `such` binary in PATH or current directory.
 #

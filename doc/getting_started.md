@@ -50,7 +50,7 @@ At this step there are plenty of flags that can be specified, the two most perti
 ./configure --disable-net --disable-tools
 ./configure LD_LIBRARY_PATH='path/to/additional/libraries'
 ./configure CFLAGS='-Ipath/to/additional/include/files'
-./configure --enable-debug --enable-tss2 --enable-test-passwd
+./configure --enable-debug --enable-tss2
 ```
 If you're building on Windows, you'll need to use `cmake` instead of `./configure`:
 
@@ -59,14 +59,7 @@ mkdir build
 cd build
 cmake ..
 ```
-Another useful flag is `--enable-test-passwd`, which will generate a random password for testing software encryption/decryption. This flag disables the need for a password to be entered when testing TPM encryption/decryption. _Note: this flag is for testing purposes only._ This flag is disabled by default, but can be enabled with the `./configure` command or by using `cmake`:
-```c
-./configure --enable-test-passwd
-```
-```c
-cmake -DTEST_PASSWD=TRUE ..
-```
-## _`--enable-test-passwd` is for **testing purposes only**._
+When tests are enabled, test password support is enabled automatically for software encryption/decryption so test runs do not block on interactive password entry.
 For a complete list of all different configuration options, you can run the command `./configure --help`.
 
 Finally, once you have configured the library to your liking, it is ready to be built. This can be done with the simple `make` command:
@@ -81,7 +74,7 @@ Or, if you would like to also run our basic unit tests, you can run the command 
 make check
 ```
 
-To test TPM flows on Linux without interactive password prompts, configure with `--enable-test-passwd` and run a TPM emulator before `make check`:
+To test TPM flows on Linux without interactive password prompts, build the test suite (which auto-defines `PASSWD_STR`) and run a TPM emulator before `make check`:
 
 ```c
 mkdir -p /tmp/libdogecoin-tpm

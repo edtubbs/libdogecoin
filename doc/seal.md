@@ -108,7 +108,7 @@ swtpm socket \
 export TPM2TOOLS_TCTI="swtpm:host=127.0.0.1,port=2321"
 
 # Run the project test suite (non-interactive password)
-./configure --enable-tss2 --enable-test-passwd
+./configure --enable-tss2
 make check
 ```
 
