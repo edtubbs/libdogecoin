@@ -29,5 +29,5 @@
   back-pressure events: 286
   timeout reassigns: 1
   invalid block rejects: 0
-  staged block drains: 0
+  staged block drains observed during experiment: 0
   decision: remove scheduler; no measured header/block throughput gain
