@@ -21,7 +21,7 @@
 === ts_b8 : spvnode_ts -o 8 -b (90s) ===
   elapsed=90s  mode=blocks  connected=0  rate=0.0/s  batches=0  staged=0  invalid=0  anchors=0  blocks=0  final_tip=0
 
-=== Per-peer block scheduler (warmed-headers two-phase, ts_b8) ===
+=== Dropped per-peer block scheduler experiment (warmed-headers two-phase, ts_b8) ===
   block sched markers: 625
   getdata BLOCK <h> dispatched: 75
   distinct peers dispatched-to: 22
@@ -29,3 +29,5 @@
   back-pressure events: 286
   timeout reassigns: 1
   invalid block rejects: 0
+  staged block drains: 0
+  decision: remove scheduler; no measured header/block throughput gain

@@ -181,55 +181,12 @@ typedef struct spv_block_stage_slot_ {
     uint8_t block_hash[32]; /* little-endian */
 } spv_block_stage_slot;
 
-/* Block download scheduler (TS mode) -- per-peer getdata BLOCK <hash> fan-out.
- *
- * Three pieces implemented here, on top of the staging ring:
- *   1. A bounded pending FIFO of block hashes learned from peer `inv` adverts.
- *      In TS mode we no longer relay the inbound inv as a blanket getdata to
- *      the same peer; instead we enqueue every advertised block hash and let
- *      the scheduler hand each hash to a *different* idle peer.
- *   2. An in-flight table keyed by block hash, recording which peer was
- *      asked and when. Block arrivals clear the matching slot; the periodic
- *      timer rescues entries older than SPV_BLOCK_INFLIGHT_TIMEOUT_SEC by
- *      pushing them back to the pending queue (where they'll be assigned to
- *      a different peer next round).
- *   3. Back-pressure: dispatch is gated on the staging ring's remaining
- *      capacity, so we never out-run the master-thread commit pipeline.
- */
-#define SPV_BLOCK_PENDING_CAP 1024u
-#define SPV_BLOCK_INFLIGHT_CAP 64u
-#define SPV_BLOCK_INFLIGHT_TIMEOUT_SEC 30
-#define SPV_BLOCK_STAGE_HIGH_WATERMARK ((SPV_BLOCKS_STAGE_CAPACITY * 3u) / 4u)
-
-typedef struct spv_pending_block_ {
-    uint8_t hash[32];
-} spv_pending_block;
-
-typedef struct spv_inflight_block_ {
-    int in_use;
-    uint8_t hash[32];
-    int nodeid;
-    time_t sent_time;
-} spv_inflight_block;
-
 typedef struct spv_blocks_stage_ctx_ {
     spv_block_stage_slot slots[SPV_BLOCKS_STAGE_CAPACITY];
     size_t count;
     uint64_t staged_total;
     uint64_t drained_total;
     uint64_t dropped_total;
-    /* scheduler state */
-    spv_pending_block pending[SPV_BLOCK_PENDING_CAP];
-    size_t pending_head;
-    size_t pending_count;
-    spv_inflight_block inflight[SPV_BLOCK_INFLIGHT_CAP];
-    size_t inflight_count;
-    uint64_t sched_enqueued;
-    uint64_t sched_deduped;
-    uint64_t sched_dispatched;
-    uint64_t sched_completed;
-    uint64_t sched_timeouts;
-    uint64_t sched_backpressure;
 } spv_blocks_stage_ctx;
 
 static spv_headers_stage_ctx* spv_headers_stage_init(void)
@@ -276,196 +233,6 @@ static void spv_blocks_stage_free(spv_blocks_stage_ctx* stage)
         }
     }
     dogecoin_free(stage);
-}
-
-/* ---- Block download scheduler helpers (TS mode) ---- */
-
-static int spv_block_sched_pending_contains(const spv_blocks_stage_ctx* s, const uint8_t hash[32])
-{
-    for (size_t i = 0; i < s->pending_count; i++) {
-        size_t idx = (s->pending_head + i) % SPV_BLOCK_PENDING_CAP;
-        if (memcmp(s->pending[idx].hash, hash, 32) == 0) return 1;
-    }
-    return 0;
-}
-
-static int spv_block_sched_inflight_contains(const spv_blocks_stage_ctx* s, const uint8_t hash[32])
-{
-    for (size_t i = 0; i < SPV_BLOCK_INFLIGHT_CAP; i++) {
-        if (s->inflight[i].in_use && memcmp(s->inflight[i].hash, hash, 32) == 0) return 1;
-    }
-    return 0;
-}
-
-static int spv_block_sched_stage_contains(const spv_blocks_stage_ctx* s, const uint8_t hash[32])
-{
-    for (size_t i = 0; i < SPV_BLOCKS_STAGE_CAPACITY; i++) {
-        if (s->slots[i].in_use && memcmp(s->slots[i].block_hash, hash, 32) == 0) return 1;
-    }
-    return 0;
-}
-
-static dogecoin_bool spv_block_sched_enqueue(dogecoin_spv_client* client, const uint8_t hash[32])
-{
-    if (!client || !client->blocks_stage_ctx) return false;
-    spv_blocks_stage_ctx* s = (spv_blocks_stage_ctx*)client->blocks_stage_ctx;
-    if (spv_block_sched_pending_contains(s, hash) ||
-        spv_block_sched_inflight_contains(s, hash) ||
-        spv_block_sched_stage_contains(s, hash)) {
-        s->sched_deduped++;
-        return false;
-    }
-    if (s->pending_count >= SPV_BLOCK_PENDING_CAP) {
-        /* Drop oldest to make room for newer advert (peer always re-advertises). */
-        s->pending_head = (s->pending_head + 1) % SPV_BLOCK_PENDING_CAP;
-        s->pending_count--;
-    }
-    size_t tail = (s->pending_head + s->pending_count) % SPV_BLOCK_PENDING_CAP;
-    memcpy(s->pending[tail].hash, hash, 32);
-    s->pending_count++;
-    s->sched_enqueued++;
-    return true;
-}
-
-/* Push to head, used when reassigning a timed-out inflight request. */
-static void spv_block_sched_pushback_front(spv_blocks_stage_ctx* s, const uint8_t hash[32])
-{
-    if (s->pending_count >= SPV_BLOCK_PENDING_CAP) {
-        size_t last = (s->pending_head + s->pending_count - 1) % SPV_BLOCK_PENDING_CAP;
-        (void)last; /* drop tail */
-        s->pending_count--;
-    }
-    s->pending_head = (s->pending_head + SPV_BLOCK_PENDING_CAP - 1) % SPV_BLOCK_PENDING_CAP;
-    memcpy(s->pending[s->pending_head].hash, hash, 32);
-    s->pending_count++;
-}
-
-static int spv_block_sched_pop_front(spv_blocks_stage_ctx* s, uint8_t out_hash[32])
-{
-    if (s->pending_count == 0) return 0;
-    memcpy(out_hash, s->pending[s->pending_head].hash, 32);
-    s->pending_head = (s->pending_head + 1) % SPV_BLOCK_PENDING_CAP;
-    s->pending_count--;
-    return 1;
-}
-
-static int spv_block_sched_inflight_add(spv_blocks_stage_ctx* s, const uint8_t hash[32], int nodeid, time_t now)
-{
-    for (size_t i = 0; i < SPV_BLOCK_INFLIGHT_CAP; i++) {
-        if (!s->inflight[i].in_use) {
-            s->inflight[i].in_use = 1;
-            memcpy(s->inflight[i].hash, hash, 32);
-            s->inflight[i].nodeid = nodeid;
-            s->inflight[i].sent_time = now;
-            s->inflight_count++;
-            return 1;
-        }
-    }
-    return 0;
-}
-
-static void spv_block_sched_inflight_remove(dogecoin_spv_client* client, const uint8_t hash[32])
-{
-    if (!client || !client->blocks_stage_ctx) return;
-    spv_blocks_stage_ctx* s = (spv_blocks_stage_ctx*)client->blocks_stage_ctx;
-    for (size_t i = 0; i < SPV_BLOCK_INFLIGHT_CAP; i++) {
-        if (s->inflight[i].in_use && memcmp(s->inflight[i].hash, hash, 32) == 0) {
-            s->inflight[i].in_use = 0;
-            if (s->inflight_count > 0) s->inflight_count--;
-            s->sched_completed++;
-            return;
-        }
-    }
-}
-
-/* Build and send a `getdata` with a single MSG_BLOCK entry for the given hash. */
-static dogecoin_bool spv_block_sched_send_getdata(dogecoin_node* node, const uint8_t hash[32])
-{
-    if (!node || !node->nodegroup) return false;
-    cstring* payload = cstr_new_sz(64);
-    if (!payload) return false;
-    ser_varlen(payload, 1u);
-    ser_u32(payload, DOGECOIN_INV_TYPE_BLOCK);
-    ser_u256(payload, hash);
-    cstring* p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, payload->str, payload->len);
-    cstr_free(payload, true);
-    if (!p2p_msg) return false;
-    dogecoin_node_send(node, p2p_msg);
-    cstr_free(p2p_msg, true);
-    return true;
-}
-
-/* Reassign in-flight requests that have been unanswered for too long. */
-static void spv_block_sched_timeout_sweep(dogecoin_spv_client* client, time_t now)
-{
-    if (!client || !client->blocks_stage_ctx) return;
-    spv_blocks_stage_ctx* s = (spv_blocks_stage_ctx*)client->blocks_stage_ctx;
-    for (size_t i = 0; i < SPV_BLOCK_INFLIGHT_CAP; i++) {
-        if (!s->inflight[i].in_use) continue;
-        if (now - s->inflight[i].sent_time < SPV_BLOCK_INFLIGHT_TIMEOUT_SEC) continue;
-        client->nodegroup->log_write_cb("Block sched: timeout reassign hash=%s prev_nodeid=%d age=%lds\n",
-            hash_to_string((uint8_t*)s->inflight[i].hash),
-            s->inflight[i].nodeid,
-            (long)(now - s->inflight[i].sent_time));
-        spv_block_sched_pushback_front(s, s->inflight[i].hash);
-        s->inflight[i].in_use = 0;
-        if (s->inflight_count > 0) s->inflight_count--;
-        s->sched_timeouts++;
-    }
-}
-
-/* Dispatch pending hashes to idle peers, one per peer per round, with
- * back-pressure against the staging ring's high-water mark. */
-static void spv_block_sched_dispatch(dogecoin_spv_client* client)
-{
-    if (!client || !client->blocks_stage_ctx || !client->nodegroup) return;
-    spv_blocks_stage_ctx* s = (spv_blocks_stage_ctx*)client->blocks_stage_ctx;
-    if (s->pending_count == 0) return;
-
-    if (s->count >= SPV_BLOCK_STAGE_HIGH_WATERMARK) {
-        s->sched_backpressure++;
-        client->nodegroup->log_write_cb("Block sched: back-pressure (stage=%zu/%u pending=%zu inflight=%zu)\n",
-            s->count, SPV_BLOCKS_STAGE_CAPACITY, s->pending_count, s->inflight_count);
-        return;
-    }
-
-    time_t now = time(NULL);
-    size_t dispatched_this_round = 0;
-    for (size_t i = 0; i < client->nodegroup->nodes->len; i++) {
-        if (s->pending_count == 0) break;
-        if (s->inflight_count >= SPV_BLOCK_INFLIGHT_CAP) break;
-        if (s->count >= SPV_BLOCK_STAGE_HIGH_WATERMARK) {
-            s->sched_backpressure++;
-            break;
-        }
-        dogecoin_node* peer = vector_idx(client->nodegroup->nodes, i);
-        if (!peer) continue;
-        if ((peer->state & NODE_CONNECTED) != NODE_CONNECTED) continue;
-        if (!peer->version_handshake) continue;
-        /* Skip peers already carrying an in-flight assignment from a prior round. */
-        int peer_busy = 0;
-        for (size_t k = 0; k < SPV_BLOCK_INFLIGHT_CAP; k++) {
-            if (s->inflight[k].in_use && s->inflight[k].nodeid == peer->nodeid) { peer_busy = 1; break; }
-        }
-        if (peer_busy) continue;
-
-        uint8_t hash[32];
-        if (!spv_block_sched_pop_front(s, hash)) break;
-        if (!spv_block_sched_send_getdata(peer, hash)) {
-            /* Send failed -- push back to head so we retry on next dispatch. */
-            spv_block_sched_pushback_front(s, hash);
-            continue;
-        }
-        spv_block_sched_inflight_add(s, hash, peer->nodeid, now);
-        peer->time_last_request = now;
-        peer->state |= NODE_BLOCKSYNC;
-        s->sched_dispatched++;
-        dispatched_this_round++;
-        client->nodegroup->log_write_cb("Block sched: getdata BLOCK %s -> node %d (pending=%zu inflight=%zu stage=%zu)\n",
-            hash_to_string(hash), peer->nodeid,
-            s->pending_count, s->inflight_count, s->count);
-    }
-    (void)dispatched_this_round;
 }
 
 static dogecoin_node* spv_find_node_by_id(dogecoin_spv_client* client, int nodeid)
@@ -1314,11 +1081,6 @@ void dogecoin_net_spv_periodic_statecheck(dogecoin_node *node, uint64_t *now)
     if ((client->stateflags & SPV_FULLBLOCK_SYNC_FLAG) == SPV_FULLBLOCK_SYNC_FLAG)
     {
         node->time_last_request = 0;
-        if (client->thread_safe_mode && client->blocks_stage_ctx) {
-            /* Reassign stalled getdata BLOCK requests, then dispatch pending hashes to idle peers. */
-            spv_block_sched_timeout_sweep(client, (time_t)*now);
-            spv_block_sched_dispatch(client);
-        }
         dogecoin_net_spv_request_headers(client);
     }
 
@@ -1765,8 +1527,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         deser_varlen(&varlen, buf);
         dogecoin_bool contains_block = false;
         dogecoin_bool contains_tx = false;
-        dogecoin_bool ts_sched = (client->thread_safe_mode && client->blocks_stage_ctx) ? true : false;
-        unsigned int enqueued = 0;
 
         client->nodegroup->log_write_cb("Get inv request with %d items\n", varlen);
 
@@ -1777,15 +1537,7 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             deser_u32(&type, buf);
             if (type == DOGECOIN_INV_TYPE_BLOCK && ((varlen >= 500) || (client->headers_db->getchaintip(client->headers_db_ctx)->height > node->bestknownheight - 1440))) {
                 contains_block = true;
-                if (ts_sched) {
-                    uint8_t hash[32];
-                    if (deser_u256(hash, buf)) {
-                        memcpy(node->last_requested_inv, hash, 32);
-                        if (spv_block_sched_enqueue(client, hash)) enqueued++;
-                    }
-                } else {
-                    deser_u256(node->last_requested_inv, buf);
-                }
+                deser_u256(node->last_requested_inv, buf);
            } else if (type == DOGECOIN_INV_TYPE_TX) {
                 contains_tx = true;
                 deser_skip(buf, 32);
@@ -1795,19 +1547,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         }
 
         if (contains_block) {
-            if (ts_sched) {
-                client->nodegroup->log_write_cb("Block sched: enqueued %u/%u inv'd block hashes from node %d\n",
-                    enqueued, varlen, node->nodeid);
-                /* Clear the peer's BLOCKSYNC so the scheduler can hand it a per-peer getdata next round. */
-                node->state &= ~NODE_BLOCKSYNC;
-                spv_block_sched_dispatch(client);
-            } else {
-                node->time_last_request = time(NULL);
-                client->nodegroup->log_write_cb("Requesting %d blocks\n", varlen);
-                cstring *p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, original_inv.p, original_inv.len);
-                dogecoin_node_send(node, p2p_msg);
-                cstr_free(p2p_msg, true);
-            }
+            node->time_last_request = time(NULL);
+            client->nodegroup->log_write_cb("Requesting %d blocks\n", varlen);
+            cstring *p2p_msg = dogecoin_p2p_message_new(node->nodegroup->chainparams->netmagic, DOGECOIN_MSG_GETDATA, original_inv.p, original_inv.len);
+            dogecoin_node_send(node, p2p_msg);
+            cstr_free(p2p_msg, true);
         }
 
         if (contains_tx && client->smpv_enabled) {
@@ -1827,15 +1571,12 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
             uint8_t prev_block[32];
             uint8_t block_hash[32];
             if (spv_extract_block_header_info(client, (const uint8_t*)buf->p, buf->len, prev_block, block_hash)) {
-                /* Clear in-flight slot for this hash (matches scheduler dispatch). */
-                spv_block_sched_inflight_remove(client, block_hash);
                 dogecoin_blockindex* tip = client->headers_db->getchaintip(client->headers_db_ctx);
                 if (tip && memcmp(prev_block, tip->hash, 32) != 0) {
                     if (spv_stage_block(client, node->nodeid, (const uint8_t*)buf->p, buf->len, prev_block, block_hash)) {
                         node->state &= ~NODE_BLOCKSYNC;
                         node->nodegroup->node_connection_state_changed_cb(node);
-                        /* Keep peers productive: schedule next pending hashes now that a slot freed. */
-                        spv_block_sched_dispatch(client);
+                        dogecoin_net_spv_node_request_headers_or_blocks(node, true);
                         return;
                     }
                 }
@@ -1844,11 +1585,6 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
 
         if (!spv_commit_block_payload(client, node->nodeid, (const uint8_t*)buf->p, buf->len)) {
             return;
-        }
-
-        if (client->thread_safe_mode && client->blocks_stage_ctx) {
-            /* Tip just advanced -- run scheduler to feed waiting peers more work. */
-            spv_block_sched_dispatch(client);
         }
     }
 
