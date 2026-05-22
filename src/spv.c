@@ -90,7 +90,6 @@ static const unsigned int COMPLETED_WHEN_NUM_NODES_AT_SAME_HEIGHT = 2;
 #define HEADER_INVALID_STREAK_SHIFT 8
 #define HEADER_INVALID_STREAK_MASK (0xFFU << HEADER_INVALID_STREAK_SHIFT)
 static const unsigned int MAX_INVALID_STREAK_VALUE = 0xFFU;
-static const unsigned int INVALID_STREAK_SENTINEL = 0x100U;
 static const unsigned int MAX_PARALLEL_HEADER_REQUESTS = 2;
 
 static unsigned int spv_get_invalid_header_streak(const dogecoin_node* node)
