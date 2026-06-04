@@ -91,6 +91,30 @@ typedef struct dogecoin_spv_client_
     void* blocks_stage_ctx;          /* bounded out-of-order full block staging (master-writer) */
     dogecoin_bool thread_safe_mode;  /* set by dogecoin_spv_client_enable_thread_safe_mode() in TS builds */
 
+    /* BIP37 bloom filter (optional). When set, getdata requests are rewritten
+       to request FILTERED_BLOCK so peers answer with merkleblock + matched tx. */
+    uint8_t* bloom_filter;
+    uint32_t bloom_filter_len;
+    uint32_t bloom_nhashfunc;
+    uint32_t bloom_ntweak;
+    uint8_t  bloom_flags;
+    char*    bloom_filter_debug_dump;
+
+   /* merkleblock -> matched tx state
+      stored as a btree keyed by txid so tx lookup is O(log n) */
+   void*      merkle_match_tree;
+   uint32_t   merkle_match_pending;
+    dogecoin_bool merkle_match_active;
+    dogecoin_blockindex* merkle_match_blockindex;
+
+    /* historical rescan progress counters */
+    uint64_t rescan_total;      /* total merkle blocks received during rescan */
+    uint64_t rescan_matched;    /* merkle blocks with at least one matched tx */
+    int32_t  filtered_history_last_end_height; /* highest historical height already requested via getdata(FILTERED_BLOCK) */
+    uint8_t  filtered_history_tail_rerequest_count; /* bounded historical tail re-requests after new matches to catch spends */
+    uint256_t filtered_history_last_rerequest_txid; /* dedupe repeated tail re-requests for the same matched tx */
+    int32_t  filtered_history_last_rerequest_height;
+
     /* callbacks */
     /* ========= */
     void (*header_connected)(struct dogecoin_spv_client_ *client);
@@ -98,6 +122,20 @@ typedef struct dogecoin_spv_client_
     dogecoin_bool (*header_message_processed)(struct dogecoin_spv_client_ *client, dogecoin_node *node, dogecoin_blockindex *newtip);
     void (*sync_transaction)(void *ctx, dogecoin_tx *tx, unsigned int pos, dogecoin_blockindex *blockindex);
     void *sync_transaction_ctx;
+
+    /* Per-client pending PQC OP_RETURN commitments awaiting carrier TX_R match.
+       Opaque pointer (spv_pqc_pending_commit_t* internally); NULL when no PQC
+       backends are compiled in. Owned by the client and freed on
+       dogecoin_spv_client_free so multiple clients do not share state. */
+    void* pqc_pending_commits;
+
+    /* Per-client pending ZK OP_RETURN commitments awaiting carrier TX_R match.
+       Opaque pointer (spv_zk_pending_commit_t* internally); NULL when the ZK
+       carrier module is not compiled in. Owned by the client and freed on
+       dogecoin_spv_client_free so multiple clients do not share state and so
+       a long-running node cannot accumulate unbounded entries from cheap
+       OP_RETURN spam (capped + LRU-evicted by spv_zk_add_pending). */
+    void* zk_pending_commits;
 } dogecoin_spv_client;
 
 LIBDOGECOIN_API dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params, dogecoin_bool debug, dogecoin_bool headers_memonly, dogecoin_bool use_checkpoints, dogecoin_bool full_sync, int maxnodes, const char *http_server);
@@ -116,6 +154,25 @@ LIBDOGECOIN_API void dogecoin_spv_set_headers_target_node(dogecoin_spv_client* c
 /* Opt-in to thread-safe runtime mode. Enables debug logging for the master-writer pipeline and
    bounded out-of-order header batch staging. Safe to call multiple times; no-op on NULL. */
 LIBDOGECOIN_API void dogecoin_spv_client_enable_thread_safe_mode(dogecoin_spv_client* client);
+LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_client *client, int depth);
+
+/* BIP37: caller supplies a bloom filter payload (as built elsewhere).
+   Insert script-relevant data (e.g. pubkey hashes, script bytes, outpoints),
+   not base58 address strings. txids/outpoints are only useful when known. */
+LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterload(
+    dogecoin_spv_client* client,
+    const uint8_t* filter,
+    uint32_t filter_len,
+    uint32_t nHashFuncs,
+    uint32_t nTweak,
+    uint8_t flags);
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filteradd(
+    dogecoin_spv_client* client,
+    const uint8_t* data,
+    uint32_t data_len);
+
+LIBDOGECOIN_API dogecoin_bool dogecoin_spv_client_filterclear(dogecoin_spv_client* client);
 
 LIBDOGECOIN_END_DECL
 

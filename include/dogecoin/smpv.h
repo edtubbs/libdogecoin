@@ -28,6 +28,7 @@
 #include <dogecoin/dogecoin.h>
 #include <dogecoin/chainparams.h>
 #include <dogecoin/tx.h>
+#include <dogecoin/uthash.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
@@ -35,7 +36,7 @@ LIBDOGECOIN_BEGIN_DECL
 typedef struct dogecoin_transaction_ dogecoin_transaction;
 
 /* SMPV transaction structure */
-typedef struct {
+typedef struct dogecoin_smpv_tx_ {
     char* txid;                    /* Transaction ID (hex string) */
     char* raw_hex;                 /* Raw transaction hex */
     dogecoin_tx* decoded_tx;       /* Decoded transaction */
@@ -60,7 +61,7 @@ typedef struct {
 } dogecoin_smpv_tx;
 
 /* SMPV address watcher structure */
-typedef struct {
+typedef struct dogecoin_smpv_watcher_ {
     char* address;                 /* Dogecoin address being watched */
     uint64_t total_received;       /* Total received in koinu */
     uint64_t total_sent;           /* Total sent in koinu */
@@ -69,8 +70,15 @@ typedef struct {
     dogecoin_bool is_active;       /* Whether watcher is active */
 } dogecoin_smpv_watcher;
 
+/* Hash table entry for txid lookup */
+typedef struct smpv_tx_lookup_ {
+    char txid[65];              /* key: hex txid (64 chars + NUL) */
+    uint32_t index;             /* index into mempool_txs array */
+    UT_hash_handle hh;
+} smpv_tx_lookup;
+
 /* SMPV client structure */
-typedef struct {
+typedef struct dogecoin_smpv_client_ {
     const dogecoin_chainparams* chain_params;
     dogecoin_smpv_watcher* watchers;   /* Hash table of watchers */
     dogecoin_smpv_tx* mempool_txs;     /* Hash table of mempool transactions */
@@ -79,11 +87,18 @@ typedef struct {
     dogecoin_bool is_running;
     uint64_t last_update_time;
 
+    /* txid lookup index */
+    smpv_tx_lookup* tx_lookup;
+
     /* lightweight running totals (not exposed via new APIs) */
     uint64_t total_bytes;
     uint32_t confirmed_count;
     uint32_t unconfirmed_count;
     uint64_t last_seen_ts;
+
+    /* internal hash indexes (map.h/uthash-backed) */
+    void* watcher_index;
+    void* tx_index;
 } dogecoin_smpv_client;
 
 /* Callback function type for transaction notifications */
@@ -166,6 +181,12 @@ LIBDOGECOIN_API void dogecoin_smpv_update_tx_status(
     dogecoin_bool confirmed,
     const char* block_hash,
     uint32_t block_height
+);
+
+/* Recalculate all confirmation counts after a new tip */
+LIBDOGECOIN_API void dogecoin_smpv_tip_update(
+    dogecoin_smpv_client* client,
+    uint32_t tip_height
 );
 
 /* Get mempool statistics */

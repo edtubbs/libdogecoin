@@ -82,13 +82,36 @@ typedef struct dogecoin_context_ {
     char last_error[256];
 } dogecoin_context;
 
+/* forward declarations for opaque types referenced by the PQC and ZK APIs */
+typedef struct cstring cstring;
+
+/* forward declarations for network/SPV node types */
+typedef struct dogecoin_node_ dogecoin_node;
+typedef struct dogecoin_spv_client_ dogecoin_spv_client;
+typedef struct dogecoin_wallet_ dogecoin_wallet;
+
+/* forward declarations for transaction container types */
+typedef struct dogecoin_tx_ dogecoin_tx;
+typedef struct dogecoin_smpv_tx_ dogecoin_smpv_tx;
+typedef struct dogecoin_smpv_watcher_ dogecoin_smpv_watcher;
+
+/* forward declaration for the SMPV client context type */
+typedef struct dogecoin_smpv_client_ dogecoin_smpv_client;
+
+/* callback invoked for smpv-processed transactions */
+typedef void (*dogecoin_smpv_tx_callback)(
+    const dogecoin_smpv_tx* tx,
+    const char* address,
+    void* user_data
+);
+
 extern const dogecoin_chainparams dogecoin_chainparams_main;
 extern const dogecoin_chainparams dogecoin_chainparams_test;
 extern const dogecoin_chainparams dogecoin_chainparams_regtest;
 
 // the mainnet checkpoints, needs a fix size
-extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[22];
-extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[18];
+extern const dogecoin_checkpoint dogecoin_mainnet_checkpoint_array[33];
+extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[24];
 
 const dogecoin_chainparams* chain_from_b58_prefix(const char* address);
 int chain_from_b58_prefix_bool(char* address);
@@ -175,8 +198,14 @@ int verifyP2pkhAddress(char p2pkh_pubkey[P2PKHLEN], size_t len);
 /* get derived hd address */
 int getDerivedHDAddress(const char masterkey[HDKEYLEN], uint32_t account, dogecoin_bool ischange, uint32_t addressindex, char outaddress[P2PKHLEN], dogecoin_bool outprivkey);
 
+/* get derived hd p2pkh address */
+int getDerivedHDAddressAsP2PKH(const char masterkey[HDKEYLEN], uint32_t account, dogecoin_bool ischange, uint32_t addressindex, char outp2pkh[P2PKHLEN]);
+
 /* get derived hd address by custom path */
-int getDerivedHDAddressByPath(const char masterkey[HDKEYLEN], const char derived_path[KEYPATHMAXLEN], char outaddress[P2PKHLEN], dogecoin_bool outprivkey);
+int getDerivedHDAddressByPath(const char masterkey[HDKEYLEN], const char derived_path[KEYPATHMAXLEN], char outaddress[P2PKHLEN]);
+
+/* get derived hd key by custom path */
+int getDerivedHDKeyByPath(const char masterkey[HDKEYLEN], const char derived_path[KEYPATHMAXLEN], char outaddress[HDKEYLEN], dogecoin_bool outprivkey);
 
 /* generate the p2pkh address from a given hex pubkey */
 dogecoin_bool addresses_from_pubkey(const dogecoin_chainparams* chain, const char pubkey_hex[PUBKEYHEXLEN], char p2pkh_address[P2PKHLEN]);
@@ -193,7 +222,7 @@ int genPrivkey(const dogecoin_bool is_testnet, char privkey_wif[PRIVKEYWIFLEN], 
 /* p2pkh utilities */
 dogecoin_bool dogecoin_pubkey_hash_to_p2pkh_address(char script_pubkey_hex[PUBKEYHEXLEN], size_t script_pubkey_hex_length, char p2pkh[P2PKHLEN], const dogecoin_chainparams* chain);
 dogecoin_bool dogecoin_p2pkh_address_to_pubkey_hash(char p2pkh[P2PKHLEN], char scripthash[PUBKEYHASHLEN]);
-char* dogecoin_address_to_pubkey_hash(char p2pkh[PUBKEYHEXLEN]);
+char* dogecoin_address_to_pubkey_hash(char p2pkh[P2PKHLEN]);
 char* dogecoin_private_key_wif_to_pubkey_hash(char private_key_wif[PRIVKEYWIFLEN]);
 
 /* generate the p2pkh address from a given pubkey hash */
@@ -204,6 +233,15 @@ typedef struct dogecoin_key_ {
     uint8_t privkey[DOGECOIN_ECKEY_PKEY_LENGTH];
 } dogecoin_key;
 
+/* initialize a private key */
+void dogecoin_privkey_init(dogecoin_key* privkey);
+/* check if a private key is valid */
+dogecoin_bool dogecoin_privkey_is_valid(const dogecoin_key* privkey);
+/* securely wipe a private key from memory */
+void dogecoin_privkey_cleanse(dogecoin_key* privkey);
+/* generate a new random private key */
+dogecoin_bool dogecoin_privkey_gen(dogecoin_key* privkey);
+/* form a WIF encoded string from the given privkey */
 void dogecoin_privkey_encode_wif(const dogecoin_key* privkey, const dogecoin_chainparams* chain, char privkey_wif[PRIVKEYWIFLEN], size_t* strsize_inout);
 dogecoin_bool dogecoin_privkey_decode_wif(const char privkey_wif[PRIVKEYWIFLEN], const dogecoin_chainparams* chain, dogecoin_key* privkey);
 
@@ -372,6 +410,18 @@ int dogecoin_verify_mnemonic (const char* mnemonic, const char* language, const 
 /* Generates a HD master key and p2pkh ready-to-use corresponding dogecoin address from a mnemonic */
 int getDerivedHDAddressFromMnemonic(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, const MNEMONIC mnemonic, const PASS pass, char* p2pkh_pubkey, const bool is_testnet);
 
+/* Generates a HD master key and p2pkh address from a mnemonic */
+int generateHDMasterPubKeypairFromMnemonic(char hd_privkey_master[HDKEYLEN], char p2pkh_pubkey_master[P2PKHLEN], const MNEMONIC mnemonic, const PASS pass, const dogecoin_bool is_testnet);
+
+/* Verifies HD master key and p2pkh address against mnemonic */
+int verifyHDMasterPubKeypairFromMnemonic(const char hd_privkey_master[HDKEYLEN], const char p2pkh_pubkey_master[P2PKHLEN], const MNEMONIC mnemonic, const PASS pass, const dogecoin_bool is_testnet);
+
+/* Generates a HD master key and p2pkh address from encrypted seed */
+int generateHDMasterPubKeypairFromEncryptedSeed(char hd_privkey_master[HDKEYLEN], char p2pkh_pubkey_master[P2PKHLEN], const dogecoin_bool is_testnet, const int file_num);
+
+/* Verifies HD master key and p2pkh address against encrypted seed */
+int verifyHDMasterPubKeypairFromEncryptedSeed(const char hd_privkey_master[HDKEYLEN], const char p2pkh_pubkey_master[P2PKHLEN], const dogecoin_bool is_testnet, const int file_num);
+
 /* TPM2 utilities */
 
 /* Encrypted file numbers */
@@ -425,6 +475,27 @@ dogecoin_bool dogecoin_decrypt_hdnode_with_sw(dogecoin_hdnode* out, const int fi
 
 /* Generate a 256-bit random english mnemonic with software */
 dogecoin_bool generateRandomEnglishMnemonicSW(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, uint8_t** encrypted_mnemonic_out, size_t* encrypted_mnemonic_size);
+
+/* Encrypt a BIP32 seed with software and store it on YubiKey */
+dogecoin_bool dogecoin_encrypt_seed_with_sw_to_yubikey(const SEED seed, const size_t size, const int file_num, const dogecoin_bool overwrite, const char* test_password);
+
+/* Decrypt a BIP32 seed with software after retrieving it from YubiKey */
+dogecoin_bool dogecoin_decrypt_seed_with_sw_from_yubikey(SEED seed, const int file_num, const char* test_password);
+
+/* Generate a BIP39 mnemonic, encrypt it with software, and store it on YubiKey */
+dogecoin_bool dogecoin_generate_mnemonic_encrypt_with_sw_to_yubikey(MNEMONIC mnemonic, const int file_num, const dogecoin_bool overwrite, const char* lang, const char* space, const char* words, const char* test_password);
+
+/* Decrypt a BIP39 mnemonic with software after retrieving it from YubiKey */
+dogecoin_bool dogecoin_decrypt_mnemonic_with_sw_from_yubikey(MNEMONIC mnemonic, const int file_num, const char* test_password);
+
+/* Generate a BIP32 HD node, encrypt it with software, and store it on YubiKey */
+dogecoin_bool dogecoin_generate_hdnode_encrypt_with_sw_to_yubikey(dogecoin_hdnode* out, const int file_num, const dogecoin_bool overwrite, const char* test_password);
+
+/* Decrypt a BIP32 HD node with software after retrieving it from YubiKey */
+dogecoin_bool dogecoin_decrypt_hdnode_with_sw_from_yubikey(dogecoin_hdnode* out, const int file_num, const char* test_password);
+
+/* List all encryption keys in the TPM */
+dogecoin_bool dogecoin_list_encryption_keys_in_tpm(wchar_t* names[], size_t* count);
 
 /* generates a new dogecoin address from an encrypted seed and a slip44 key path */
 int getDerivedHDAddressFromEncryptedSeed(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, char* p2pkh_pubkey, const dogecoin_bool is_testnet, const int file_num);
@@ -491,6 +562,16 @@ int sign_transaction_ex(int txindex, const char* script_pubkey, const char* priv
 /* convenience wrapper: sign a single-key p2pkh tx at (txindex) using (privkey); writes signed hex into (buf) with capacity (buf_cap) */
 int sign_transaction_w_privkey_ex(int txindex, const char* privkey, char* buf, size_t buf_cap);
 
+/* build an M-of-N P2SH multisig address from (n) compressed pubkey hex strings;
+   writes the P2SH address into (p2sh_addr_out) (must hold at least P2PKHLEN bytes,
+   capacity given by (p2sh_addr_cap)) and the redeem script hex into
+   (redeem_script_hex_out) (must hold at least (n*68+6)*2+1 bytes, capacity given
+   by (redeem_script_hex_cap));
+   returns 1 on success, 0 on error (including insufficient buffer capacity) */
+int get_p2sh_multisig_address(const char** pubkeys_hex, int n, int m, int is_testnet,
+                               char* p2sh_addr_out, size_t p2sh_addr_cap,
+                               char* redeem_script_hex_out, size_t redeem_script_hex_cap);
+
 /* QR Code Generation Functions
 ---------------------------------
 */
@@ -539,6 +620,10 @@ uint64_t coins_to_koinu_str(char* coins);
 --------------------------------------------------------------------------
 */
 char* dogecoin_char_vla(size_t size);
+/* allocate zero-initialized memory for count elements of size bytes each */
+void* dogecoin_calloc(size_t count, size_t size);
+/* allocate an unsigned char variable-length array */
+unsigned char* dogecoin_uchar_vla(size_t size);
 void dogecoin_free(void* ptr);
 volatile void* dogecoin_mem_zero(volatile void* dst, size_t len);
 
@@ -552,6 +637,23 @@ typedef struct dogecoin_pubkey_ {
     uint8_t pubkey[DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH];
 } dogecoin_pubkey;
 
+/* initialize a public key */
+void dogecoin_pubkey_init(dogecoin_pubkey* pubkey);
+/* check if a public key is valid */
+dogecoin_bool dogecoin_pubkey_is_valid(const dogecoin_pubkey* pubkey);
+/* securely wipe a public key from memory */
+void dogecoin_pubkey_cleanse(dogecoin_pubkey* pubkey);
+/* derive a public key from a private key */
+void dogecoin_pubkey_from_key(const dogecoin_key* privkey, dogecoin_pubkey* pubkey_inout);
+/* sign a 32-byte hash and return a 64-byte compact signature with recovery id (fixed compression) */
+dogecoin_bool dogecoin_key_sign_hash_compact_recoverable_fcomp(const dogecoin_key* privkey, const uint256_t hash, unsigned char* sigout, size_t* outlen, int* recid);
+/* recover a public key from a compact signature and recovery id */
+dogecoin_bool dogecoin_key_recover_pubkey(const unsigned char* sig, const uint256_t hash, int recid, dogecoin_pubkey* pubkey);
+/* verify a compact encoded signature with given pubkey and return true if valid */
+dogecoin_bool dogecoin_pubkey_verify_sigcmp(const dogecoin_pubkey* pubkey, const uint256_t hash, unsigned char* sigcmp);
+/* derive a p2pkh address from a public key */
+dogecoin_bool dogecoin_pubkey_getaddr_p2pkh(const dogecoin_pubkey* pubkey, const dogecoin_chainparams* chain, char* addrout);
+
 typedef struct eckey {
     int idx;
     dogecoin_key private_key;
@@ -563,7 +665,9 @@ typedef struct eckey {
 } eckey;
 
 // instantiates a new eckey
-eckey* new_eckey();
+eckey* new_eckey(dogecoin_bool is_testnet);
+// instantiates a new eckey from a WIF-encoded private key
+eckey* new_eckey_from_privkey(char* key);
 
 // adds eckey structure to hash table
 void add_eckey(eckey *key);
@@ -573,9 +677,11 @@ eckey* find_eckey(int idx);
 
 // remove eckey from the hash table
 void remove_eckey(eckey *key);
+// free the memory allocated for an eckey
+void dogecoin_key_free(eckey* eckey);
 
 // instantiates and adds key to the hash table
-int start_key();
+int start_key(dogecoin_bool is_testnet);
 
 /* sign a message with a private key */
 char* sign_message(char* privkey, char* msg);
@@ -598,13 +704,21 @@ typedef struct vector_t {
 
 #define vector_idx(vec, idx) vec->data[idx]
 
+/* create a new vector with initial reserve and optional element destructor */
 vector_t* vector_new(size_t res, void (*free_f)(void*));
+/* free vector internals and optionally free backing array */
 void vector_free(vector_t* vec, dogecoin_bool free_array);
+/* append an element pointer to the vector */
 dogecoin_bool vector_add(vector_t* vec, void* data);
+/* remove first matching element pointer from the vector */
 dogecoin_bool vector_remove(vector_t* vec, void* data);
+/* remove vector element at index */
 void vector_remove_idx(vector_t* vec, size_t idx);
+/* remove a contiguous range of vector elements */
 void vector_remove_range(vector_t* vec, size_t idx, size_t len);
+/* resize vector capacity/length bookkeeping */
 dogecoin_bool vector_resize(vector_t* vec, size_t newsz);
+/* find index of an element pointer, or -1 if absent */
 ssize_t vector_find(vector_t* vec, void* data);
 
 
@@ -612,19 +726,94 @@ ssize_t vector_find(vector_t* vec, void* data);
 --------------------------------------------------------------------------
 */
 
+/* read wallet data for a watched address */
+dogecoin_wallet* dogecoin_wallet_read(char* address);
+/* unregister address from connected node watch list */
 int dogecoin_unregister_watch_address_with_node(char* address);
+/* register address with connected node watch list */
+int dogecoin_register_watch_address_with_node(char* address);
+/* fill provided vector with utxo entries for address */
 int dogecoin_get_utxo_vector(char* address, vector_t* utxos);
+/* get serialized utxo bytes for address */
 uint8_t* dogecoin_get_utxos(char* address);
+/* get utxo entry count for address */
 unsigned int dogecoin_get_utxos_length(char* address);
+/* get utxo txid hex string at index */
 char* dogecoin_get_utxo_txid_str(char* address, unsigned int index);
+/* get utxo txid bytes at index */
 uint8_t* dogecoin_get_utxo_txid(char* address, unsigned int index);
+/* get utxo amount value at index */
+uint64_t dogecoin_get_utxo_amount(char* address, unsigned int index);
+/* get utxo output index (vout) at index */
+uint32_t dogecoin_get_utxo_vout(char* address, unsigned int index);
+/* get total confirmed balance in koinu for address */
 uint64_t dogecoin_get_balance(char* address);
+/* get total confirmed balance as decimal string for address */
 char* dogecoin_get_balance_str(char* address);
+
+/* SPV API
+--------------------------------------------------------------------------
+*/
+/* create a new spv client instance */
+dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams* params, dogecoin_bool debug, dogecoin_bool headers_memonly, dogecoin_bool use_checkpoints, dogecoin_bool full_sync, int maxnodes, const char* http_server);
+/* free an spv client instance */
+void dogecoin_spv_client_free(dogecoin_spv_client* client);
+/* load spv client headers and state from file */
+dogecoin_bool dogecoin_spv_client_load(dogecoin_spv_client* client, const char* file_path, dogecoin_bool prompt);
+/* discover peers from DNS seeds or provided ips */
+void dogecoin_spv_client_discover_peers(dogecoin_spv_client* client, const char* ips);
+/* run the spv client main loop */
+void dogecoin_spv_client_runloop(dogecoin_spv_client* client);
+/* request headers from connected peers */
+dogecoin_bool dogecoin_net_spv_request_headers(dogecoin_spv_client* client);
+/* request either headers or blocks from a peer node */
+void dogecoin_net_spv_node_request_headers_or_blocks(dogecoin_node* node, dogecoin_bool blocks);
+/* enable or disable simple payment verification tracking */
+void dogecoin_spv_enable_smpv(dogecoin_spv_client* client, dogecoin_bool enable);
+/* process and track a mempool transaction from hex */
+dogecoin_bool dogecoin_spv_handle_mempool_tx_hex(dogecoin_spv_client* client, const char* raw_tx_hex);
+/* retrieve smpv transaction and watch statistics */
+void dogecoin_spv_get_smpv_stats(dogecoin_spv_client* client, uint32_t* total_txs, uint32_t* watched_addrs);
+/* request mempool contents from peers */
+void dogecoin_net_spv_request_mempool(dogecoin_spv_client* client);
+
+/* SMPV API
+--------------------------------------------------------------------------
+*/
+/* create an SMPV client instance for chain parameters */
+dogecoin_smpv_client* dogecoin_smpv_client_new(const dogecoin_chainparams* chain_params);
+/* free an SMPV client instance and owned resources */
+void dogecoin_smpv_client_free(dogecoin_smpv_client* client);
+/* add an address to SMPV watch list */
+dogecoin_bool dogecoin_smpv_add_watcher(dogecoin_smpv_client* client, const char* address);
+/* remove an address from SMPV watch list */
+dogecoin_bool dogecoin_smpv_remove_watcher(dogecoin_smpv_client* client, const char* address);
+/* retrieve a watcher record by address */
+dogecoin_smpv_watcher* dogecoin_smpv_get_watcher(const dogecoin_smpv_client* client, const char* address);
+/* start SMPV processing state */
+dogecoin_bool dogecoin_smpv_start(dogecoin_smpv_client* client);
+/* stop SMPV processing state */
+void dogecoin_smpv_stop(dogecoin_smpv_client* client);
+/* decode, filter and process a raw transaction with callbacks */
+dogecoin_bool dogecoin_smpv_process_tx(dogecoin_smpv_client* client, const char* raw_tx_hex, dogecoin_smpv_tx_callback callback, void* user_data);
+/* get tracked SMPV transaction by txid */
+dogecoin_smpv_tx* dogecoin_smpv_get_tx(const dogecoin_smpv_client* client, const char* txid);
+/* decode a raw transaction hex string into a tx object */
+dogecoin_tx* dogecoin_smpv_decode_tx(const char* raw_tx_hex);
+/* update tracked transaction status and optional block data */
+void dogecoin_smpv_update_tx_status(dogecoin_smpv_client* client, const char* txid, dogecoin_bool confirmed, const char* block_hash, uint32_t block_height);
+/* retrieve SMPV transaction and watcher totals */
+void dogecoin_smpv_get_stats(const dogecoin_smpv_client* client, uint32_t* total_txs, uint32_t* watched_addresses);
+/* convert tracked smpv transaction data to json */
+char* dogecoin_smpv_tx_to_json(const dogecoin_smpv_tx* tx);
+/* convert watcher data to json */
+char* dogecoin_smpv_watcher_to_json(const dogecoin_smpv_watcher* watcher);
 
 /* Random API
 --------------------------------------------------------------------------
 */
 
+/* fill buffer with cryptographically secure random bytes */
 dogecoin_bool dogecoin_random_bytes(uint8_t* buf, uint32_t len, const uint8_t update_seed);
 
 /* Crypto API
@@ -633,7 +822,390 @@ dogecoin_bool dogecoin_random_bytes(uint8_t* buf, uint32_t len, const uint8_t up
 
 #define SHA1_DIGEST_LENGTH 20
 #define SHA256_DIGEST_LENGTH 32
+#define SHA512_DIGEST_LENGTH 64
 
+/* compute hmac-sha1 for the input message */
 void hmac_sha1(const uint8_t* key, const size_t keylen, const uint8_t* msg, const size_t msglen, uint8_t* hmac);
-
+/* compute hmac-sha256 for the input message */
+void hmac_sha256(const uint8_t* key, const size_t keylen, const uint8_t* msg, const size_t msglen, uint8_t* hmac);
+/* compute hmac-sha512 for the input message */
+void hmac_sha512(const uint8_t* key, const size_t keylen, const uint8_t* msg, const size_t msglen, uint8_t* hmac);
+/* compute sha256 digest for raw input bytes */
 void sha256_raw(const uint8_t*, size_t, uint8_t[SHA256_DIGEST_LENGTH]);
+/* compute sha1 digest for raw input bytes */
+void sha1_Raw(const uint8_t*, size_t, uint8_t[SHA1_DIGEST_LENGTH]);
+/* compute sha512 digest for raw input bytes */
+void sha512_raw(const uint8_t*, size_t, uint8_t[SHA512_DIGEST_LENGTH]);
+/* derive key material with pbkdf2-hmac-sha256 */
+void pbkdf2_hmac_sha256(const uint8_t *pass, int passlen, const uint8_t *salt, int saltlen, uint32_t iterations, uint8_t *key, int keylen);
+/* derive key material with pbkdf2-hmac-sha512 */
+void pbkdf2_hmac_sha512(const uint8_t *pass, int passlen, const uint8_t *salt, int saltlen, uint32_t iterations, uint8_t *key);
+/* compute ripemd160 digest for input bytes */
+void rmd160(const uint8_t* msg, uint32_t msg_len, uint8_t* hash);
+
+/* Base58 API
+--------------------------------------------------------------------------
+*/
+/* encode binary data to base58 string */
+int dogecoin_base58_encode(char* b58, size_t* b58sz, const void* data, size_t binsz);
+/* decode base58 string into binary buffer */
+int dogecoin_base58_decode(void* bin, size_t* binszp, const char* b58, size_t b58sz);
+/* encode binary data to base58check string */
+size_t dogecoin_base58_encode_check(const uint8_t* data, size_t datalen, char* str, size_t strsize);
+/* decode base58check string and verify checksum */
+size_t dogecoin_base58_decode_check(const char* str, uint8_t* data, size_t datalen);
+
+/* Key / ECC API
+--------------------------------------------------------------------------
+*/
+/* derive public key bytes from private key bytes */
+void dogecoin_ecc_get_pubkey(const uint8_t* private_key, uint8_t* public_key, size_t* public_key_len, dogecoin_bool compressed);
+/* sign a 256-bit hash with a private key */
+dogecoin_bool dogecoin_ecc_sign(const uint8_t* private_key, const uint256_t hash, unsigned char* sigder, size_t* outlen);
+/* verify a DER signature against a 256-bit hash */
+dogecoin_bool dogecoin_ecc_verify_sig(const uint8_t* public_key, dogecoin_bool compressed, const uint256_t hash, unsigned char* sigder, size_t siglen);
+/* verify a compact signature against a 256-bit hash */
+dogecoin_bool dogecoin_ecc_verify_sigcmp(const uint8_t* public_key, dogecoin_bool compressed, const uint256_t hash, unsigned char* sigcmp);
+
+/* Transaction Object API
+--------------------------------------------------------------------------
+*/
+/* create a new transaction object */
+dogecoin_tx* dogecoin_tx_new();
+/* free a transaction object */
+void dogecoin_tx_free(dogecoin_tx* tx);
+/* deep-copy transaction contents */
+void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src);
+/* deserialize transaction bytes into object */
+int dogecoin_tx_deserialize(const unsigned char* tx_serialized, size_t inlen, dogecoin_tx* tx, size_t* consumed_length);
+/* compute transaction hash */
+void dogecoin_tx_hash(const dogecoin_tx* tx, uint256_t hashout);
+/* return whether transaction is coinbase */
+dogecoin_bool dogecoin_tx_is_coinbase(dogecoin_tx* tx);
+/* add a p2pkh output for an address */
+dogecoin_bool dogecoin_tx_add_address_out(dogecoin_tx* tx, const dogecoin_chainparams* chain, int64_t amount, const char* address);
+/* add a p2pkh output from hash160 */
+dogecoin_bool dogecoin_tx_add_p2pkh_hash160_out(dogecoin_tx* tx, int64_t amount, uint160_t hash160);
+/* add a p2sh output from hash160 */
+dogecoin_bool dogecoin_tx_add_p2sh_hash160_out(dogecoin_tx* tx, int64_t amount, uint160_t hash160);
+/* add an op_return-style data output */
+dogecoin_bool dogecoin_tx_add_data_out(dogecoin_tx* tx, const int64_t amount, const uint8_t* data, const size_t datalen);
+
+/* Post-Quantum Cryptography (PQC) API: PQC carrier helpers and Falcon-512 /
+   Dilithium2 (USE_LIBOQS) / Raccoon-G-44 (USE_RACCOON_G) signature schemes. */
+
+/* PQC carrier sizing / wire-format constants. */
+#define DOGECOIN_PQC_CARRIER_MAX_CHUNKS 3
+#define DOGECOIN_PQC_CARRIER_CHUNK_MAX  520
+#define DOGECOIN_PQC_CARRIER_HDR_LEN    8
+#define DOGECOIN_PQC_CARRIER_TAG_LEN    8
+
+/* P2PKH scriptSig length bounds used during PQC sighash derivation. */
+#define DOGECOIN_PQC_MIN_P2PKH_SCRIPTSIG_LEN 106
+#define DOGECOIN_PQC_MAX_P2PKH_SCRIPTSIG_LEN 180
+
+/* DER signature push length bounds (includes 1-byte sighash type). */
+#define DOGECOIN_PQC_MIN_DER_SIG_PUSH_LEN 9
+#define DOGECOIN_PQC_MAX_DER_SIG_PUSH_LEN 73
+
+/* PQC algorithm discriminant used by carrier extraction and SPV validation. */
+typedef enum {
+    DOGECOIN_PQC_ALGO_FALCON,
+    DOGECOIN_PQC_ALGO_DILITHIUM,
+    DOGECOIN_PQC_ALGO_RACCOONG /* available only when built with USE_RACCOON_G */
+} dogecoin_pqc_algo_t;
+
+/* Per-algorithm tag / commit / push-total constants. */
+#define DOGECOIN_PQC_FALCON_TAG          "FLC1"
+#define DOGECOIN_PQC_FALCON_TAG_LEN      4
+#define DOGECOIN_PQC_FALCON_COMMIT_LEN   32
+#define DOGECOIN_PQC_FALCON_PUSH_TOTAL   (DOGECOIN_PQC_FALCON_TAG_LEN + DOGECOIN_PQC_FALCON_COMMIT_LEN)
+
+#define DOGECOIN_PQC_DILITHIUM_TAG        "DIL2"
+#define DOGECOIN_PQC_DILITHIUM_TAG_LEN    4
+#define DOGECOIN_PQC_DILITHIUM_COMMIT_LEN 32
+#define DOGECOIN_PQC_DILITHIUM_PUSH_TOTAL (DOGECOIN_PQC_DILITHIUM_TAG_LEN + DOGECOIN_PQC_DILITHIUM_COMMIT_LEN)
+
+#define DOGECOIN_PQC_RACCOON_TAG          "RCG4"
+#define DOGECOIN_PQC_RACCOON_TAG_LEN      4
+#define DOGECOIN_PQC_RACCOON_COMMIT_LEN   32
+#define DOGECOIN_PQC_RACCOON_PUSH_TOTAL   (DOGECOIN_PQC_RACCOON_TAG_LEN + DOGECOIN_PQC_RACCOON_COMMIT_LEN)
+#define DOGECOIN_PQC_RACCOON_CHAINCODE_LEN 32
+
+/* Build a P2SH redeem script / scriptPubKey for PQC carrier outputs. */
+dogecoin_bool dogecoin_pqc_carrier_build_redeemscript(cstring** out_redeem);
+dogecoin_bool dogecoin_pqc_carrier_build_p2sh_scriptpubkey(const cstring* redeem, cstring** out_spk);
+
+/* Build a carrier scriptSig for one part of a multi-part PQC payload. */
+dogecoin_bool dogecoin_pqc_carrier_build_part_scriptsig(
+    const char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN],
+    uint8_t part_index,
+    uint8_t part_total,
+    uint16_t pk_len,
+    uint16_t full_len,
+    const uint8_t* part_data,
+    size_t part_data_len,
+    const cstring* redeem,
+    cstring** out_scriptsig);
+
+/* Parse a carrier scriptSig to extract tag, part metadata, and payload. */
+dogecoin_bool dogecoin_pqc_carrier_parse_part_scriptsig(
+    const cstring* scriptsig,
+    char out_tag8[DOGECOIN_PQC_CARRIER_TAG_LEN + 1],
+    uint8_t* out_part_index,
+    uint8_t* out_part_total,
+    uint16_t* out_pk_len,
+    uint16_t* out_full_len,
+    uint8_t** out_part_data,
+    size_t* out_part_data_len,
+    cstring** out_redeem);
+
+/* Add carrier P2SH outputs to a transaction. */
+dogecoin_bool dogecoin_tx_add_pqc_carrier_outputs(
+    dogecoin_tx* tx,
+    const cstring* carrier_spk,
+    uint64_t value,
+    uint8_t part_total);
+
+/* Reassemble PQC pubkey+sig from carrier-format scriptSigs.
+   Caller must free *carrier_buf with dogecoin_free(). */
+dogecoin_bool dogecoin_pqc_carrier_extract_scriptsig(
+    const dogecoin_tx* tx,
+    dogecoin_pqc_algo_t* out_algo,
+    const uint8_t** out_pk,
+    size_t* out_pk_len,
+    const uint8_t** out_sig,
+    size_t* out_sig_len,
+    size_t* out_vin_index,
+    uint8_t** carrier_buf,
+    size_t* carrier_buf_len);
+
+/* Verify a PQC carrier reveal by reconstructing TX_BASE from raw TX_C bytes,
+   deriving the sighash32, and verifying the PQC signature over it. */
+dogecoin_bool dogecoin_pqc_carrier_verify_reveal(
+    dogecoin_pqc_algo_t algo,
+    const uint8_t* txc_raw,
+    size_t txc_raw_len,
+    const uint8_t* pk,
+    size_t pk_len,
+    const uint8_t* sig,
+    size_t sig_len,
+    uint8_t out_sighash[32]);
+
+/* Falcon-512 (requires USE_LIBOQS).  Caller must free *pk/*sk/*sig with dogecoin_free(). */
+dogecoin_bool dogecoin_falcon512_keypair(uint8_t** pk, size_t* pk_len, uint8_t** sk, size_t* sk_len);
+dogecoin_bool dogecoin_falcon512_sign(const uint8_t* sk, size_t sk_len, const uint8_t* msg, size_t msg_len, uint8_t** sig, size_t* sig_len);
+dogecoin_bool dogecoin_falcon512_verify(const uint8_t* pk, size_t pk_len, const uint8_t* msg, size_t msg_len, const uint8_t* sig, size_t sig_len);
+dogecoin_bool dogecoin_falcon512_commit_bytes(const uint8_t* pk, size_t pk_len, const uint8_t* sig, size_t sig_len, uint8_t commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_add_falcon512_commit(dogecoin_tx* tx, const uint8_t commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_extract_falcon512_commit(const dogecoin_tx* tx, uint8_t out_commit32[DOGECOIN_PQC_FALCON_COMMIT_LEN]);
+
+/* Dilithium2 (requires USE_LIBOQS).  Caller must free *pk/*sk/*sig with dogecoin_free(). */
+dogecoin_bool dogecoin_dilithium2_keypair(uint8_t** pk, size_t* pk_len, uint8_t** sk, size_t* sk_len);
+dogecoin_bool dogecoin_dilithium2_sign(const uint8_t* sk, size_t sk_len, const uint8_t* msg, size_t msg_len, uint8_t** sig, size_t* sig_len);
+dogecoin_bool dogecoin_dilithium2_verify(const uint8_t* pk, size_t pk_len, const uint8_t* msg, size_t msg_len, const uint8_t* sig, size_t sig_len);
+dogecoin_bool dogecoin_dilithium2_commit_bytes(const uint8_t* pk, size_t pk_len, const uint8_t* signature, size_t signature_len, uint8_t commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_add_dilithium2_commit(dogecoin_tx* tx, const uint8_t commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_extract_dilithium2_commit(const dogecoin_tx* tx, uint8_t out_commit32[DOGECOIN_PQC_DILITHIUM_COMMIT_LEN]);
+
+/* Raccoon-G-44 (requires USE_RACCOON_G).  Caller must free *pk/*sk/*sig/*child_* with dogecoin_free(). */
+dogecoin_bool dogecoin_raccoong44_is_available(void);
+dogecoin_bool dogecoin_raccoong44_keypair(uint8_t** pk, size_t* pk_len, uint8_t** sk, size_t* sk_len);
+dogecoin_bool dogecoin_raccoong44_sign(const uint8_t* sk, size_t sk_len, const uint8_t* msg, size_t msg_len, uint8_t** sig, size_t* sig_len);
+dogecoin_bool dogecoin_raccoong44_verify(const uint8_t* pk, size_t pk_len, const uint8_t* msg, size_t msg_len, const uint8_t* sig, size_t sig_len);
+dogecoin_bool dogecoin_raccoong44_commit_bytes(const uint8_t* pk, size_t pk_len, const uint8_t* signature, size_t signature_len, uint8_t commit32[DOGECOIN_PQC_RACCOON_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_add_raccoong44_commit(dogecoin_tx* tx, const uint8_t commit32[DOGECOIN_PQC_RACCOON_COMMIT_LEN]);
+dogecoin_bool dogecoin_tx_extract_raccoong44_commit(const dogecoin_tx* tx, uint8_t out_commit32[DOGECOIN_PQC_RACCOON_COMMIT_LEN]);
+
+/* Derive Raccoon-G-44 child secret + public key from parent (BIP32-style). */
+dogecoin_bool dogecoin_raccoong44_hd_derive_priv(const uint8_t* parent_sk, size_t parent_sk_len,
+                                                 const uint8_t* parent_pk, size_t parent_pk_len,
+                                                 const uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN],
+                                                 uint32_t index, dogecoin_bool hardened,
+                                                 uint8_t** child_sk, size_t* child_sk_len,
+                                                 uint8_t** child_pk, size_t* child_pk_len);
+
+/* Derive Raccoon-G-44 child public key from parent public key (non-hardened only). */
+dogecoin_bool dogecoin_raccoong44_hd_derive_pub(const uint8_t* parent_pk, size_t parent_pk_len,
+                                                const uint8_t chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN],
+                                                uint32_t index,
+                                                uint8_t** child_pk, size_t* child_pk_len);
+
+/* Zero-Knowledge Proof (ZK) Carrier API: Groth16 / PLONK / STARK payload
+   encode/decode, commit hashing, TX_C / TX_R helpers (USE_ZK_CARRIER). */
+
+#define DOGECOIN_ZK_CARRIER_MAGIC      "ZKP1"
+#define DOGECOIN_ZK_CARRIER_MAGIC_LEN  4
+#define DOGECOIN_ZK_CARRIER_TAG8       "ZKP1FULL"
+#define DOGECOIN_ZK_CARRIER_HDR_FIXED  (DOGECOIN_ZK_CARRIER_MAGIC_LEN + 1 + 1 + 4 + 2)
+#define DOGECOIN_ZK_OPRETURN_TAG       "DZKC"
+#define DOGECOIN_ZK_OPRETURN_TAG_LEN   4
+#define DOGECOIN_ZK_OPRETURN_DATA_LEN  (DOGECOIN_ZK_OPRETURN_TAG_LEN + 1 + 32)
+
+/* Wire-format version byte: v0 = legacy (no embedded vk); v1 = self-contained
+   reveal with verification-key bytes appended after the proof. */
+#define DOGECOIN_ZK_PAYLOAD_VERSION_V0     0x00
+#define DOGECOIN_ZK_PAYLOAD_VERSION_V1     0x01
+#define DOGECOIN_ZK_PAYLOAD_VERSION_MASK   0x01
+
+/* Selectable proof systems; values are stable on-wire mode selectors. */
+typedef enum {
+    DOGECOIN_ZK_MODE_GROTH16  = 0,
+    DOGECOIN_ZK_MODE_PLONK    = 1,
+    DOGECOIN_ZK_MODE_STARK_S2 = 2
+} dogecoin_zk_mode_t;
+
+typedef enum {
+    DOGECOIN_ZK_OK                  = 0,
+    DOGECOIN_ZK_ERR_INVALID_ARG     = -1,
+    DOGECOIN_ZK_ERR_BAD_MAGIC       = -2,
+    DOGECOIN_ZK_ERR_BAD_MODE        = -3,
+    DOGECOIN_ZK_ERR_TRUNCATED       = -4,
+    DOGECOIN_ZK_ERR_OOM             = -5,
+    DOGECOIN_ZK_ERR_NOT_IMPLEMENTED = -6,
+    DOGECOIN_ZK_ERR_DELEGATED       = -7,
+    DOGECOIN_ZK_ERR_VERIFY_FAIL     = -8,
+    DOGECOIN_ZK_ERR_BAD_VERSION     = -9
+} dogecoin_zk_err_t;
+
+/* Encode a proof + public inputs (and optional verification key) into the
+   canonical ZK carrier payload.  Caller frees *out_payload with dogecoin_free(). */
+dogecoin_zk_err_t dogecoin_zk_encode_payload(
+    dogecoin_zk_mode_t mode,
+    uint32_t circuit_id,
+    const uint8_t* public_inputs,
+    size_t public_inputs_len,
+    const uint8_t* proof,
+    size_t proof_len,
+    const uint8_t* vk_bytes,
+    size_t vk_len,
+    uint8_t** out_payload,
+    size_t* out_payload_len);
+
+/* Decode a canonical ZK carrier payload.  Out-pointers alias into the input
+   buffer (no allocation); caller must keep `payload` alive while in use. */
+dogecoin_zk_err_t dogecoin_zk_decode_payload(
+    const uint8_t* payload,
+    size_t payload_len,
+    dogecoin_zk_mode_t* out_mode,
+    uint32_t* out_circuit_id,
+    const uint8_t** out_public_inputs,
+    size_t* out_public_inputs_len,
+    const uint8_t** out_proof,
+    size_t* out_proof_len,
+    const uint8_t** out_vk,
+    size_t* out_vk_len);
+
+/* Compute the TX_C commitment value: SHA256d(payload). */
+dogecoin_zk_err_t dogecoin_zk_get_commitment_hash(
+    const uint8_t* payload,
+    size_t payload_len,
+    uint8_t out_commitment[32]);
+
+/* Extract the canonical 25-byte P2PKH scriptPubKey of the signer for input 0
+   of `tx`, parsing the standard `<sig> <pubkey>` P2PKH scriptSig.  Returns
+   NULL on parse failure; caller frees the cstring. */
+cstring* dogecoin_zk_extract_signer_p2pkh_spk(const dogecoin_tx* tx);
+
+/* Compute the tx_base sighash for a candidate TX_C.  This is the value the
+   ZK prover MUST bind into its `tx_binding` public input, mirroring the PQC
+   carrier sighash binding.  The top byte of the returned digest is zeroed
+   to give an unambiguous 248-bit field element for BN254 R1CS. */
+dogecoin_zk_err_t dogecoin_zk_compute_tx_base_sighash(
+    const dogecoin_tx* tx_c,
+    const cstring* signer_p2pkh_spk,
+    const cstring* carrier_spk,
+    uint8_t out_sighash[32]);
+
+/* Build the canonical OP_RETURN scriptPubKey carrying a ZK commitment. */
+dogecoin_zk_err_t dogecoin_zk_build_opreturn_scriptpubkey(
+    dogecoin_zk_mode_t mode,
+    const uint8_t commitment[32],
+    cstring** out_spk);
+
+/* Parse the decimal string at index `idx` of a snarkjs-style public-inputs
+   JSON array and convert it to a 32-byte big-endian buffer. */
+dogecoin_zk_err_t dogecoin_zk_parse_public_input_be32(
+    const uint8_t* public_inputs,
+    size_t public_inputs_len,
+    size_t idx,
+    uint8_t out_be32[32],
+    size_t* out_token_count);
+
+/* Append the OP_RETURN commit output and the P2SH carrier outputs (one per
+   reveal-part) to an in-progress TX_C.  *out_carrier_spk is the P2SH spk of
+   the carrier outputs (caller frees) and *out_part_total is how many parts
+   TX_R will spend. */
+dogecoin_zk_err_t dogecoin_zk_build_carrier_tx_c(
+    dogecoin_tx* tx,
+    const uint8_t* payload,
+    size_t payload_len,
+    dogecoin_zk_mode_t mode,
+    uint64_t carrier_value,
+    cstring** out_carrier_spk,
+    uint8_t* out_part_total);
+
+/* Build the per-part scriptSigs for TX_R; caller frees each scriptsig with
+   cstr_free(..., true) and the array itself with dogecoin_free(). */
+dogecoin_zk_err_t dogecoin_zk_build_carrier_tx_r_scriptsigs(
+    const uint8_t* payload,
+    size_t payload_len,
+    cstring*** out_scriptsigs,
+    uint8_t* out_part_total);
+
+/* Reassemble a previously-revealed payload from a TX_R by walking its inputs.
+   Caller frees *out_payload with dogecoin_free(). */
+dogecoin_zk_err_t dogecoin_zk_extract_carrier_payload(
+    const dogecoin_tx* tx_r,
+    uint8_t** out_payload,
+    size_t* out_payload_len);
+
+/* Walk a transaction's outputs for the canonical TX_C OP_RETURN commitment.
+   Mirrors dogecoin_tx_extract_falcon512_commit for SPV detection. */
+dogecoin_bool dogecoin_tx_extract_zk_commit(
+    const dogecoin_tx* tx,
+    dogecoin_zk_mode_t* out_mode,
+    uint8_t out_commit32[32]);
+
+/* Verify a Groth16 proof using the rapidsnark verifier when HAVE_RAPIDSNARK
+   is enabled at build time; otherwise returns DOGECOIN_ZK_ERR_NOT_IMPLEMENTED. */
+dogecoin_zk_err_t dogecoin_zk_verify_groth16(
+    const uint8_t* vk_json,
+    size_t vk_json_len,
+    const uint8_t* public_json,
+    size_t public_json_len,
+    const uint8_t* proof_json,
+    size_t proof_json_len);
+
+/* Verify any ZK payload by mode, dispatching to the proof-system specific
+   verifier.  v1 payloads carry their own vk and ignore `vk_blob`; for v0
+   payloads the caller-supplied vk_blob is used. */
+dogecoin_zk_err_t dogecoin_zk_verify_proof(
+    const uint8_t* payload,
+    size_t payload_len,
+    const uint8_t* vk_blob,
+    size_t vk_blob_len);
+
+/* Proof generation surface — always returns DOGECOIN_ZK_ERR_DELEGATED in
+   this build because proving lives outside libdogecoin (snarkjs / rapidsnark
+   CLI driven by contrib/zk_carrier/witness_helper.py). */
+dogecoin_zk_err_t dogecoin_zk_generate_groth16_proof(
+    const uint8_t* witness_json,
+    size_t witness_json_len,
+    const char* circuit_path,
+    uint8_t** out_proof,
+    size_t* out_proof_len,
+    uint8_t** out_public,
+    size_t* out_public_len);
+
+dogecoin_zk_err_t dogecoin_zk_generate_plonk_proof(
+    const uint8_t* witness_json,
+    size_t witness_json_len,
+    const char* circuit_path,
+    uint8_t** out_proof,
+    size_t* out_proof_len,
+    uint8_t** out_public,
+    size_t* out_public_len);
+
+/* Human-readable error string.  Never returns NULL. */
+const char* dogecoin_zk_strerror(dogecoin_zk_err_t err);
