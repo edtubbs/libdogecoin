@@ -187,28 +187,26 @@ int get_transaction_count_ts(dogecoin_transaction_context* ctx) {
     return HASH_COUNT(ctx->transactions);
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 dogecoin_tx* dogecoin_tx_new_ts(void)
 {
     dogecoin_tx* tx = dogecoin_tx_new();
     if (!tx) return NULL;
-#ifdef DOGECOIN_THREAD_SAFE
     if (!dogecoin_mutex_init(&tx->lock)) {
         dogecoin_tx_free(tx);
         return NULL;
     }
     tx->thread_safe = true;
-#endif
     return tx;
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 void dogecoin_tx_free_ts(dogecoin_tx* tx)
 {
     dogecoin_tx_free(tx);
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 int dogecoin_tx_add_input_ts(dogecoin_tx* tx, const dogecoin_tx_in* tx_in)
 {
     if (!tx || !tx_in || !tx->vin) return false;
@@ -224,7 +222,7 @@ int dogecoin_tx_add_input_ts(dogecoin_tx* tx, const dogecoin_tx_in* tx_in)
     return true;
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 int dogecoin_tx_add_output_ts(dogecoin_tx* tx, const dogecoin_tx_out* tx_out)
 {
     if (!tx || !tx_out || !tx->vout) return false;
@@ -240,7 +238,7 @@ int dogecoin_tx_add_output_ts(dogecoin_tx* tx, const dogecoin_tx_out* tx_out)
     return true;
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 int dogecoin_tx_sign_ts(dogecoin_tx* tx, dogecoin_wallet* wallet, const char* passphrase)
 {
     /* Reserved for future encrypted-wallet integration. */
@@ -275,7 +273,7 @@ int dogecoin_tx_sign_ts(dogecoin_tx* tx, dogecoin_wallet* wallet, const char* pa
     return ok;
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 int dogecoin_tx_finalize_ts(dogecoin_tx* tx)
 {
     if (!tx) return false;

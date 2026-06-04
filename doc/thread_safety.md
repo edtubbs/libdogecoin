@@ -1,39 +1,11 @@
 # Thread safety model (libdogecoin)
 
 This document describes which libdogecoin APIs are safe to call from multiple
-threads and the internal concurrency design used by the SPV client. It also
-describes the **thread-safe (`_ts`) build variants** of the CLI tools and the
-compile-time `DOGECOIN_THREAD_SAFE` macro they are built with.
+threads and the internal concurrency design used by the SPV client.
 
-> The intent is to provide safer binaries without disturbing legacy APIs. When
-> in doubt, use the `_ts` variants for concurrent or long-running processes.
-
-## Build variants
-
-For every CLI tool shipped by libdogecoin there is a parallel thread-safe
-binary that is compiled with `DOGECOIN_THREAD_SAFE=1`:
-
-| Legacy tool | Thread-safe tool |
-|-------------|------------------|
-| `such`      | `such_ts`        |
-| `sendtx`    | `sendtx_ts`      |
-| `spvnode`   | `spvnode_ts`     |
-
-Both variants link the same `libdogecoin` shared library. The `_ts` variants:
-
-* Define `DOGECOIN_THREAD_SAFE=1` at compile time so TS-only code paths in the
-  CLI can be conditionally compiled.
-* Call `dogecoin_spv_client_enable_thread_safe_mode()` immediately after
-  constructing the SPV client. This enables the master-writer pipeline
-  (documented below) and the bounded out-of-order header-batch staging ring.
-* Do **not** change the on-disk format of `headers.db` or any other
-  persisted state. You can alternate between the legacy and `_ts` binaries
-  against the same chainstate.
-
-To produce the `_ts` binaries alongside the legacy ones:
-
-* Autotools: `./configure --with-net --with-tools && make`
-* CMake: `cmake -B build -DWITH_NET=ON -DWITH_TOOLS=ON && cmake --build build`
+> Thread-safe (`_ts`) library APIs provide per-object mutex protection.
+> The CLI tools (`such`, `sendtx`, `spvnode`) always enable thread-safe
+> mode where applicable.
 
 ## Concurrency model in the SPV client
 
@@ -41,6 +13,9 @@ The SPV client uses a **single master writer** combined with a small pool of
 **worker producers** for header batches. Only the master thread ever writes to
 the headers DB (`.headers.db`) or to the in-memory block index; workers never
 touch the headers DB, the wallet, or the chain tip.
+
+`spvnode` always enables thread-safe mode by calling
+`dogecoin_spv_client_enable_thread_safe_mode()` at startup.
 
 ```
             ┌──────────┐           per-node parsed batches
@@ -81,15 +56,14 @@ ring only addresses innocuous gap-fill caused by concurrent peers.
 ### What the master-writer model implies
 
 * **No headers DB lock is needed — headersdb is single-writer by contract.**
-  The SPV master thread is the only writer, and legacy tools (`spvnode`,
-  `such`, `sendtx`) are single-threaded, so the previous `sync_lock` has
-  been removed from `src/headersdb_file.c`. The `sync_lock` field is kept
+  The SPV master thread is the only writer, and the CLI tools are
+  single-threaded for DB access, so the previous `sync_lock` has been
+  removed from `src/headersdb_file.c`. The `sync_lock` field is kept
   as a reserved `void*` to preserve ABI for callers that embed
   `dogecoin_headers_db` in their own structures; the field is never
   dereferenced. If a future caller needs to share a single
-  `dogecoin_headers_db` across threads, provide a `*_ts` wrapper that
-  wraps your own mutex around the call site rather than re-adding a lock
-  inside the DB.
+  `dogecoin_headers_db` across threads, wrap your own mutex around the
+  call site rather than re-adding a lock inside the DB.
 * **Workers do not see partially-written DB state.** They only produce parsed
   batches; they cannot race with the master.
 * **No mid-batch staging.** If a batch fails structurally mid-way (bad PoW,
@@ -116,11 +90,12 @@ ring only addresses innocuous gap-fill caused by concurrent peers.
 * Read access to chain parameters (`&dogecoin_chainparams_main`, etc.) — they
   are immutable at process start.
 
-### Safe only in the `_ts` binaries (or after opt-in at runtime)
+### Safe after opt-in at runtime
 
 * `dogecoin_spv_client_runloop` combined with out-of-order batch delivery —
   call `dogecoin_spv_client_enable_thread_safe_mode(client)` right after
-  `dogecoin_spv_client_new()` to activate the staging ring.
+  `dogecoin_spv_client_new()` to activate the staging ring. The `spvnode`
+  CLI does this automatically.
 
 ### Not thread-safe (must be single-threaded)
 
@@ -136,8 +111,7 @@ non-TS object on a single owning thread.
 
 ## Enabling thread-safe mode at runtime from the library
 
-If you link `libdogecoin` into your own program you can enable the TS behavior
-without recompiling:
+If you link `libdogecoin` into your own program you can enable the TS behavior:
 
 ```c
 #include <dogecoin/spv.h>
@@ -146,11 +120,9 @@ dogecoin_spv_client* client = dogecoin_spv_client_new(...);
 dogecoin_spv_client_enable_thread_safe_mode(client);
 ```
 
-This is what `spvnode_ts` does on startup.
-
 ## Verifying the pipeline
 
-`spvnode_ts` (run with `-d`) logs lines such as:
+`spvnode` (run with `-d`) logs lines such as:
 
 ```
 SPV thread-safe mode enabled: master-writer pipeline with 8 out-of-order staging slots
@@ -158,9 +130,6 @@ Staged out-of-order headers batch from node 17 (count=2000, staged=1)
 Draining staged headers batch from node 17 (count=2000, remaining_staged=0)
 Chaintip at height ...
 ```
-
-An example capture is kept under
-`doc/verification/spvnode_ts_phase2_thread_safe_sample.txt`.
 
 ## Code examples
 
@@ -226,7 +195,7 @@ remain tracked here for a future pass:
 ## Wallet and transaction `_ts` wrappers
 
 The wallet and transaction builder now expose explicit `_ts` variants that add
-internal per-object mutex protection in `DOGECOIN_THREAD_SAFE` builds:
+internal per-object mutex protection:
 
 * Wallet: `dogecoin_wallet_new_ts`, `dogecoin_wallet_load_ts`,
   `dogecoin_wallet_add_hd_account_ts`, `dogecoin_wallet_get_address_ts`,

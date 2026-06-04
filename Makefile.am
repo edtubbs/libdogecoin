@@ -325,13 +325,6 @@ such_CFLAGS = $(libdogecoin_la_CFLAGS)
 such_CPPFLAGS = -I$(top_srcdir)/src
 such_LDFLAGS = -static
 
-inst_PROGRAMS += such_ts
-such_ts_LDADD = $(such_LDADD)
-such_ts_SOURCES = $(such_SOURCES)
-such_ts_CFLAGS = $(such_CFLAGS)
-such_ts_CPPFLAGS = $(such_CPPFLAGS) -DDOGECOIN_THREAD_SAFE=1
-such_ts_LDFLAGS = $(such_LDFLAGS)
-
 if WITH_NET
 inst_PROGRAMS += sendtx
 sendtx_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LIBSECP256K1) $(ASM_LIB_FILES)
@@ -341,13 +334,6 @@ sendtx_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS
 sendtx_CPPFLAGS = -I$(top_srcdir)/src
 sendtx_LDFLAGS = -static
 
-inst_PROGRAMS += sendtx_ts
-sendtx_ts_LDADD = $(sendtx_LDADD)
-sendtx_ts_SOURCES = $(sendtx_SOURCES)
-sendtx_ts_CFLAGS = $(sendtx_CFLAGS)
-sendtx_ts_CPPFLAGS = $(sendtx_CPPFLAGS) -DDOGECOIN_THREAD_SAFE=1
-sendtx_ts_LDFLAGS = $(sendtx_LDFLAGS)
-
 inst_PROGRAMS += spvnode
 spvnode_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ASM_LIB_FILES)
 spvnode_SOURCES = \
@@ -355,13 +341,6 @@ spvnode_SOURCES = \
 spvnode_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 spvnode_CPPFLAGS = -I$(top_srcdir)/src
 spvnode_LDFLAGS = -static
-
-inst_PROGRAMS += spvnode_ts
-spvnode_ts_LDADD = $(spvnode_LDADD)
-spvnode_ts_SOURCES = $(spvnode_SOURCES)
-spvnode_ts_CFLAGS = $(spvnode_CFLAGS)
-spvnode_ts_CPPFLAGS = $(spvnode_CPPFLAGS) -DDOGECOIN_THREAD_SAFE=1
-spvnode_ts_LDFLAGS = $(spvnode_LDFLAGS)
 endif
 endif
 

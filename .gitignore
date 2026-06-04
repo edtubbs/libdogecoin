@@ -164,10 +164,6 @@ store/*
 /spvnode
 /sendtx
 /such
-/spvnode_ts
-/sendtx_ts
-/such_ts
-spvbench_out/
 build-ctx/
 build-ci-fix/
 build-local/

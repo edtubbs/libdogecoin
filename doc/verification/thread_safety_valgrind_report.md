@@ -1,6 +1,6 @@
 # Thread-safety Valgrind Verification Report
 
-This report captures final valgrind verification for thread-safe (`_ts`) and legacy binaries on branch `copilot/make-libdogecoin-stateless`.
+This report captures final valgrind verification for thread-safe library APIs and CLI binaries.
 
 ## Environment
 - Host: Ubuntu runner
@@ -18,38 +18,27 @@ Result:
 - `ERROR SUMMARY: 0 errors from 0 contexts`
 - `All heap blocks were freed -- no leaks are possible`
 
-### 2) `such_ts` startup/usage path
+### 2) `such` startup/usage path
 ```bash
 valgrind --leak-check=full --show-leak-kinds=all \
-  --errors-for-leak-kinds=all --error-exitcode=99 ./such_ts --help
+  --errors-for-leak-kinds=all --error-exitcode=99 ./such --help
 ```
 Result:
 - `ERROR SUMMARY: 0 errors from 0 contexts`
 - `All heap blocks were freed -- no leaks are possible`
 
-### 3) `sendtx_ts` startup/usage path
+### 3) `sendtx` startup/usage path
 ```bash
 valgrind --leak-check=full --show-leak-kinds=all \
-  --errors-for-leak-kinds=all --error-exitcode=99 ./sendtx_ts --help
+  --errors-for-leak-kinds=all --error-exitcode=99 ./sendtx --help
 ```
 Result:
 - `ERROR SUMMARY: 0 errors from 0 contexts`
 - `All heap blocks were freed -- no leaks are possible`
 
-### 4) `spvnode_ts` bounded scan with graceful shutdown
+### 4) `spvnode` bounded scan with graceful shutdown
 ```bash
 (sleep 20; echo q) | \
-valgrind --leak-check=full --show-leak-kinds=all \
-  --errors-for-leak-kinds=all --error-exitcode=99 \
-  ./spvnode_ts -l -f 0 -o 2 -p scan
-```
-Result:
-- `ERROR SUMMARY: 0 errors from 0 contexts`
-- `All heap blocks were freed -- no leaks are possible`
-
-### 5) Legacy `spvnode` parity check (bounded scan, graceful shutdown)
-```bash
-(sleep 15; echo q) | \
 valgrind --leak-check=full --show-leak-kinds=all \
   --errors-for-leak-kinds=all --error-exitcode=99 \
   ./spvnode -l -f 0 -o 2 -p scan

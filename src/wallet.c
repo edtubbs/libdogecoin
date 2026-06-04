@@ -403,7 +403,7 @@ dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
     return wallet;
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 dogecoin_wallet* dogecoin_wallet_new_ts(dogecoin_ctx* ctx)
 {
     const dogecoin_chainparams* params = &dogecoin_chainparams_main;
@@ -417,7 +417,6 @@ dogecoin_wallet* dogecoin_wallet_new_ts(dogecoin_ctx* ctx)
     if (wallet->ctx) {
         dogecoin_ctx_acquire(wallet->ctx);
     }
-#ifdef DOGECOIN_THREAD_SAFE
     if (!dogecoin_mutex_init(&wallet->lock)) {
         if (wallet->ctx) {
             dogecoin_ctx_release(wallet->ctx);
@@ -427,7 +426,6 @@ dogecoin_wallet* dogecoin_wallet_new_ts(dogecoin_ctx* ctx)
         return NULL;
     }
     wallet->thread_safe = true;
-#endif
     return wallet;
 }
 
@@ -713,7 +711,7 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
     dogecoin_free(wallet);
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 dogecoin_wallet* dogecoin_wallet_load_ts(dogecoin_ctx* ctx, const char* file)
 {
     int error = 0;
@@ -734,7 +732,7 @@ dogecoin_wallet* dogecoin_wallet_load_ts(dogecoin_ctx* ctx, const char* file)
     return wallet;
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 void dogecoin_wallet_free_ts(dogecoin_wallet* wallet)
 {
     dogecoin_wallet_free(wallet);
@@ -1119,7 +1117,7 @@ dogecoin_bool dogecoin_wallet_flush(dogecoin_wallet* wallet)
     return true;
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 int dogecoin_wallet_save_ts(dogecoin_wallet* wallet)
 {
     if (!wallet) return false;
@@ -1258,7 +1256,7 @@ dogecoin_wallet_addr* dogecoin_wallet_next_bip44_addr(dogecoin_wallet* wallet)
     return waddr;
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 int dogecoin_wallet_get_address_ts(dogecoin_wallet* wallet, char* address, size_t len, uint32_t account, uint32_t index, dogecoin_bool change)
 {
     if (!wallet || !wallet->masterkey || !address || len < P2PKHLEN) return false;
@@ -1282,7 +1280,7 @@ int dogecoin_wallet_get_address_ts(dogecoin_wallet* wallet, char* address, size_
     return ret;
 }
 
-/* THREAD-SAFE variant - uses internal mutex when DOGECOIN_THREAD_SAFE=1 */
+/* THREAD-SAFE variant - uses internal mutex */
 int dogecoin_wallet_add_hd_account_ts(dogecoin_wallet* wallet, uint32_t account)
 {
     if (!wallet || !wallet->masterkey) return false;
