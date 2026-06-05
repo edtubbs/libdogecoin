@@ -605,7 +605,7 @@ static dogecoin_bool spv_extract_block_header_info(dogecoin_spv_client* client, 
     if (!client || !payload || payload_len == 0 || !prev_block || !block_hash) return false;
     struct const_buffer cbuf = { payload, payload_len };
     dogecoin_block_header* hdr = dogecoin_block_header_new();
-    uint256_t chainwork;
+    arith_uint256 chainwork;
     if (!hdr) return false;
     if (!dogecoin_block_header_deserialize(hdr, &cbuf, client->chainparams, &chainwork)) {
         dogecoin_block_header_free(hdr);
@@ -2141,6 +2141,11 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
                     client->nodegroup->log_write_cb("Error deserializing transaction\n");
                     if (!client->headers_db->disconnect_tip(client->headers_db_ctx)) {
                         dogecoin_free(pindex);
+                    }
+                    dogecoin_tx_free(tx);
+                    node->state &= ~NODE_BLOCKSYNC;
+                    node->nodegroup->node_connection_state_changed_cb(node);
+                    return;
                 }
 
                 deser_skip(buf, consumedlength);
