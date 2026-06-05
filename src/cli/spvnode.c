@@ -451,6 +451,10 @@ static dogecoin_bool spv_worker_pool_enqueue(int height, time_t timestamp)
 #endif
 
 /* This is a list of all the options that can be used with the program. */
+enum {
+        OPT_HEADERS_NODE = 256
+};
+
 static struct option long_options[] = {
         {"testnet", no_argument, NULL, 't'},
         {"regtest", no_argument, NULL, 'r'},
@@ -458,7 +462,7 @@ static struct option long_options[] = {
         {"debug", no_argument, NULL, 'd'},
         {"maxnodes", required_argument, NULL, 'm'},
         {"workers", required_argument, NULL, 'o'},
-        {"headers_node", required_argument, NULL, 'g'},
+        {"headers_node", required_argument, NULL, OPT_HEADERS_NODE},
         {"mnemonic", no_argument, NULL, 'n'},
         {"pass_phrase", no_argument, NULL, 's'},
         {"dbfile", no_argument, NULL, 'f'},
@@ -492,7 +496,7 @@ static void print_version() {
  */
 static void print_usage() {
     print_version();
-    printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m|--maxnodes <int>) (-o|--workers <int>) (-g|--headers_node <nodeid>) (-f <headersfile|0 for in mem only>) \
+    printf("Usage: spvnode (-c|continuous) (-i|--ips <ip,ip,...>) (-m|--maxnodes <int>) (-o|--workers <int>) (--headers_node <nodeid>) (-f <headersfile|0 for in mem only>) \
 (-a|--address <address>) (-n|--mnemonic <seed_phrase>) (-s|[--pass_phrase]) (-y|--encrypted_file <file_num 0-999>) \
 (-w|--wallet_file <filename>) (-h|--headers_file <filename>) (-l|[--no_prompt]) (-b[--full_sync]) (-p[--checkpoint]) (-k[--master_key]) (-j[--use_tpm]) \
 (-u|--http_server <ip:port>) (-x|--smpv) (-g|--filtered_blocks) (-q|--select_checkpoint) (-t|--testnet) (-r|--regtest) (-d|--debug) <command>\n");
@@ -782,7 +786,7 @@ int main(int argc, char* argv[]) {
     data = argv[argc - 1];
 
     /* get arguments */
-    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:o:g:n:f:y:u:w:h:a:lbpzkj:xgqv", long_options, &long_index)) != -1) {
+    while ((opt = getopt_long_only(argc, argv, "i:ctrdsm:o:gn:f:y:u:w:h:a:lbpzkj:xqv", long_options, &long_index)) != -1) {
         switch (opt) {
                 case 'c':
                     quit_when_synced = false;
@@ -810,12 +814,12 @@ int main(int argc, char* argv[]) {
                     if (workers < 1) workers = 1;
                     if (workers > 64) workers = 64;
                     break;
-                case 'g':
+                case OPT_HEADERS_NODE:
                 {
                     char* endptr = NULL;
                     long parsed_nodeid = strtol(optarg, &endptr, 10);
                     if (endptr == optarg || *endptr != '\0' || parsed_nodeid < 0 || parsed_nodeid > INT_MAX) {
-                        printf("Invalid nodeid for -g/--headers_node: %s\n", optarg);
+                        printf("Invalid nodeid for --headers_node: %s\n", optarg);
                         exit(EXIT_FAILURE);
                     }
                     headers_target_nodeid = (int)parsed_nodeid;
