@@ -660,7 +660,7 @@ void dogecoin_node_connection_state_changed(dogecoin_node* node)
         if ((node->state & NODE_CONNECTED) == NODE_CONNECTED || (node->state & NODE_CONNECTING) == NODE_CONNECTING) {
             dogecoin_node_disconnect(node);
         }
-    } else if ((node->state & NODE_CONNECTED) == NODE_CONNECTED) {
+    } else if ((node->state & NODE_CONNECTED) == NODE_CONNECTED && node->event_bev) {
         dogecoin_node_send_version(node);
     }
 }
