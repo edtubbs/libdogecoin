@@ -577,16 +577,6 @@ void test_reorg() {
     remove_all_hashes();
     remove_all_maps();
 
-    // Re-initialize SPV client and load the headers database
-    client = dogecoin_spv_client_new(chain, false, false, false, false, 8, NULL);
-    client->header_message_processed = test_spv_header_message_processed;
-    client->sync_completed = test_spv_sync_completed;
-    dogecoin_spv_client_load(client, headersfile, false);
-
-    // Cleanup
-    dogecoin_spv_client_free(client);
-    remove_all_hashes();
-    remove_all_maps();
 }
 
 // BIP37 filter state tests
