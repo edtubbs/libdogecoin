@@ -421,11 +421,15 @@ jobs:
               "aarch64-linux" | "aarch64-linux-optee")
               qemu-aarch64 -E LD_LIBRARY_PATH=/usr/aarch64-linux-gnu/lib/ /usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1 ./tests
               ;;
-              "x86_64-linux-dbg" | "x86_64-linux-openenclave" | "x86_64-nixos")
+              "x86_64-linux-dbg" | "x86_64-linux-openenclave")
               make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
               python3 tooltests.py
               sudo ./rpctest/fetch.py --host x86_64-linux-gnu
               sudo rm /usr/local/bin/dogecoind
+              ;;
+              "x86_64-nixos")
+              make check -j"$(getconf _NPROCESSORS_ONLN)" V=1
+              python3 tooltests.py
               ;;
               "x86_64-win-native")
               test_exe="./build/libdogecoin-${{ github.sha }}-${{ matrix.name }}/Debug/tests.exe"

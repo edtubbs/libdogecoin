@@ -23,6 +23,7 @@ include_HEADERS = \
     include/dogecoin/dogecoin.h \
     include/dogecoin/libdogecoin.h \
     include/dogecoin/uthash.h \
+    include/dogecoin/vector.h \
     config/libdogecoin-config.h
 noinst_HEADERS = \
     include/bip39/index.h \
@@ -76,7 +77,6 @@ noinst_HEADERS = \
     include/dogecoin/utf8proc.h \
     include/dogecoin/utils.h \
     include/dogecoin/validation.h \
-    include/dogecoin/vector.h \
     include/dogecoin/version.h \
     include/dogecoin/wow.h \
     include/dogecoin/zk_carrier.h
