@@ -196,9 +196,11 @@ int main()
 #endif
     u_run_test(test_transaction);
     u_run_test(test_transaction_ts_contexts);
+#ifndef USE_OPTEE
     u_run_test(test_transaction_ts_wrappers);
 #if !defined(_WIN32)
     u_run_test(test_transaction_ts_multithread_stress);
+#endif
 #endif
     u_run_test(test_validation);
     u_run_test(test_tx_serialization);
@@ -247,9 +249,11 @@ int main()
     u_run_test(test_wallet_basics);
     u_run_test(test_wallet);
     u_run_test(test_wallet_reorg_utxo_update);
+#ifndef USE_OPTEE
     u_run_test(test_wallet_ts_wrappers);
 #if !defined(_WIN32)
     u_run_test(test_wallet_ts_multithread_stress);
+#endif
 #endif
     u_run_test(test_wallet_balance_accounts_for_spends);
 #endif

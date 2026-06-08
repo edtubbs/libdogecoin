@@ -34,6 +34,7 @@
 
 #include <string.h>
 #include <time.h>
+#include <stdlib.h>
 
 #include <test/utest.h>
 
@@ -65,6 +66,12 @@ dogecoin_bool test_spv_header_message_processed(struct dogecoin_spv_client_ *cli
 
 void test_spv()
 {
+    const char* run_live_spv = getenv("DOGECOIN_RUN_LIVE_SPV_TESTS");
+    if (!run_live_spv || strcmp(run_live_spv, "1") != 0) {
+        printf("Skipping live SPV network test; set DOGECOIN_RUN_LIVE_SPV_TESTS=1 to enable\n");
+        return;
+    }
+
     // set chain:
     const dogecoin_chainparams* chain = &dogecoin_chainparams_test;
 
