@@ -571,6 +571,8 @@ static int spv_filter_oldest_utxo_height = 0;
 
 /* Global pointers used by handle_sigint for graceful cleanup */
 static dogecoin_spv_client* g_spv_client_shutdown = NULL;
+static struct event* g_sigint_event = NULL;
+static struct event* g_sigterm_event = NULL;
 #if WITH_WALLET
 static dogecoin_wallet* g_wallet_shutdown = NULL;
 #endif
@@ -727,16 +729,10 @@ void spv_sync_completed(dogecoin_spv_client* client) {
     }
 }
 
-// Signal handler for SIGINT
+// Shutdown callback for SIGINT/SIGTERM
+#ifdef _WIN32
 void handle_sigint(int sig) {
     UNUSED(sig);
-    // Reset standard input back to blocking mode
-#ifndef _WIN32
-    int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
-    if (stdin_flags != -1) {
-        fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
-    }
-#endif
     // Trigger a graceful event-loop exit so cleanup functions run normally.
     if (g_spv_client_shutdown && g_spv_client_shutdown->nodegroup) {
         dogecoin_node_group_shutdown(g_spv_client_shutdown->nodegroup);
@@ -746,6 +742,55 @@ void handle_sigint(int sig) {
         exit(0);
     }
 }
+#else
+static void handle_shutdown_signal(evutil_socket_t sig, short events, void* arg) {
+    UNUSED(sig);
+    UNUSED(events);
+    UNUSED(arg);
+    int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
+    if (stdin_flags != -1) {
+        (void)fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
+    }
+    if (g_spv_client_shutdown && g_spv_client_shutdown->nodegroup) {
+        dogecoin_node_group_shutdown(g_spv_client_shutdown->nodegroup);
+        if (g_spv_client_shutdown->nodegroup->event_base)
+            event_base_loopbreak(g_spv_client_shutdown->nodegroup->event_base);
+    }
+}
+
+static dogecoin_bool setup_shutdown_signal_events(dogecoin_spv_client* client) {
+    if (!client || !client->nodegroup || !client->nodegroup->event_base) {
+        return false;
+    }
+    g_sigint_event = evsignal_new(client->nodegroup->event_base, SIGINT, handle_shutdown_signal, NULL);
+    g_sigterm_event = evsignal_new(client->nodegroup->event_base, SIGTERM, handle_shutdown_signal, NULL);
+    if (!g_sigint_event || !g_sigterm_event ||
+        event_add(g_sigint_event, NULL) != 0 ||
+        event_add(g_sigterm_event, NULL) != 0) {
+        if (g_sigint_event) {
+            event_free(g_sigint_event);
+            g_sigint_event = NULL;
+        }
+        if (g_sigterm_event) {
+            event_free(g_sigterm_event);
+            g_sigterm_event = NULL;
+        }
+        return false;
+    }
+    return true;
+}
+
+static void free_shutdown_signal_events(void) {
+    if (g_sigint_event) {
+        event_free(g_sigint_event);
+        g_sigint_event = NULL;
+    }
+    if (g_sigterm_event) {
+        event_free(g_sigterm_event);
+        g_sigterm_event = NULL;
+    }
+}
+#endif
 
 int main(int argc, char* argv[]) {
     int ret = 0;
@@ -929,8 +974,10 @@ int main(int argc, char* argv[]) {
         }
         client->header_message_processed = spv_header_message_processed;
         client->sync_completed = spv_sync_completed;
+#ifdef _WIN32
         signal(SIGINT, handle_sigint);
         signal(SIGTERM, handle_sigint);
+#endif
 
 #if WITH_WALLET
         dogecoin_wallet_opts wopts = {
@@ -1165,7 +1212,25 @@ int main(int argc, char* argv[]) {
 #if WITH_WALLET
             g_wallet_shutdown = wallet;
 #endif
+#ifndef _WIN32
+            if (!setup_shutdown_signal_events(client)) {
+                fprintf(stderr, "Failed to initialize shutdown signal handlers\n");
+                g_spv_client_shutdown = NULL;
+#if WITH_WALLET
+                g_wallet_shutdown = NULL;
+                dogecoin_wallet_free(wallet);
+#endif
+                dogecoin_spv_client_free(client);
+                spv_worker_pool_stop();
+                dogecoin_ecc_stop();
+                libevent_global_shutdown();
+                return EXIT_FAILURE;
+            }
+#endif
             dogecoin_spv_client_runloop(client);
+#ifndef _WIN32
+            free_shutdown_signal_events();
+#endif
             g_spv_client_shutdown = NULL;
 #if WITH_WALLET
             g_wallet_shutdown = NULL;

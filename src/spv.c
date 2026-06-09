@@ -40,6 +40,7 @@
 #endif
 
 #include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
@@ -1328,7 +1329,10 @@ void dogecoin_spv_client_discover_peers(dogecoin_spv_client* client, const char 
     // set stdin to non-blocking mode for quit command
     int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
     if (stdin_flags != -1) {
-        fcntl(STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK);
+        if (fcntl(STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK) == -1 &&
+            client->nodegroup && client->nodegroup->log_write_cb) {
+            client->nodegroup->log_write_cb("Failed to set stdin non-blocking: %s\n", strerror(errno));
+        }
     }
 #endif
 
@@ -1364,7 +1368,10 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
     int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
     if (stdin_flags != -1 && (stdin_flags & O_NONBLOCK))
     {
-        fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
+        if (fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK) == -1 &&
+            client->nodegroup && client->nodegroup->log_write_cb) {
+            client->nodegroup->log_write_cb("Failed to restore stdin blocking mode: %s\n", strerror(errno));
+        }
     }
 #endif
 
@@ -3091,12 +3098,19 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
         }
     }
 #else
-    char c = fgetc(stdin);
+    int c = fgetc(stdin);
+    if (c == EOF) {
+        clearerr(stdin);
+        return;
+    }
     if (c == 'Q' || c == 'q') {
         // Reset standard input back to blocking mode
         int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
         if (stdin_flags != -1) {
-            fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
+            if (fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK) == -1 &&
+                client->nodegroup && client->nodegroup->log_write_cb) {
+                client->nodegroup->log_write_cb("Failed to restore stdin blocking mode: %s\n", strerror(errno));
+            }
         }
 
         printf("Disconnecting...\n");
