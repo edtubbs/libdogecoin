@@ -942,6 +942,9 @@ void dogecoin_spv_client_enable_thread_safe_mode(dogecoin_spv_client* client)
 {
     if (!client) return;
     if (client->thread_safe_mode) return;
+    if (!client->headers_pipeline_ctx) {
+        client->headers_pipeline_ctx = spv_headers_pipeline_init();
+    }
     if (!client->headers_stage_ctx) {
         client->headers_stage_ctx = spv_headers_stage_init();
     }
@@ -1297,7 +1300,7 @@ dogecoin_spv_client* dogecoin_spv_client_new(const dogecoin_chainparams *params,
     // SMPV default off
     client->smpv_ctx = NULL;
     client->smpv_enabled = false;
-    client->headers_pipeline_ctx = spv_headers_pipeline_init();
+    client->headers_pipeline_ctx = NULL;
     client->headers_stage_ctx = NULL;
     client->blocks_stage_ctx = NULL;
     client->thread_safe_mode = false;

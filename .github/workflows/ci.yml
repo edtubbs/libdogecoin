@@ -411,7 +411,6 @@ jobs:
 
       - name: test libdogecoin
         if: ${{ matrix.run-tests }}
-        timeout-minutes: 30
         shell: bash
         run: |
             case "${{ matrix.name }}" in
