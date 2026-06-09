@@ -728,11 +728,14 @@ void spv_sync_completed(dogecoin_spv_client* client) {
 }
 
 // Signal handler for SIGINT
-void handle_sigint() {
+void handle_sigint(int sig) {
+    UNUSED(sig);
     // Reset standard input back to blocking mode
 #ifndef _WIN32
     int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
-    fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
+    if (stdin_flags != -1) {
+        fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
+    }
 #endif
     // Trigger a graceful event-loop exit so cleanup functions run normally.
     if (g_spv_client_shutdown && g_spv_client_shutdown->nodegroup) {

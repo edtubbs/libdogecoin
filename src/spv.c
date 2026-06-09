@@ -1325,9 +1325,11 @@ void dogecoin_spv_set_headers_target_node(dogecoin_spv_client* client, int nodei
 void dogecoin_spv_client_discover_peers(dogecoin_spv_client* client, const char *ips)
 {
 #ifndef _WIN32
-    // set stdin to non-blocking for quit command
+    // set stdin to non-blocking mode for quit command
     int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
-    fcntl(STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK);
+    if (stdin_flags != -1) {
+        fcntl(STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK);
+    }
 #endif
 
     dogecoin_node_group_add_peers_by_ip_or_seed(client->nodegroup, ips);
@@ -1358,7 +1360,7 @@ void dogecoin_spv_client_free(dogecoin_spv_client *client)
         return;
 
 #ifndef _WIN32
-    // set stdin to back to blocking
+    // set stdin back to blocking mode
     int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
     if (stdin_flags != -1 && (stdin_flags & O_NONBLOCK))
     {
@@ -3093,7 +3095,9 @@ void dogecoin_net_spv_post_cmd(dogecoin_node *node, dogecoin_p2p_msg_hdr *hdr, s
     if (c == 'Q' || c == 'q') {
         // Reset standard input back to blocking mode
         int stdin_flags = fcntl(STDIN_FILENO, F_GETFL);
-        fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
+        if (stdin_flags != -1) {
+            fcntl(STDIN_FILENO, F_SETFL, stdin_flags & ~O_NONBLOCK);
+        }
 
         printf("Disconnecting...\n");
         dogecoin_node_group_shutdown(client->nodegroup);
