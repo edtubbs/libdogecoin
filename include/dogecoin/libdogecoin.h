@@ -337,7 +337,7 @@ int getDerivedHDAddressFromMnemonic(const uint32_t account, const uint32_t index
 #define SLIP0039_MAX_SECRET_BYTES 32
 typedef char SLIP0039_SHARE[SLIP0039_MAX_SHARE_STR_SIZE];
 int dogecoin_slip0039_generate_shares(const uint8_t* secret, size_t secret_len, uint8_t threshold, uint8_t share_count, char shares[][SLIP0039_MAX_SHARE_STR_SIZE]);
-int dogecoin_slip0039_recover_secret(const char* shares[], size_t share_count, uint8_t* secret_out, size_t* secret_len_out);
+int dogecoin_slip0039_recover_secret(const char* shares[], size_t share_count, const uint8_t* passphrase, size_t passphrase_len, uint8_t* secret_out, size_t* secret_len_out);
 
 /* TPM2 utilities */
 

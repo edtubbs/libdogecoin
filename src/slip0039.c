@@ -4,8 +4,8 @@
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  *                                                                    *
  * SLIP-0039 (Shamir's Secret-Sharing for Mnemonic Codes)             *
- *   Single group implementation: group_threshold=1, group_count=1.   *
- *   Non-extendable shares (customization string "shamir").           *
+ *   Supports multi-group Shamir recovery (group_threshold >= 1).     *
+ *   Supports both non-extendable ("shamir") and extendable shares.   *
  *   Default iteration_exponent = 1 (10000 PBKDF2 iterations).        *
  *                                                                    *
  *   Reference: https://github.com/satoshilabs/slips/blob/master/     *
@@ -43,6 +43,11 @@
 /* "shamir" mapped to wordlist 10-bit indices for the RS1024 customization. */
 static const uint16_t SLIP0039_RS1024_CUSTOMIZATION[6] = {
     's', 'h', 'a', 'm', 'i', 'r'
+};
+
+/* "shamir_extendable" for extendable mnemonics (ext=1). */
+static const uint16_t SLIP0039_RS1024_CUSTOMIZATION_EXT[17] = {
+    's','h','a','m','i','r','_','e','x','t','e','n','d','a','b','l','e'
 };
 
 static const uint32_t SLIP0039_RS1024_GEN[10] = {
@@ -140,31 +145,37 @@ static uint32_t rs1024_polymod(const uint16_t* values, size_t n)
     return chk;
 }
 
-static void rs1024_create_checksum(uint16_t* words, size_t total_words)
+static void rs1024_create_checksum(uint16_t* words, size_t total_words, int extendable)
 {
     /* total_words includes the 3 checksum slots (already zeroed by caller). */
-    enum { CUST_LEN = 6, RS1024_MAX_DATA = 64 };
-    uint16_t buf[CUST_LEN + RS1024_MAX_DATA];
+    enum { RS1024_MAX_DATA = 64 };
+    const uint16_t* cust    = extendable ? SLIP0039_RS1024_CUSTOMIZATION_EXT
+                                         : SLIP0039_RS1024_CUSTOMIZATION;
+    size_t          cust_len = extendable ? 17 : 6;
+    uint16_t buf[17 + RS1024_MAX_DATA];
     if (total_words > RS1024_MAX_DATA) {
         return; /* unreachable for supported sizes (<= 33) */
     }
-    memcpy(buf, SLIP0039_RS1024_CUSTOMIZATION, CUST_LEN * sizeof(uint16_t));
-    memcpy(buf + CUST_LEN, words, total_words * sizeof(uint16_t));
-    uint32_t poly = rs1024_polymod(buf, CUST_LEN + total_words) ^ 1UL;
+    memcpy(buf, cust, cust_len * sizeof(uint16_t));
+    memcpy(buf + cust_len, words, total_words * sizeof(uint16_t));
+    uint32_t poly = rs1024_polymod(buf, cust_len + total_words) ^ 1UL;
     for (size_t i = 0; i < SLIP0039_CHECKSUM_WORDS; ++i) {
         words[total_words - SLIP0039_CHECKSUM_WORDS + i] =
             (uint16_t)((poly >> (10 * (SLIP0039_CHECKSUM_WORDS - 1 - i))) & 0x3FFU);
     }
 }
 
-static int rs1024_verify_checksum(const uint16_t* words, size_t total_words)
+static int rs1024_verify_checksum(const uint16_t* words, size_t total_words, int extendable)
 {
-    enum { CUST_LEN = 6, RS1024_MAX_DATA = 64 };
-    uint16_t buf[CUST_LEN + RS1024_MAX_DATA];
+    enum { RS1024_MAX_DATA = 64 };
+    const uint16_t* cust    = extendable ? SLIP0039_RS1024_CUSTOMIZATION_EXT
+                                         : SLIP0039_RS1024_CUSTOMIZATION;
+    size_t          cust_len = extendable ? 17 : 6;
+    uint16_t buf[17 + RS1024_MAX_DATA];
     if (total_words > RS1024_MAX_DATA) return -1;
-    memcpy(buf, SLIP0039_RS1024_CUSTOMIZATION, CUST_LEN * sizeof(uint16_t));
-    memcpy(buf + CUST_LEN, words, total_words * sizeof(uint16_t));
-    return (rs1024_polymod(buf, CUST_LEN + total_words) == 1UL) ? 0 : -1;
+    memcpy(buf, cust, cust_len * sizeof(uint16_t));
+    memcpy(buf + cust_len, words, total_words * sizeof(uint16_t));
+    return (rs1024_polymod(buf, cust_len + total_words) == 1UL) ? 0 : -1;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -267,6 +278,7 @@ static int slip0039_round_function(uint8_t round_index,
                                    const uint8_t* passphrase, size_t passlen,
                                    uint16_t identifier,
                                    uint8_t iter_exp,
+                                   int extendable,
                                    const uint8_t* r_half, size_t half_len,
                                    uint8_t* out)
 {
@@ -276,18 +288,28 @@ static int slip0039_round_function(uint8_t round_index,
     pass_buf[0] = round_index;
     if (passphrase && passlen) memcpy(pass_buf + 1, passphrase, passlen);
 
-    /* Salt = customization || id (BE 2 bytes) || R. */
-    const size_t cust_len = strlen(SLIP0039_CUSTOMIZATION_STRING);
+    /* Salt computation depends on extendable flag:
+     *   extendable=0: salt = "shamir" || id_BE(2) || R
+     *   extendable=1: salt = R  (empty prefix) */
     uint8_t salt_buf[16 + 64];
-    if (cust_len + 2 + half_len > sizeof(salt_buf)) return -1;
-    memcpy(salt_buf, SLIP0039_CUSTOMIZATION_STRING, cust_len);
-    salt_buf[cust_len + 0] = (uint8_t)((identifier >> 8) & 0xFF);
-    salt_buf[cust_len + 1] = (uint8_t)(identifier & 0xFF);
-    memcpy(salt_buf + cust_len + 2, r_half, half_len);
+    size_t  salt_len;
+    if (extendable) {
+        if (half_len > sizeof(salt_buf)) return -1;
+        memcpy(salt_buf, r_half, half_len);
+        salt_len = half_len;
+    } else {
+        const size_t cust_len = 6; /* strlen("shamir") */
+        if (cust_len + 2 + half_len > sizeof(salt_buf)) return -1;
+        memcpy(salt_buf, SLIP0039_CUSTOMIZATION_STRING, cust_len);
+        salt_buf[cust_len + 0] = (uint8_t)((identifier >> 8) & 0xFF);
+        salt_buf[cust_len + 1] = (uint8_t)(identifier & 0xFF);
+        memcpy(salt_buf + cust_len + 2, r_half, half_len);
+        salt_len = cust_len + 2 + half_len;
+    }
 
     uint32_t iters = ((uint32_t)SLIP0039_BASE_ITERATION_COUNT << iter_exp) / SLIP0039_ROUND_COUNT;
     pbkdf2_hmac_sha256(pass_buf, (int)(1 + passlen),
-                       salt_buf, (int)(cust_len + 2 + half_len),
+                       salt_buf, (int)salt_len,
                        iters, out, (int)half_len);
     dogecoin_mem_zero(pass_buf, sizeof(pass_buf));
     dogecoin_mem_zero(salt_buf, sizeof(salt_buf));
@@ -297,7 +319,7 @@ static int slip0039_round_function(uint8_t round_index,
 static int slip0039_encrypt(const uint8_t* ms, size_t ms_len,
                             const uint8_t* passphrase, size_t passlen,
                             uint16_t identifier, uint8_t iter_exp,
-                            uint8_t* ems_out)
+                            int extendable, uint8_t* ems_out)
 {
     if (ms_len < 2 || (ms_len & 1)) return -1;
     size_t half = ms_len / 2;
@@ -308,7 +330,7 @@ static int slip0039_encrypt(const uint8_t* ms, size_t ms_len,
     memcpy(L, ms, half);
     memcpy(R, ms + half, half);
     for (uint8_t i = 0; i < SLIP0039_ROUND_COUNT; ++i) {
-        if (slip0039_round_function(i, passphrase, passlen, identifier, iter_exp, R, half, F) != 0) {
+        if (slip0039_round_function(i, passphrase, passlen, identifier, iter_exp, extendable, R, half, F) != 0) {
             dogecoin_mem_zero(L, sizeof(L));
             dogecoin_mem_zero(R, sizeof(R));
             dogecoin_mem_zero(F, sizeof(F));
@@ -330,7 +352,7 @@ static int slip0039_encrypt(const uint8_t* ms, size_t ms_len,
 static int slip0039_decrypt(const uint8_t* ems, size_t ems_len,
                             const uint8_t* passphrase, size_t passlen,
                             uint16_t identifier, uint8_t iter_exp,
-                            uint8_t* ms_out)
+                            int extendable, uint8_t* ms_out)
 {
     if (ems_len < 2 || (ems_len & 1)) return -1;
     size_t half = ems_len / 2;
@@ -341,7 +363,7 @@ static int slip0039_decrypt(const uint8_t* ems, size_t ems_len,
     memcpy(L, ems, half);
     memcpy(R, ems + half, half);
     for (int i = SLIP0039_ROUND_COUNT - 1; i >= 0; --i) {
-        if (slip0039_round_function((uint8_t)i, passphrase, passlen, identifier, iter_exp, R, half, F) != 0) {
+        if (slip0039_round_function((uint8_t)i, passphrase, passlen, identifier, iter_exp, extendable, R, half, F) != 0) {
             dogecoin_mem_zero(L, sizeof(L));
             dogecoin_mem_zero(R, sizeof(R));
             dogecoin_mem_zero(F, sizeof(F));
@@ -426,7 +448,7 @@ static int slip0039_encode_mnemonic(uint16_t identifier,
     }
 
     /* RS1024 checksum (computed over data + zero placeholders). */
-    rs1024_create_checksum(words, total_words);
+    rs1024_create_checksum(words, total_words, 0 /* non-extendable */);
 
     /* Render to space-separated mnemonic string. */
     size_t pos = 0;
@@ -450,6 +472,7 @@ static int slip0039_encode_mnemonic(uint16_t identifier,
  */
 static int slip0039_decode_mnemonic(const char* mnemonic,
                                     uint16_t* identifier_out,
+                                    uint8_t*  extendable_out,
                                     uint8_t*  iter_exp_out,
                                     uint8_t*  group_idx_out,
                                     uint8_t*  group_thr_out,
@@ -480,8 +503,14 @@ static int slip0039_decode_mnemonic(const char* mnemonic,
     if (total_words < (SLIP0039_METADATA_BITS / 10) + SLIP0039_CHECKSUM_WORDS + 1) return -1;
     if (total_words > sizeof(words) / sizeof(words[0])) return -1;
 
-    /* Verify RS1024 checksum. */
-    if (rs1024_verify_checksum(words, total_words) != 0) return -1;
+    /* Extract ext bit from header words (first 20 bits across words[0..1]) before
+     * checksum verification, since the customization string depends on it.
+     * Layout: [id:15][ext:1][iter_exp:4] packed into 2 x 10-bit words. */
+    {
+        uint32_t id_exp = ((uint32_t)words[0] << 10) | (uint32_t)words[1];
+        uint8_t ext_bit = (uint8_t)((id_exp >> SLIP0039_ITER_EXP_BITS) & 1);
+        if (rs1024_verify_checksum(words, total_words, ext_bit) != 0) return -1;
+    }
 
     size_t share_words = total_words - (SLIP0039_METADATA_BITS / 10) - SLIP0039_CHECKSUM_WORDS;
     size_t share_bits  = share_words * 10;
@@ -495,6 +524,7 @@ static int slip0039_decode_mnemonic(const char* mnemonic,
     if ((value_bits & 7) != 0) return -1;
     size_t ems_len = value_bits / 8;
     if (ems_len < SLIP0039_MIN_SECRET_BYTES || ems_len > SLIP0039_MAX_SECRET_BYTES) return -1;
+    if ((ems_len & 1) != 0) return -1;
     if (*value_len < ems_len) return -1;
 
     bitpack_reader r;
@@ -504,8 +534,7 @@ static int slip0039_decode_mnemonic(const char* mnemonic,
     if (br_get(&r, SLIP0039_ID_BITS, &v) != 0)        return -1;
     *identifier_out = (uint16_t)v;
     if (br_get(&r, SLIP0039_EXT_BITS, &v) != 0)       return -1;
-    /* Only non-extendable (ext == 0) is supported. */
-    if (v != 0)                                       return -1;
+    *extendable_out = (uint8_t)v;
     if (br_get(&r, SLIP0039_ITER_EXP_BITS, &v) != 0)  return -1;
     *iter_exp_out = (uint8_t)v;
     if (br_get(&r, 4, &v) != 0) return -1;
@@ -514,6 +543,8 @@ static int slip0039_decode_mnemonic(const char* mnemonic,
     *group_thr_out = (uint8_t)(v + 1);
     if (br_get(&r, 4, &v) != 0) return -1;
     *group_count_out = (uint8_t)(v + 1);
+    /* group_threshold must not exceed group_count */
+    if (*group_thr_out > *group_count_out) return -1;
     if (br_get(&r, 4, &v) != 0) return -1;
     *member_idx_out = (uint8_t)v;
     if (br_get(&r, 4, &v) != 0) return -1;
@@ -687,7 +718,7 @@ int dogecoin_slip0039_generate_shares(const uint8_t* secret, size_t secret_len,
 
     /* Encrypt master secret to EMS. */
     uint8_t ems[SLIP0039_MAX_SECRET_BYTES];
-    if (slip0039_encrypt(secret, secret_len, NULL, 0, identifier, iter_exp, ems) != 0) {
+    if (slip0039_encrypt(secret, secret_len, NULL, 0, identifier, iter_exp, 0 /* non-extendable */, ems) != 0) {
         return -1;
     }
 
@@ -721,72 +752,152 @@ int dogecoin_slip0039_recover_secret(const char* shares[], size_t share_count,
                                      uint8_t* secret_out, size_t* secret_len_out)
 {
     if (!shares || !share_count || !secret_out || !secret_len_out) return -1;
-    if (share_count > SLIP0039_MAX_SHARES) return -1;
+    /* At most gc(16) * mc(16) = 256 shares total. */
+    if (share_count > (size_t)SLIP0039_MAX_SHARES * SLIP0039_MAX_SHARES) return -1;
 
-    uint16_t common_id = 0;
+    /* Common parameters (must match across all shares). */
+    uint16_t common_id   = 0;
+    uint8_t  common_ext  = 0;
     uint8_t  common_iter = 0;
-    uint8_t  common_thr = 0;
-    size_t   common_len = 0;
-    uint8_t  used_idx[16];
-    memset(used_idx, 0, sizeof(used_idx));
+    uint8_t  common_gt   = 0;  /* group threshold */
+    uint8_t  common_gc   = 0;  /* group count */
+    size_t   common_len  = 0;
+    int      have_common = 0;
+    int      rc          = -1;
 
-    uint8_t xs[SLIP0039_MAX_SHARES];
-    uint8_t ys[SLIP0039_MAX_SHARES * SLIP0039_MAX_SECRET_BYTES];
+    /* Per-group state, indexed by group_idx (0..15). */
+    typedef struct {
+        uint8_t  member_thr;
+        uint8_t  member_count;
+        uint8_t  xs[SLIP0039_MAX_SHARES];
+        uint8_t  ys[SLIP0039_MAX_SHARES * SLIP0039_MAX_SECRET_BYTES];
+        uint8_t  used_mi[SLIP0039_MAX_SHARES]; /* duplicate detection */
+        int      present;
+    } group_slot_t;
+    group_slot_t groups[SLIP0039_MAX_SHARES];
+    memset(groups, 0, sizeof(groups));
 
+    /* Group-level Shamir coordinates, populated after member combine. */
+    uint8_t group_xs[SLIP0039_MAX_SHARES];
+    uint8_t group_ys[SLIP0039_MAX_SHARES * SLIP0039_MAX_SECRET_BYTES];
+    memset(group_xs, 0, sizeof(group_xs));
+    memset(group_ys, 0, sizeof(group_ys));
+
+    /* --- Step 1: Parse and group all shares. --- */
     for (size_t i = 0; i < share_count; ++i) {
-        if (!shares[i]) return -1;
+        if (!shares[i]) goto cleanup;
 
-        uint16_t id; uint8_t e, gi, gt, gc, mi, mt;
-        uint8_t value[SLIP0039_MAX_SECRET_BYTES];
-        size_t  vlen = sizeof(value);
-        if (slip0039_decode_mnemonic(shares[i], &id, &e, &gi, &gt, &gc, &mi, &mt, value, &vlen) != 0) {
+        uint16_t id;
+        uint8_t  ext, iter, gi, gt, gc, mi, mt;
+        uint8_t  value[SLIP0039_MAX_SECRET_BYTES];
+        size_t   vlen = sizeof(value);
+
+        if (slip0039_decode_mnemonic(shares[i], &id, &ext, &iter, &gi, &gt, &gc,
+                                     &mi, &mt, value, &vlen) != 0) {
             dogecoin_mem_zero(value, sizeof(value));
-            return -1;
+            goto cleanup;
         }
-        /* This implementation only supports a single group. */
-        if (gt != 1 || gc != 1 || gi != 0) {
+
+        /* Establish or verify common parameters. */
+        if (!have_common) {
+            common_id   = id;
+            common_ext  = ext;
+            common_iter = iter;
+            common_gt   = gt;
+            common_gc   = gc;
+            common_len  = vlen;
+            have_common = 1;
+        } else if (id != common_id || ext != common_ext || iter != common_iter ||
+                   gt != common_gt || gc != common_gc || vlen != common_len) {
             dogecoin_mem_zero(value, sizeof(value));
-            return -1;
+            goto cleanup;
         }
-        if (i == 0) {
-            common_id = id; common_iter = e; common_thr = mt; common_len = vlen;
-        } else if (id != common_id || e != common_iter || mt != common_thr || vlen != common_len) {
+
+        if (gi >= SLIP0039_MAX_SHARES) {
             dogecoin_mem_zero(value, sizeof(value));
-            return -1;
+            goto cleanup;
         }
-        if (mi >= SLIP0039_MAX_SHARES || used_idx[mi]) {
+
+        group_slot_t* g = &groups[gi];
+        if (!g->present) {
+            g->present      = 1;
+            g->member_thr   = mt;
+            g->member_count = 0;
+        } else if (g->member_thr != mt) {
+            /* Conflicting member thresholds within the same group. */
             dogecoin_mem_zero(value, sizeof(value));
-            return -1;
+            goto cleanup;
         }
-        used_idx[mi] = 1;
-        xs[i] = mi;
-        memcpy(ys + i * common_len, value, common_len);
+
+        if (mi >= SLIP0039_MAX_SHARES || g->used_mi[mi]) {
+            /* Duplicate or out-of-range member index. */
+            dogecoin_mem_zero(value, sizeof(value));
+            goto cleanup;
+        }
+
+        uint8_t slot = g->member_count;
+        if (slot >= SLIP0039_MAX_SHARES) {
+            dogecoin_mem_zero(value, sizeof(value));
+            goto cleanup;
+        }
+        g->xs[slot] = mi;
+        memcpy(g->ys + (size_t)slot * common_len, value, common_len);
+        g->used_mi[mi] = 1;
+        g->member_count++;
+
         dogecoin_mem_zero(value, sizeof(value));
     }
 
-    if (share_count != common_thr) return -1;
+    if (!have_common) goto cleanup;
 
-    /* Combine to recover the EMS, then decrypt to get the master secret. */
-    uint8_t ems[SLIP0039_MAX_SECRET_BYTES];
-    if (slip0039_combine(xs, ys, share_count, common_len, common_thr, ems) != 0) {
-        dogecoin_mem_zero(ys, sizeof(ys));
-        return -1;
+    /* --- Step 2: For each complete group, combine member shares. --- */
+    uint8_t n_complete = 0;
+    for (uint8_t gi = 0; gi < common_gc && n_complete < common_gt; ++gi) {
+        group_slot_t* g = &groups[gi];
+        if (!g->present || g->member_count < g->member_thr) continue;
+
+        uint8_t group_share[SLIP0039_MAX_SECRET_BYTES];
+        if (slip0039_combine(g->xs, g->ys, g->member_thr, common_len,
+                             g->member_thr, group_share) != 0) {
+            dogecoin_mem_zero(group_share, sizeof(group_share));
+            goto cleanup;
+        }
+
+        group_xs[n_complete] = gi;
+        memcpy(group_ys + (size_t)n_complete * common_len, group_share, common_len);
+        ++n_complete;
+
+        dogecoin_mem_zero(group_share, sizeof(group_share));
     }
 
+    if (n_complete < common_gt) goto cleanup;
+
+    /* --- Step 3: Group-level combine to recover master EMS. --- */
+    uint8_t master_ems[SLIP0039_MAX_SECRET_BYTES];
+    if (slip0039_combine(group_xs, group_ys, common_gt, common_len,
+                         common_gt, master_ems) != 0) {
+        dogecoin_mem_zero(master_ems, sizeof(master_ems));
+        goto cleanup;
+    }
+
+    /* --- Step 4: Decrypt master EMS to recover the master secret. --- */
     if (*secret_len_out < common_len) {
-        dogecoin_mem_zero(ems, sizeof(ems));
-        dogecoin_mem_zero(ys, sizeof(ys));
-        return -1;
+        dogecoin_mem_zero(master_ems, sizeof(master_ems));
+        goto cleanup;
     }
 
-    if (slip0039_decrypt(ems, common_len, NULL, 0, common_id, common_iter, secret_out) != 0) {
-        dogecoin_mem_zero(ems, sizeof(ems));
-        dogecoin_mem_zero(ys, sizeof(ys));
-        return -1;
+    if (slip0039_decrypt(master_ems, common_len, NULL, 0,
+                         common_id, common_iter, common_ext, secret_out) != 0) {
+        dogecoin_mem_zero(master_ems, sizeof(master_ems));
+        goto cleanup;
     }
     *secret_len_out = common_len;
+    rc = 0;
 
-    dogecoin_mem_zero(ems, sizeof(ems));
-    dogecoin_mem_zero(ys, sizeof(ys));
-    return 0;
+    dogecoin_mem_zero(master_ems, sizeof(master_ems));
+
+cleanup:
+    dogecoin_mem_zero(groups, sizeof(groups));
+    dogecoin_mem_zero(group_ys, sizeof(group_ys));
+    return rc;
 }
