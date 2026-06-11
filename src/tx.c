@@ -41,6 +41,7 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 
+
 /**
  * @brief This function frees the memory allocated
  * for a transaction input.
@@ -200,6 +201,10 @@ void dogecoin_tx_free(dogecoin_tx* tx)
  */
 int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p2pkh, int is_mainnet) {
     if (!txout) return false;
+    /* P2PKH scriptPubKey is exactly 25 bytes (OP_DUP OP_HASH160 <20-byte-hash> OP_EQUALVERIFY OP_CHECKSIG).
+       Reject anything shorter to avoid an unsigned underflow in the loop condition below
+       (copy->script_pubkey->len - 4 wraps to SIZE_MAX when len < 4). */
+    if (!txout->script_pubkey || txout->script_pubkey->len < 25) return false;
     const dogecoin_chainparams* chain = is_mainnet ? &dogecoin_chainparams_main : &dogecoin_chainparams_test;
     dogecoin_tx_out* copy = dogecoin_tx_out_new();
     dogecoin_tx_out_copy(copy, txout);
@@ -649,6 +654,11 @@ void dogecoin_tx_in_copy(dogecoin_tx_in* dest, const dogecoin_tx_in* src)
     memcpy_safe(&dest->prevout, &src->prevout, sizeof(dest->prevout));
     dest->sequence = src->sequence;
 
+    if (dest->script_sig) {
+        cstr_free(dest->script_sig, true);
+        dest->script_sig = NULL;
+    }
+
     if (!src->script_sig) {
         dest->script_sig = NULL;
     } else {
@@ -712,7 +722,7 @@ void dogecoin_tx_copy(dogecoin_tx* dest, const dogecoin_tx* src)
         for (i = 0; i < src->vin->len; i++) {
             dogecoin_tx_in *tx_in_old, *tx_in_new;
             tx_in_old = vector_idx(src->vin, i);
-            tx_in_new = dogecoin_malloc(sizeof(*tx_in_new));
+            tx_in_new = dogecoin_tx_in_new();
             dogecoin_tx_in_copy(tx_in_new, tx_in_old);
             vector_add(dest->vin, tx_in_new);
         }
@@ -912,6 +922,34 @@ out:
     return ret;
 }
 
+/**
+ * @brief This function computes a transaction sighash and
+ * writes the raw 32-byte digest to out32.
+ *
+ * @param tx_to The pointer to the transaction.
+ * @param fromPubKey The scriptPubKey of the input being signed.
+ * @param in_num The index of the input being signed.
+ * @param hashtype The sighash type (e.g. SIGHASH_ALL).
+ * @param out32 The output buffer for the 32-byte hash.
+ *
+ * @return true if the sighash was computed, false on error.
+ */
+dogecoin_bool dogecoin_tx_sighash32(const dogecoin_tx* tx_to,
+                                    const cstring* fromPubKey,
+                                    size_t in_num, int hashtype,
+                                    uint8_t out32[32])
+{
+    if (!tx_to || !fromPubKey || !out32) {
+        return false;
+    }
+    uint256_t hash;
+    if (!dogecoin_tx_sighash(tx_to, fromPubKey, in_num, hashtype, hash)) {
+        return false;
+    }
+    memcpy(out32, hash, 32);
+    return true;
+}
+
 
 /**
  * @brief This function adds another transaction output to
@@ -1069,7 +1107,17 @@ dogecoin_bool dogecoin_tx_add_p2pkh_out(dogecoin_tx* tx, int64_t amount, const d
  */
 dogecoin_bool dogecoin_tx_outpoint_is_null(dogecoin_tx_outpoint* tx)
 {
-    (void)(tx);
+    if (!tx) {
+        return true;
+    }
+    if (tx->n != (uint32_t)-1) {
+        return false;
+    }
+    for (size_t i = 0; i < sizeof(tx->hash); i++) {
+        if (tx->hash[i] != 0) {
+            return false;
+        }
+    }
     return true;
 }
 
@@ -1175,8 +1223,10 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
         if (memcmp(hash160_in_script, hash160, sizeof(hash160)) != 0) {
             res = DOGECOIN_SIGN_NO_KEY_MATCH; //sign anyways
         }
-    } else {
-        // unknown script, however, still try to create a signature (don't apply though)
+    } else if (type != DOGECOIN_TX_MULTISIG) {
+        // unknown script, however, still try to create a signature (don't apply though).
+        // P2SH multisig (DOGECOIN_TX_MULTISIG) is handled by the dedicated branch below,
+        // so do not flag it as unknown here.
         res = DOGECOIN_SIGN_UNKNOWN_SCRIPT_TYPE;
     }
     vector_free(script_pushes, true);
@@ -1220,6 +1270,69 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
         // apply pubkey
         ser_varlen(tx_in->script_sig, pubkey.compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH);
         ser_bytes(tx_in->script_sig, pubkey.pubkey, pubkey.compressed ? DOGECOIN_ECKEY_COMPRESSED_LENGTH : DOGECOIN_ECKEY_UNCOMPRESSED_LENGTH);
+    } else if (type == DOGECOIN_TX_MULTISIG) {
+        /* P2SH multisig: scriptSig = OP_0 <sig1> ... <sigN> <serialized_redeem_script>
+         *
+         * We parse any existing signature pushes out of the current scriptSig
+         * (stripping the leading OP_0 marker and the trailing redeem-script push
+         * if present), append the new DER signature, and rebuild the full
+         * scriptSig including the redeem script. Sig pushes are identified
+         * structurally — not by length — so this correctly handles small
+         * redeem scripts (e.g. a 71-byte 2-of-2 redeem) that collide with the
+         * usual DER signature length window.
+         */
+        vector_t* existing_ops = vector_new(4, dogecoin_script_op_free_cb);
+        dogecoin_script_get_ops(tx_in->script_sig, existing_ops);
+
+        size_t start = 0;
+        size_t end = existing_ops->len;
+        if (end > 0) {
+            /* Strip the leading OP_0 marker that BIP16 requires in front of
+             * the signatures (this also covers the OP_CHECKMULTISIG off-by-one). */
+            dogecoin_script_op* first = vector_idx(existing_ops, 0);
+            if (first->op == OP_0 && first->datalen == 0) {
+                start = 1;
+            }
+            /* Strip the trailing redeem-script push (verified to match the
+             * caller-supplied `script` arg byte-for-byte). */
+            dogecoin_script_op* last = vector_idx(existing_ops, end - 1);
+            if (end > start && last->data && last->datalen == script->len &&
+                memcmp(last->data, script->str, script->len) == 0) {
+                end--;
+            }
+        }
+
+        cstring* new_sig = cstr_new_sz(512);
+
+        /* OP_0 (required by BIP16 / OP_CHECKMULTISIG off-by-one) */
+        uint8_t op0 = OP_0;
+        ser_bytes(new_sig, &op0, 1);
+
+        /* re-emit existing signature pushes (everything between OP_0 and the
+         * redeem-script push). */
+        for (size_t k = start; k < end; ++k) {
+            dogecoin_script_op* op = vector_idx(existing_ops, k);
+            if (op->data && op->datalen > 0) {
+                ser_varlen(new_sig, op->datalen);
+                ser_bytes(new_sig, op->data, op->datalen);
+            }
+        }
+        vector_free(existing_ops, true);
+
+        /* new DER signature + hashtype */
+        ser_varlen(new_sig, sigderlen);
+        ser_bytes(new_sig, sigder_plus_hashtype, sigderlen);
+
+        /* serialized redeem script push */
+        ser_varlen(new_sig, script->len);
+        ser_bytes(new_sig, (const unsigned char*)script->str, script->len);
+
+        /* replace the input's scriptSig */
+        cstr_resize(tx_in->script_sig, 0);
+        cstr_append_buf(tx_in->script_sig, new_sig->str, new_sig->len);
+        cstr_free(new_sig, true);
+
+        res = DOGECOIN_SIGN_OK;
     } else {
         // append nothing
         res = DOGECOIN_SIGN_UNKNOWN_SCRIPT_TYPE;
@@ -1238,4 +1351,3 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
 int getAddrFromPubkeyHash(const char pubkey_hash[PUBKEYHASHLEN], const dogecoin_bool is_testnet, char p2pkh_address[P2PKHLEN]) {
     return dogecoin_pubkey_hash_to_p2pkh_address((char *)utils_hex_to_uint8(pubkey_hash), SCRIPT_PUBKEY_LENGTH, p2pkh_address, is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main);
 }
-

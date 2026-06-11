@@ -30,10 +30,19 @@ SET(USE_SSE FALSE CACHE BOOL "enable intel sse")
 SET(USE_SSE2 FALSE CACHE BOOL "enable scrypt sse2")
 SET(USE_ARMV8 FALSE CACHE BOOL "enable armv8 crypto")
 SET(USE_ARMV82 FALSE CACHE BOOL "enable armv8.2 crypto")
+SET(USE_DIT FALSE CACHE BOOL "enable data independent timing support")
 SET(USE_TPM2 TRUE CACHE BOOL "enable tpm2")
+SET(TEST_TPM_AUTO FALSE CACHE BOOL "disable TPM UI policy for automated tests")
+SET(USE_TSS2 FALSE CACHE BOOL "enable tss2 (Linux TPM2) functions")
 SET(USE_OPENENCLAVE FALSE CACHE BOOL "enable openenclave")
 SET(USE_YUBIKEY FALSE CACHE BOOL "enable yubikey")
-SET(TEST_PASSWD FALSE CACHE BOOL "enable test password")
+SET(USE_LIBOQS FALSE CACHE BOOL "enable liboqs")
+SET(USE_RACCOON_G FALSE CACHE BOOL "enable in-tree Raccoon-G-44 (experimental, requires GMP/MPFR)")
+# Default OFF to match the autoconf default (--enable-zk-carrier defaults to no
+# in configure.ac); flip both knobs together when the on-chain semantics are
+# frozen so the two build systems produce equivalent libraries.
+SET(USE_ZK_CARRIER FALSE CACHE BOOL "enable ZK carrier (Groth16/PLONK/STARK)")
+SET(USE_RAPIDSNARK FALSE CACHE BOOL "link rapidsnark Groth16 verifier")
 string(RANDOM LENGTH 12 ALPHABET abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 PASSWD_STR)
 SET(RANDOM_DEVICE "/dev/urandom" CACHE STRING "set the device to read random data from")
 
@@ -99,14 +108,77 @@ IF(WITH_NET)
     ENDIF()
 ENDIF()
 
+# The TSS2 (Linux TPM2) seal backend does not depend on net, so detect it
+# independently of WITH_NET. This lets the seal API be built without net
+# (e.g. a TPM-only configuration), matching the autotools behaviour where
+# --enable-tss2 is handled separately from --enable-net.
+IF(USE_TSS2 AND NOT WIN32)
+    # Minimum recommended libtss2-esys version: 2.4.0
+    # Prefer pkg-config (handles transitive deps and version checking),
+    # but fall back to a plain library lookup so builds work even when
+    # pkg-config metadata for tss2-esys is missing.
+    FIND_PACKAGE(PkgConfig QUIET)
+    IF(PkgConfig_FOUND)
+        PKG_CHECK_MODULES(TSS2_ESYS QUIET tss2-esys>=2.4.0)
+    ENDIF()
+    IF(TSS2_ESYS_FOUND)
+        SET(LIBTSS2 ${TSS2_ESYS_LIBRARIES})
+        INCLUDE_DIRECTORIES(${TSS2_ESYS_INCLUDE_DIRS})
+    ELSE()
+        FIND_LIBRARY(LIBTSS2 tss2-esys)
+        IF(NOT LIBTSS2)
+            MESSAGE(FATAL_ERROR
+                "USE_TSS2 requested but libtss2-esys was not found. "
+                "Install libtss2-dev (>= 2.4.0) or disable USE_TSS2.")
+        ENDIF()
+    ENDIF()
+    FIND_PATH(TSS2_ESYS_HEADER tss2/tss2_esys.h)
+    IF(NOT TSS2_ESYS_HEADER)
+        MESSAGE(FATAL_ERROR
+            "tss2/tss2_esys.h not found; install libtss2-dev.")
+    ENDIF()
+ENDIF()
+
 # NASM integration for AVX2
 if(USE_AVX2 OR USE_SSE)
+    # Prefer depends-built nasm when present, so the build does not rely on nasm
+    # being on $PATH. HOST may be passed in by callers; otherwise also scan the
+    # usual depends/*/native/bin outputs.
+    set(LIBDOGECOIN_NASM_HINTS
+        "${CMAKE_CURRENT_SOURCE_DIR}/depends/native/bin")
+    if(DEFINED HOST AND NOT "${HOST}" STREQUAL "")
+        list(PREPEND LIBDOGECOIN_NASM_HINTS
+            "${CMAKE_CURRENT_SOURCE_DIR}/depends/${HOST}/native/bin")
+    endif()
+    file(GLOB LIBDOGECOIN_DEPENDS_NATIVE_BIN_DIRS
+        "${CMAKE_CURRENT_SOURCE_DIR}/depends/*/native/bin")
+    list(APPEND LIBDOGECOIN_NASM_HINTS ${LIBDOGECOIN_DEPENDS_NATIVE_BIN_DIRS})
+
+    if(CMAKE_ASM_NASM_COMPILER AND NOT EXISTS "${CMAKE_ASM_NASM_COMPILER}")
+        unset(CMAKE_ASM_NASM_COMPILER CACHE)
+        unset(LIBDOGECOIN_NASM_COMPILER CACHE)
+    elseif(NOT CMAKE_ASM_NASM_COMPILER AND LIBDOGECOIN_NASM_COMPILER AND NOT EXISTS "${LIBDOGECOIN_NASM_COMPILER}")
+        unset(CMAKE_ASM_NASM_COMPILER CACHE)
+        unset(LIBDOGECOIN_NASM_COMPILER CACHE)
+    endif()
+
+    if(NOT CMAKE_ASM_NASM_COMPILER OR NOT EXISTS "${CMAKE_ASM_NASM_COMPILER}")
+        find_program(LIBDOGECOIN_NASM_COMPILER
+            NAMES nasm
+            HINTS ${LIBDOGECOIN_NASM_HINTS}
+        )
+        if(LIBDOGECOIN_NASM_COMPILER)
+            set(CMAKE_ASM_NASM_COMPILER "${LIBDOGECOIN_NASM_COMPILER}" CACHE FILEPATH "NASM assembler" FORCE)
+        endif()
+    endif()
+    if(NOT CMAKE_ASM_NASM_COMPILER)
+        message(FATAL_ERROR "Can't find NASM assembler")
+    endif()
+
     enable_language(ASM_NASM)
     if(NOT CMAKE_ASM_NASM_COMPILER_LOADED)
         message(FATAL_ERROR "Can't find NASM assembler")
     endif()
-
-    set(CMAKE_ASM_NASM_COMPILER nasm)
 
     set(NASM_VERSION_REQUIRED "2.14")
     execute_process(
@@ -201,8 +273,14 @@ IF(USE_ARMV82)
 
     ADD_DEFINITIONS(-DUSE_ARMV82=1)
 ENDIF()
+IF(USE_DIT)
+    ADD_DEFINITIONS(-DUSE_DIT=1)
+ENDIF()
 IF(USE_TPM2)
     ADD_DEFINITIONS(-DUSE_TPM2=1)
+ENDIF()
+IF(USE_TSS2)
+    ADD_DEFINITIONS(-DUSE_TSS2=1)
 ENDIF()
 IF(USE_OPENENCLAVE)
     ADD_DEFINITIONS(-DUSE_OPENENCLAVE=1)
@@ -211,8 +289,21 @@ IF(USE_YUBIKEY)
     FIND_LIBRARY(LIBYKPIV NAMES ykpiv REQUIRED HINTS /usr/lib/x86_64-linux-gnu)
     ADD_DEFINITIONS(-DUSE_YUBIKEY=1)
 ENDIF()
-IF(TEST_PASSWD)
-    ADD_DEFINITIONS(-DTEST_PASSWD=1)
+IF(USE_LIBOQS)
+    ADD_DEFINITIONS(-DUSE_LIBOQS=1)
+ENDIF()
+IF(USE_RACCOON_G)
+    FIND_LIBRARY(LIBGMP NAMES gmp REQUIRED)
+    FIND_LIBRARY(LIBMPFR NAMES mpfr REQUIRED)
+    ADD_DEFINITIONS(-DUSE_RACCOON_G=1)
+ENDIF()
+IF(USE_ZK_CARRIER)
+    ADD_DEFINITIONS(-DUSE_ZK_CARRIER=1)
+ENDIF()
+IF(USE_RAPIDSNARK)
+    ADD_DEFINITIONS(-DHAVE_RAPIDSNARK=1)
+ENDIF()
+IF(USE_TESTS)
     ADD_DEFINITIONS(-DPASSWD_STR="${PASSWD_STR}")
 ENDIF()
 
@@ -230,14 +321,21 @@ MESSAGE(STATUS "  USE_SSE        = ${USE_SSE}")
 MESSAGE(STATUS "  USE_SSE2       = ${USE_SSE2}")
 MESSAGE(STATUS "  USE_ARMV8      = ${USE_ARMV8}")
 MESSAGE(STATUS "  USE_ARMV82     = ${USE_ARMV82}")
+MESSAGE(STATUS "  USE_DIT        = ${USE_DIT}")
 MESSAGE(STATUS "  USE_TPM2       = ${USE_TPM2}")
-MESSAGE(STATUS "  TEST_PASSWD    = ${TEST_PASSWD}")
-IF(TEST_PASSWD)
-MESSAGE(STATUS "                   ${PASSWD_STR}")
+MESSAGE(STATUS "  TEST_TPM_AUTO  = ${TEST_TPM_AUTO}")
+MESSAGE(STATUS "  USE_TSS2       = ${USE_TSS2}")
+MESSAGE(STATUS "")
+IF(USE_TESTS)
+MESSAGE(STATUS "  test password  = ${PASSWD_STR}")
 ENDIF()
 MESSAGE(STATUS "")
 MESSAGE(STATUS "  openenclave    = ${USE_OPENENCLAVE}")
 MESSAGE(STATUS "  yubikey        = ${USE_YUBIKEY}")
+MESSAGE(STATUS "  liboqs         = ${USE_LIBOQS}")
+MESSAGE(STATUS "  raccoon_g      = ${USE_RACCOON_G} (experimental, in-tree)")
+MESSAGE(STATUS "  zk_carrier     = ${USE_ZK_CARRIER}")
+MESSAGE(STATUS "  rapidsnark     = ${USE_RAPIDSNARK}")
 MESSAGE(STATUS "")
 message(STATUS "  library type   = ${library_type}")
 MESSAGE(STATUS "")
@@ -303,9 +401,61 @@ TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
     src/validation.c
     src/vector.c
 )
+IF(USE_LIBOQS)
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
+    src/pqc_dilithium.c
+    src/pqc_falcon.c
+)
+ENDIF()
+# pqc_carrier.c provides the P2SH carrier helpers shared by the PQ and ZK
+# carriers; build it whenever either is enabled.  pqc_falcon.c (Falcon-512
+# helpers) is only needed when LIBOQS is on — the ZK carrier no longer
+# depends on it now that dogecoin_tx_sighash32 lives in src/tx.c.
+IF(USE_LIBOQS OR USE_ZK_CARRIER)
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
+    src/pqc_carrier.c
+)
+ENDIF()
+IF(USE_RACCOON_G)
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
+    src/pqc_raccoon.c
+    src/raccoon_g/polyr.c
+    src/raccoon_g/ntt.c
+    src/raccoon_g/gaussian.c
+    src/raccoon_g/shake256.c
+    src/raccoon_g/thrc.c
+    src/raccoon_g/keygen_kdf.c
+    src/raccoon_g/raccoong.c
+)
+TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBMPFR} ${LIBGMP})
+ENDIF()
+IF(USE_ZK_CARRIER)
+TARGET_SOURCES(${LIBDOGECOIN_NAME} PRIVATE
+    src/zk_carrier/zk_carrier.c
+    src/zk_carrier/zk_commit.c
+    src/zk_carrier/zk_groth16.c
+    src/zk_carrier/zk_plonk.c
+    src/zk_carrier/zk_stark.c
+)
+IF(USE_RAPIDSNARK)
+    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} PRIVATE rapidsnark)
+ENDIF()
+ENDIF()
 TARGET_SOURCES(${LIBDOGECOIN_NAME} PUBLIC
     src/chainparams.c
 )
+
+IF(WIN32 AND USE_TPM2)
+    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} tbs ncrypt crypt32)
+ENDIF()
+
+# Link the Linux TPM2 (TSS2) backend into the core library regardless of net,
+# so the seal API works in a net-less build. When WITH_NET is enabled the net
+# link rule below also adds ${LIBTSS2}; linking the same library twice is
+# harmless.
+IF(USE_TSS2)
+    TARGET_LINK_LIBRARIES(${LIBDOGECOIN_NAME} ${LIBTSS2})
+ENDIF()
 
 IF(USE_SSE2)
 TARGET_SOURCES(${LIBDOGECOIN_NAME} ${visibility}
@@ -389,12 +539,18 @@ IF(USE_TESTS)
         test/smpv_tests.c
         test/tpm_tests.c
         test/transaction_tests.c
+        test/validation_tests.c
         test/tx_tests.c
         include/test/utest.h
         test/unittester.c
         test/utils_tests.c
         test/vector_tests.c
 )
+IF(USE_ZK_CARRIER)
+TARGET_SOURCES(tests ${visibility}
+        test/zk_carrier_tests.c
+)
+ENDIF()
 IF (USE_YUBIKEY)
     SET(LIBS ${LIBDOGECOIN_NAME} ${LIBYKPIV})
 ELSE()
@@ -402,7 +558,12 @@ ELSE()
 ENDIF()
 
 IF (WIN32 AND USE_TPM2)
+    IF (TEST_TPM_AUTO)
+        TARGET_COMPILE_DEFINITIONS(tests PRIVATE TEST_TPM_AUTO=1)
+    ENDIF()
     TARGET_LINK_LIBRARIES(tests ${LIBS} tbs ncrypt crypt32)
+ELSEIF (USE_TSS2)
+    TARGET_LINK_LIBRARIES(tests ${LIBS} ${LIBTSS2})
 ELSE()
     TARGET_LINK_LIBRARIES(tests ${LIBS})
 ENDIF()
@@ -463,6 +624,7 @@ IF(WITH_NET)
         DESTINATION include/dogecoin
     )
     TARGET_SOURCES(${LIBDOGECOIN_NAME} ${visibility}
+        src/bip37.c
         src/headersdb_file.c
         src/net.c
         src/protocol.c
@@ -472,6 +634,8 @@ IF(WITH_NET)
 
     IF(WIN32 AND USE_TPM2)
         TARGET_LINK_LIBRARIES(${LIBS} ${LIBEVENT} ${LIBEVENT_PTHREADS} tbs ncrypt crypt32)
+    ELSEIF(USE_TSS2)
+        TARGET_LINK_LIBRARIES(${LIBS} ${LIBEVENT} ${LIBEVENT_PTHREADS} ${LIBTSS2})
     ELSE()
         TARGET_LINK_LIBRARIES(${LIBS} ${LIBEVENT} ${LIBEVENT_PTHREADS})
     ENDIF()
@@ -495,6 +659,8 @@ IF(WITH_TOOLS)
     INSTALL(TARGETS such RUNTIME)
     IF (WIN32 AND USE_TPM2)
         TARGET_LINK_LIBRARIES(such ${LIBS} tbs ncrypt crypt32)
+    ELSEIF (USE_TSS2)
+        TARGET_LINK_LIBRARIES(such ${LIBS} ${LIBTSS2})
     ELSE()
         TARGET_LINK_LIBRARIES(such ${LIBS})
     ENDIF()

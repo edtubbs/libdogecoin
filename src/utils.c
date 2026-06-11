@@ -39,6 +39,10 @@
 #include <assert.h>
 #include <time.h>
 
+#ifdef HAVE_READPASSPHRASE_H
+#include <readpassphrase.h>
+#endif
+
 #include <dogecoin/cstr.h>
 #include <dogecoin/mem.h>
 #include <dogecoin/utils.h>
@@ -87,6 +91,47 @@
 #include <win/winunistd.h>
 #else
 #include <unistd.h>
+#endif
+
+#ifdef __APPLE__
+#include <sys/sysctl.h>
+#endif
+
+#if defined(USE_DIT) && defined(__aarch64__) && (defined(__linux__) || defined(__ANDROID__)) && !defined(USE_OPTEE)
+#include <sys/auxv.h>
+#include <asm/hwcap.h>
+#endif
+
+#if defined(USE_DIT) && defined(__aarch64__)
+/*
+ * PSTATE.DIT is per-thread architectural state (saved/restored on context
+ * switch), so the prior-value cache and the enable/disable nesting depth
+ * used by disable_DIT() must also be per-thread. Otherwise enable/disable
+ * pairs racing across threads (or nesting on one thread) will clobber each
+ * other's saved bit. See ARM ARM, D13.2.36 (DIT, bit 24).
+ *
+ * The nesting counter ensures that nested enable_DIT()/disable_DIT() pairs
+ * only touch PSTATE.DIT at the outermost boundary, so the prior bit
+ * snapshot taken by the outer enable_DIT() is the value actually restored
+ * by the matching outer disable_DIT().
+ */
+static _Thread_local int dogecoin_dit_prior_state = 0;
+static _Thread_local unsigned dogecoin_dit_nest_count = 0;
+
+static unsigned dogecoin_arm64_read_dit_bit(void)
+{
+    uint64_t dit_state = 0;
+    /* MRS DIT, Xt -- system register S3_3_C4_C2_5; bit 24 is PSTATE.DIT. */
+    __asm__ volatile("mrs %0, S3_3_C4_C2_5" : "=r"(dit_state));
+    return (unsigned)((dit_state >> 24) & 1);
+}
+
+static void dogecoin_arm64_write_dit(unsigned dit_bit)
+{
+    /* MSR DIT, Xt uses Xt[24] -> PSTATE.DIT. */
+    uint64_t dit_reg = (dit_bit ? 1ULL : 0ULL) << 24;
+    __asm__ volatile("msr S3_3_C4_C2_5, %0" : : "r"(dit_reg));
+}
 #endif
 
 static uint8_t buffer_hex_to_uint8[TO_UINT8_HEX_BUF_LEN];
@@ -198,7 +243,7 @@ uint8_t* utils_hex_to_uint8(const char* str)
  *
  * @return Nothing.
  */
-void utils_bin_to_hex(unsigned char* bin_in, size_t inlen, char* hex_out)
+void utils_bin_to_hex(const unsigned char* bin_in, size_t inlen, char* hex_out)
     {
     static char digits[] = "0123456789abcdef";
     size_t i;
@@ -692,7 +737,7 @@ void text_to_hex(char* in, char* out) {
     out[i++] = '\0';
     }
 
-const char* get_build() {
+const char* get_build(void) {
         #if defined(__x86_64__) || defined(_M_X64)
             return "x86_64";
         #elif defined(i386) || defined(__i386__) || defined(__i386) || defined(_M_IX86)
@@ -749,31 +794,51 @@ char *getpass(const char *prompt) {
     ssize_t nread = strlen(buffer);
     if (nread > 0 && buffer[nread-1] == '\n')
         buffer[nread-1] = '\0';  // Remove newline character
+#elif defined(HAVE_READPASSPHRASE)
+# ifndef RPP_ECHO_OFF
+#  define RPP_ECHO_OFF 0x00
+# endif
+    if (!readpassphrase(prompt, buffer, sizeof(buffer), RPP_ECHO_OFF))
+        return NULL;
 #else
     struct termios old, new;
     ssize_t nread;
+    FILE *tty = fopen("/dev/tty", "r+");
+    int tfd = tty ? fileno(tty) : STDIN_FILENO;
 
-    if (tcgetattr(STDIN_FILENO, &old) != 0)
+    if (tcgetattr(tfd, &old) != 0) {
+        if (tty) fclose(tty);
         return NULL;
+    }
 
     new = old;
     new.c_lflag &= ~ECHO;
 
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &new) != 0)
+    if (tcsetattr(tfd, TCSAFLUSH, &new) != 0) {
+        if (tty) fclose(tty);
         return NULL;
+    }
 
-    printf("%s", prompt);
-    fflush(stdout);
+    fputs(prompt, tty ? tty : stderr);
+    fflush(tty ? tty : stderr);
 
-    if (!fgets(buffer, sizeof(buffer), stdin))
+    if (!fgets(buffer, sizeof(buffer), tty ? tty : stdin)) {
+        tcsetattr(tfd, TCSAFLUSH, &old);
+        if (tty) fclose(tty);
         return NULL;
+    }
 
     nread = strlen(buffer);
     if (nread > 0 && buffer[nread-1] == '\n')
-        buffer[nread-1] = '\0';  // Remove newline character
+        buffer[nread-1] = '\0';
 
-    if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &old) != 0)
+    if (tcsetattr(tfd, TCSAFLUSH, &old) != 0) {
+        if (tty) fclose(tty);
         return NULL;
+    }
+
+    fputs("\n", tty ? tty : stderr);
+    if (tty) fclose(tty);
 
 #endif
     return strdup(buffer);
@@ -809,7 +874,7 @@ void dogecoin_uitoa(int n, char s[])
     dogecoin_str_reverse(s);
 }
 
-bool dogecoin_network_enabled() {
+bool dogecoin_network_enabled(void) {
 #ifndef WITH_NET
     return false;
 #else
@@ -955,4 +1020,101 @@ unsigned int base64_decode(const unsigned char* in, unsigned int in_len, unsigne
     out[k] = '\0';
 
 	return k;
+}
+
+dogecoin_bool is_DIT_supported(void)
+{
+#if defined(USE_DIT) && defined(__aarch64__) && defined(__APPLE__)
+    /*
+     * Racy init is intentional: the underlying sysctl is idempotent and
+     * returns the same value on every call, so concurrent initialization
+     * threads will all compute and store the same result. The -1 value is
+     * a sentinel meaning "not yet probed"; valid stored values are 0/1.
+     */
+    static _Atomic int has_DIT = -1;
+    if (has_DIT == -1)
+    {
+        int local = 0;
+        size_t local_size = sizeof(local);
+        if (sysctlbyname("hw.optional.arm.FEAT_DIT", &local, &local_size, NULL, 0) == -1)
+        {
+            local = 0;
+        }
+        has_DIT = (local != 0);
+    }
+    return has_DIT != 0;
+#elif defined(USE_DIT) && defined(__aarch64__) && (defined(__linux__) || defined(__ANDROID__))
+    /* Idempotent init with -1 sentinel; see note above. */
+    static _Atomic int has_DIT = -1;
+    if (has_DIT == -1)
+    {
+        int local;
+#if defined(USE_OPTEE)
+        local = 0;
+#elif defined(HWCAP_DIT)
+        unsigned long hwcap = getauxval(AT_HWCAP);
+        local = ((hwcap & HWCAP_DIT) != 0);
+#else
+        local = 0;
+#endif
+        has_DIT = local;
+    }
+    return has_DIT != 0;
+#else
+    return false;
+#endif
+}
+
+dogecoin_bool enable_DIT(void)
+{
+#if defined(USE_DIT) && defined(__aarch64__)
+    if (!is_DIT_supported())
+    {
+        return false;
+    }
+    /*
+     * Nested enable: PSTATE.DIT is already set by an outer caller on this
+     * thread. Just bump the nest count so the matching disable_DIT() does
+     * not prematurely restore the prior bit.
+     */
+    if (dogecoin_dit_nest_count > 0)
+    {
+        dogecoin_dit_nest_count++;
+        return true;
+    }
+    /*
+     * Outermost enable: snapshot the current PSTATE.DIT bit, then attempt
+     * to set it. Only commit the snapshot (and the nest count) once we've
+     * confirmed the write actually took effect -- on platforms where
+     * userspace writes to PSTATE.DIT are silently dropped we must not
+     * corrupt the per-thread restore value.
+     */
+    unsigned prior = dogecoin_arm64_read_dit_bit();
+    dogecoin_arm64_write_dit(1);
+    if (dogecoin_arm64_read_dit_bit() == 0) {
+        return false;
+    }
+    dogecoin_dit_prior_state = (int)prior;
+    dogecoin_dit_nest_count = 1;
+    return true;
+#else
+    return false;
+#endif
+}
+
+void disable_DIT(void)
+{
+#if defined(USE_DIT) && defined(__aarch64__)
+    if (!is_DIT_supported() || dogecoin_dit_nest_count == 0)
+    {
+        return;
+    }
+    if (--dogecoin_dit_nest_count > 0)
+    {
+        /* Inner disable: leave PSTATE.DIT set for the outer caller. */
+        return;
+    }
+    /* Outermost disable: restore the prior per-thread PSTATE.DIT bit. */
+    dogecoin_arm64_write_dit((unsigned)dogecoin_dit_prior_state);
+#endif
 }

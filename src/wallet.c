@@ -165,7 +165,6 @@ int dogecoin_tx_outpoint_compare(const void *l, const void *r)
     return 0;
 }
 
-
 /*
  ==========================================================
  WALLET TRANSACTION (WTX) FUNCTIONS
@@ -590,8 +589,8 @@ void print_utxos(dogecoin_wallet* wallet) {
                 printf("address:        %s\n", utxo->address);
                 printf("script_pubkey:  %s\n", utxo->script_pubkey);
                 printf("amount:         %s\n", utxo->amount);
-                debug_print("confirmations:  %d\n", utxo->confirmations);
                 printf("height:         %d\n", utxo->height);
+                printf("confirmations:  %d\n", utxo->confirmations);
                 printf("spendable:      %d\n", utxo->spendable);
                 printf("solvable:       %d\n", utxo->solvable);
                 wallet_total_u64 += coins_to_koinu_str(utxo->amount);
@@ -609,8 +608,8 @@ void print_utxos(dogecoin_wallet* wallet) {
                 printf("address:        %s\n", utxo->address);
                 printf("script_pubkey:  %s\n", utxo->script_pubkey);
                 printf("amount:         %s\n", utxo->amount);
-                debug_print("confirmations:  %d\n", utxo->confirmations);
                 printf("height:         %d\n", utxo->height);
+                printf("confirmations:  %d\n", utxo->confirmations);
                 printf("spendable:      %d\n", utxo->spendable);
                 printf("solvable:       %d\n", utxo->solvable);
                 wallet_total_u64 += coins_to_koinu_str(utxo->amount);
@@ -649,10 +648,13 @@ void dogecoin_wallet_free(dogecoin_wallet* wallet)
     wallet->chain = NULL;
 
     // Destroy binary trees
+    // NOTE: wtxes_rbtree and waddr_rbtree share ownership of their elements
+    // with vec_wtxes and waddr_vector respectively, which were already freed
+    // above with their owning destructor. Pass NULL here to avoid double-free.
     dogecoin_btree_tdestroy(wallet->hdkeys_rbtree, NULL);
     dogecoin_btree_tdestroy(wallet->unspent_rbtree, NULL);
-    dogecoin_btree_tdestroy(wallet->spends_rbtree, NULL);
-    dogecoin_btree_tdestroy(wallet->wtxes_rbtree, (void (*)(void *)) dogecoin_wallet_wtx_free);
+    dogecoin_btree_tdestroy(wallet->spends_rbtree, dogecoin_free);
+    dogecoin_btree_tdestroy(wallet->wtxes_rbtree, NULL);
     dogecoin_btree_tdestroy(wallet->waddr_rbtree, NULL);
 
     remove_all_utxos();
@@ -695,20 +697,23 @@ void dogecoin_wallet_scrape_utxos(dogecoin_wallet* wallet, dogecoin_wtx* wtx) {
         }
     }
 
+    vector_t* addrs = NULL;
+    if (wallet->waddr_vector->len) {
+        addrs = vector_new(1, free);
+        dogecoin_wallet_get_addresses(wallet, addrs);
+    }
+
     size_t j = 0;
     // iterate through vout's:
     for (; j < wtx->tx->vout->len; j++) {
         dogecoin_tx_out* tx_out = vector_idx(wtx->tx->vout, j);
         // populate address vector_t if script_pubkey exists:
-        if (wallet->waddr_vector->len && tx_out->script_pubkey->len) {
+        if (addrs && tx_out->script_pubkey->len) {
             char p2pkh_from_script_pubkey[P2PKHLEN];
             // convert script pubkey hash to p2pkh address:
             if (!dogecoin_pubkey_hash_to_p2pkh_address(tx_out->script_pubkey->str, tx_out->script_pubkey->len, p2pkh_from_script_pubkey, wallet->chain)) {
                 printf("failed to convert pubkey hash to p2pkh address!\n");
             }
-            vector_t* addrs = vector_new(1, free);
-            // grab all addresses in vector_t:
-            dogecoin_wallet_get_addresses(wallet, addrs);
             unsigned int i, g;
             // loop through addresses:
             for (i = 0; i < addrs->len; i++) {
@@ -770,9 +775,9 @@ void dogecoin_wallet_scrape_utxos(dogecoin_wallet* wallet, dogecoin_wtx* wtx) {
                     }
                 }
             }
-            vector_free(addrs, true);
         }
     }
+    if (addrs) vector_free(addrs, true);
 
     // update the wallet with the new utxos:
     wallet->utxos = utxos;
@@ -791,20 +796,45 @@ void dogecoin_wallet_add_wtx_intern_move(dogecoin_wallet *wallet, const dogecoin
     if (checkwtx) {
         // remove existing wtx
         checkwtx = *(dogecoin_wtx **)checkwtx;
+        // we do not really delete transactions
+        checkwtx->ignore = true;
+        dogecoin_btree_tdelete(checkwtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
+        // vec_wtxes owns the wtx (its elem_free_f is dogecoin_wallet_wtx_free),
+        // so vector_remove_idx will free checkwtx. Do not free it again here.
         unsigned int i;
         for (i = 0; i < wallet->vec_wtxes->len; i++) {
             dogecoin_wtx *wtx_vec = vector_idx(wallet->vec_wtxes, i);
             if (wtx_vec == checkwtx) {
                 vector_remove_idx(wallet->vec_wtxes, i);
+                break;
             }
         }
-        // we do not really delete transactions
-        checkwtx->ignore = true;
-        dogecoin_btree_tdelete(checkwtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
-        dogecoin_wallet_wtx_free(checkwtx);
     }
-    dogecoin_btree_tfind(wtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
+    dogecoin_btree_tsearch(wtx, &wallet->wtxes_rbtree, dogecoin_wtx_compare);
     vector_add(wallet->vec_wtxes, (dogecoin_wtx *)wtx);
+
+    /* Index spends: for is_from_me wtx, record each non-coinbase prevout in
+     * spends_rbtree so dogecoin_wallet_is_spent() can answer outpoint queries. */
+    if (wtx && wtx->tx && wtx->tx->vin && dogecoin_wallet_is_from_me(wallet, wtx->tx)) {
+        for (unsigned int i = 0; i < wtx->tx->vin->len; i++) {
+            dogecoin_tx_in *in = vector_idx(wtx->tx->vin, i);
+            if (!in || dogecoin_tx_outpoint_is_null(&in->prevout)) continue;
+
+            /* Probe with a stack-local key first so we only heap-allocate on
+             * insert; tfind matches the same comparator as tsearch. */
+            dogecoin_tx_outpoint key;
+            memcpy_safe(&key.hash, in->prevout.hash, sizeof(uint256_t));
+            key.n = in->prevout.n;
+            if (dogecoin_btree_tfind(&key, &wallet->spends_rbtree, dogecoin_tx_outpoint_compare)) {
+                continue;
+            }
+
+            dogecoin_tx_outpoint *op = dogecoin_calloc(1, sizeof(dogecoin_tx_outpoint));
+            memcpy_safe(&op->hash, in->prevout.hash, sizeof(uint256_t));
+            op->n = in->prevout.n;
+            dogecoin_btree_tsearch(op, &wallet->spends_rbtree, dogecoin_tx_outpoint_compare);
+        }
+    }
 }
 
 dogecoin_bool dogecoin_wallet_create(dogecoin_wallet* wallet, const char* file_path, int *error)
@@ -983,6 +1013,8 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
         }
     }
     else {
+        uint32_t tx_loaded_count = 0;
+        dogecoin_bool tx_loading_announced = false;
         // check file-header-magic, version and genesis
         uint8_t buf[sizeof(file_hdr_magic)+sizeof(current_version)+sizeof(uint256_t)];
         if ((uint32_t)buffer.st_size < (uint32_t)(sizeof(buf)) || fread(buf, sizeof(buf), 1, wallet->dbfile) != 1 || memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)))
@@ -1022,10 +1054,21 @@ dogecoin_bool dogecoin_wallet_load(dogecoin_wallet* wallet, const char* file_pat
             } else if (rectype == WALLET_DB_REC_TYPE_ADDR) {
                 if (!dogecoin_wallet_load_address(wallet)) return false;
             } else if (rectype == WALLET_DB_REC_TYPE_TX) {
+                if (!tx_loading_announced) {
+                    printf("Loading wallet transactions from disk...\n");
+                    tx_loading_announced = true;
+                }
                 if (!dogecoin_wallet_load_transaction(wallet, reclen)) return false;
+                tx_loaded_count++;
+                if (wallet->vec_wtxes) {
+                    tx_loaded_count = (uint32_t)wallet->vec_wtxes->len;
+                }
             } else {
                 fseek(wallet->dbfile, reclen, SEEK_CUR);
             }
+        }
+        if (tx_loading_announced) {
+            printf("%u transactions loaded\n", tx_loaded_count);
         }
     }
 
@@ -1475,7 +1518,43 @@ int64_t dogecoin_wallet_get_debit_tx(dogecoin_wallet *wallet, const dogecoin_tx 
 
 dogecoin_bool dogecoin_wallet_is_from_me(dogecoin_wallet *wallet, const dogecoin_tx *tx)
 {
-    return (dogecoin_wallet_get_debit_tx(wallet, tx) > 0);
+    if (dogecoin_wallet_get_debit_tx(wallet, tx) > 0) {
+        return true;
+    }
+
+    if (!wallet || !tx || !tx->vin) {
+        return false;
+    }
+
+    for (unsigned int i = 0; i < tx->vin->len; i++) {
+        dogecoin_tx_in* tx_in = vector_idx(tx->vin, i);
+        if (!tx_in) {
+            continue;
+        }
+
+        dogecoin_utxo* utxo;
+        dogecoin_utxo* tmp;
+        HASH_ITER(hh, utxos, utxo, tmp) {
+            if (memcmp(tx_in->prevout.hash, utxo->txid, 32) == 0) {
+                return true;
+            }
+
+            /*
+             * prevout hashes may be observed in opposite byte orders depending on
+             * source (raw wire vs. txid cache), so accept either representation
+             * against tracked wallet UTXOs.
+             */
+            uint8_t reversed_prevout[32];
+            for (unsigned int b = 0; b < 32; b++) {
+                reversed_prevout[b] = tx_in->prevout.hash[31 - b];
+            }
+            if (memcmp(reversed_prevout, utxo->txid, 32) == 0) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 dogecoin_bool dogecoin_wallet_is_spent(dogecoin_wallet* wallet, uint256_t hash, uint32_t n)
@@ -1544,10 +1623,29 @@ void dogecoin_wallet_check_transaction(void *ctx, dogecoin_tx *tx, unsigned int 
     (void)(pos);
     dogecoin_wallet *wallet = (dogecoin_wallet *)ctx;
     if (dogecoin_wallet_is_mine(wallet, tx) || dogecoin_wallet_is_from_me(wallet, tx)) {
-        printf("\nFound relevant transaction!\n");
+        dogecoin_wtx find;
+        uint256_t txid;
+        char txid_hex[65];
+        memset(&find, 0, sizeof(find));
+        dogecoin_tx_hash(tx, txid);
+        dogecoin_hash_set(find.tx_hash_cache, txid);
+        if (wallet->vec_wtxes) {
+            unsigned int i;
+            for (i = 0; i < wallet->vec_wtxes->len; i++) {
+                dogecoin_wtx* existing = vector_idx(wallet->vec_wtxes, i);
+                if (existing && memcmp(existing->tx_hash_cache, find.tx_hash_cache, sizeof(uint256_t)) == 0) {
+                    dogecoin_wallet_utxos_update_confirmations(pindex->height);
+                    return;
+                }
+            }
+        }
+        utils_bin_to_hex(txid, DOGECOIN_HASH_LENGTH, txid_hex);
+        txid_hex[64] = '\0';
+        utils_reverse_hex(txid_hex, 64);
         dogecoin_wtx* wtx = dogecoin_wallet_wtx_new();
         uint256_t blockhash;
         dogecoin_block_header_hash(&pindex->header, blockhash);
+        printf("Found new relevant transaction: %s (height: %u)\n", txid_hex, pindex->height);
         dogecoin_hash_set(wtx->blockhash, blockhash);
         wtx->height = pindex->height;
         dogecoin_tx_copy(wtx->tx, tx);
