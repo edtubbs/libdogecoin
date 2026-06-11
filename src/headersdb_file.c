@@ -89,7 +89,7 @@ dogecoin_headers_db* dogecoin_headers_db_new(const dogecoin_chainparams* chainpa
     db->genesis.height = 0;
     db->genesis.prev = NULL;
     memcpy_safe(db->genesis.hash, chainparams->genesisblockhash, DOGECOIN_HASH_LENGTH);
-    memcpy_safe(db->genesis.chainwork, chainparams->genesisblockchainwork, DOGECOIN_HASH_LENGTH);
+    uint_to_arith(&db->genesis.chainwork, &chainparams->genesisblockchainwork);
     db->chaintip = &db->genesis;
     db->chainbottom = &db->genesis;
 
@@ -196,10 +196,14 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
              memcmp(buf, file_hdr_magic, sizeof(file_hdr_magic)))
         {
             fprintf(stderr, "Error reading database file\n");
+            fclose(db->headers_tree_file);
+            db->headers_tree_file = NULL;
             return false;
         }
         if (le32toh(*(buf+sizeof(file_hdr_magic))) > current_version) {
             fprintf(stderr, "Unsupported file version\n");
+            fclose(db->headers_tree_file);
+            db->headers_tree_file = NULL;
             return false;
         }
     }
@@ -217,7 +221,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                 fflush(stdout);
             }
 
-            uint8_t buf_all[32+4+32+80];
+            uint8_t buf_all[SPV_HEADERS_FILE_REC_LEN];
             if (fread(buf_all, sizeof(buf_all), 1, db->headers_tree_file) == 1) {
                 struct const_buffer cbuf_all = {buf_all, sizeof(buf_all)};
 
@@ -225,10 +229,10 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
 
                 uint256_t hash;
                 uint32_t height;
-                uint256_t chainwork;
+                arith_uint256 chainwork = {0};
                 deser_u256(hash, &cbuf_all);
                 deser_u32(&height, &cbuf_all);
-                deser_u256(chainwork, &cbuf_all);
+                deser_u256((uint8_t*)chainwork.pn, &cbuf_all);
                 dogecoin_bool connected;
                 if (firstblock)
                 {
@@ -258,7 +262,7 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
                         connected_headers_count++;
                     }
                 }
-                memcpy(db->chaintip->chainwork, chainwork, sizeof(uint256_t));
+                db->chaintip->chainwork = chainwork;
             }
         }
     }
@@ -275,10 +279,10 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
  * @return Nothing.
  */
 dogecoin_bool dogecoin_headers_db_write(dogecoin_headers_db* db, dogecoin_blockindex *blockindex) {
-    cstring *rec = cstr_new_sz(148); // hash + height + chainwork + header
+    cstring *rec = cstr_new_sz(SPV_HEADERS_FILE_REC_LEN); // hash + height + chainwork + header
     ser_u256(rec, blockindex->hash);
     ser_u32(rec, blockindex->height);
-    ser_u256(rec, blockindex->chainwork);
+    ser_u256(rec, arith_to_uint256(&blockindex->chainwork));
     dogecoin_block_header_serialize(rec, &blockindex->header);
     size_t res = fwrite(rec->str, rec->len, 1, db->headers_tree_file);
     dogecoin_file_commit(db->headers_tree_file);
@@ -350,24 +354,13 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
         blockindex->prev = connect_at;
         blockindex->height = connect_at->height+1;
 
-        arith_uint256* connect_at_chainwork = init_arith_uint256();
-        memcpy(connect_at_chainwork, connect_at->chainwork, sizeof(connect_at->chainwork));
-        arith_uint256* blockindex_chainwork = init_arith_uint256();
-        memcpy(blockindex_chainwork, blockindex->chainwork, sizeof(blockindex->chainwork));
-        arith_uint256* chaintip_chainwork = init_arith_uint256();
-        memcpy(chaintip_chainwork, db->chaintip->chainwork, sizeof(db->chaintip->chainwork));
-
-        arith_uint256* added_chainwork = add_arith_uint256(connect_at_chainwork, blockindex_chainwork);
-        memcpy(blockindex->chainwork, (const arith_uint256*) added_chainwork, sizeof(blockindex->chainwork));
-
-        // Free the dynamically allocated memory
-        dogecoin_free(connect_at_chainwork);
-        dogecoin_free(blockindex_chainwork);
+        arith_uint256* added_chainwork = add_arith_uint256(&connect_at->chainwork, &blockindex->chainwork);
+        blockindex->chainwork = *added_chainwork;
 
         // Chain reorganization if necessary
         if (fork_from_block && blockindex->height > db->chaintip->height &&
-            (arith_uint256_greater_than(added_chainwork, chaintip_chainwork) ||
-             (arith_uint256_equal(added_chainwork, chaintip_chainwork) && blockindex->header.timestamp > db->chaintip->header.timestamp))) {
+            (arith_uint256_greater_than(added_chainwork, &db->chaintip->chainwork) ||
+             (arith_uint256_equal(added_chainwork, &db->chaintip->chainwork) && blockindex->header.timestamp > db->chaintip->header.timestamp))) {
 
             // Identify the common ancestor
             dogecoin_blockindex* common_ancestor = db->chaintip;
@@ -384,7 +377,6 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
                 // Break the loop if either reaches the start of the chain
                 if (!common_ancestor || !fork_chain) {
                     fprintf(stderr, "Unable to find common ancestor.\n");
-                    dogecoin_free(chaintip_chainwork);
                     dogecoin_free(added_chainwork);
                     return blockindex;
                 }
@@ -411,7 +403,6 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
                     }
 
                     // Free the dynamically allocated memory
-                    dogecoin_free(chaintip_chainwork);
                     dogecoin_free(added_chainwork);
                     return blockindex;
                 }
@@ -431,7 +422,6 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
         }
 
         // Free the dynamically allocated memory
-        dogecoin_free(chaintip_chainwork);
         dogecoin_free(added_chainwork);
 
         if (!load_process && db->read_write_file)
@@ -444,7 +434,7 @@ dogecoin_blockindex * dogecoin_headers_db_connect_hdr(dogecoin_headers_db* db, s
             dogecoin_btree_tsearch(blockindex, &db->tree_root, dogecoin_header_compare);
         }
 
-        if (db->max_hdr_in_mem > 0) {
+        if (!load_process && db->max_hdr_in_mem > 0) {
             // de-allocate no longer required headers
             // keep them only on-disk
             dogecoin_blockindex *scan_tip = db->chaintip;
@@ -576,10 +566,15 @@ dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db) {
  * @param height The height of the block that this is a checkpoint for.
  * @param chainwork The chainwork of the block that this is a checkpoint for.
  */
-void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t hash, uint32_t height, uint256_t chainwork) {
+void dogecoin_headersdb_set_checkpoint_start(dogecoin_headers_db* db, uint256_t hash, uint32_t height, arith_uint256 chainwork) {
     db->chainbottom = dogecoin_calloc(1, sizeof(dogecoin_blockindex));
     db->chainbottom->height = height;
     memcpy_safe(db->chainbottom->hash, hash, sizeof(uint256_t));
-    memcpy_safe(db->chainbottom->chainwork, chainwork, sizeof(uint256_t));
+    db->chainbottom->chainwork = chainwork;
     db->chaintip = db->chainbottom;
+    /* Add to tree so dogecoin_btree_tdestroy (in dogecoin_headers_db_free) and
+       the trim path (dogecoin_btree_tdelete) can properly free this block. */
+    if (db->use_binary_tree) {
+        dogecoin_btree_tsearch(db->chainbottom, &db->tree_root, dogecoin_header_compare);
+    }
 }

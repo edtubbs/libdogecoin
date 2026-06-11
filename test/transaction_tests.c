@@ -1,8 +1,8 @@
 /**********************************************************************
  * Copyright (c) 2022 bluezr                                          *
- * Copyright (c) 2022-2023 The Dogecoin Foundation                         *
- * Distributed under the MIT software license, see the accompanying   *
- * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
+ * Copyright (c) 2022-2023 The Dogecoin Foundation                     *
+ * Distributed under the MIT software license, see the accompanying    *
+ * file COPYING or http://www.opensource.org/licenses/mit-license.php. *
  **********************************************************************/
 
 #include <stdlib.h>
@@ -19,7 +19,16 @@
 #include <dogecoin/transaction.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/pqc_dilithium.h>
+#include <dogecoin/pqc_falcon.h>
+#include <dogecoin/pqc_carrier.h>
+#ifdef USE_RACCOON_G
+#include <dogecoin/pqc_raccoon.h>
+#endif
 
+/*
+ * Transaction API tests (UTXO build/sign) plus optional Falcon-512 commit test.
+ */
 void test_transaction()
 {
     // internal keys
@@ -598,4 +607,157 @@ void test_transaction()
     u_assert_true(sign_transaction_w_privkey_ex(working_transaction_index, private_key_wif, buf5, sizeof(buf5)));
     u_assert_str_eq(buf5, get_raw_transaction(working_transaction_index));
 
+    // ----------------------------------------------------------------
+    // optional Falcon-512 OP_RETURN commit test (only when built with liboqs)
+#ifdef USE_LIBOQS
+    uint8_t *pk = NULL, *sk = NULL, *sig = NULL;
+    size_t pk_len = 0, sk_len = 0, sig_len = 0;
+
+    // generate keypair
+    u_assert_true(dogecoin_falcon512_keypair(&pk, &pk_len, &sk, &sk_len));
+
+    // sign a simple 32-byte message (for demo; a tx sighash could also be used)
+    uint8_t msg[32];
+    for (int i = 0; i < 32; ++i) msg[i] = (uint8_t)i;
+    u_assert_true(dogecoin_falcon512_sign(sk, sk_len, msg, sizeof msg, &sig, &sig_len));
+
+    // verify signature
+    u_assert_true(dogecoin_falcon512_verify(pk, pk_len, msg, sizeof msg, sig, sig_len));
+
+    // compute commit = SHA256(pk||sig)
+    uint8_t commit32[32];
+    u_assert_true(dogecoin_falcon512_commit_bytes(pk, pk_len, sig, sig_len, commit32));
+
+    // push commit into OP_RETURN and then extract it back
+    dogecoin_tx* txc = dogecoin_tx_new();
+    u_assert_true(dogecoin_tx_add_falcon512_commit(txc, commit32));
+
+    uint8_t extracted[32];
+    u_assert_true(dogecoin_tx_extract_falcon512_commit(txc, extracted));
+    u_assert_true(memcmp(extracted, commit32, 32) == 0);
+
+    // cleanup
+    dogecoin_tx_free(txc);
+    dogecoin_free(pk);
+    dogecoin_free(sk);
+    dogecoin_free(sig);
+
+    // optional Dilithium2 OP_RETURN commit test
+    uint8_t *dpk = NULL, *dsk = NULL, *dsig = NULL;
+    size_t dpk_len = 0, dsk_len = 0, dsig_len = 0;
+
+    u_assert_true(dogecoin_dilithium2_keypair(&dpk, &dpk_len, &dsk, &dsk_len));
+    u_assert_true(dogecoin_dilithium2_sign(dsk, dsk_len, msg, sizeof msg, &dsig, &dsig_len));
+    u_assert_true(dogecoin_dilithium2_verify(dpk, dpk_len, msg, sizeof msg, dsig, dsig_len));
+
+    uint8_t dcommit32[32];
+    u_assert_true(dogecoin_dilithium2_commit_bytes(dpk, dpk_len, dsig, dsig_len, dcommit32));
+
+    dogecoin_tx* dtxc = dogecoin_tx_new();
+    u_assert_true(dogecoin_tx_add_dilithium2_commit(dtxc, dcommit32));
+
+    uint8_t dextracted[32];
+    u_assert_true(dogecoin_tx_extract_dilithium2_commit(dtxc, dextracted));
+    u_assert_true(memcmp(dextracted, dcommit32, 32) == 0);
+
+    dogecoin_tx_free(dtxc);
+    dogecoin_free(dpk);
+    dogecoin_free(dsk);
+    dogecoin_free(dsig);
+
+#ifdef USE_RACCOON_G
+    // optional Raccoon-G-44 OP_RETURN commit + HD derivation test
+    uint8_t *rpk = NULL, *rsk = NULL, *rsig = NULL;
+    size_t rpk_len = 0, rsk_len = 0, rsig_len = 0;
+
+    u_assert_true(dogecoin_raccoong44_keypair(&rpk, &rpk_len, &rsk, &rsk_len));
+    u_assert_true(dogecoin_raccoong44_sign(rsk, rsk_len, msg, sizeof msg, &rsig, &rsig_len));
+    u_assert_true(dogecoin_raccoong44_verify(rpk, rpk_len, msg, sizeof msg, rsig, rsig_len));
+
+    uint8_t rcommit32[32];
+    u_assert_true(dogecoin_raccoong44_commit_bytes(rpk, rpk_len, rsig, rsig_len, rcommit32));
+
+    dogecoin_tx* rtxc = dogecoin_tx_new();
+    u_assert_true(dogecoin_tx_add_raccoong44_commit(rtxc, rcommit32));
+
+    uint8_t rextracted[32];
+    u_assert_true(dogecoin_tx_extract_raccoong44_commit(rtxc, rextracted));
+    u_assert_true(memcmp(rextracted, rcommit32, 32) == 0);
+
+    uint8_t hd_chaincode[DOGECOIN_PQC_RACCOON_CHAINCODE_LEN];
+    memset(hd_chaincode, 0x42, sizeof(hd_chaincode));
+    uint8_t *child_sk = NULL, *child_pk = NULL, *child_pubonly = NULL;
+    size_t child_sk_len = 0, child_pk_len = 0, child_pubonly_len = 0;
+    u_assert_true(dogecoin_raccoong44_hd_derive_priv(rsk, rsk_len, rpk, rpk_len, hd_chaincode, 7, false, &child_sk, &child_sk_len, &child_pk, &child_pk_len));
+    u_assert_true(dogecoin_raccoong44_hd_derive_pub(rpk, rpk_len, hd_chaincode, 7, &child_pubonly, &child_pubonly_len));
+    u_assert_true(child_pk_len == child_pubonly_len);
+    u_assert_true(memcmp(child_pk, child_pubonly, child_pk_len) == 0);
+
+    /* Sign with the derived child secret key and verify against the derived
+       child public key. This is a critical regression test for the additive
+       lattice HD scheme: derive_priv and derive_pub agreeing on pk_bytes is
+       NOT sufficient — the matching (sk, pk) pair must also produce a sig
+       that verifies. The previous (now-removed) implementation passed the
+       pk-equality check while silently producing non-matching keys. */
+    uint8_t *child_sig = NULL;
+    size_t child_sig_len = 0;
+    u_assert_true(dogecoin_raccoong44_sign(child_sk, child_sk_len, msg, sizeof msg, &child_sig, &child_sig_len));
+    u_assert_true(dogecoin_raccoong44_verify(child_pk, child_pk_len, msg, sizeof msg, child_sig, child_sig_len));
+
+    /* Key-isolation: signing with the PARENT secret must NOT verify against
+       the CHILD public key, otherwise the derivation collapses domains. */
+    uint8_t *parent_sig = NULL;
+    size_t parent_sig_len = 0;
+    u_assert_true(dogecoin_raccoong44_sign(rsk, rsk_len, msg, sizeof msg, &parent_sig, &parent_sig_len));
+    u_assert_true(dogecoin_raccoong44_verify(child_pk, child_pk_len, msg, sizeof msg, parent_sig, parent_sig_len) == false);
+
+    dogecoin_tx_free(rtxc);
+    dogecoin_free(rpk);
+    dogecoin_free(rsk);
+    dogecoin_free(rsig);
+    dogecoin_free(child_sk);
+    dogecoin_free(child_pk);
+    dogecoin_free(child_pubonly);
+    dogecoin_free(child_sig);
+    dogecoin_free(parent_sig);
+#endif /* USE_RACCOON_G */
+
+    cstring* carrier_redeem = NULL;
+    cstring* carrier_spk = NULL;
+    u_assert_true(dogecoin_pqc_carrier_build_redeemscript(&carrier_redeem));
+    u_assert_true(dogecoin_pqc_carrier_build_p2sh_scriptpubkey(carrier_redeem, &carrier_spk));
+
+    const uint16_t test_pk_len = 48;
+    const uint16_t test_sig_len = 96;
+    size_t full_len = (size_t)test_pk_len + (size_t)test_sig_len;
+    uint8_t* full = dogecoin_malloc(full_len);
+    for (size_t i = 0; i < full_len; i++) full[i] = (uint8_t)(i & 0xff);
+    cstring* carrier_ss = NULL;
+    char tag8[DOGECOIN_PQC_CARRIER_TAG_LEN] = { 'F','L','C','1','F','U','L','L' };
+    u_assert_true(dogecoin_pqc_carrier_build_part_scriptsig(
+        tag8, 0, 1, test_pk_len, (uint16_t)full_len, full, full_len, carrier_redeem, &carrier_ss));
+
+    char out_tag8[9];
+    uint8_t part_index = 0, part_total = 0;
+    uint16_t out_pk_len = 0, out_full_len = 0;
+    uint8_t* out_part = NULL;
+    size_t out_part_len = 0;
+    cstring* out_redeem = NULL;
+    u_assert_true(dogecoin_pqc_carrier_parse_part_scriptsig(
+        carrier_ss, out_tag8, &part_index, &part_total, &out_pk_len, &out_full_len, &out_part, &out_part_len, &out_redeem));
+    u_assert_true(part_index == 0 && part_total == 1);
+    u_assert_true(out_pk_len == test_pk_len);
+    u_assert_true(out_full_len == full_len);
+    u_assert_true(out_part_len == full_len);
+    u_assert_true(memcmp(out_part, full, full_len) == 0);
+    u_assert_true(out_redeem->len == carrier_redeem->len);
+    u_assert_true(memcmp(out_redeem->str, carrier_redeem->str, carrier_redeem->len) == 0);
+
+    dogecoin_free(out_part);
+    cstr_free(out_redeem, true);
+    cstr_free(carrier_ss, true);
+    dogecoin_free(full);
+    cstr_free(carrier_spk, true);
+    cstr_free(carrier_redeem, true);
+#endif
 }

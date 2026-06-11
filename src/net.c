@@ -296,6 +296,7 @@ void node_periodical_timer(int fd, short int event, void* ctx)
     if (node->time_started_con + DOGECOIN_CONNECT_TIMEOUT_S < now && ((node->state & NODE_CONNECTING) == NODE_CONNECTING)) {
         node->state = 0;
         node->time_started_con = 0;
+        node->state |= NODE_ERRORED;
         node->state |= NODE_TIMEOUT;
         dogecoin_node_connection_state_changed(node);
     }
@@ -549,6 +550,11 @@ void dogecoin_node_group_shutdown(dogecoin_node_group *group) {
     if (group->http_server) {
         dogecoin_http_server_shutdown(group);
     }
+
+    /* break the event loop if it's running */
+    if (group->event_base) {
+        event_base_loopbreak(group->event_base);
+    }
 }
 
 /**
@@ -782,6 +788,7 @@ int dogecoin_node_parse_message(dogecoin_node* node, dogecoin_p2p_msg_hdr* hdr, 
             if ((v_msg_check.services & DOGECOIN_NODE_NETWORK) != DOGECOIN_NODE_NETWORK) {
                 dogecoin_node_disconnect(node);
             }
+            node->services = v_msg_check.services;
             node->bestknownheight = v_msg_check.start_height;
             node->nodegroup->log_write_cb("Connected to node %d: %s (%d)\n", node->nodeid, v_msg_check.useragent, v_msg_check.start_height);
             /* confirm version via verack */
@@ -1097,7 +1104,7 @@ dogecoin_bool broadcast_tx(const dogecoin_chainparams* chain, const dogecoin_tx*
     ctx.tx = tx;
     ctx.debuglevel = debug;
     ctx.timeout = timeout;
-    ctx.max_peers_to_inv = 2;
+    ctx.max_peers_to_inv = maxpeers;
     ctx.found_on_non_inved_peers = 0;
     ctx.getdata_from_peers = 0;
     ctx.inved_to_peers = 0;

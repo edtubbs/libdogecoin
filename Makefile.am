@@ -31,6 +31,7 @@ noinst_HEADERS = \
     include/dogecoin/arith_uint256.h \
     include/dogecoin/auxpow.h \
     include/dogecoin/base58.h \
+    include/dogecoin/bip37.h \
     include/dogecoin/bip32.h \
     include/dogecoin/bip39.h \
     include/dogecoin/bip44.h \
@@ -53,6 +54,10 @@ noinst_HEADERS = \
     include/dogecoin/moon.h \
     include/dogecoin/portable_endian.h \
     include/dogecoin/pow.h \
+    include/dogecoin/pqc_carrier.h \
+    include/dogecoin/pqc_dilithium.h \
+    include/dogecoin/pqc_falcon.h \
+    include/dogecoin/pqc_raccoon.h \
     include/qr/png.h \
     include/qr/qr.h \
     include/qr/jpeg.h \
@@ -73,7 +78,8 @@ noinst_HEADERS = \
     include/dogecoin/validation.h \
     include/dogecoin/vector.h \
     include/dogecoin/version.h \
-    include/dogecoin/wow.h
+    include/dogecoin/wow.h \
+    include/dogecoin/zk_carrier.h
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libdogecoin.pc
@@ -122,55 +128,85 @@ libdogecoin_la_SOURCES = \
     src/validation.c \
     src/vector.c
 
-# NASM assembler setup
-NASM = nasm
+if USE_LIBOQS
+libdogecoin_la_SOURCES += \
+    src/pqc_dilithium.c \
+    src/pqc_falcon.c
+endif
+
+if USE_PQC_CARRIER
+libdogecoin_la_SOURCES += \
+    src/pqc_carrier.c
+endif
+
+if USE_RACCOON_G
+libdogecoin_la_SOURCES += \
+    src/pqc_raccoon.c \
+    src/raccoon_g/polyr.c \
+    src/raccoon_g/ntt.c \
+    src/raccoon_g/gaussian.c \
+    src/raccoon_g/shake256.c \
+    src/raccoon_g/keygen_kdf.c \
+    src/raccoon_g/thrc.c \
+    src/raccoon_g/raccoong.c
+endif
+
+if USE_ZK_CARRIER
+libdogecoin_la_SOURCES += \
+    src/zk_carrier/zk_carrier.c \
+    src/zk_carrier/zk_commit.c \
+    src/zk_carrier/zk_groth16.c \
+    src/zk_carrier/zk_plonk.c \
+    src/zk_carrier/zk_stark.c
+
+if HAVE_MCL
+# Groth16 BN254 verifier via herumi/mcl.
+libdogecoin_la_SOURCES += src/zk_carrier/zk_groth16_mcl.cpp
+endif
+endif
+
+# NASM assembler setup (absolute path resolved by configure, e.g. from
+# depends/${host}/native/bin via config.site, falling back to system nasm)
+NASM = @NASM@
+CLEANFILES =
+
+%.o: %.asm
+	$(NASM) $(NASMFLAGS) -I$(DIR_ASM_INCLUDE) -o $@ $<
+
+%.a: %.o
+	$(AR) $(ARFLAGS) $@ $<
 
 if USE_AVX2
-# Directory containing assembly source files and includes
 DIR_ASM_SOURCE = src/intel/avx_t1
 DIR_ASM_INCLUDE = src/intel/
 
-# Find all assembly source files and define corresponding object files
 ASM_SOURCE_FILES = $(wildcard $(DIR_ASM_SOURCE)/*.asm)
 ASM_OBJECT_FILES = $(ASM_SOURCE_FILES:.asm=.o)
 ASM_LIB_FILES = $(ASM_SOURCE_FILES:.asm=.a)
 
-# Add the assembly object files to the list of dependencies
 libdogecoin_la_DEPENDENCIES = $(ASM_LIB_FILES)
 
-# Pattern rule for building .o files from .asm files
-%.o: %.asm
-	$(NASM) $(NASMFLAGS) -I$(DIR_ASM_INCLUDE) -o $@ $<
-
-# Pattern rule for custom static library from .o files
-%.a: %.o
-	$(AR) $(ARFLAGS) $@ $<
-
-CLEANFILES = $(ASM_OBJECT_FILES)
+CLEANFILES += $(ASM_OBJECT_FILES) $(ASM_LIB_FILES)
 endif
 
 if USE_SSE
-# Directory containing assembly source files and includes
+if !USE_AVX2
+# SSE only when AVX2 is off: src/sha2.c's C preprocessor path checks USE_AVX2
+# first, then USE_SSE. If both --enable-intel-avx2 and --enable-intel-sse are
+# specified, AVX2 takes precedence; building SSE asm alongside AVX2-defined C
+# would produce a library whose internal calls don't match the assembled symbols.
+# In that case, only AVX2 assembly is built and linked into the library.
 DIR_ASM_SOURCE = src/intel/sse_t1
 DIR_ASM_INCLUDE = src/intel/
 
-# Find all assembly source files and define corresponding object files
 ASM_SOURCE_FILES = $(wildcard $(DIR_ASM_SOURCE)/*.asm)
 ASM_OBJECT_FILES = $(ASM_SOURCE_FILES:.asm=.o)
 ASM_LIB_FILES = $(ASM_SOURCE_FILES:.asm=.a)
 
-# Add the assembly object files to the list of dependencies
 libdogecoin_la_DEPENDENCIES = $(ASM_LIB_FILES)
 
-# Pattern rule for building .o files from .asm files
-%.o: %.asm
-	$(NASM) $(NASMFLAGS) -I$(DIR_ASM_INCLUDE) -o $@ $<
-
-# Pattern rule for custom static library from .o files
-%.a: %.o
-	$(AR) $(ARFLAGS) $@ $<
-
-CLEANFILES = $(ASM_OBJECT_FILES) $(ASM_LIB_FILES)
+CLEANFILES += $(ASM_OBJECT_FILES) $(ASM_LIB_FILES)
+endif
 endif
 
 if USE_SSE2
@@ -179,7 +215,19 @@ libdogecoin_la_SOURCES += \
 endif
 
 libdogecoin_la_CFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/src/logdb/include -fPIC
+# Linking $(ASM_LIB_FILES) here triggers a libtool "non-portable" warning
+# but is needed so libdogecoin.so ships the asm symbols. Only one of the
+# USE_AVX2 / USE_SSE asm blocks above is active at a time (the SSE block
+# is gated by !USE_AVX2), so $(ASM_LIB_FILES) is unambiguous.
 libdogecoin_la_LIBADD = $(LIBSECP256K1) $(ASM_LIB_FILES)
+
+if HAVE_MCL
+# mcl BN254 flags.
+libdogecoin_la_CFLAGS    += @MCL_CFLAGS@
+libdogecoin_la_CXXFLAGS   = -I$(top_srcdir)/include -fPIC @MCL_CFLAGS@ -std=c++14
+libdogecoin_la_LIBADD    += @MCL_LIBS@
+endif
+
 noinst_PROGRAMS =
 
 if USE_TESTS
@@ -215,11 +263,16 @@ tests_SOURCES = \
     test/smpv_tests.c \
     test/tpm_tests.c \
     test/transaction_tests.c \
+    test/validation_tests.c \
     test/tx_tests.c \
     include/test/utest.h \
     test/unittester.c \
     test/utils_tests.c \
     test/vector_tests.c
+
+if USE_ZK_CARRIER
+tests_SOURCES += test/zk_carrier_tests.c
+endif
 
 tests_CFLAGS = $(libdogecoin_la_CFLAGS)
 tests_CPPFLAGS = -I$(top_srcdir)/src
@@ -258,6 +311,39 @@ tests_SOURCES += \
 endif
 endif
 
+if USE_RACCOON_G
+if USE_TESTS
+tests_SOURCES += \
+    test/raccoong_polyr_tests.c \
+    test/raccoong_ntt_tests.c \
+    test/raccoong_gaussian_tests.c \
+    test/raccoong_shake_tests.c \
+    test/raccoong_xof_sample_q_tests.c \
+    test/raccoong_matvec_tests.c \
+    test/raccoong_keygen_t_tests.c \
+    test/raccoong_keypair_tests.c \
+    test/raccoong_hd_derive_tests.c \
+    test/raccoong_signature_serialize_tests.c \
+    test/raccoong_chal_poly_tests.c \
+    test/raccoong_hash_vec_tests.c \
+    test/raccoong_buff_mu_tests.c \
+    test/raccoong_sign_tests.c \
+    test/data/raccoong_polyr_vectors.h \
+    test/data/raccoong_ntt_vectors.h \
+    test/data/raccoong_gaussian_vectors.h \
+    test/data/raccoong_xof_sample_q_vectors.h \
+    test/data/raccoong_matvec_vectors.h \
+    test/data/raccoong_keygen_t_vectors.h \
+    test/data/raccoong_keypair_vectors.h \
+    test/data/raccoong_hd_derive_vectors.h \
+    test/data/raccoong_signature_serialize_vectors.h \
+    test/data/raccoong_chal_poly_vectors.h \
+    test/data/raccoong_hash_vec_vectors.h \
+    test/data/raccoong_buff_mu_vectors.h \
+    test/data/raccoong_sign_vectors.h
+endif
+endif
+
 if WITH_BENCH
 noinst_PROGRAMS += bench
 bench_LDADD = libdogecoin.la $(ASM_LIB_FILES)
@@ -292,6 +378,7 @@ noinst_HEADERS += \
 
 libdogecoin_la_SOURCES += \
     src/headersdb_file.c \
+    src/bip37.c \
     src/net.c \
     src/protocol.c \
     src/rest.c \

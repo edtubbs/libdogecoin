@@ -41,6 +41,7 @@ extern void test_aes();
 extern void test_arith_uint256();
 extern void test_base58();
 extern void test_base64();
+extern void test_dit();
 extern void test_bip32();
 extern void test_bip39();
 extern void test_bip44();
@@ -69,10 +70,12 @@ extern void test_smpv();
 extern void test_signmsg_ext();
 extern void test_tpm();
 extern void test_transaction();
+extern void test_validation();
 extern void test_tx_serialization();
 extern void test_tx_sighash();
 extern void test_tx_sighash_ext();
 extern void test_tx_negative_version();
+extern void test_validation_version_signed();
 extern void test_script_parse();
 extern void test_script_op_codeseperator();
 extern void test_invalid_tx_deser();
@@ -81,6 +84,27 @@ extern void test_scripts();
 extern void test_utils();
 extern void test_vector();
 extern void test_qr();
+
+#ifdef USE_RACCOON_G
+extern void test_raccoong_polyr();
+extern void test_raccoong_ntt();
+extern void test_raccoong_shake();
+extern void test_raccoong_xof_sample_q();
+extern void test_raccoong_matvec();
+extern void test_raccoong_keygen_t();
+extern void test_raccoong_keypair();
+extern void test_raccoong_gaussian();
+extern void test_raccoong_hd_derive();
+extern void test_raccoong_signature_serialize();
+extern void test_raccoong_chal_poly();
+extern void test_raccoong_hash_vec();
+extern void test_raccoong_buff_mu();
+extern void test_raccoong_sign();
+#endif
+
+#ifdef USE_ZK_CARRIER
+extern void test_zk_carrier();
+#endif
 
 #ifdef WITH_LOGDB
 extern void test_red_black_tree();
@@ -93,6 +117,7 @@ extern void test_examples();
 extern void test_wallet_basics();
 extern void test_wallet();
 extern void test_wallet_reorg_utxo_update();
+extern void test_wallet_balance_accounts_for_spends();
 #endif
 
 #ifdef WITH_TOOLS
@@ -105,6 +130,8 @@ extern void test_protocol();
 extern void test_net_flag_defined();
 extern void test_reorg();
 extern void test_spv();
+extern void test_bip37_filter_state();
+extern void test_bip37_merkleblock_vector();
 #else
 extern void test_net_flag_not_defined();
 #endif
@@ -124,6 +151,7 @@ int main()
     u_run_test(test_arith_uint256);
     u_run_test(test_base58);
     u_run_test(test_base64);
+    u_run_test(test_dit);
     u_run_test(test_bip32);
     u_run_test(test_bip39);
     u_run_test(test_bip44);
@@ -154,18 +182,41 @@ int main()
     u_run_test(test_tpm);
 #endif
     u_run_test(test_transaction);
+    u_run_test(test_validation);
     u_run_test(test_tx_serialization);
     u_run_test(test_invalid_tx_deser);
     u_run_test(test_tx_sign);
     u_run_test(test_tx_sighash);
     u_run_test(test_tx_sighash_ext);
     u_run_test(test_tx_negative_version);
+    u_run_test(test_validation_version_signed);
     u_run_test(test_scripts);
     u_run_test(test_script_parse);
     u_run_test(test_script_op_codeseperator);
     u_run_test(test_utils);
     u_run_test(test_vector);
     u_run_test(test_qr);
+
+#ifdef USE_RACCOON_G
+    u_run_test(test_raccoong_polyr);
+    u_run_test(test_raccoong_ntt);
+    u_run_test(test_raccoong_shake);
+    u_run_test(test_raccoong_xof_sample_q);
+    u_run_test(test_raccoong_matvec);
+    u_run_test(test_raccoong_keygen_t);
+    u_run_test(test_raccoong_keypair);
+    u_run_test(test_raccoong_gaussian);
+    u_run_test(test_raccoong_hd_derive);
+    u_run_test(test_raccoong_signature_serialize);
+    u_run_test(test_raccoong_chal_poly);
+    u_run_test(test_raccoong_hash_vec);
+    u_run_test(test_raccoong_buff_mu);
+    u_run_test(test_raccoong_sign);
+#endif
+
+#ifdef USE_ZK_CARRIER
+    u_run_test(test_zk_carrier);
+#endif
 
 #ifdef WITH_LOGDB
     u_run_test(test_red_black_tree);
@@ -178,6 +229,7 @@ int main()
     u_run_test(test_wallet_basics);
     u_run_test(test_wallet);
     u_run_test(test_wallet_reorg_utxo_update);
+    u_run_test(test_wallet_balance_accounts_for_spends);
 #endif
 
 #ifdef WITH_TOOLS
@@ -190,6 +242,8 @@ int main()
     u_run_test(test_protocol);
     u_run_test(test_reorg);
     u_run_test(test_spv);
+    u_run_test(test_bip37_filter_state);
+    u_run_test(test_bip37_merkleblock_vector);
 #else
     u_run_test(test_net_flag_not_defined);
 #endif

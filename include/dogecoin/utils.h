@@ -56,7 +56,7 @@ LIBDOGECOIN_BEGIN_DECL
 
 LIBDOGECOIN_API void utils_clear_buffers(void);
 LIBDOGECOIN_API void utils_hex_to_bin(const char* str, unsigned char* out, size_t inLen, size_t* outLen);
-LIBDOGECOIN_API void utils_bin_to_hex(unsigned char* bin_in, size_t inlen, char* hex_out);
+LIBDOGECOIN_API void utils_bin_to_hex(const unsigned char* bin_in, size_t inlen, char* hex_out);
 LIBDOGECOIN_API uint8_t* utils_hex_to_uint8(const char* str);
 LIBDOGECOIN_API char* utils_uint8_to_hex(const uint8_t* bin, size_t l);
 LIBDOGECOIN_API void utils_reverse_hex(char* h, size_t len);
@@ -84,11 +84,11 @@ LIBDOGECOIN_API char* concat(char* prefix, char* suffix);
 LIBDOGECOIN_API void slice(const char *str, char *result, size_t start, size_t end);
 LIBDOGECOIN_API void replace_last_after_delim(const char *str, char* delim, char* replacement);
 LIBDOGECOIN_API void text_to_hex(char* in, char* out);
-LIBDOGECOIN_API const char* get_build();
+LIBDOGECOIN_API const char* get_build(void);
 LIBDOGECOIN_API char* getpass(const char *prompt);
 LIBDOGECOIN_API void dogecoin_str_reverse(char s[]);
 LIBDOGECOIN_API void dogecoin_uitoa(int n, char s[]);
-LIBDOGECOIN_API bool dogecoin_network_enabled();
+LIBDOGECOIN_API bool dogecoin_network_enabled(void);
 LIBDOGECOIN_API int integer_length(int x);
 LIBDOGECOIN_API int file_copy (char src [], char dest []);
 unsigned int base64_int(unsigned int ch);
@@ -230,6 +230,15 @@ dogecoin_btree_tsearch (const void * __restrict vkey,		/* key to be located */
   q->left = q->right = NULL;
   return q;
 }
+
+/* Checks if DIT is supported */
+dogecoin_bool is_DIT_supported(void);
+
+/* Enables DIT */
+dogecoin_bool enable_DIT(void);
+
+/* Disables DIT */
+void disable_DIT(void);
 
 LIBDOGECOIN_END_DECL
 
