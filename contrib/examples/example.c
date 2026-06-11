@@ -205,7 +205,7 @@ int main() {
 	const char* slip39_recovery_shares[] = {slip39_shares[0], slip39_shares[1]};
 	uint8_t slip39_recovered_secret[MAX_SEED_SIZE] = {0};
 	size_t slip39_recovered_secret_len = sizeof(slip39_recovered_secret);
-	if (dogecoin_slip0039_recover_secret(slip39_recovery_shares, 2, slip39_recovered_secret, &slip39_recovered_secret_len) != 0) {
+	if (dogecoin_slip0039_recover_secret(slip39_recovery_shares, 2, NULL, 0, slip39_recovered_secret, &slip39_recovered_secret_len) != 0) {
 		printf("SLIP39 secret recovery failed.\n");
 		return -1;
 	}

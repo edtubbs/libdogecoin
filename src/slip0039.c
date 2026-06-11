@@ -136,7 +136,7 @@ static uint32_t rs1024_polymod(const uint16_t* values, size_t n)
 {
     uint32_t chk = 1;
     for (size_t i = 0; i < n; ++i) {
-        uint8_t b = (uint8_t)(chk >> 20);
+        uint32_t b = chk >> 20;
         chk = ((chk & 0xFFFFFUL) << 10) ^ (uint32_t)values[i];
         for (int j = 0; j < 10; ++j) {
             if ((b >> j) & 1) chk ^= SLIP0039_RS1024_GEN[j];
@@ -749,6 +749,7 @@ int dogecoin_slip0039_generate_shares(const uint8_t* secret, size_t secret_len,
 }
 
 int dogecoin_slip0039_recover_secret(const char* shares[], size_t share_count,
+                                     const uint8_t* passphrase, size_t passphrase_len,
                                      uint8_t* secret_out, size_t* secret_len_out)
 {
     if (!shares || !share_count || !secret_out || !secret_len_out) return -1;
@@ -886,7 +887,7 @@ int dogecoin_slip0039_recover_secret(const char* shares[], size_t share_count,
         goto cleanup;
     }
 
-    if (slip0039_decrypt(master_ems, common_len, NULL, 0,
+    if (slip0039_decrypt(master_ems, common_len, passphrase, passphrase_len,
                          common_id, common_iter, common_ext, secret_out) != 0) {
         dogecoin_mem_zero(master_ems, sizeof(master_ems));
         goto cleanup;

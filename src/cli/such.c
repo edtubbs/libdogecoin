@@ -1580,7 +1580,7 @@ int main(int argc, char* argv[])
         uint8_t recovered[MAX_SEED_SIZE];
         dogecoin_mem_zero(recovered, sizeof(recovered));
         size_t recovered_len = sizeof(recovered);
-        if (dogecoin_slip0039_recover_secret(share_ptrs, share_count, recovered, &recovered_len) != 0) {
+        if (dogecoin_slip0039_recover_secret(share_ptrs, share_count, NULL, 0, recovered, &recovered_len) != 0) {
             dogecoin_mem_zero(csv, txhex_len + 1);
             dogecoin_free(csv);
             dogecoin_mem_zero(recovered, sizeof(recovered));
