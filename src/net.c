@@ -75,30 +75,49 @@ static const int DOGECOIN_PERIODICAL_NODE_TIMER_S = 3;
 static const int DOGECOIN_PING_INTERVAL_S = 120;
 static const int DOGECOIN_CONNECT_TIMEOUT_S = 10;
 static const int DOGECOIN_MAX_PEERS_PER_SUBNET = 2; /* M7: peer diversity limit per /16 */
+static const int DOGECOIN_MAX_PEERS_PER_IPV6_SUBNET = 2; /* M30: peer diversity limit per IPv6 /48 */
 
 /**
- * M7: Count how many connected/connecting nodes share the same /16 subnet
- * as the given node address. IPv4 only — IPv6 is not limited.
+ * M7/M30: Count how many connected/connecting nodes share the same subnet
+ * as the given node address:
+ * - IPv4 uses /16
+ * - IPv6 uses /48
  */
 static int count_peers_in_subnet(dogecoin_node_group* group, struct sockaddr* addr)
 {
-    if (addr->sa_family != AF_INET) return 0;
-    struct sockaddr_in* target = (struct sockaddr_in*)addr;
-    uint16_t target_prefix = ntohl(target->sin_addr.s_addr) >> 16; /* first 2 octets = /16 */
-
     int count = 0;
-    for (size_t i = 0; i < group->nodes->len; i++) {
-        dogecoin_node* n = vector_idx(group->nodes, i);
-        if (!((n->state & NODE_CONNECTED) == NODE_CONNECTED ||
-              (n->state & NODE_CONNECTING) == NODE_CONNECTING))
-            continue;
-        if (n->addr.sa_family != AF_INET) continue;
-        struct sockaddr_in* peer = (struct sockaddr_in*)&n->addr;
-        uint16_t peer_prefix = ntohl(peer->sin_addr.s_addr) >> 16;
-        if (peer_prefix == target_prefix)
-            count++;
+    if (addr->sa_family == AF_INET) {
+        struct sockaddr_in* target = (struct sockaddr_in*)addr;
+        uint16_t target_prefix = ntohl(target->sin_addr.s_addr) >> 16; /* first 2 octets = /16 */
+        for (size_t i = 0; i < group->nodes->len; i++) {
+            dogecoin_node* n = vector_idx(group->nodes, i);
+            if (!((n->state & NODE_CONNECTED) == NODE_CONNECTED ||
+                  (n->state & NODE_CONNECTING) == NODE_CONNECTING))
+                continue;
+            if (n->addr.sa_family != AF_INET) continue;
+            struct sockaddr_in* peer = (struct sockaddr_in*)&n->addr;
+            uint16_t peer_prefix = ntohl(peer->sin_addr.s_addr) >> 16;
+            if (peer_prefix == target_prefix)
+                count++;
+        }
+        return count;
     }
-    return count;
+    if (addr->sa_family == AF_INET6) {
+        struct sockaddr_in6* target6 = (struct sockaddr_in6*)addr;
+        const unsigned char* target_prefix6 = target6->sin6_addr.s6_addr; /* first 6 octets = /48 */
+        for (size_t i = 0; i < group->nodes->len; i++) {
+            dogecoin_node* n = vector_idx(group->nodes, i);
+            if (!((n->state & NODE_CONNECTED) == NODE_CONNECTED ||
+                  (n->state & NODE_CONNECTING) == NODE_CONNECTING))
+                continue;
+            if (n->addr.sa_family != AF_INET6) continue;
+            struct sockaddr_in6* peer6 = (struct sockaddr_in6*)&n->addr;
+            if (memcmp(peer6->sin6_addr.s6_addr, target_prefix6, 6) == 0)
+                count++;
+        }
+        return count;
+    }
+    return 0;
 }
 
 /**
@@ -643,8 +662,11 @@ dogecoin_bool dogecoin_node_group_connect_next_nodes(dogecoin_node_group* group)
             !((node->state & NODE_CONNECTED) == NODE_CONNECTED) &&
             !((node->state & NODE_DISCONNECTED) == NODE_DISCONNECTED) &&
             !((node->state & NODE_CONNECTING) == NODE_CONNECTING)) {
-            /* M7: enforce peer diversity — skip if /16 subnet is over-represented */
-            if (count_peers_in_subnet(group, &node->addr) >= DOGECOIN_MAX_PEERS_PER_SUBNET) {
+            /* M7/M30: enforce peer diversity — skip if subnet is over-represented */
+            int subnet_limit = (node->addr.sa_family == AF_INET6) ?
+                DOGECOIN_MAX_PEERS_PER_IPV6_SUBNET :
+                DOGECOIN_MAX_PEERS_PER_SUBNET;
+            if (count_peers_in_subnet(group, &node->addr) >= subnet_limit) {
                 continue;
             }
             /* setup buffer event */
