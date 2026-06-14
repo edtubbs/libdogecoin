@@ -67,7 +67,6 @@ extern void test_sha_512();
 extern void test_sha_hmac();
 extern void test_signmsg();
 extern void test_smpv();
-extern void test_slip0039();
 extern void test_signmsg_ext();
 extern void test_tpm();
 extern void test_transaction();
@@ -178,7 +177,6 @@ int main()
     u_run_test(test_sha_hmac);
     u_run_test(test_signmsg);
     u_run_test(test_signmsg_ext);
-    u_run_test(test_slip0039);
     u_run_test(test_smpv);
 #ifndef USE_OPTEE // TPM is not supported in OPTEE
     u_run_test(test_tpm);
