@@ -106,27 +106,26 @@ void broadcasting_menu(int txindex, int is_testnet) {
                 printf("1. yes\n");
                 printf("2. no\n");
                 switch (atoi(getl("\ncommand"))) {
-                        case 1:
-                            /* The above code is checking if the data is NULL, empty or larger than the maximum
-                            size of a p2p message. */
-                            if (raw_hexadecimal_tx == NULL || strlen(raw_hexadecimal_tx) == 0 || strlen(raw_hexadecimal_tx) > DOGECOIN_MAX_P2P_MSG_SIZE) {
-                                printf("Transaction in invalid or to large.\n");
-                                }
-                            uint8_t* data_bin = dogecoin_malloc(strlen(raw_hexadecimal_tx) / 2 + 1);
+                        case 1: {
+                            size_t raw_hex_len = raw_hexadecimal_tx ? strspn(raw_hexadecimal_tx, VALID_HEX_CHARS) : 0;
+                            if (raw_hexadecimal_tx == NULL || raw_hex_len == 0 || raw_hex_len > DOGECOIN_MAX_P2P_MSG_SIZE || (raw_hex_len % 2) != 0 || raw_hexadecimal_tx[raw_hex_len] != '\0') {
+                                printf("Transaction is invalid or too large.\n");
+                                break;
+                            }
+                            uint8_t* data_bin = dogecoin_malloc(raw_hex_len / 2 + 1);
                             size_t outlen = 0;
-                            utils_hex_to_bin(raw_hexadecimal_tx, data_bin, strlen(raw_hexadecimal_tx), &outlen);
+                            utils_hex_to_bin(raw_hexadecimal_tx, data_bin, raw_hex_len, &outlen);
 
-                            /* Deserializing the transaction and broadcasting it to the network. */
                             if (dogecoin_tx_deserialize(data_bin, outlen, tx->transaction, NULL)) {
                                 broadcast_tx(chain, tx->transaction, 0, 10, 15, 0);
-                                }
-                            else {
+                            } else {
                                 printf("Transaction is invalid\n");
-                                }
+                            }
                             dogecoin_free(data_bin);
                             selected = -1; // set selected to number out of bounds for i
                             i = length; // reset loop to start
                             break;
+                        }
                         case 2:
                             selected = -1; // set selected to number out of bounds for i
                             i = length; // reset loop to start
