@@ -115,7 +115,7 @@ void dogecoin_ecc_stop(void);
 #define HDKEYLEN 112 // Function expects 128 but needs to be fixed to take 111.
 
 //#define P2PKHLEN 34 //our mainnet addresses are 34 chars if p2pkh and start with D.  Internally this is cited as 35 for strings that represent it because +stringterm.
-#define P2PKHLEN 35 // Function expects 35, 34-char address + NUL terminator.
+#define P2PKHLEN 35 // Function expects 35, but needs to be fixed to take 34.
 
 //#define PUBKEYHEXLEN 67 //should be 66 for hex pubkey.  Internally this is cited as 67 for strings that represent it because +stringterm.
 #define PUBKEYHEXLEN 67
@@ -367,6 +367,15 @@ int dogecoin_verify_mnemonic (const char* mnemonic, const char* language, const 
 
 /* Generates a HD master key and p2pkh ready-to-use corresponding dogecoin address from a mnemonic */
 int getDerivedHDAddressFromMnemonic(const uint32_t account, const uint32_t index, const CHANGE_LEVEL change_level, const MNEMONIC mnemonic, const PASS pass, char* p2pkh_pubkey, const bool is_testnet);
+
+/* SLIP-0039 helpers (mnemonic-based Shamir secret sharing) */
+#define SLIP0039_MAX_SHARES 16
+#define SLIP0039_MAX_SHARE_STR_SIZE 320
+#define SLIP0039_MIN_SECRET_BYTES 16
+#define SLIP0039_MAX_SECRET_BYTES 32
+typedef char SLIP0039_SHARE[SLIP0039_MAX_SHARE_STR_SIZE];
+int dogecoin_slip0039_generate_shares(const uint8_t* secret, size_t secret_len, uint8_t threshold, uint8_t share_count, char shares[][SLIP0039_MAX_SHARE_STR_SIZE]);
+int dogecoin_slip0039_recover_secret(const char* shares[], size_t share_count, const uint8_t* passphrase, size_t passphrase_len, uint8_t* secret_out, size_t* secret_len_out);
 
 /* Generates a HD master key and p2pkh address from a mnemonic */
 int generateHDMasterPubKeypairFromMnemonic(char hd_privkey_master[HDKEYLEN], char p2pkh_pubkey_master[P2PKHLEN], const MNEMONIC mnemonic, const PASS pass, const dogecoin_bool is_testnet);
