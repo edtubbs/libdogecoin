@@ -140,7 +140,7 @@ IF(USE_TSS2 AND NOT WIN32)
     ENDIF()
 ENDIF()
 
-# NASM integration for AVX2
+# NASM integration for AVX2/SSE assembly
 if(USE_AVX2 OR USE_SSE)
     # Prefer depends-built nasm when present, so the build does not rely on nasm
     # being on $PATH. HOST may be passed in by callers; otherwise also scan the
