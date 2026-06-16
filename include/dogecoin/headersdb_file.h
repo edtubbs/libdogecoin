@@ -55,6 +55,7 @@ typedef struct dogecoin_headers_db_
     dogecoin_blockindex genesis;
     dogecoin_blockindex *chaintip;
     dogecoin_blockindex *chainbottom;
+    void* sync_lock;
 } dogecoin_headers_db;
 
 dogecoin_headers_db *dogecoin_headers_db_new(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only);

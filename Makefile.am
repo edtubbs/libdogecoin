@@ -25,6 +25,7 @@ include_HEADERS = \
     include/dogecoin/dogecoin.h \
     include/dogecoin/libdogecoin.h \
     include/dogecoin/uthash.h \
+    include/dogecoin/vector.h \
     config/libdogecoin-config.h
 noinst_HEADERS = \
     include/bip39/index.h \
@@ -78,7 +79,6 @@ noinst_HEADERS = \
     include/dogecoin/utf8proc.h \
     include/dogecoin/utils.h \
     include/dogecoin/validation.h \
-    include/dogecoin/vector.h \
     include/dogecoin/version.h \
     include/dogecoin/wow.h \
     include/dogecoin/zk_carrier.h
@@ -98,6 +98,7 @@ libdogecoin_la_SOURCES = \
     src/block.c \
     src/buffer.c \
     src/chacha20.c \
+    src/context.c \
     src/chainparams.c \
     src/cstr.c \
     src/ctaes.c \
@@ -268,6 +269,7 @@ tests_SOURCES = \
     test/block_tests.c \
     test/buffer_tests.c \
     test/chacha20_tests.c \
+    test/context_tests.c \
     test/cstr_tests.c \
     test/ecc_tests.c \
     test/hash_tests.c \
@@ -444,10 +446,10 @@ sendtx_CPPFLAGS = -I$(top_srcdir)/src
 sendtx_LDFLAGS = -static
 
 inst_PROGRAMS += spvnode
-spvnode_LDADD = libdogecoin.la $(ASM_LIB_FILES)
+spvnode_LDADD = libdogecoin.la $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ASM_LIB_FILES)
 spvnode_SOURCES = \
     src/cli/spvnode.c
-spvnode_CFLAGS = $(libdogecoin_la_CFLAGS)
+spvnode_CFLAGS = $(libdogecoin_la_CFLAGS) $(EVENT_CFLAGS) $(EVENT_PTHREADS_CFLAGS)
 spvnode_CPPFLAGS = -I$(top_srcdir)/src
 spvnode_LDFLAGS = -static
 endif

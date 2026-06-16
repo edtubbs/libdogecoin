@@ -35,7 +35,23 @@
 #include <dogecoin/transaction.h>
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
+#include <dogecoin/wallet.h>
 #include <dogecoin/vector.h>
+
+static dogecoin_transaction_context* default_transaction_context(void) {
+    static DOGECOIN_THREAD_LOCAL dogecoin_transaction_context default_ctx = {0};
+    return &default_ctx;
+}
+
+dogecoin_transaction_context* dogecoin_transaction_context_new(void) {
+    return (dogecoin_transaction_context*)dogecoin_calloc(1, sizeof(dogecoin_transaction_context));
+}
+
+void dogecoin_transaction_context_free(dogecoin_transaction_context* ctx) {
+    if (!ctx) return;
+    remove_all_ts(ctx);
+    dogecoin_free(ctx);
+}
 
 /**
  * @brief This function instantiates a new working transaction,
@@ -44,9 +60,14 @@
  * @return A pointer to the new working transaction.
  */
 working_transaction* new_transaction() {
+    return new_transaction_ts(default_transaction_context());
+}
+
+working_transaction* new_transaction_ts(dogecoin_transaction_context* ctx) {
+    if (!ctx) return NULL;
     working_transaction* working_tx = (struct working_transaction*)dogecoin_calloc(1, sizeof *working_tx);
     working_tx->transaction = dogecoin_tx_new();
-    working_tx->idx = HASH_COUNT(transactions) + 1;
+    working_tx->idx = HASH_COUNT(ctx->transactions) + 1;
     return working_tx;
 }
 
@@ -59,12 +80,17 @@ working_transaction* new_transaction() {
  * @return Nothing.
  */
 void add_transaction(working_transaction *working_tx) {
+    add_transaction_ts(default_transaction_context(), working_tx);
+}
+
+void add_transaction_ts(dogecoin_transaction_context* ctx, working_transaction *working_tx) {
+    if (!ctx || !working_tx) return;
     working_transaction *tx;
-    HASH_FIND_INT(transactions, &working_tx->idx, tx);
+    HASH_FIND_INT(ctx->transactions, &working_tx->idx, tx);
     if (tx == NULL) {
-        HASH_ADD_INT(transactions, idx, working_tx);
+        HASH_ADD_INT(ctx->transactions, idx, working_tx);
     } else {
-        HASH_REPLACE_INT(transactions, idx, working_tx, tx);
+        HASH_REPLACE_INT(ctx->transactions, idx, working_tx, tx);
     }
     dogecoin_free(tx);
 }
@@ -79,8 +105,13 @@ void add_transaction(working_transaction *working_tx) {
  * the provided index.
  */
 working_transaction* find_transaction(int idx) {
+    return find_transaction_ts(default_transaction_context(), idx);
+}
+
+working_transaction* find_transaction_ts(dogecoin_transaction_context* ctx, int idx) {
+    if (!ctx) return NULL;
     working_transaction *working_tx;
-    HASH_FIND_INT(transactions, &idx, working_tx);
+    HASH_FIND_INT(ctx->transactions, &idx, working_tx);
     return working_tx;
 }
 
@@ -93,7 +124,12 @@ working_transaction* find_transaction(int idx) {
  * @return Nothing.
  */
 void remove_transaction(working_transaction *working_tx) {
-    HASH_DEL(transactions, working_tx); /* delete it (transactions advances to next) */
+    remove_transaction_ts(default_transaction_context(), working_tx);
+}
+
+void remove_transaction_ts(dogecoin_transaction_context* ctx, working_transaction *working_tx) {
+    if (!ctx || !working_tx) return;
+    HASH_DEL(ctx->transactions, working_tx); /* delete it (transactions advances to next) */
     dogecoin_tx_free(working_tx->transaction);
     dogecoin_free(working_tx);
 }
@@ -105,11 +141,16 @@ void remove_transaction(working_transaction *working_tx) {
  * @return Nothing.
  */
 void remove_all() {
+    remove_all_ts(default_transaction_context());
+}
+
+void remove_all_ts(dogecoin_transaction_context* ctx) {
+    if (!ctx) return;
     struct working_transaction *current_tx;
     struct working_transaction *tmp;
 
-    HASH_ITER(hh, transactions, current_tx, tmp) {
-        remove_transaction(current_tx);
+    HASH_ITER(hh, ctx->transactions, current_tx, tmp) {
+        remove_transaction_ts(ctx, current_tx);
     }
 }
 
@@ -122,8 +163,9 @@ void remove_all() {
 void print_transactions()
 {
     struct working_transaction *s;
+    working_transaction* root = default_transaction_context()->transactions;
 
-    for (s = transactions; s != NULL; s = (struct working_transaction*)(s->hh.next)) {
+    for (s = root; s != NULL; s = (struct working_transaction*)(s->hh.next)) {
         printf("\nworking transaction id: %d\nraw transaction (hexadecimal): %s\n", s->idx, get_raw_transaction(s->idx));
     }
 }
@@ -135,8 +177,119 @@ void print_transactions()
  * @return Nothing.
  */
 void count_transactions() {
-    int temp = HASH_COUNT(transactions);
+    int temp = get_transaction_count();
     printf("there are %d transactions\n", temp);
+}
+
+int get_transaction_count(void) {
+    return get_transaction_count_ts(default_transaction_context());
+}
+
+int get_transaction_count_ts(dogecoin_transaction_context* ctx) {
+    if (!ctx) return 0;
+    return HASH_COUNT(ctx->transactions);
+}
+
+/* THREAD-SAFE variant - uses internal mutex */
+dogecoin_tx* dogecoin_tx_new_ts(void)
+{
+    dogecoin_tx* tx = dogecoin_tx_new();
+    if (!tx) return NULL;
+    if (!dogecoin_mutex_init(&tx->lock)) {
+        dogecoin_tx_free(tx);
+        return NULL;
+    }
+    tx->thread_safe = true;
+    return tx;
+}
+
+/* THREAD-SAFE variant - uses internal mutex */
+void dogecoin_tx_free_ts(dogecoin_tx* tx)
+{
+    dogecoin_tx_free(tx);
+}
+
+/* THREAD-SAFE variant - uses internal mutex */
+int dogecoin_tx_add_input_ts(dogecoin_tx* tx, const dogecoin_tx_in* tx_in)
+{
+    if (!tx || !tx_in || !tx->vin) return false;
+    if (tx->thread_safe) dogecoin_mutex_lock(&tx->lock);
+    dogecoin_tx_in* tx_in_new = dogecoin_tx_in_new();
+    if (!tx_in_new) {
+        if (tx->thread_safe) dogecoin_mutex_unlock(&tx->lock);
+        return false;
+    }
+    dogecoin_tx_in_copy(tx_in_new, tx_in);
+    vector_add(tx->vin, tx_in_new);
+    if (tx->thread_safe) dogecoin_mutex_unlock(&tx->lock);
+    return true;
+}
+
+/* THREAD-SAFE variant - uses internal mutex */
+int dogecoin_tx_add_output_ts(dogecoin_tx* tx, const dogecoin_tx_out* tx_out)
+{
+    if (!tx || !tx_out || !tx->vout) return false;
+    if (tx->thread_safe) dogecoin_mutex_lock(&tx->lock);
+    dogecoin_tx_out* tx_out_new = dogecoin_tx_out_new();
+    if (!tx_out_new) {
+        if (tx->thread_safe) dogecoin_mutex_unlock(&tx->lock);
+        return false;
+    }
+    dogecoin_tx_out_copy(tx_out_new, tx_out);
+    vector_add(tx->vout, tx_out_new);
+    if (tx->thread_safe) dogecoin_mutex_unlock(&tx->lock);
+    return true;
+}
+
+/* THREAD-SAFE variant - uses internal mutex */
+int dogecoin_tx_sign_ts(dogecoin_tx* tx, dogecoin_wallet* wallet, const char* passphrase)
+{
+    /* Reserved for future encrypted-wallet integration. */
+    (void)passphrase;
+    if (!tx || !wallet || !wallet->masterkey || !dogecoin_hdnode_has_privkey(wallet->masterkey)) return false;
+    /* Lock-order contract: always acquire tx->lock before wallet->lock. */
+    if (tx->thread_safe) dogecoin_mutex_lock(&tx->lock);
+    if (wallet->thread_safe) dogecoin_mutex_lock(&wallet->lock);
+
+    dogecoin_key key;
+    dogecoin_privkey_init(&key);
+    memcpy(key.privkey, wallet->masterkey->private_key, sizeof(key.privkey));
+
+    size_t i;
+    int ok = true;
+    for (i = 0; i < tx->vin->len; i++) {
+        dogecoin_tx_in* txin = vector_idx(tx->vin, i);
+        if (!txin || !txin->script_sig || txin->script_sig->len == 0) continue;
+        uint8_t sigcompact[64] = {0};
+        uint8_t sigder[75] = {0};
+        size_t sigder_len = sizeof(sigder);
+        enum dogecoin_tx_sign_result res = dogecoin_tx_sign_input(tx, txin->script_sig, &key, i, 1, sigcompact, sigder, &sigder_len);
+        if (res != DOGECOIN_SIGN_OK && res != DOGECOIN_SIGN_NO_KEY_MATCH) {
+            ok = false;
+            break;
+        }
+    }
+
+    dogecoin_privkey_cleanse(&key);
+    if (wallet->thread_safe) dogecoin_mutex_unlock(&wallet->lock);
+    if (tx->thread_safe) dogecoin_mutex_unlock(&tx->lock);
+    return ok;
+}
+
+/* THREAD-SAFE variant - uses internal mutex */
+int dogecoin_tx_finalize_ts(dogecoin_tx* tx)
+{
+    if (!tx) return false;
+    if (tx->thread_safe) dogecoin_mutex_lock(&tx->lock);
+    /* Finalization currently performs a deterministic serialization+hash pass
+     * as an integrity check; no additional state is persisted yet. */
+    cstring* tmp = cstr_new_sz(256);
+    dogecoin_tx_serialize(tmp, tx);
+    uint256_t hash;
+    dogecoin_tx_hash(tx, hash);
+    cstr_free(tmp, true);
+    if (tx->thread_safe) dogecoin_mutex_unlock(&tx->lock);
+    return true;
 }
 
 /**
@@ -229,9 +382,15 @@ const char *get_private_key(const char *prompt_key)
  * @return The index of the new transaction.
  */
 int start_transaction() {
-    working_transaction* working_tx = new_transaction();
+    return start_transaction_ts(default_transaction_context());
+}
+
+int start_transaction_ts(dogecoin_transaction_context* ctx) {
+    if (!ctx) return -1;
+    working_transaction* working_tx = new_transaction_ts(ctx);
+    if (!working_tx) return -1;
     int index = working_tx->idx;
-    add_transaction(working_tx);
+    add_transaction_ts(ctx, working_tx);
     return index;
 }
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-If you are looking to just explore the functionality of Libdogecoin without building a complicated project yourself, look no further than the CLI tools provided in this repo. The first tool, `such`, is an interactive CLI application that allows you to perform all Essential address and transaction operations with prompts to guide you through the process. The second tool, `sendtx`, handles the process of broadcasting a transaction built using Libdogecoin to eventually push it onto the blockchain. The third tool, `spvnode`, run a Simple Payment Verification (SPV) node for the Dogecoin blockchain. It enables users to interact with the Dogecoin network, verify transactions and stay in sync with the blockchain.
+If you are looking to just explore the functionality of Libdogecoin without building a complicated project yourself, look no further than the CLI tools provided in this repo. The first tool, `such`, is an interactive CLI application that allows you to perform all Essential address and transaction operations with prompts to guide you through the process. The second tool, `sendtx`, handles the process of broadcasting a transaction built using Libdogecoin to eventually push it onto the blockchain. The third tool, `spvnode`, run a Simple Payment Verification (SPV) node for the Dogecoin blockchain. It enables users to interact with the Dogecoin network, verify transactions and stay in sync with the blockchain. All CLI tools use the thread-safe library APIs by default.
 
 This document goes over the usage of these tools along with examples of how to use them.
 
@@ -420,7 +420,8 @@ To choose a checkpoint start manually (all available checkpoints shown), apply t
 | `-r`, `--regtest` | Regtest Mode | No | Activate regtest network: `./spvnode -r scan` |
 | `-i`, `--ips` | Initial Peers | Yes | Specify initial peers: `./spvnode -i 127.0.0.1:22556 scan` |
 | `-d`, `--debug` | Debug Mode | No | Enable debug output: `./spvnode -d scan` |
-| `-m`, `--maxnodes` | Max Peers | No | Set max peers: `./spvnode -m 8 scan` |
+| `-m`, `--maxnodes` | Max Peers | Yes | Set max peers: `./spvnode -m 8 scan` |
+| `-o`, `--workers` | Worker Threads | Yes | Set worker threads: `./spvnode -o 4 scan` |
 | `-a`, `--address` | Address | Yes | Use address: `./spvnode -a "your address here" scan` |
 | `-n`, `--mnemonic` | Mnemonic Seed | Yes | Use BIP39 mnemonic: `./spvnode -n "your mnemonic here" scan` |
 | `-s`, `--pass_phrase` | Passphrase | No | Passphrase for BIP39 seed: `./spvnode -s scan` |
@@ -439,6 +440,10 @@ To choose a checkpoint start manually (all available checkpoints shown), apply t
 | `-x`, `--smpv` | Enable SMPV | No | Enabled SMPV: `./spvnode -x scan` |
 | `-g`, `--filtered_blocks` | Filtered Blocks | No | Enable BIP37 filtered blocks: `./spvnode -g scan` |
 | `-q`, `--select_checkpoint` | Select Checkpoint | No | Prompt for checkpoint start (defaults to latest when used with `-l`): `./spvnode -q scan` |
+
+`spvnode` uses a libevent runloop plus worker threads for header-processing callbacks (`--workers`). It enables libevent threading support and can request headers from multiple peers in parallel over asynchronous network I/O.
+
+Note: `_ts` APIs are used where explicit context ownership is required for thread safety. If a function can be made thread-safe without changing parameters, the original API name is preferred. Formal thread-safety guarantees for every API path still depend on deeper context ownership semantics across all modules.
 
 ### Commands
 

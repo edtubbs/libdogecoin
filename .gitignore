@@ -164,6 +164,16 @@ store/*
 !/src/optee/ta/Makefile
 /src/optee/build
 
+/spvnode
+/sendtx
+/such
+build-ctx/
+build-ci-fix/
+build-local/
+build-winfix/
+build-fix/
+build-*/
+
 # Node.js (snarkjs etc. for ZK helpers)
 node_modules/
 package.json

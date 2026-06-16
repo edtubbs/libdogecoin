@@ -91,10 +91,10 @@ void broadcasting_menu(int txindex, int is_testnet) {
     const dogecoin_chainparams* chain = is_testnet ? &dogecoin_chainparams_test : &dogecoin_chainparams_main;
     working_transaction* tx = find_transaction(txindex);
     char* raw_hexadecimal_tx = get_raw_transaction(txindex);
-    int length = HASH_COUNT(transactions);
     while (running) {
+        int length = get_transaction_count();
         printf("length: %d\n", length);
-        for (int i = 0; i <= length; i++) {
+        for (int i = 0; i < length; i++) {
             printf("\n--------------------------------\n");
             printf("transaction to broadcast: %s\n", raw_hexadecimal_tx);
             selected == i ? printf("confirm:         [X]\n") : 0;
