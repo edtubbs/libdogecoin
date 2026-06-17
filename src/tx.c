@@ -1247,11 +1247,13 @@ enum dogecoin_tx_sign_result dogecoin_tx_sign_input(dogecoin_tx* tx_in_out, cons
         memcpy_safe(sigcompact_out, sig, siglen);
     }
 
-    // form normalized DER signature & hashtype
+    // form normalized DER signature & hashtype (normalized DER is 69-72 bytes on secp256k1)
     unsigned char sigder_plus_hashtype[74 + 1];
     size_t sigderlen = 75;
-    dogecoin_ecc_compact_to_der_normalized(sig, sigder_plus_hashtype, &sigderlen);
-    assert(sigderlen <= 74 && sigderlen >= 70);
+    if (!dogecoin_ecc_compact_to_der_normalized(sig, sigder_plus_hashtype, &sigderlen) ||
+        sigderlen > 72 || sigderlen < 69) {
+        return DOGECOIN_SIGN_UNKNOWN;
+    }
     sigder_plus_hashtype[sigderlen] = sighashtype;
     sigderlen += 1; //+hashtype
     if (sigcompact_out) {
