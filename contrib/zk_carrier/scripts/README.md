@@ -42,22 +42,13 @@ Steps performed:
 
 #### WIF / address handling
 
-The script never embeds a private key in source.  Resolution order:
+The script resolves funding credentials in this order:
 
 1. `ZK_CARRIER_WIF` env var (operator-supplied).
 2. `FUNDED_WIF` env var.
-3. The mainnet default reused from `contrib/mainnet_falcon_test.sh` and
-   friends:
-   * WIF: `QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w`
-   * Address: `DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr`
 
-   This is the same key/address used by the existing mainnet PQC scripts in
-   this branch family — it is **already public there** and is reused only
-   so a single funded UTXO chain can be exercised across PQ + ZK demos.
-
-If you don't want that, export `ZK_CARRIER_WIF` to your own WIF (and
-`ZK_CARRIER_ADDR` if it differs from the WIF's natural address) before
-running.
+Address resolution follows `ZK_CARRIER_ADDR`, then `FUNDED_ADDR`.
+Set both WIF and address explicitly before running.
 
 #### Logging
 

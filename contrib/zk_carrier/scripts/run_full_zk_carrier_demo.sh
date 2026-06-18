@@ -40,9 +40,10 @@ Usage: $0 [options]
   -h, --help                 show this help
 
 Environment variables (override defaults; same names as contrib/mainnet_falcon_test.sh):
-  ZK_CARRIER_WIF    REQUIRED for mainnet; testnet falls back to FUNDED_WIF
-  FUNDED_WIF            mainnet WIF (default: reused from mainnet_falcon_test.sh)
-  FUNDED_ADDR           mainnet address (default: reused from mainnet_falcon_test.sh)
+  ZK_CARRIER_WIF    preferred funding WIF
+  ZK_CARRIER_ADDR   preferred funding address
+  FUNDED_WIF        fallback funding WIF
+  FUNDED_ADDR       fallback funding address
   FUNDED_UTXO_TXID      previous TXID to spend
   FUNDED_UTXO_VOUT      previous vout (default: 0)
   FUNDED_UTXO_VALUE_KOINU  previous value in koinu (required if AUTO_PREPARE_TX_FROM_UTXO=1)
@@ -79,23 +80,12 @@ LOG_FILE="zk_carrier_demo_$(date -u +%Y%m%d_%H%M%S).log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 echo "==> log file: $LOG_FILE"
 
-# --------------------------- WIF / address (mainnet defaults match
-#                              contrib/mainnet_falcon_test.sh, contrib/
-#                              mainnet_dilithium2_test.sh, etc.) --------------
-#
-# WARNING: the FUNDED_WIF default below is the SAME publicly-known demo WIF
-# already shipped in this branch's contrib/mainnet_*_test.sh scripts.  It
-# is *not* secret.  Any real DOGE you send to its address is immediately
-# spendable by anyone who has cloned this branch.  Override via:
-#
+# --------------------------- WIF / address ------------------------------------
+# Set these via environment before running (for example:
 #   export ZK_CARRIER_WIF=<your-WIF>
-#   export ZK_CARRIER_ADDR=<your-address>
-#
-# before running.  This script intentionally inherits the public demo WIF
-# only so the same funded UTXO chain can be exercised across the PQ + ZK
-# demos in this branch family.
-FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
-FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
+#   export ZK_CARRIER_ADDR=<your-address>)
+FUNDED_WIF="${FUNDED_WIF:-}"
+FUNDED_ADDR="${FUNDED_ADDR:-}"
 
 if [[ "$NETWORK" == "mainnet" ]]; then
     WIF="${ZK_CARRIER_WIF:-$FUNDED_WIF}"
@@ -112,6 +102,10 @@ EXPLORER_BASE="${EXPLORER_BASE:-$EXPLORER_DEFAULT}"
 
 if [[ -z "$WIF" ]]; then
     echo "ERROR: no WIF available — set ZK_CARRIER_WIF or FUNDED_WIF" >&2
+    exit 2
+fi
+if [[ -z "$ADDR" ]]; then
+    echo "ERROR: no address available — set ZK_CARRIER_ADDR or FUNDED_ADDR" >&2
     exit 2
 fi
 

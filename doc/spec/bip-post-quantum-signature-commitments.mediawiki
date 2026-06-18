@@ -386,10 +386,10 @@ Commitment transaction (TX_C) with OP_RETURN commitment and P2SH carrier output 
 <source>
 TX_C txid:   f26940627dad32d5f86c1b17f9be96bf413dbe78b181721b73677d6fe7bd81ed
 Block:       6173895 (mainnet, confirmed 2026-04-20)
-Funded addr: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+Funded addr: YOUR_FUNDED_ADDR
 
 Outputs:
-  vout 0: change → DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  vout 0: change → YOUR_FUNDED_ADDR
   vout 1: OP_RETURN 6a24 464c4331 e780b663d19966bc8f4ca355fb61bdf7d6b66885e8a75a212bd368a6fb0dcac2
   vout 2: 1.0 DOGE → A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q (P2SH carrier)
 </source>
@@ -417,10 +417,10 @@ Commitment transaction (TX_C) with OP_RETURN commitment and P2SH carrier outputs
 <source>
 TX_C txid:   822044a82f070da8d9d4a7c6e6e26359b50300b5ee1020c10fe0c76a11b7c933
 Block:       6173897 (mainnet, confirmed 2026-04-20)
-Funded addr: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+Funded addr: YOUR_FUNDED_ADDR
 
 Outputs:
-  vout 0: change → DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
+  vout 0: change → YOUR_FUNDED_ADDR
   vout 1: OP_RETURN 6a24 44494c32 f8dda582556e73e4abd62f6f69354faebed920100bec13944516ffea226c99ca
   vout 2–4: 1.0 DOGE each → A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q (P2SH carrier, 3 parts)
 </source>

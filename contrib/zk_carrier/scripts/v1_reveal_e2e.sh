@@ -15,12 +15,8 @@
 #   contrib/zk_carrier/scripts/v1_reveal_e2e.sh plonk   [out_dir]
 #
 # Environment hooks documented in contrib/zk_carrier/scripts/broadcast_set.sh:
-#   FUNDED_ADDR / FUNDED_WIF — defaulted to the public demo address
-#                              DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (per task)
-#                              so the on-chain UTXOs at
-#                              https://chain.so/address/DOGE/DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr
-#                              fund the carrier when the operator runs the
-#                              broadcast variant of this script.
+#   FUNDED_ADDR / FUNDED_WIF can be set by the operator for the broadcast
+#   variant. This local validation script does not broadcast.
 
 set -eu
 
@@ -56,7 +52,7 @@ esac
 # address are what `broadcast_set.sh` would consume in the real-network
 # variant of this driver.  For the in-process v1 reveal validation we
 # don't actually broadcast, but log the address so the trace is auditable.
-FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
+FUNDED_ADDR="${FUNDED_ADDR:-operator-provided}"
 
 LOG="$OUT_DIR/v1_reveal_e2e_${PROOF_SYSTEM}.log"
 exec > >(tee "$LOG") 2>&1
@@ -84,8 +80,7 @@ echo "--- Step 0: build TX_C base (funding tx without commit/carrier) and comput
 # This synthetic single-vin/single-vout base tx represents what would be a
 # real spend of the on-chain UTXOs at the funded address.  Replacing it with
 # `getrawtransaction` of an actual funding tx is what `broadcast_set.sh`
-# does for live runs against
-# https://chain.so/address/DOGE/DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr.
+# does for live runs.
 BASE_UNSIGNED=$(python3 - <<'PY'
 def le_u32(n): return n.to_bytes(4, "little").hex()
 def le_u64(n): return n.to_bytes(8, "little").hex()
@@ -94,12 +89,12 @@ def varint(n):
     return "fd" + n.to_bytes(2, "little").hex()
 prev = "00" * 32
 vin  = prev + le_u32(0) + "00" + "ffffffff"
-spk  = "76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac"  # P2PKH for funded addr
+spk  = "76a914000000000000000000000000000000000000000088ac"  # synthetic P2PKH
 vout = le_u64(100_000_000) + varint(len(spk)//2) + spk
 print("01000000" + varint(1) + vin + varint(1) + vout + "00000000")
 PY
 )
-SIGNER_SPK="76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac"
+SIGNER_SPK="76a914000000000000000000000000000000000000000088ac"
 TX_BINDING_RAW=$("$SUCH" -c tx_sighash32 -x "$BASE_UNSIGNED" -s "$SIGNER_SPK" -i 0 -h 1 2>&1 | awk -F': ' '/^tx_sighash32:/ {print $2; exit}' | tr -d ' ')
 # Zero top byte so the value is an unambiguous BN254 field element — matches
 # dogecoin_zk_compute_tx_base_sighash() exactly.
@@ -162,7 +157,7 @@ def varint(n):
     return "fd" + n.to_bytes(2, "little").hex()
 prev_le = bytes.fromhex(txid)[::-1].hex()
 vin = "".join(prev_le + le_u32(fv + i) + "00" + "ffffffff" for i in range(pt))
-spk = "76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac"
+spk = "76a914000000000000000000000000000000000000000088ac"
 vout = le_u64(99_000_000 * pt) + varint(len(spk)//2) + spk
 print("01000000" + varint(pt) + vin + "01" + vout + "00000000")
 PY
@@ -270,7 +265,7 @@ def varint(n):
     return "fd" + n.to_bytes(2, "little").hex()
 prev = "00" * 32
 vin  = prev + le_u32(0) + "00" + "ffffffff"
-spk  = "76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac"
+spk  = "76a914000000000000000000000000000000000000000088ac"
 vout = le_u64(99_500_000) + varint(len(spk)//2) + spk  # different value → different sighash
 print("01000000" + varint(1) + vin + varint(1) + vout + "00000000")
 PY

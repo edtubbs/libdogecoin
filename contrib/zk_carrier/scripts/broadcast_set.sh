@@ -33,9 +33,7 @@
 #   - libdogecoin built with --enable-zk-carrier --enable-test-passwd
 #     [--with-mcl=DIR]; binaries such, sendtx, spvnode in . or PATH.
 #   - node + snarkjs installed (same as witness_helper.py needs).
-#   - $FUNDED_WIF holds koinu in $FUNDED_ADDR; default WIF/ADDR mirror
-#     contrib/mainnet_dilithium2_test.sh so a single funded wallet covers
-#     both PQC and ZK runs.
+#   - $FUNDED_WIF holds koinu in $FUNDED_ADDR.
 #   - Range-proof circuit artifacts: $WASM, $ZKEY, and $VKEY.
 #
 # Usage:
@@ -86,17 +84,15 @@ NETWORK="${NETWORK:-mainnet}"
 NETWORK_FLAG=""
 [ "$NETWORK" = "testnet" ] && NETWORK_FLAG="-t"
 
-# Defaults match contrib/mainnet_dilithium2_test.sh so the same funded wallet
-# can drive both PQC and ZK runs.
-FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
-FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
+FUNDED_WIF="${FUNDED_WIF:-}"
+FUNDED_ADDR="${FUNDED_ADDR:-}"
 
 # Initial UTXO to spend.  Subsequent iterations chain off TX_C's change vout 0.
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-${CHAINED_UTXO_TXID:-}}"
 FUNDED_UTXO_VOUT="${FUNDED_UTXO_VOUT:-${CHAINED_UTXO_VOUT:-0}}"
 FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-${CHAINED_UTXO_VALUE_KOINU:-}}"
-# Default to FUNDED_ADDR's P2PKH script (76a914 + hash160(DDMpdcTr...) + 88ac)
-FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}}"
+# Optional: if unset, scriptPubKey is auto-discovered with UTXO lookup where available.
+FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PUBKEY:-}}"
 
 CARRIER_VALUE_KOINU="${CARRIER_VALUE_KOINU:-100000000}"   # 1 DOGE per carrier part
 TX_FEE_KOINU="${TX_FEE_KOINU:-2000000}"
@@ -188,6 +184,8 @@ fi
 [ -x "$SUCH" ]    || die "such not found at $SUCH (build first)"
 [ -x "$SENDTX" ]  || die "sendtx not found at $SENDTX"
 [ -f "$WITNESS_HELPER" ] || die "witness_helper.py not found at $WITNESS_HELPER"
+[ -n "$FUNDED_WIF" ] || die "FUNDED_WIF is required"
+[ -n "$FUNDED_ADDR" ] || die "FUNDED_ADDR is required"
 command -v node    >/dev/null || die "node not found (snarkjs needs it)"
 command -v snarkjs >/dev/null || die "snarkjs not found in PATH"
 command -v curl    >/dev/null || die "curl not found"

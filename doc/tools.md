@@ -855,14 +855,14 @@ with SPV node validation of Falcon-512 commitments.
 
 ```
 TX_C (Commitment Transaction) — standard P2PKH + OP_RETURN + P2SH
-  Input:  DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (funded address, secp256k1 signed)
-  Output 0: Change back to DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (P2PKH)
+  Input:  YOUR_FUNDED_ADDR (funded address, secp256k1 signed)
+  Output 0: Change back to YOUR_FUNDED_ADDR (P2PKH)
   Output 1: OP_RETURN 6a24 FLC1 <32-byte SHA256 commitment>
   Output 2: 1 DOGE to A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q (P2SH carrier output)
 
 TX_R (Reveal Transaction) — spends P2SH carrier with PQC payload in scriptSig
   Input:  A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q (P2SH carrier from TX_C)
-  Output: DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr (return funds minus fee)
+  Output: YOUR_FUNDED_ADDR (return funds minus fee)
 ```
 
 #### Commitment Math
@@ -901,11 +901,11 @@ TXID: a9f2f84b3f2dff84c4505ac680ea6932224eb69c0960d00a5ad8f49df18b4e1e
 Block: 6156750 | Size: 271 bytes | Fee: 0.001 DOGE
 
 Input:
-  DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr  33.931 DOGE (standard secp256k1 P2PKH)
+  YOUR_FUNDED_ADDR  33.931 DOGE (standard secp256k1 P2PKH)
 
 Outputs:
-  [0] DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr  32.930 DOGE (P2PKH change)
-      script: 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+  [0] YOUR_FUNDED_ADDR  32.930 DOGE (P2PKH change)
+      script: YOUR_FUNDED_SCRIPT_PUBKEY
   [1] OP_RETURN  0 DOGE (Falcon-512 commitment)
       script: 6a24 464c4331 43b877ae18aa928ce080b472e0c16758014d7a1885c9f9ef43b148ba0a942da6
       decode: OP_RETURN OP_PUSH36 "FLC1" <32-byte commitment>
@@ -941,8 +941,8 @@ Input:
     sig_len=657 bytes, sig_prefix=3938a41d3ffc68a55583033a2be98c11
 
 Output:
-  [0] DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr  0.995 DOGE (P2PKH)
-      script: 76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac
+  [0] YOUR_FUNDED_ADDR  0.995 DOGE (P2PKH)
+      script: YOUR_FUNDED_SCRIPT_PUBKEY
 
 SPV validation log:
   [falcon-commit] Valid at height=6156750 txpos=12
