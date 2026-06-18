@@ -84,8 +84,8 @@ echo "==> log file: $LOG_FILE"
 # Set these via environment before running (for example:
 #   export ZK_CARRIER_WIF=<your-WIF>
 #   export ZK_CARRIER_ADDR=<your-address>)
-FUNDED_WIF="${FUNDED_WIF:-}"
-FUNDED_ADDR="${FUNDED_ADDR:-}"
+FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
+FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 
 if [[ "$NETWORK" == "mainnet" ]]; then
     WIF="${ZK_CARRIER_WIF:-$FUNDED_WIF}"

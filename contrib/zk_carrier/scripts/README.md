@@ -46,9 +46,14 @@ The script resolves funding credentials in this order:
 
 1. `ZK_CARRIER_WIF` env var (operator-supplied).
 2. `FUNDED_WIF` env var.
+3. The reference default:
+   * WIF: `QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w`
+   * Address: `DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr`
+
+   This key/address is a public reference used across the PQC and ZK demo
+   scripts. **Do not send real DOGE here** — this key is public.
 
 Address resolution follows `ZK_CARRIER_ADDR`, then `FUNDED_ADDR`.
-Set both WIF and address explicitly before running.
 
 #### Logging
 

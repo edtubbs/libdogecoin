@@ -277,7 +277,7 @@ PAIRS = [
         "vk_rotated_ok": True,   # v0 reference; vk in tree rotated since this pair was published
     },
     # v1 self-contained reveals (vk embedded on-chain) — fresh cascade run
-    # 2026-05-03 against funded address YOUR_FUNDED_ADDR.
+    # 2026-05-03 against funded address DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr.
     # For these pairs the validator MUST verify the proof using ONLY the vk
     # bytes recovered from the TX_R reveal (no out-of-band vk channel).
     {
@@ -289,7 +289,7 @@ PAIRS = [
         "vk_rotated_ok": False,  # v1: vk embedded inline; verify must pass against the embedded vk
     },
     # v2 replay-resistant cascade — fresh run 2026-05-13 against funded
-    # address YOUR_FUNDED_ADDR.  Differs from v1 (G1/Q1)
+    # address DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr.  Differs from v1 (G1/Q1)
     # in that each proof commits to `tx_binding == tx_base_sighash(TX_C)` as
     # its 3rd public input (witness_helper.py was invoked with
     # `--tx-binding-hex 00<31 bytes>` derived from `such tx_sighash32`

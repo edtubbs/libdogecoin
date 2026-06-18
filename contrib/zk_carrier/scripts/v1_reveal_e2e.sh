@@ -52,7 +52,7 @@ esac
 # address are what `broadcast_set.sh` would consume in the real-network
 # variant of this driver.  For the in-process v1 reveal validation we
 # don't actually broadcast, but log the address so the trace is auditable.
-FUNDED_ADDR="${FUNDED_ADDR:-operator-provided}"
+FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 
 LOG="$OUT_DIR/v1_reveal_e2e_${PROOF_SYSTEM}.log"
 exec > >(tee "$LOG") 2>&1

@@ -199,8 +199,8 @@ LIBDOGECOIN_API cstring* dogecoin_zk_extract_signer_p2pkh_spk(const dogecoin_tx*
  * conversion (big-endian decimal string) is the caller's responsibility.
  *
  * `signer_p2pkh_spk` is the canonical P2PKH scriptPubKey of the funding
- * input's signer; for demo flows this is derived from the operator-funded
- * address (address → HASH160 → 25-byte P2PKH spk).
+ * input's signer; for demo flows this is derived from the funded address
+ * (DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr → HASH160 → 25-byte P2PKH spk).
  *
  * Returns DOGECOIN_ZK_OK on success.
  */

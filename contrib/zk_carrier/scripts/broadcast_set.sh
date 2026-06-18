@@ -33,7 +33,8 @@
 #   - libdogecoin built with --enable-zk-carrier --enable-test-passwd
 #     [--with-mcl=DIR]; binaries such, sendtx, spvnode in . or PATH.
 #   - node + snarkjs installed (same as witness_helper.py needs).
-#   - $FUNDED_WIF holds koinu in $FUNDED_ADDR.
+#   - $FUNDED_WIF holds koinu in $FUNDED_ADDR (defaults to the reference
+#     address DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr; do not send real DOGE there).
 #   - Range-proof circuit artifacts: $WASM, $ZKEY, and $VKEY.
 #
 # Usage:
@@ -84,8 +85,8 @@ NETWORK="${NETWORK:-mainnet}"
 NETWORK_FLAG=""
 [ "$NETWORK" = "testnet" ] && NETWORK_FLAG="-t"
 
-FUNDED_WIF="${FUNDED_WIF:-}"
-FUNDED_ADDR="${FUNDED_ADDR:-}"
+FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
+FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 
 # Initial UTXO to spend.  Subsequent iterations chain off TX_C's change vout 0.
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-${CHAINED_UTXO_TXID:-}}"
