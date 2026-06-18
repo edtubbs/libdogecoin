@@ -69,9 +69,6 @@ typedef struct dogecoin_spv_client_
     uint64_t last_block_size;
     uint64_t last_block_tx_count;
     uint64_t last_block_total_tx_size;
-    uint32_t next_headers_peer_cursor;
-    uint32_t header_no_progress_rounds;
-    uint32_t last_tip_height_observed;
     spv_block_sample stats_ring[SPV_STATS_RING];
     int stats_ring_len;
     int stats_ring_head;
@@ -82,14 +79,9 @@ typedef struct dogecoin_spv_client_
     uint64_t stats_fees_total;
     uint64_t stats_block_bytes_total;
     uint64_t start_ts;
-    int headers_target_nodeid;
 
     void* smpv_ctx;
     dogecoin_bool smpv_enabled;
-    void* headers_pipeline_ctx;
-    void* headers_stage_ctx;         /* bounded out-of-order header batch staging (master-writer) */
-    void* blocks_stage_ctx;          /* bounded out-of-order full block staging (master-writer) */
-    dogecoin_bool thread_safe_mode;  /* set by dogecoin_spv_client_enable_thread_safe_mode() in TS builds */
 
     /* BIP37 bloom filter (optional). When set, getdata requests are rewritten
        to request FILTERED_BLOCK so peers answer with merkleblock + matched tx. */
@@ -150,10 +142,6 @@ LIBDOGECOIN_API void dogecoin_spv_enable_smpv(dogecoin_spv_client* client, dogec
 LIBDOGECOIN_API dogecoin_bool dogecoin_spv_handle_mempool_tx_hex(dogecoin_spv_client* client, const char* raw_tx_hex);
 LIBDOGECOIN_API void dogecoin_spv_get_smpv_stats(dogecoin_spv_client* client, uint32_t* total_txs, uint32_t* watched_addrs);
 LIBDOGECOIN_API void dogecoin_net_spv_request_mempool(dogecoin_spv_client *client);
-LIBDOGECOIN_API void dogecoin_spv_set_headers_target_node(dogecoin_spv_client* client, int nodeid);
-/* Opt-in to thread-safe runtime mode. Enables debug logging for the master-writer pipeline and
-   bounded out-of-order header batch staging. Safe to call multiple times; no-op on NULL. */
-LIBDOGECOIN_API void dogecoin_spv_client_enable_thread_safe_mode(dogecoin_spv_client* client);
 LIBDOGECOIN_API void dogecoin_net_spv_request_filtered_history(dogecoin_spv_client *client, int depth);
 
 /* BIP37: caller supplies a bloom filter payload (as built elsewhere).

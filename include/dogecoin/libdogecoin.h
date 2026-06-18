@@ -694,9 +694,41 @@ int verify_message(char* sig, char* msg, char* address);
 --------------------------------------------------------------------------
 */
 
-/* Vector API: see dogecoin/vector.h for vector_t, vector_new, vector_free,
-   vector_add, vector_remove, vector_resize, vector_find, etc. */
-#include <dogecoin/vector.h>
+/* Duplicated (not #included) so the public API header stays self-contained.
+   Guarded with the dogecoin/vector.h include guard so a translation unit that
+   pulls in the internal header (e.g. via dogecoin/utils.h) sees a single
+   definition. */
+#ifndef __LIBDOGECOIN_VECTOR_H__
+#define __LIBDOGECOIN_VECTOR_H__
+
+typedef struct vector_t {
+    void** data;  /* array of pointers */
+    size_t len;   /* array element count */
+    size_t alloc; /* allocated array elements */
+
+    void (*elem_free_f)(void*);
+} vector_t;
+
+#define vector_idx(vec, idx) vec->data[idx]
+
+/* create a new vector with initial reserve and optional element destructor */
+vector_t* vector_new(size_t res, void (*free_f)(void*));
+/* free vector internals and optionally free backing array */
+void vector_free(vector_t* vec, dogecoin_bool free_array);
+/* append an element pointer to the vector */
+dogecoin_bool vector_add(vector_t* vec, void* data);
+/* remove first matching element pointer from the vector */
+dogecoin_bool vector_remove(vector_t* vec, void* data);
+/* remove vector element at index */
+void vector_remove_idx(vector_t* vec, size_t idx);
+/* remove a contiguous range of vector elements */
+void vector_remove_range(vector_t* vec, size_t idx, size_t len);
+/* resize vector capacity/length bookkeeping */
+dogecoin_bool vector_resize(vector_t* vec, size_t newsz);
+/* find index of an element pointer, or -1 if absent */
+ssize_t vector_find(vector_t* vec, void* data);
+
+#endif /* __LIBDOGECOIN_VECTOR_H__ */
 
 
 /* Wallet API

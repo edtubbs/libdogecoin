@@ -41,6 +41,14 @@ void dogecoin_transaction_context_free(struct dogecoin_transaction_context* ctx)
 struct dogecoin_eckey_context* dogecoin_eckey_context_new(void);
 void dogecoin_eckey_context_free(struct dogecoin_eckey_context* ctx);
 
+/**
+ * @brief Returns the platform mutex size used to guard the refcount.
+ *
+ * Selects the size of the underlying critical section (Windows) or
+ * pthread mutex (POSIX) that backs the context reference-count lock.
+ *
+ * @return The number of bytes to allocate for the refcount lock.
+ */
 static size_t dogecoin_refcount_lock_size(void)
 {
 #ifdef _WIN32
@@ -50,6 +58,17 @@ static size_t dogecoin_refcount_lock_size(void)
 #endif
 }
 
+/**
+ * @brief Releases every owned subsystem held by a context.
+ *
+ * Frees the transaction, eckey, RNG and secp256k1 sub-contexts as well as the
+ * refcount lock, and resets the pointers to NULL. Does not free the context
+ * structure itself.
+ *
+ * @param ctx The context whose members should be released. May be NULL.
+ *
+ * @return Nothing.
+ */
 static void dogecoin_context_cleanup(dogecoin_context* ctx)
 {
     if (!ctx) return;
@@ -72,6 +91,13 @@ static void dogecoin_context_cleanup(dogecoin_context* ctx)
     ctx->refcount_lock = NULL;
 }
 
+/**
+ * @brief Clears the last-error state stored on a context.
+ *
+ * @param ctx The context whose error code and message should be reset. May be NULL.
+ *
+ * @return Nothing.
+ */
 static void dogecoin_context_zero_error(dogecoin_context* ctx)
 {
     if (!ctx) return;
@@ -79,6 +105,18 @@ static void dogecoin_context_zero_error(dogecoin_context* ctx)
     ctx->last_error[0] = '\0';
 }
 
+/**
+ * @brief Allocates and initializes a new stateless libdogecoin context.
+ *
+ * Creates the per-context secp256k1 context (seeded with fresh randomness), the
+ * fast RNG state, and the transaction and eckey sub-contexts, and initializes
+ * the refcount lock with an initial reference count of 1.
+ *
+ * @param testnet    Selects testnet chain parameters when true, mainnet otherwise.
+ * @param enable_net Records whether networking is intended for this context.
+ *
+ * @return A pointer to the new context, or NULL on allocation/initialization failure.
+ */
 dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enable_net)
 {
     dogecoin_context* ctx = (dogecoin_context*)dogecoin_calloc(1, sizeof(*ctx));
@@ -132,6 +170,16 @@ dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enab
     return ctx;
 }
 
+/**
+ * @brief Atomically increments the reference count of a context.
+ *
+ * Acquires an additional owning reference; each call must be balanced by a
+ * matching dogecoin_context_release().
+ *
+ * @param ctx The context to retain. No-op if NULL or uninitialized.
+ *
+ * @return Nothing.
+ */
 void dogecoin_context_acquire(dogecoin_context* ctx)
 {
     if (!ctx) return;
@@ -149,6 +197,16 @@ void dogecoin_context_acquire(dogecoin_context* ctx)
 #endif
 }
 
+/**
+ * @brief Atomically decrements the reference count and frees on zero.
+ *
+ * Drops one owning reference. When the final reference is released the context's
+ * subsystems are cleaned up and the structure is freed.
+ *
+ * @param ctx The context to release. No-op if NULL or uninitialized.
+ *
+ * @return Nothing.
+ */
 void dogecoin_context_release(dogecoin_context* ctx)
 {
     dogecoin_bool should_free = false;
@@ -171,31 +229,78 @@ void dogecoin_context_release(dogecoin_context* ctx)
     dogecoin_free(ctx);
 }
 
+/**
+ * @brief Returns the chain parameters bound to a context.
+ *
+ * @param ctx The context to query. May be NULL.
+ *
+ * @return The chain parameters, or NULL if ctx is NULL.
+ */
 const dogecoin_chainparams* dogecoin_context_get_chainparams(const dogecoin_context* ctx)
 {
     return ctx ? ctx->chain_params : NULL;
 }
 
+/**
+ * @brief Returns the per-context transaction sub-context.
+ *
+ * @param ctx The context to query. May be NULL.
+ *
+ * @return The transaction context, or NULL if ctx is NULL.
+ */
 struct dogecoin_transaction_context* dogecoin_context_get_transaction_context(dogecoin_context* ctx)
 {
     return ctx ? ctx->tx_ctx : NULL;
 }
 
+/**
+ * @brief Returns the per-context eckey sub-context.
+ *
+ * @param ctx The context to query. May be NULL.
+ *
+ * @return The eckey context, or NULL if ctx is NULL.
+ */
 struct dogecoin_eckey_context* dogecoin_context_get_eckey_context(dogecoin_context* ctx)
 {
     return ctx ? ctx->key_ctx : NULL;
 }
 
+/**
+ * @brief Returns the opaque per-context secp256k1 context.
+ *
+ * @param ctx The context to query. May be NULL.
+ *
+ * @return The secp256k1 context pointer, or NULL if ctx is NULL.
+ */
 void* dogecoin_context_get_ecc_context(dogecoin_context* ctx)
 {
     return ctx ? ctx->ecc_ctx : NULL;
 }
 
+/**
+ * @brief Returns the opaque per-context fast RNG state.
+ *
+ * @param ctx The context to query. May be NULL.
+ *
+ * @return The RNG state pointer, or NULL if ctx is NULL.
+ */
 void* dogecoin_context_get_rng_state(dogecoin_context* ctx)
 {
     return ctx ? ctx->rng_state : NULL;
 }
 
+/**
+ * @brief Records an error code and message on a context.
+ *
+ * Stores the supplied code and copies the message (truncated to fit) into the
+ * context's last-error buffer for later retrieval.
+ *
+ * @param ctx  The context to update. No-op if NULL.
+ * @param code The numeric error code to store.
+ * @param msg  The error message, or NULL to clear the message.
+ *
+ * @return Nothing.
+ */
 void dogecoin_context_set_error(dogecoin_context* ctx, int code, const char* msg)
 {
     if (!ctx) return;
@@ -208,17 +313,49 @@ void dogecoin_context_set_error(dogecoin_context* ctx, int code, const char* msg
     ctx->last_error[sizeof(ctx->last_error) - 1] = '\0';
 }
 
+/**
+ * @brief Returns the last error code recorded on a context.
+ *
+ * @param ctx The context to query. May be NULL.
+ *
+ * @return The stored error code, or 0 if ctx is NULL.
+ */
 int dogecoin_context_get_error_code(const dogecoin_context* ctx)
 {
     return ctx ? ctx->error_code : 0;
 }
 
+/**
+ * @brief Returns the last error message recorded on a context.
+ *
+ * @param ctx The context to query. May be NULL.
+ *
+ * @return The stored error message, or an empty string if ctx is NULL.
+ */
 const char* dogecoin_context_get_error(const dogecoin_context* ctx)
 {
     if (!ctx) return "";
     return ctx->last_error;
 }
 
+/**
+ * @brief Generates a private/public keypair using a context's chain.
+ *
+ * Produces a WIF-encoded private key and matching P2PKH address for the chain
+ * selected by the context. When wif or addr is NULL the required buffer sizes
+ * are returned via wif_size/addr_size without generating output. On buffer
+ * overflow the required sizes are written and an error is recorded on the
+ * context.
+ *
+ * @param ctx       The context selecting the chain. Receives error state on failure.
+ * @param wif       Destination buffer for the WIF key, or NULL to query the size.
+ * @param wif_size  In/out: capacity of wif on input, bytes needed on output.
+ * @param addr      Destination buffer for the address, or NULL to query the size.
+ * @param addr_size In/out: capacity of addr on input, bytes needed on output.
+ *
+ * @return true on success, false on invalid arguments, generation failure, or
+ *         insufficient buffer capacity.
+ */
 int dogecoin_generate_keypair_ex(dogecoin_context* ctx, char* wif, size_t* wif_size, char* addr, size_t* addr_size)
 {
     if (!ctx || !wif_size || !addr_size) {
@@ -265,6 +402,17 @@ int dogecoin_generate_keypair_ex(dogecoin_context* ctx, char* wif, size_t* wif_s
  * per-object locking when wired through the context.
  * --------------------------------------------------------------------------- */
 
+/**
+ * @brief Creates a thread-compatible context (short-form alias).
+ *
+ * Equivalent to dogecoin_context_new() and leaves the context untagged so
+ * subsystems use their default (non-_ts) single-owner behavior.
+ *
+ * @param testnet    Selects testnet chain parameters when true, mainnet otherwise.
+ * @param enable_net Records whether networking is intended for this context.
+ *
+ * @return A pointer to the new context, or NULL on failure.
+ */
 dogecoin_ctx* dogecoin_ctx_new(dogecoin_bool testnet, dogecoin_bool enable_net)
 {
     dogecoin_ctx* ctx = dogecoin_context_new(testnet, enable_net);
@@ -272,6 +420,17 @@ dogecoin_ctx* dogecoin_ctx_new(dogecoin_bool testnet, dogecoin_bool enable_net)
     return ctx;
 }
 
+/**
+ * @brief Creates a thread-safe-tagged context (short-form alias).
+ *
+ * Equivalent to dogecoin_context_new() but marks the context as thread-safe so
+ * dependent subsystems select per-object locking via dogecoin_ctx_is_thread_safe().
+ *
+ * @param testnet    Selects testnet chain parameters when true, mainnet otherwise.
+ * @param enable_net Records whether networking is intended for this context.
+ *
+ * @return A pointer to the new thread-safe context, or NULL on failure.
+ */
 dogecoin_ctx* dogecoin_ctx_new_ts(dogecoin_bool testnet, dogecoin_bool enable_net)
 {
     dogecoin_ctx* ctx = dogecoin_context_new(testnet, enable_net);
@@ -279,16 +438,37 @@ dogecoin_ctx* dogecoin_ctx_new_ts(dogecoin_bool testnet, dogecoin_bool enable_ne
     return ctx;
 }
 
+/**
+ * @brief Retains a context reference (short-form alias).
+ *
+ * @param ctx The context to retain. No-op if NULL.
+ *
+ * @return Nothing.
+ */
 void dogecoin_ctx_acquire(dogecoin_ctx* ctx)
 {
     dogecoin_context_acquire(ctx);
 }
 
+/**
+ * @brief Releases a context reference (short-form alias).
+ *
+ * @param ctx The context to release. No-op if NULL.
+ *
+ * @return Nothing.
+ */
 void dogecoin_ctx_release(dogecoin_ctx* ctx)
 {
     dogecoin_context_release(ctx);
 }
 
+/**
+ * @brief Reports whether a context was tagged thread-safe.
+ *
+ * @param ctx The context to query. May be NULL.
+ *
+ * @return Nonzero if the context was created via dogecoin_ctx_new_ts(), 0 otherwise.
+ */
 int dogecoin_ctx_is_thread_safe(const dogecoin_ctx* ctx)
 {
     return ctx ? ctx->thread_safe : 0;

@@ -164,14 +164,7 @@ store/*
 !/src/optee/ta/Makefile
 /src/optee/build
 
-/spvnode
-/sendtx
-/such
-build-ctx/
-build-ci-fix/
-build-local/
-build-winfix/
-build-fix/
+# Out-of-tree build directories for the independent library/test/CLI builds
 build-*/
 
 # Node.js (snarkjs etc. for ZK helpers)

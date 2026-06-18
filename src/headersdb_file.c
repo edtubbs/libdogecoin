@@ -35,25 +35,9 @@
 #include <dogecoin/serialize.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/validation.h>
-#include <stdio.h>
 
 static const unsigned char file_hdr_magic[4] = {0xA8, 0xF0, 0x11, 0xC5}; /* header magic */
 static const uint32_t current_version = 3; /* 3: added chainwork */
-
-/* headersdb is single-writer by contract. See doc/thread_safety.md: the SPV
- * master thread is the only caller in the _ts build, and legacy callers
- * (spvnode, tools) are single-threaded. The prior sync_lock has been removed
- * since it was redundant and imposed overhead on every read/write.
- */
-static void headersdb_lock_init(dogecoin_headers_db* db)
-{
-    if (db) db->sync_lock = NULL;
-}
-
-static void headersdb_lock_destroy(dogecoin_headers_db* db)
-{
-    if (db) db->sync_lock = NULL;
-}
 
 /**
  * "Compare two block headers by their hashes."
@@ -98,7 +82,6 @@ int dogecoin_header_compare(const void *l, const void *r)
 dogecoin_headers_db* dogecoin_headers_db_new(const dogecoin_chainparams* chainparams, dogecoin_bool inmem_only) {
     dogecoin_headers_db* db;
     db = dogecoin_calloc(1, sizeof(*db));
-    headersdb_lock_init(db);
     db->read_write_file = !inmem_only;
     db->use_binary_tree = true;
     db->max_hdr_in_mem = 1440;
@@ -140,7 +123,6 @@ void dogecoin_headers_db_free(dogecoin_headers_db* db) {
 
     db->chaintip = NULL;
     db->chainbottom = NULL;
-    headersdb_lock_destroy(db);
 
     dogecoin_free(db);
 }
@@ -180,10 +162,10 @@ dogecoin_bool dogecoin_headers_db_load(dogecoin_headers_db* db, const char *file
         if (prompt) {
             printf("\nLoad %s? (Enter) or (o)verwrite:", file_path_local);
             char response[MAX_LEN];
-                if (!fgets(response, MAX_LEN, stdin)) {
-                    printf("Error reading input.\n");
-                    return false;
-                }
+            if (!fgets(response, MAX_LEN, stdin)) {
+                printf("Error reading input.\n");
+                return false;
+            }
             if (response[0] == 'o' || response[0] == 'O') {
                 printf("Are you sure? (y/n): \n");
                 char confirm[MAX_LEN];
@@ -540,8 +522,7 @@ dogecoin_blockindex * dogecoin_headersdb_find(dogecoin_headers_db* db, uint256_t
  * @return The current tip of the blockchain.
  */
 dogecoin_blockindex * dogecoin_headersdb_getchaintip(dogecoin_headers_db* db) {
-    dogecoin_blockindex* tip = db->chaintip;
-    return tip;
+    return db->chaintip;
 }
 
 /**
@@ -574,8 +555,7 @@ dogecoin_bool dogecoin_headersdb_disconnect_tip(dogecoin_headers_db* db) {
  * @return A boolean value.
  */
 dogecoin_bool dogecoin_headersdb_has_checkpoint_start(dogecoin_headers_db* db) {
-    dogecoin_bool has_checkpoint = (db->chainbottom->height != 0);
-    return has_checkpoint;
+    return (db->chainbottom->height != 0);
 }
 
 /**
