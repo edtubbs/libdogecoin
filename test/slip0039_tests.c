@@ -1,10 +1,9 @@
 /**********************************************************************
+ * Copyright (c) 2026 edtubbs                                         *
  * Copyright (c) 2026 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
  **********************************************************************/
-
-#include <test/utest.h>
 
 #include <dogecoin/mem.h>
 #include <dogecoin/slip0039.h>

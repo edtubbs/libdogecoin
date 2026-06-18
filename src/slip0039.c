@@ -1,15 +1,8 @@
 /**********************************************************************
+ * Copyright (c) 2026 edtubbs                                         *
  * Copyright (c) 2026 The Dogecoin Foundation                         *
  * Distributed under the MIT software license, see the accompanying   *
  * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
- *                                                                    *
- * SLIP-0039 (Shamir's Secret-Sharing for Mnemonic Codes)             *
- *   Supports multi-group Shamir recovery (group_threshold >= 1).     *
- *   Supports both non-extendable ("shamir") and extendable shares.   *
- *   Default iteration_exponent = 1 (10000 PBKDF2 iterations).        *
- *                                                                    *
- *   Reference: https://github.com/satoshilabs/slips/blob/master/     *
- *              slip-0039.md                                          *
  **********************************************************************/
 
 #include <dogecoin/slip0039.h>
