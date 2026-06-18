@@ -402,6 +402,30 @@ dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams *params)
     return wallet;
 }
 
+/* Promote an already-constructed wallet to thread-safe by attaching a context
+ * (whose refcount is retained) and initializing the per-object mutex. The
+ * wallet keeps the chain parameters it was created with, so this is safe to use
+ * for wallets whose chain (e.g. regtest) cannot be represented by a context.
+ * Idempotent; returns true on success. */
+int dogecoin_wallet_enable_thread_safe(dogecoin_wallet* wallet, dogecoin_ctx* ctx)
+{
+    if (!wallet) return false;
+    if (wallet->thread_safe) return true;
+    wallet->ctx = ctx;
+    if (wallet->ctx) {
+        dogecoin_ctx_acquire(wallet->ctx);
+    }
+    if (!dogecoin_mutex_init(&wallet->lock)) {
+        if (wallet->ctx) {
+            dogecoin_ctx_release(wallet->ctx);
+            wallet->ctx = NULL;
+        }
+        return false;
+    }
+    wallet->thread_safe = true;
+    return true;
+}
+
 /* THREAD-SAFE variant - uses internal mutex */
 dogecoin_wallet* dogecoin_wallet_new_ts(dogecoin_ctx* ctx)
 {
@@ -412,19 +436,10 @@ dogecoin_wallet* dogecoin_wallet_new_ts(dogecoin_ctx* ctx)
     }
     dogecoin_wallet* wallet = dogecoin_wallet_new(params);
     if (!wallet) return NULL;
-    wallet->ctx = ctx;
-    if (wallet->ctx) {
-        dogecoin_ctx_acquire(wallet->ctx);
-    }
-    if (!dogecoin_mutex_init(&wallet->lock)) {
-        if (wallet->ctx) {
-            dogecoin_ctx_release(wallet->ctx);
-            wallet->ctx = NULL;
-        }
+    if (!dogecoin_wallet_enable_thread_safe(wallet, ctx)) {
         dogecoin_wallet_free(wallet);
         return NULL;
     }
-    wallet->thread_safe = true;
     return wallet;
 }
 
@@ -605,6 +620,18 @@ dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const c
         } else {
             dogecoin_wallet_next_addr(wallet);
         }
+    }
+    return wallet;
+}
+
+/* THREAD-SAFE variant of dogecoin_wallet_init - keeps the explicit chain and
+ * promotes the resulting wallet to thread-safe (attaches ctx, inits mutex). */
+dogecoin_wallet* dogecoin_wallet_init_ts(dogecoin_ctx* ctx, const dogecoin_chainparams* chain, const char* address, const char* name, const dogecoin_wallet_opts* opts) {
+    dogecoin_wallet* wallet = dogecoin_wallet_init(chain, address, name, opts);
+    if (!wallet) return NULL;
+    if (!dogecoin_wallet_enable_thread_safe(wallet, ctx)) {
+        dogecoin_wallet_free(wallet);
+        return NULL;
     }
     return wallet;
 }

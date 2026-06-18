@@ -87,6 +87,12 @@ LIBDOGECOIN_API int start_transaction_ts(dogecoin_transaction_context* ctx);
 LIBDOGECOIN_API dogecoin_transaction_context* dogecoin_transaction_context_new(void);
 LIBDOGECOIN_API void dogecoin_transaction_context_free(dogecoin_transaction_context* ctx);
 
+/* Returns the per-thread default transaction context that the non-`_ts`
+ * convenience wrappers (and the index-based transaction API) operate on. This
+ * lets callers invoke the `_ts` transaction-context API explicitly against the
+ * same registry, rather than going through the non-`_ts` wrappers. */
+LIBDOGECOIN_API dogecoin_transaction_context* dogecoin_transaction_context_default(void);
+
 LIBDOGECOIN_API int save_raw_transaction(int txindex, const char* hexadecimal_transaction);
 
 LIBDOGECOIN_API int add_utxo(int txindex, char* hex_utxo_txid, int vout); // #returns 1 if success.

@@ -72,6 +72,7 @@ noinst_HEADERS = \
     include/dogecoin/seal.h \
     include/dogecoin/sha2.h \
     include/dogecoin/smpv.h \
+    include/dogecoin/threadsafe.h \
     include/dogecoin/tool.h \
     include/dogecoin/transaction.h \
     include/dogecoin/tx.h \

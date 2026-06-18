@@ -43,6 +43,10 @@ static dogecoin_transaction_context* default_transaction_context(void) {
     return &default_ctx;
 }
 
+dogecoin_transaction_context* dogecoin_transaction_context_default(void) {
+    return default_transaction_context();
+}
+
 dogecoin_transaction_context* dogecoin_transaction_context_new(void) {
     return (dogecoin_transaction_context*)dogecoin_calloc(1, sizeof(dogecoin_transaction_context));
 }
@@ -60,13 +64,24 @@ void dogecoin_transaction_context_free(dogecoin_transaction_context* ctx) {
  * @return A pointer to the new working transaction.
  */
 working_transaction* new_transaction() {
-    return new_transaction_ts(default_transaction_context());
+    dogecoin_transaction_context* ctx = default_transaction_context();
+    if (!ctx) return NULL;
+    working_transaction* working_tx = (struct working_transaction*)dogecoin_calloc(1, sizeof *working_tx);
+    working_tx->transaction = dogecoin_tx_new();
+    working_tx->idx = HASH_COUNT(ctx->transactions) + 1;
+    return working_tx;
 }
 
 working_transaction* new_transaction_ts(dogecoin_transaction_context* ctx) {
     if (!ctx) return NULL;
     working_transaction* working_tx = (struct working_transaction*)dogecoin_calloc(1, sizeof *working_tx);
-    working_tx->transaction = dogecoin_tx_new();
+    /* Thread-safe registry entries carry a mutex-bearing transaction so the
+       _ts CLI builds operate on per-transaction-locked objects. */
+    working_tx->transaction = dogecoin_tx_new_ts();
+    if (!working_tx->transaction) {
+        dogecoin_free(working_tx);
+        return NULL;
+    }
     working_tx->idx = HASH_COUNT(ctx->transactions) + 1;
     return working_tx;
 }

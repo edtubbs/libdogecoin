@@ -159,6 +159,10 @@ LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new(const dogecoin_chainparams 
 /* THREAD-SAFE variant - uses internal mutex */
 LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_new_ts(dogecoin_ctx* ctx);
 LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_init(const dogecoin_chainparams* chain, const char* address, const char* name, const dogecoin_wallet_opts* opts);
+/* THREAD-SAFE variant of dogecoin_wallet_init - keeps the explicit chain */
+LIBDOGECOIN_API dogecoin_wallet* dogecoin_wallet_init_ts(dogecoin_ctx* ctx, const dogecoin_chainparams* chain, const char* address, const char* name, const dogecoin_wallet_opts* opts);
+/* Promote an existing wallet to thread-safe (attach ctx + init mutex). Idempotent. */
+LIBDOGECOIN_API int dogecoin_wallet_enable_thread_safe(dogecoin_wallet* wallet, dogecoin_ctx* ctx);
 LIBDOGECOIN_API void print_utxos(dogecoin_wallet* wallet);
 LIBDOGECOIN_API void dogecoin_wallet_free(dogecoin_wallet* wallet);
 /* THREAD-SAFE variant - uses internal mutex */
