@@ -186,16 +186,58 @@ binary:
 | `sendtx`      | `sendtx_ts`      |
 | `spvnode`     | `spvnode_ts`     |
 
-The `_ts` binaries are the same sources compiled with `-DDOGECOIN_TS=1`
-(`src/cli/cli_ts.h`). In that mode the transaction-builder entry points
-(`dogecoin_tx_new` / `dogecoin_tx_free`) are routed to their `_ts` variants and
-the tool creates a thread-safe context at startup, printing for example:
+The `_ts` binaries are the same sources compiled with `-DDOGECOIN_TS=1`. Rather
+than invisibly redefining public API names, the CLIs route every thread-safe
+operation through explicit, greppable wrappers declared in
+`include/dogecoin/threadsafe.h` (`#include <dogecoin/threadsafe.h>`). Each `cli_*`
+wrapper calls the matching `_ts` library API under `-DDOGECOIN_TS` and the plain
+API otherwise; the two builds are otherwise identical.
+
+At startup the `_ts` tools create a thread-safe context and announce it, e.g.:
 
 ```
 such: thread-safe mode enabled
 ```
 
 The legacy binaries are unaffected and print nothing extra.
+
+### What the `_ts` CLI builds exercise
+
+The wrappers ensure that, in the `_ts` build, every object the CLI creates is the
+thread-safe (mutex-bearing) variant operating under a thread-safe context, and
+every CLI code path that mutates or serializes a transaction holds the matching
+per-transaction mutex:
+
+| CLI operation (wrapper)                                   | `_ts` API / context / mutex used                                            |
+|----------------------------------------------------------|------------------------------------------------------------------------------|
+| context lifecycle (`cli_ts_context_start`/`_finish`)     | `dogecoin_ctx_new_ts` / `dogecoin_ctx_release`; refcount-mutex `dogecoin_ctx`|
+| transaction create/free (`cli_tx_new`/`cli_tx_free`)     | `dogecoin_tx_new_ts` / `dogecoin_tx_free_ts`; initializes `dogecoin_tx.lock` |
+| registry (`cli_start/find/remove/remove_all/get_count`)  | `*_ts` against `dogecoin_transaction_context_default()`                      |
+| index ops (`cli_save_raw_transaction`, `cli_add_utxo`, `cli_add_output`, `cli_finalize_transaction`, `cli_get_raw_transaction`) | hold the working transaction's `dogecoin_tx.lock` for the duration of the call |
+| `cli_clear_transaction`                                   | `remove_transaction_ts` against the default context (frees the entry)        |
+| eckey (`cli_eckey_from_privkey`)                          | `dogecoin_eckey_context` lifecycle + `new_eckey_from_privkey_ts`            |
+| wallet init/new/free (`cli_wallet_init`/`_new`/`_free`)  | `dogecoin_wallet_init_ts` / `dogecoin_wallet_enable_thread_safe` / `dogecoin_wallet_free_ts`; initializes/uses `dogecoin_wallet.lock` |
+
+Because the CLIs drive transactions through the higher-level index API rather
+than calling the low-level `dogecoin_tx`/eckey/wallet primitives directly, the
+remaining `_ts` primitives — `dogecoin_tx_add_input_ts`/`add_output_ts`/
+`finalize_ts`/`sign_ts`, the eckey registry (`add_eckey_ts`/`find_eckey_ts`/
+`remove_eckey_ts`/`start_key_ts`/`new_eckey_ts`), and
+`dogecoin_wallet_load_ts`/`save_ts`/`add_hd_account_ts`/`get_address_ts` — have
+no corresponding CLI command and are validated by the unit-test suite
+(`test/transaction_tests.c`, `test/wallet_tests.c`, `test/eckey_tests.c`).
+
+Notes:
+
+* The registry and eckey contexts hold only a hashmap and rely on per-thread
+  isolation (no internal mutex); the real locks live on `dogecoin_tx.lock`,
+  `dogecoin_wallet.lock` and the `dogecoin_ctx` refcount mutex.
+* The index-based transaction API binds to the per-thread *default* transaction
+  context, so the `cli_*` registry/index wrappers target that same default
+  context to keep index lookups consistent.
+* `_ts` working transactions are mutex-bearing because `new_transaction_ts`
+  constructs them with `dogecoin_tx_new_ts()`; the legacy `new_transaction`
+  path remains lock-free.
 
 ## Verifying with sanitizers
 
