@@ -78,6 +78,7 @@
 #include <dogecoin/tx.h>
 #include <dogecoin/utils.h>
 #include <dogecoin/wallet.h>
+#include "cli_ts.h"
 
 #ifndef WIN32
 #define BD_NO_CHDIR          01 /* Don't chdir ("/") */
@@ -575,6 +576,7 @@ int main(int argc, char* argv[]) {
 
     if (strcmp(data, "scan") == 0) {
         dogecoin_ecc_start();
+        DOGECOIN_CLI_TS_ANNOUNCE("spvnode");
         in_memory_headers = (dbfile && ((strcmp(dbfile, "0") == 0) || (strcmp(dbfile, "no") == 0)));
         dogecoin_spv_client* client = dogecoin_spv_client_new(chain, debug, in_memory_headers, use_checkpoint, full_sync, maxnodes, http_server);
 

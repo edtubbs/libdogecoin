@@ -83,6 +83,7 @@ static const char* SUCH_MULTISIG_REDEEM_SCRIPT_LABEL = "multisig redeem script: 
 static const char* SUCH_MULTISIG_P2SH_ADDRESS_LABEL = "multisig p2sh address: %s\n";
 
 // ******************************** SUCH -C TRANSACTION MENU ********************************
+#include "cli_ts.h"
 #ifdef WITH_NET
 #include <dogecoin/net.h>
 void broadcasting_menu(int txindex, int is_testnet) {
@@ -1300,6 +1301,8 @@ int main(int argc, char* argv[])
 
     /* start ECC context */
     dogecoin_ecc_start();
+
+    DOGECOIN_CLI_TS_ANNOUNCE("such");
 
     /* WIF / extended-key length sanity check for commands that consume -p as
        a base58-encoded private key.  PQC carrier and PQC signing commands
