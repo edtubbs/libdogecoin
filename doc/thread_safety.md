@@ -186,12 +186,17 @@ binary:
 | `sendtx`      | `sendtx_ts`      |
 | `spvnode`     | `spvnode_ts`     |
 
-The `_ts` binaries are the same sources compiled with `-DDOGECOIN_TS=1`. Rather
-than invisibly redefining public API names, the CLIs route every thread-safe
-operation through explicit, greppable wrappers declared in
-`include/dogecoin/threadsafe.h` (`#include <dogecoin/threadsafe.h>`). Each `cli_*`
-wrapper calls the matching `_ts` library API under `-DDOGECOIN_TS` and the plain
-API otherwise; the two builds are otherwise identical.
+The `_ts` binaries are the same sources compiled with `-DDOGECOIN_TS=1`. The CLIs
+route thread-safe operations through `include/dogecoin/threadsafe.h`
+(`#include <dogecoin/threadsafe.h>`). Operations whose `_ts` variant shares the
+exact signature of the plain API (the direct `dogecoin_tx` create/free calls)
+are routed with a compile-time rename, so the CLI sources keep calling the
+canonical `dogecoin_tx_new()`/`dogecoin_tx_free()` names. Operations whose `_ts`
+variant takes an extra context argument or has a distinct lifecycle are routed
+through explicit, greppable `cli_*` wrappers that inject the context for the
+caller. Each rename or wrapper resolves to the matching `_ts` library API under
+`-DDOGECOIN_TS` and the plain API otherwise; the two builds are otherwise
+identical.
 
 At startup the `_ts` tools create a thread-safe context and announce it, e.g.:
 
@@ -217,9 +222,10 @@ functions (`add_utxo_ts`, `add_output_ts`, `finalize_transaction_ts`,
 Those variants in turn drive the per-object transaction primitives
 (`dogecoin_tx_add_input_ts`, `dogecoin_tx_add_output_ts`,
 `dogecoin_tx_finalize_ts`) and serialize/copy under the working transaction's
-`dogecoin_tx.lock`. The context lifecycle, registry, transaction create/free,
-eckey and wallet wrappers route through the matching `_ts` context, registry and
-per-object APIs in the same way. The non-`_ts` higher-level index functions are
+`dogecoin_tx.lock`. The context lifecycle, registry, eckey and wallet wrappers,
+together with the `dogecoin_tx_new()`/`dogecoin_tx_free()` compile-time renames,
+route through the matching `_ts` context, registry and per-object APIs in the
+same way. The non-`_ts` higher-level index functions are
 thin wrappers that delegate to the same `_ts` implementations against the
 per-thread default context, so the legacy and thread-safe builds share a single
 code path and produce byte-identical transactions.

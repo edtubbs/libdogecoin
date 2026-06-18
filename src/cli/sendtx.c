@@ -161,7 +161,7 @@ int main(int argc, char* argv[]) {
     size_t outlen = 0;
     utils_hex_to_bin(data, data_bin, data_hex_len, &outlen);
 
-    dogecoin_tx* tx = cli_tx_new();
+    dogecoin_tx* tx = dogecoin_tx_new();
     /* Deserializing the transaction and broadcasting it to the network. */
     if (dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
         if (debug) print_tx_debug(tx);
@@ -172,7 +172,7 @@ int main(int argc, char* argv[]) {
         ret = 1;
         }
     dogecoin_free(data_bin);
-    cli_tx_free(tx);
+    dogecoin_tx_free(tx);
 
     cli_ts_context_finish(ts_ctx);
     return ret;

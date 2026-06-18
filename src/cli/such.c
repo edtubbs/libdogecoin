@@ -1548,20 +1548,20 @@ int main(int argc, char* argv[])
             }
 
         //deserialize transaction
-        dogecoin_tx* tx = cli_tx_new();
+        dogecoin_tx* tx = dogecoin_tx_new();
         uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
         size_t outlen = 0;
         utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
         if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
             dogecoin_free(data_bin);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid tx hex");
             }
 
         dogecoin_free(data_bin);
 
         if ((size_t)inputindex >= tx->vin->len) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Inputindex out of range");
             }
 
@@ -1594,7 +1594,7 @@ int main(int argc, char* argv[])
         else {
             if (pkey) {
                 if (strlen(pkey) > 50) {
-                    cli_tx_free(tx);
+                    dogecoin_tx_free(tx);
                     cstr_free(script, true);
                     return showError("Invalid wif privkey\n");
                     }
@@ -1634,7 +1634,7 @@ int main(int argc, char* argv[])
             cstr_free(signed_tx, true);
             free(signed_tx_hex);
             }
-        cli_tx_free(tx);
+        dogecoin_tx_free(tx);
         }
 #ifdef USE_LIBOQS
     else if (strcmp(cmd, "pqc_carrier_redeemscript") == 0) {
@@ -1821,38 +1821,38 @@ int main(int argc, char* argv[])
         if (strlen(txhex) > 1024 * 100) {
             return showError("tx too large (max 100kb)\n");
         }
-        dogecoin_tx* tx = cli_tx_new();
+        dogecoin_tx* tx = dogecoin_tx_new();
         uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
         size_t outlen = 0;
         utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
         if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
             dogecoin_free(data_bin);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid tx hex");
         }
         dogecoin_free(data_bin);
         if ((size_t)inputindex >= tx->vin->len) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Inputindex out of range");
         }
         dogecoin_tx_in* tx_in = vector_idx(tx->vin, inputindex);
         if (!tx_in->script_sig) {
             tx_in->script_sig = cstr_new_sz(32);
             if (!tx_in->script_sig) {
-                cli_tx_free(tx);
+                dogecoin_tx_free(tx);
                 return showError("Failed to allocate scriptSig");
             }
         }
         size_t ss_len = strlen(scripthex) / 2;
         uint8_t* ss_bin = dogecoin_malloc(ss_len + 1);
         if (!ss_bin) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("OOM");
         }
         utils_hex_to_bin(scripthex, ss_bin, strlen(scripthex), &outlen);
         if (outlen != ss_len) {
             dogecoin_free(ss_bin);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid scriptSig hex");
         }
         cstr_resize(tx_in->script_sig, 0);
@@ -1865,7 +1865,7 @@ int main(int argc, char* argv[])
         printf("tx with scriptsig set: %s\n", out_tx_hex);
         cstr_free(out_tx, true);
         free(out_tx_hex);
-        cli_tx_free(tx);
+        dogecoin_tx_free(tx);
     }
     else if (strcmp(cmd, "pqc_chunk_hex") == 0) {
         if (!txhex) {
@@ -1903,19 +1903,19 @@ int main(int argc, char* argv[])
             return showError("tx too large (max 100kb)\n");
         }
 
-        dogecoin_tx* tx = cli_tx_new();
+        dogecoin_tx* tx = dogecoin_tx_new();
         uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
         size_t outlen = 0;
         utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
         if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
             dogecoin_free(data_bin);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid tx hex");
         }
         dogecoin_free(data_bin);
 
         if ((size_t)inputindex >= tx->vin->len) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Inputindex out of range");
         }
 
@@ -1928,14 +1928,14 @@ int main(int argc, char* argv[])
         dogecoin_mem_zero(sighash32, sizeof(sighash32));
         if (!dogecoin_tx_sighash32(tx, script, inputindex, sighashtype, sighash32)) {
             cstr_free(script, true);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to compute tx sighash");
         }
 
         char* sighash_hex = utils_uint8_to_hex(sighash32, sizeof(sighash32));
         printf("tx_sighash32: %s\n", sighash_hex);
         cstr_free(script, true);
-        cli_tx_free(tx);
+        dogecoin_tx_free(tx);
     }
     else if (strcmp(cmd, "comp2der") == 0) {
         // ./such -c comp2der -s <compact signature>
@@ -2956,13 +2956,13 @@ int main(int argc, char* argv[])
             }
         }
 
-        dogecoin_tx* tx = cli_tx_new();
+        dogecoin_tx* tx = dogecoin_tx_new();
         uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
         size_t outlen = 0;
         utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
         if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
             dogecoin_free(data_bin);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid tx hex\n");
         }
         dogecoin_free(data_bin);
@@ -2971,12 +2971,12 @@ int main(int argc, char* argv[])
         size_t commit_len = 0;
         utils_hex_to_bin(scripthex, commit32, strlen(scripthex), &commit_len);
         if (commit_len != sizeof(commit32)) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to decode commitment\n");
         }
 
         if (!dogecoin_tx_add_falcon512_commit(tx, commit32)) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to append Falcon commitment output\n");
         }
 
@@ -2985,7 +2985,7 @@ int main(int argc, char* argv[])
         char* tx_with_commit_hex = dogecoin_malloc(tx_with_commit->len * 2 + 1);
         if (!tx_with_commit_hex) {
             cstr_free(tx_with_commit, true);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to allocate memory for tx hex\n");
         }
         utils_bin_to_hex((unsigned char*)tx_with_commit->str, tx_with_commit->len, tx_with_commit_hex);
@@ -2994,7 +2994,7 @@ int main(int argc, char* argv[])
 
         cstr_free(tx_with_commit, true);
         dogecoin_free(tx_with_commit_hex);
-        cli_tx_free(tx);
+        dogecoin_tx_free(tx);
     }
     else if (strcmp(cmd, "dilithium2_add_commit_tx") == 0) {
         if (!txhex || !scripthex) {
@@ -3012,13 +3012,13 @@ int main(int argc, char* argv[])
             }
         }
 
-        dogecoin_tx* tx = cli_tx_new();
+        dogecoin_tx* tx = dogecoin_tx_new();
         uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
         size_t outlen = 0;
         utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
         if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
             dogecoin_free(data_bin);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid tx hex\n");
         }
         dogecoin_free(data_bin);
@@ -3027,12 +3027,12 @@ int main(int argc, char* argv[])
         size_t commit_len = 0;
         utils_hex_to_bin(scripthex, commit32, strlen(scripthex), &commit_len);
         if (commit_len != sizeof(commit32)) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to decode commitment\n");
         }
 
         if (!dogecoin_tx_add_dilithium2_commit(tx, commit32)) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to append Dilithium2 commitment output\n");
         }
 
@@ -3041,14 +3041,14 @@ int main(int argc, char* argv[])
         char* tx_with_commit_hex = dogecoin_malloc(tx_with_commit->len * 2 + 1);
         if (!tx_with_commit_hex) {
             cstr_free(tx_with_commit, true);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to allocate memory for tx hex\n");
         }
         utils_bin_to_hex((unsigned char*)tx_with_commit->str, tx_with_commit->len, tx_with_commit_hex);
         printf("tx with commitment: %s\n", tx_with_commit_hex);
         cstr_free(tx_with_commit, true);
         dogecoin_free(tx_with_commit_hex);
-        cli_tx_free(tx);
+        dogecoin_tx_free(tx);
     }
 #endif /* USE_LIBOQS (falcon/dilithium add_commit_tx) */
 #ifdef USE_RACCOON_G
@@ -3068,13 +3068,13 @@ int main(int argc, char* argv[])
             }
         }
 
-        dogecoin_tx* tx = cli_tx_new();
+        dogecoin_tx* tx = dogecoin_tx_new();
         uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
         size_t outlen = 0;
         utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
         if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
             dogecoin_free(data_bin);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid tx hex\n");
         }
         dogecoin_free(data_bin);
@@ -3083,12 +3083,12 @@ int main(int argc, char* argv[])
         size_t commit_len = 0;
         utils_hex_to_bin(scripthex, commit32, strlen(scripthex), &commit_len);
         if (commit_len != sizeof(commit32)) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to decode commitment\n");
         }
 
         if (!dogecoin_tx_add_raccoong44_commit(tx, commit32)) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to append Raccoon-G-44 commitment output\n");
         }
 
@@ -3097,14 +3097,14 @@ int main(int argc, char* argv[])
         char* tx_with_commit_hex = dogecoin_malloc(tx_with_commit->len * 2 + 1);
         if (!tx_with_commit_hex) {
             cstr_free(tx_with_commit, true);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to allocate memory for tx hex\n");
         }
         utils_bin_to_hex((unsigned char*)tx_with_commit->str, tx_with_commit->len, tx_with_commit_hex);
         printf("tx with commitment: %s\n", tx_with_commit_hex);
         cstr_free(tx_with_commit, true);
         dogecoin_free(tx_with_commit_hex);
-        cli_tx_free(tx);
+        dogecoin_tx_free(tx);
     }
 #endif /* USE_RACCOON_G */
     else if (
@@ -3124,20 +3124,20 @@ int main(int argc, char* argv[])
         }
         uint64_t carrier_value_koinu = (sighashtype > 0) ? (uint64_t)sighashtype : 100000000;
 
-        dogecoin_tx* tx = cli_tx_new();
+        dogecoin_tx* tx = dogecoin_tx_new();
         uint8_t* data_bin = dogecoin_malloc(strlen(txhex) / 2 + 1);
         size_t outlen = 0;
         utils_hex_to_bin(txhex, data_bin, strlen(txhex), &outlen);
         if (!dogecoin_tx_deserialize(data_bin, outlen, tx, NULL)) {
             dogecoin_free(data_bin);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid tx hex\n");
         }
         dogecoin_free(data_bin);
 
         uint8_t commit32[32];
         if (!such_commit_hex_to_bytes32(derived_path, commit32)) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Commitment must be exactly 32 bytes (64 hex characters)\n");
         }
 
@@ -3164,7 +3164,7 @@ int main(int argc, char* argv[])
         uint32_t carrier_first_vout = 0;
         if (!such_tx_add_commit_and_carrier_outputs(tx, commit32, add_commit_fn, tag4_ascii, pubkey, scripthex,
                                                     carrier_value_koinu, &carrier_spk, &part_total, &carrier_first_vout)) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to append commitment + carrier outputs\n");
         }
 
@@ -3176,7 +3176,7 @@ int main(int argc, char* argv[])
             if (pk) dogecoin_free(pk);
             if (sig) dogecoin_free(sig);
             cstr_free(carrier_spk, true);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("OOM");
         }
         outlen = 0;
@@ -3185,7 +3185,7 @@ int main(int argc, char* argv[])
             dogecoin_free(pk);
             dogecoin_free(sig);
             cstr_free(carrier_spk, true);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid pqc pubkey hex");
         }
         utils_hex_to_bin(scripthex, sig, strlen(scripthex), &outlen);
@@ -3193,7 +3193,7 @@ int main(int argc, char* argv[])
             dogecoin_free(pk);
             dogecoin_free(sig);
             cstr_free(carrier_spk, true);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid pqc signature hex");
         }
         size_t full_len = pk_len + sig_len;
@@ -3202,7 +3202,7 @@ int main(int argc, char* argv[])
             dogecoin_free(pk);
             dogecoin_free(sig);
             cstr_free(carrier_spk, true);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("OOM");
         }
         memcpy(full, pk, pk_len);
@@ -3217,7 +3217,7 @@ int main(int argc, char* argv[])
         if (!dogecoin_pqc_carrier_build_redeemscript(&redeem)) {
             dogecoin_free(full);
             cstr_free(carrier_spk, true);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Failed to build carrier redeemScript");
         }
 
@@ -3229,7 +3229,7 @@ int main(int argc, char* argv[])
             cstr_free(redeem, true);
             dogecoin_free(full);
             cstr_free(carrier_spk, true);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("OOM");
         }
         utils_bin_to_hex((unsigned char*)tx_out->str, tx_out->len, tx_out_hex);
@@ -3253,7 +3253,7 @@ int main(int argc, char* argv[])
                 cstr_free(redeem, true);
                 dogecoin_free(full);
                 cstr_free(carrier_spk, true);
-                cli_tx_free(tx);
+                dogecoin_tx_free(tx);
                 return showError("Failed to build carrier part scriptsig");
             }
             char* ss_hex = utils_uint8_to_hex((const uint8_t*)part_scriptsig->str, part_scriptsig->len);
@@ -3266,7 +3266,7 @@ int main(int argc, char* argv[])
         cstr_free(redeem, true);
         dogecoin_free(full);
         cstr_free(carrier_spk, true);
-        cli_tx_free(tx);
+        dogecoin_tx_free(tx);
     }
 #endif
 #ifdef USE_ZK_CARRIER
@@ -3381,11 +3381,11 @@ int main(int argc, char* argv[])
         }
 
         /* Deserialize tx. */
-        dogecoin_tx* tx = cli_tx_new();
+        dogecoin_tx* tx = dogecoin_tx_new();
         size_t tx_bin_len = strlen(txhex) / 2;
         uint8_t* tx_bin = dogecoin_malloc(tx_bin_len + 1);
         if (!tx || !tx_bin) {
-            if (tx) cli_tx_free(tx);
+            if (tx) dogecoin_tx_free(tx);
             if (tx_bin) dogecoin_free(tx_bin);
             return showError("OOM\n");
         }
@@ -3393,7 +3393,7 @@ int main(int argc, char* argv[])
         utils_hex_to_bin(txhex, tx_bin, strlen(txhex), &outlen);
         if (outlen != tx_bin_len || !dogecoin_tx_deserialize(tx_bin, outlen, tx, NULL)) {
             dogecoin_free(tx_bin);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid tx hex\n");
         }
         dogecoin_free(tx_bin);
@@ -3402,14 +3402,14 @@ int main(int argc, char* argv[])
         size_t payload_len = strlen(scripthex) / 2;
         uint8_t* payload = dogecoin_malloc(payload_len ? payload_len : 1);
         if (!payload) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("OOM\n");
         }
         outlen = 0;
         utils_hex_to_bin(scripthex, payload, strlen(scripthex), &outlen);
         if (outlen != payload_len) {
             dogecoin_free(payload);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid payload hex\n");
         }
 
@@ -3420,7 +3420,7 @@ int main(int argc, char* argv[])
             carrier_value_koinu, &carrier_spk, &part_total);
         if (e != DOGECOIN_ZK_OK) {
             dogecoin_free(payload);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError(dogecoin_zk_strerror(e));
         }
 
@@ -3459,7 +3459,7 @@ int main(int argc, char* argv[])
         cstr_free(tx_out, true);
         cstr_free(carrier_spk, true);
         dogecoin_free(payload);
-        cli_tx_free(tx);
+        dogecoin_tx_free(tx);
     }
     else if (strcmp(cmd, "zk_extract_carrier") == 0) {
         // ./such -c zk_extract_carrier -x <tx_r_hex>
@@ -3469,10 +3469,10 @@ int main(int argc, char* argv[])
         uint8_t* bin = dogecoin_malloc(bin_len + 1);
         size_t outlen = 0;
         utils_hex_to_bin(txhex, bin, strlen(txhex), &outlen);
-        dogecoin_tx* tx = cli_tx_new();
+        dogecoin_tx* tx = dogecoin_tx_new();
         if (!dogecoin_tx_deserialize(bin, outlen, tx, NULL)) {
             dogecoin_free(bin);
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError("Invalid tx hex\n");
         }
         dogecoin_free(bin);
@@ -3481,7 +3481,7 @@ int main(int argc, char* argv[])
         size_t payload_len = 0;
         dogecoin_zk_err_t e = dogecoin_zk_extract_carrier_payload(tx, &payload, &payload_len);
         if (e != DOGECOIN_ZK_OK) {
-            cli_tx_free(tx);
+            dogecoin_tx_free(tx);
             return showError(dogecoin_zk_strerror(e));
         }
         char* hex = dogecoin_malloc(payload_len * 2 + 1);
@@ -3516,7 +3516,7 @@ int main(int argc, char* argv[])
         }
         dogecoin_free(hex);
         dogecoin_free(payload);
-        cli_tx_free(tx);
+        dogecoin_tx_free(tx);
     }
 #endif
     else {
