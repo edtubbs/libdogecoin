@@ -167,31 +167,16 @@ static inline int cli_get_transaction_count(void)
  *
  * The CLI mutates and serializes working transactions through the index-based
  * API. In the `_ts` build the working transaction is mutex-bearing (created
- * via dogecoin_tx_new_ts() inside new_transaction_ts), so these wrappers
- * acquire the matching per-transaction lock around each operation. The base
- * index functions never re-enter these wrappers, so the lock is taken at most
- * once per call. In the legacy build the lock is absent (thread_safe == 0) and
- * the wrappers reduce to a direct call.
+ * via dogecoin_tx_new_ts() inside new_transaction_ts), and the `_ts` index
+ * variants route every mutation through the thread-safe transaction primitives
+ * (dogecoin_tx_add_input_ts / dogecoin_tx_add_output_ts / dogecoin_tx_finalize_ts)
+ * and serialize under the per-transaction mutex. In the legacy build the lock is
+ * absent (thread_safe == 0) and the wrappers reduce to the plain index API.
  * -------------------------------------------------------------------------- */
-#ifdef DOGECOIN_TS
-static inline dogecoin_mutex_t* cli_tx_lock_for(int txindex)
-{
-    working_transaction* wtx = find_transaction_ts(dogecoin_transaction_context_default(), txindex);
-    if (wtx && wtx->transaction && wtx->transaction->thread_safe) {
-        return &wtx->transaction->lock;
-    }
-    return NULL;
-}
-#endif
-
 static inline int cli_save_raw_transaction(int txindex, const char* hexadecimal_transaction)
 {
 #ifdef DOGECOIN_TS
-    dogecoin_mutex_t* lk = cli_tx_lock_for(txindex);
-    if (lk) dogecoin_mutex_lock(lk);
-    int r = save_raw_transaction(txindex, hexadecimal_transaction);
-    if (lk) dogecoin_mutex_unlock(lk);
-    return r;
+    return save_raw_transaction_ts(dogecoin_transaction_context_default(), txindex, hexadecimal_transaction);
 #else
     return save_raw_transaction(txindex, hexadecimal_transaction);
 #endif
@@ -200,11 +185,7 @@ static inline int cli_save_raw_transaction(int txindex, const char* hexadecimal_
 static inline int cli_add_utxo(int txindex, char* hex_utxo_txid, int vout)
 {
 #ifdef DOGECOIN_TS
-    dogecoin_mutex_t* lk = cli_tx_lock_for(txindex);
-    if (lk) dogecoin_mutex_lock(lk);
-    int r = add_utxo(txindex, hex_utxo_txid, vout);
-    if (lk) dogecoin_mutex_unlock(lk);
-    return r;
+    return add_utxo_ts(dogecoin_transaction_context_default(), txindex, hex_utxo_txid, vout);
 #else
     return add_utxo(txindex, hex_utxo_txid, vout);
 #endif
@@ -213,11 +194,7 @@ static inline int cli_add_utxo(int txindex, char* hex_utxo_txid, int vout)
 static inline int cli_add_output(int txindex, char* destinationaddress, char* amount)
 {
 #ifdef DOGECOIN_TS
-    dogecoin_mutex_t* lk = cli_tx_lock_for(txindex);
-    if (lk) dogecoin_mutex_lock(lk);
-    int r = add_output(txindex, destinationaddress, amount);
-    if (lk) dogecoin_mutex_unlock(lk);
-    return r;
+    return add_output_ts(dogecoin_transaction_context_default(), txindex, destinationaddress, amount);
 #else
     return add_output(txindex, destinationaddress, amount);
 #endif
@@ -227,12 +204,8 @@ static inline char* cli_finalize_transaction(int txindex, char* destinationaddre
                                              char* out_dogeamount_for_verification, char* changeaddress)
 {
 #ifdef DOGECOIN_TS
-    dogecoin_mutex_t* lk = cli_tx_lock_for(txindex);
-    if (lk) dogecoin_mutex_lock(lk);
-    char* r = finalize_transaction(txindex, destinationaddress, subtractedfee,
-                                   out_dogeamount_for_verification, changeaddress);
-    if (lk) dogecoin_mutex_unlock(lk);
-    return r;
+    return finalize_transaction_ts(dogecoin_transaction_context_default(), txindex, destinationaddress,
+                                   subtractedfee, out_dogeamount_for_verification, changeaddress);
 #else
     return finalize_transaction(txindex, destinationaddress, subtractedfee,
                                 out_dogeamount_for_verification, changeaddress);
@@ -242,11 +215,7 @@ static inline char* cli_finalize_transaction(int txindex, char* destinationaddre
 static inline char* cli_get_raw_transaction(int txindex)
 {
 #ifdef DOGECOIN_TS
-    dogecoin_mutex_t* lk = cli_tx_lock_for(txindex);
-    if (lk) dogecoin_mutex_lock(lk);
-    char* r = get_raw_transaction(txindex);
-    if (lk) dogecoin_mutex_unlock(lk);
-    return r;
+    return get_raw_transaction_ts(dogecoin_transaction_context_default(), txindex);
 #else
     return get_raw_transaction(txindex);
 #endif
@@ -258,8 +227,7 @@ static inline char* cli_get_raw_transaction(int txindex)
 static inline void cli_clear_transaction(int txindex)
 {
 #ifdef DOGECOIN_TS
-    dogecoin_transaction_context* ctx = dogecoin_transaction_context_default();
-    remove_transaction_ts(ctx, find_transaction_ts(ctx, txindex));
+    clear_transaction_ts(dogecoin_transaction_context_default(), txindex);
 #else
     clear_transaction(txindex);
 #endif

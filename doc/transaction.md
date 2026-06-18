@@ -35,6 +35,8 @@ Buffered `_ex` transaction APIs are retained as the primary API surface (for exa
 
 Thread-safety policy: `_ts` APIs are used when explicit context ownership is required. For APIs that can be made thread-safe without signature changes, the original API names are used directly.
 
+The higher-level index functions also provide `_ts` variants that take an explicit `dogecoin_transaction_context*` and route through the per-object transaction primitives (`dogecoin_tx_add_input_ts`, `dogecoin_tx_add_output_ts`, `dogecoin_tx_finalize_ts`): `add_utxo_ts`, `add_output_ts`, `finalize_transaction_ts`, `save_raw_transaction_ts`, `get_raw_transaction_ts`, and `clear_transaction_ts`. The non-`_ts` functions are thin wrappers that delegate to these against the per-thread default context, so both paths share a single implementation. The thread-safe CLI builds (`such_ts`, `sendtx_ts`, `spvnode_ts`) call the `_ts` variants. See [thread_safety.md](thread_safety.md).
+
 ```C
 typedef struct working_transaction {
     int index;

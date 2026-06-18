@@ -94,18 +94,32 @@ LIBDOGECOIN_API void dogecoin_transaction_context_free(dogecoin_transaction_cont
 LIBDOGECOIN_API dogecoin_transaction_context* dogecoin_transaction_context_default(void);
 
 LIBDOGECOIN_API int save_raw_transaction(int txindex, const char* hexadecimal_transaction);
+/* THREAD-SAFE variant - operates on the supplied transaction context and
+   acquires the working transaction's per-object mutex. */
+LIBDOGECOIN_API int save_raw_transaction_ts(dogecoin_transaction_context* ctx, int txindex, const char* hexadecimal_transaction);
 
 LIBDOGECOIN_API int add_utxo(int txindex, char* hex_utxo_txid, int vout); // #returns 1 if success.
+/* THREAD-SAFE variant - routes the input through dogecoin_tx_add_input_ts. */
+LIBDOGECOIN_API int add_utxo_ts(dogecoin_transaction_context* ctx, int txindex, char* hex_utxo_txid, int vout);
 
 LIBDOGECOIN_API int add_output(int txindex, char* destinationaddress, char* amount);
+/* THREAD-SAFE variant - routes the output through dogecoin_tx_add_output_ts. */
+LIBDOGECOIN_API int add_output_ts(dogecoin_transaction_context* ctx, int txindex, char* destinationaddress, char* amount);
 
 // 'closes the inputs', specifies the recipient, specifies the amnt-to-subtract-as-fee, and returns the raw tx..
 // out_dogeamount == just an echoback of the total amount specified in the addutxos for verification
 LIBDOGECOIN_API char* finalize_transaction(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* public_key);
+/* THREAD-SAFE variant - adds change via dogecoin_tx_add_output_ts and runs the
+   dogecoin_tx_finalize_ts integrity pass before serializing. */
+LIBDOGECOIN_API char* finalize_transaction_ts(dogecoin_transaction_context* ctx, int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* public_key);
 
 LIBDOGECOIN_API char* get_raw_transaction(int txindex); // #returns 0 if not closed, returns rawtx again if closed/created.
+/* THREAD-SAFE variant - serializes under the working transaction's mutex. */
+LIBDOGECOIN_API char* get_raw_transaction_ts(dogecoin_transaction_context* ctx, int txindex);
 
 LIBDOGECOIN_API void clear_transaction(int txindex); // #clears a tx in memory. (overwrites)
+/* THREAD-SAFE variant - removes the entry from the supplied context. */
+LIBDOGECOIN_API void clear_transaction_ts(dogecoin_transaction_context* ctx, int txindex);
 
 // sign a given inputted transaction with a given private key, and return a hex signed transaction.
 // we may want to add such things to 'advanced' section:

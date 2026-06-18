@@ -203,29 +203,33 @@ The legacy binaries are unaffected and print nothing extra.
 
 ### What the `_ts` CLI builds exercise
 
-The wrappers ensure that, in the `_ts` build, every object the CLI creates is the
-thread-safe (mutex-bearing) variant operating under a thread-safe context, and
-every CLI code path that mutates or serializes a transaction holds the matching
-per-transaction mutex:
+In the `_ts` build, every object the CLI creates is the thread-safe
+(mutex-bearing) variant operating under a thread-safe context, and every CLI
+code path that builds, mutates or serializes a transaction routes through the
+thread-safe library APIs rather than holding ad-hoc locks around the legacy
+ones.
 
-| CLI operation (wrapper)                                   | `_ts` API / context / mutex used                                            |
-|----------------------------------------------------------|------------------------------------------------------------------------------|
-| context lifecycle (`cli_ts_context_start`/`_finish`)     | `dogecoin_ctx_new_ts` / `dogecoin_ctx_release`; refcount-mutex `dogecoin_ctx`|
-| transaction create/free (`cli_tx_new`/`cli_tx_free`)     | `dogecoin_tx_new_ts` / `dogecoin_tx_free_ts`; initializes `dogecoin_tx.lock` |
-| registry (`cli_start/find/remove/remove_all/get_count`)  | `*_ts` against `dogecoin_transaction_context_default()`                      |
-| index ops (`cli_save_raw_transaction`, `cli_add_utxo`, `cli_add_output`, `cli_finalize_transaction`, `cli_get_raw_transaction`) | hold the working transaction's `dogecoin_tx.lock` for the duration of the call |
-| `cli_clear_transaction`                                   | `remove_transaction_ts` against the default context (frees the entry)        |
-| eckey (`cli_eckey_from_privkey`)                          | `dogecoin_eckey_context` lifecycle + `new_eckey_from_privkey_ts`            |
-| wallet init/new/free (`cli_wallet_init`/`_new`/`_free`)  | `dogecoin_wallet_init_ts` / `dogecoin_wallet_enable_thread_safe` / `dogecoin_wallet_free_ts`; initializes/uses `dogecoin_wallet.lock` |
+The transaction-building wrappers (`cli_add_utxo`, `cli_add_output`,
+`cli_finalize_transaction`, `cli_save_raw_transaction`, `cli_get_raw_transaction`,
+`cli_clear_transaction`) call the `_ts` variants of the higher-level index
+functions (`add_utxo_ts`, `add_output_ts`, `finalize_transaction_ts`,
+`save_raw_transaction_ts`, `get_raw_transaction_ts`, `clear_transaction_ts`).
+Those variants in turn drive the per-object transaction primitives
+(`dogecoin_tx_add_input_ts`, `dogecoin_tx_add_output_ts`,
+`dogecoin_tx_finalize_ts`) and serialize/copy under the working transaction's
+`dogecoin_tx.lock`. The context lifecycle, registry, transaction create/free,
+eckey and wallet wrappers route through the matching `_ts` context, registry and
+per-object APIs in the same way. The non-`_ts` higher-level index functions are
+thin wrappers that delegate to the same `_ts` implementations against the
+per-thread default context, so the legacy and thread-safe builds share a single
+code path and produce byte-identical transactions.
 
-Because the CLIs drive transactions through the higher-level index API rather
-than calling the low-level `dogecoin_tx`/eckey/wallet primitives directly, the
-remaining `_ts` primitives — `dogecoin_tx_add_input_ts`/`add_output_ts`/
-`finalize_ts`/`sign_ts`, the eckey registry (`add_eckey_ts`/`find_eckey_ts`/
-`remove_eckey_ts`/`start_key_ts`/`new_eckey_ts`), and
-`dogecoin_wallet_load_ts`/`save_ts`/`add_hd_account_ts`/`get_address_ts` — have
-no corresponding CLI command and are validated by the unit-test suite
-(`test/transaction_tests.c`, `test/wallet_tests.c`, `test/eckey_tests.c`).
+Because the wrappers route through the `_ts` APIs end to end, there is no
+explicit coverage matrix carving out primitives that the CLI does not exercise:
+the thread-safe build drives the thread-safe transaction primitives directly.
+The remaining wallet/eckey `_ts` surface that has no dedicated CLI command is
+additionally validated by the unit-test suite (`test/transaction_tests.c`,
+`test/wallet_tests.c`, `test/eckey_tests.c`).
 
 Notes:
 

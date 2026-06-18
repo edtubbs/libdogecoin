@@ -43,6 +43,10 @@ static dogecoin_transaction_context* default_transaction_context(void) {
     return &default_ctx;
 }
 
+/* internal helpers for the thread-safe index API (defined below) */
+static int add_address_output_ts(working_transaction* tx, const dogecoin_chainparams* chain, int64_t koinu, const char* address);
+static int make_change_ts(dogecoin_transaction_context* ctx, int txindex, char* public_key, uint64_t subtractedfee, uint64_t amount);
+
 dogecoin_transaction_context* dogecoin_transaction_context_default(void) {
     return default_transaction_context();
 }
@@ -422,8 +426,12 @@ int start_transaction_ts(dogecoin_transaction_context* ctx) {
  * @return 1 if the transaction was saved successfully, 0 otherwise.
  */
 int save_raw_transaction(int txindex, const char* hexadecimal_transaction) {
+    return save_raw_transaction_ts(default_transaction_context(), txindex, hexadecimal_transaction);
+}
+
+int save_raw_transaction_ts(dogecoin_transaction_context* ctx, int txindex, const char* hexadecimal_transaction) {
     debug_print("raw_hexadecimal_transaction: %s\n", hexadecimal_transaction);
-    if (!hexadecimal_transaction) {
+    if (!ctx || !hexadecimal_transaction) {
         printf("invalid tx hex\n");
         return false;
     }
@@ -448,8 +456,17 @@ int save_raw_transaction(int txindex, const char* hexadecimal_transaction) {
         return false;
     }
     // free byte array
-    working_transaction* tx_raw = find_transaction(txindex);
+    working_transaction* tx_raw = find_transaction_ts(ctx, txindex);
+    if (!tx_raw) {
+        dogecoin_tx_free(txtmp);
+        dogecoin_free(data_bin);
+        return false;
+    }
+    // hold the per-object mutex while overwriting the working transaction
+    dogecoin_bool locked = tx_raw->transaction->thread_safe;
+    if (locked) dogecoin_mutex_lock(&tx_raw->transaction->lock);
     dogecoin_tx_copy(tx_raw->transaction, txtmp);
+    if (locked) dogecoin_mutex_unlock(&tx_raw->transaction->lock);
     dogecoin_tx_free(txtmp);
     dogecoin_free(data_bin);
     return true;
@@ -466,8 +483,13 @@ int save_raw_transaction(int txindex, const char* hexadecimal_transaction) {
  * @return 1 if the transaction input was added successfully, 0 otherwise.
  */
 int add_utxo(int txindex, char* hex_utxo_txid, int vout) {
+    return add_utxo_ts(default_transaction_context(), txindex, hex_utxo_txid, vout);
+}
+
+int add_utxo_ts(dogecoin_transaction_context* ctx, int txindex, char* hex_utxo_txid, int vout) {
+    if (!ctx) return false;
     // find working transaction by index and pass to funciton local variable to manipulate:
-    working_transaction* tx = find_transaction(txindex);
+    working_transaction* tx = find_transaction_ts(ctx, txindex);
 
     // guard against null pointer exceptions
     if (tx == NULL) return false;
@@ -488,13 +510,16 @@ int add_utxo(int txindex, char* hex_utxo_txid, int vout) {
     // set index of utxo we want to spend
     tx_in->prevout.n = vout;
 
-    // add to working tx object
-    vector_add(tx->transaction->vin, tx_in);
+    // route the input through the thread-safe primitive, which copies tx_in
+    // into the working transaction under its per-object mutex when present:
+    int added = dogecoin_tx_add_input_ts(tx->transaction, tx_in);
 
-    // free tx_in struct since it has been added to our working tx
+    // dogecoin_tx_add_input_ts copies the input, so free our local template:
+    dogecoin_tx_in_free(tx_in);
+
     // ensure the length of our working tx inputs length has incremented by 1
     // which will return true if successful:
-    return flag + 1 == tx->transaction->vin->len;
+    return added && (flag + 1 == tx->transaction->vin->len);
 }
 
 /**
@@ -509,8 +534,46 @@ int add_utxo(int txindex, char* hex_utxo_txid, int vout) {
  * @return 1 if the transaction input was added successfully, 0 otherwise.
  */
 int add_output(int txindex, char* destinationaddress, char* amount) {
+    return add_output_ts(default_transaction_context(), txindex, destinationaddress, amount);
+}
+
+/**
+ * @brief Internal helper that appends an address output to a working
+ * transaction by routing it through the thread-safe dogecoin_tx_add_output_ts
+ * primitive. The output script is built with the existing
+ * dogecoin_tx_add_address_out logic into a throwaway transaction, then each
+ * resulting output is copied into the working transaction under its per-object
+ * mutex (when present).
+ *
+ * @return 1 if at least one output was added, 0 otherwise.
+ */
+static int add_address_output_ts(working_transaction* tx, const dogecoin_chainparams* chain, int64_t koinu, const char* address) {
+    if (!tx || !tx->transaction || !chain || !address) return false;
+
+    // build the output script(s) using the shared address-out logic in a scratch tx
+    dogecoin_tx* scratch = dogecoin_tx_new();
+    if (!scratch) return false;
+    if (!dogecoin_tx_add_address_out(scratch, chain, koinu, address)) {
+        dogecoin_tx_free(scratch);
+        return false;
+    }
+
+    int added = false;
+    size_t i;
+    for (i = 0; i < scratch->vout->len; i++) {
+        dogecoin_tx_out* tx_out = vector_idx(scratch->vout, i);
+        if (dogecoin_tx_add_output_ts(tx->transaction, tx_out)) {
+            added = true;
+        }
+    }
+    dogecoin_tx_free(scratch);
+    return added;
+}
+
+int add_output_ts(dogecoin_transaction_context* ctx, int txindex, char* destinationaddress, char* amount) {
+    if (!ctx) return false;
     // find working transaction by index and pass to funciton local variable to manipulate:
-    working_transaction* tx = find_transaction(txindex);
+    working_transaction* tx = find_transaction_ts(ctx, txindex);
     // guard against null pointer exceptions
     if (tx == NULL) {
         return false;
@@ -520,8 +583,8 @@ int add_output(int txindex, char* destinationaddress, char* amount) {
 
     uint64_t koinu = coins_to_koinu_str(amount);
     // calculate total minus fees
-    // pass in transaction obect, network paramters, amount of dogecoin to send to address and finally p2pkh address:
-    return dogecoin_tx_add_address_out(tx->transaction, chain, (int64_t)koinu, destinationaddress);
+    // route through the thread-safe output primitive:
+    return add_address_output_ts(tx, chain, (int64_t)koinu, destinationaddress);
 }
 
 /**
@@ -537,9 +600,14 @@ int add_output(int txindex, char* destinationaddress, char* amount) {
  * @return 1 if the additional output was created successfully, 0 otherwise.
  */
 static int make_change(int txindex, char* public_key, uint64_t subtractedfee, uint64_t amount) {
+    return make_change_ts(default_transaction_context(), txindex, public_key, subtractedfee, amount);
+}
+
+static int make_change_ts(dogecoin_transaction_context* ctx, int txindex, char* public_key, uint64_t subtractedfee, uint64_t amount) {
+    if (!ctx) return false;
     if (amount==subtractedfee) return false; // utxos already fully spent, no change needed
     // find working transaction by index and pass to funciton local variable to manipulate:
-    working_transaction* tx = find_transaction(txindex);
+    working_transaction* tx = find_transaction_ts(ctx, txindex);
 
     // guard against null pointer exceptions
     if (tx == NULL) return false;
@@ -550,7 +618,8 @@ static int make_change(int txindex, char* public_key, uint64_t subtractedfee, ui
     // calculate total minus fees
     uint64_t total_change_back = amount - subtractedfee;
 
-    return dogecoin_tx_add_address_out(tx->transaction, chain, total_change_back, public_key);
+    // route the change output through the thread-safe output primitive:
+    return add_address_output_ts(tx, chain, (int64_t)total_change_back, public_key);
 }
 
 /**
@@ -566,8 +635,13 @@ static int make_change(int txindex, char* public_key, uint64_t subtractedfee, ui
  * @return The hex of the finalized transaction.
  */
 char* finalize_transaction(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress) {
+    return finalize_transaction_ts(default_transaction_context(), txindex, destinationaddress, subtractedfee, out_dogeamount_for_verification, changeaddress);
+}
+
+char* finalize_transaction_ts(dogecoin_transaction_context* ctx, int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress) {
+    if (!ctx) return false;
     // find working transaction by index and pass to funciton local variable to manipulate:
-    working_transaction* tx = find_transaction(txindex);
+    working_transaction* tx = find_transaction_ts(ctx, txindex);
 
     // guard against null pointer exceptions
     if (tx == NULL) return false;
@@ -593,7 +667,7 @@ char* finalize_transaction(int txindex, char* destinationaddress, char* subtract
         p2pkh_count = dogecoin_tx_out_pubkey_hash_to_p2pkh_address(tx_out_tmp, (char *)p2pkh, is_testnet);
         if (i == length - 1 && changeaddress) {
             // manually make change and send back to our public key address
-            if (make_change(txindex, changeaddress, subtractedfee_koinu, out_koinu_for_verification - tx_out_total)) {
+            if (make_change_ts(ctx, txindex, changeaddress, subtractedfee_koinu, out_koinu_for_verification - tx_out_total)) {
                 p2pkh_count += 1;
                 tx_out_tmp = vector_idx(tx->transaction->vout, tx->transaction->vout->len - 1);
                 tx_out_total += tx_out_tmp->value;
@@ -607,8 +681,13 @@ char* finalize_transaction(int txindex, char* destinationaddress, char* subtract
         return false;
     }
 
+    if (tx_out_total != total) return false;
+
+    // run the thread-safe finalization integrity pass before serializing:
+    dogecoin_tx_finalize_ts(tx->transaction);
+
     // pass in transaction obect, network paramters, amount of dogecoin to send to address and finally p2pkh address:
-    return tx_out_total == total ? get_raw_transaction(txindex) : false;
+    return get_raw_transaction_ts(ctx, txindex);
 }
 
 /**
@@ -620,11 +699,20 @@ char* finalize_transaction(int txindex, char* destinationaddress, char* subtract
  * @return The hex representation of the transaction.
  */
 char* get_raw_transaction(int txindex) {
+    return get_raw_transaction_ts(default_transaction_context(), txindex);
+}
+
+char* get_raw_transaction_ts(dogecoin_transaction_context* ctx, int txindex) {
+    if (!ctx) return false;
     // find working transaction by index and pass to function local variable to manipulate:
-    working_transaction* tx = find_transaction(txindex);
+    working_transaction* tx = find_transaction_ts(ctx, txindex);
 
     // guard against null pointer exceptions
     if (tx == NULL) return false;
+
+    // serialize under the per-object mutex when present:
+    dogecoin_bool locked = tx->transaction->thread_safe;
+    if (locked) dogecoin_mutex_lock(&tx->transaction->lock);
 
     // new allocated cstring to store hexadeicmal buffer string:
     cstring* serialized_transaction = cstr_new_sz(1024);
@@ -635,6 +723,8 @@ char* get_raw_transaction(int txindex) {
     char* hexadecimal_buffer = utils_uint8_to_hex((unsigned char*)serialized_transaction->str, serialized_transaction->len);
 
     cstr_free(serialized_transaction, true);
+
+    if (locked) dogecoin_mutex_unlock(&tx->transaction->lock);
 
     return hexadecimal_buffer;
 }
@@ -648,10 +738,15 @@ char* get_raw_transaction(int txindex) {
  * @return Nothing.
  */
 void clear_transaction(int txindex) {
+    clear_transaction_ts(default_transaction_context(), txindex);
+}
+
+void clear_transaction_ts(dogecoin_transaction_context* ctx, int txindex) {
+    if (!ctx) return;
     // find working transaction by index and pass to funciton local variable to manipulate:
-    working_transaction* tx = find_transaction(txindex);
+    working_transaction* tx = find_transaction_ts(ctx, txindex);
     // remove from hashmap
-    remove_transaction(tx);
+    remove_transaction_ts(ctx, tx);
 }
 
 /**

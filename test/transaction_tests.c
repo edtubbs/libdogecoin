@@ -326,6 +326,54 @@ void test_transaction()
     u_assert_str_eq(raw_hexadecimal_transaction, expected_single_utxo_signed_transaction);
 
     // ----------------------------------------------------------------
+    // test the thread-safe index API (_ts variants) against a dedicated
+    // thread-safe transaction context. The working transaction is mutex-bearing
+    // (built via new_transaction_ts -> dogecoin_tx_new_ts), so add_utxo_ts /
+    // add_output_ts / finalize_transaction_ts exercise the underlying
+    // dogecoin_tx_add_input_ts / dogecoin_tx_add_output_ts / dogecoin_tx_finalize_ts
+    // primitives and must produce byte-identical output to the non-_ts path.
+    //
+    // Build the reference (unsigned) transaction through the non-_ts index API
+    // and snapshot it (utils_uint8_to_hex returns a shared static buffer, so the
+    // result must be copied before any further serialization overwrites it):
+
+    int ref_index = start_transaction();
+    u_assert_int_eq(add_utxo(ref_index, utxo_txid_from_tx_worth_10_dogecoin, utxo_previous_output_index_from_tx_worth_10_dogecoin), 1);
+    u_assert_int_eq(add_output(ref_index, external_p2pkh_address, "9.99887"), 1);
+    char* ref_finalized = finalize_transaction(ref_index, external_p2pkh_address, ".00113", "10.0", internal_p2pkh_address);
+    u_assert_not_null(ref_finalized);
+    char ref_unsigned_hex[512];
+    u_assert_true(strlen(ref_finalized) < sizeof(ref_unsigned_hex));
+    strcpy(ref_unsigned_hex, ref_finalized);
+    clear_transaction(ref_index);
+
+    // Build the same transaction through the thread-safe index API on its own context:
+    dogecoin_transaction_context* ts_ctx = dogecoin_transaction_context_new();
+    u_assert_not_null(ts_ctx);
+
+    int ts_index = start_transaction_ts(ts_ctx);
+
+    // add the single 10 dogecoin input through the thread-safe primitive:
+    u_assert_int_eq(add_utxo_ts(ts_ctx, ts_index, utxo_txid_from_tx_worth_10_dogecoin, utxo_previous_output_index_from_tx_worth_10_dogecoin), 1);
+
+    // add the output through the thread-safe primitive:
+    u_assert_int_eq(add_output_ts(ts_ctx, ts_index, external_p2pkh_address, "9.99887"), 1);
+
+    // finalize through the thread-safe primitive and confirm identical bytes:
+    char* ts_finalized = finalize_transaction_ts(ts_ctx, ts_index, external_p2pkh_address, ".00113", "10.0", internal_p2pkh_address);
+    u_assert_not_null(ts_finalized);
+    u_assert_str_eq(ts_finalized, ref_unsigned_hex);
+
+    // get_raw_transaction_ts must return the same serialized hex:
+    u_assert_str_eq(get_raw_transaction_ts(ts_ctx, ts_index), ref_unsigned_hex);
+
+    // clear_transaction_ts removes the entry from the thread-safe context:
+    clear_transaction_ts(ts_ctx, ts_index);
+    u_assert_is_null(get_raw_transaction_ts(ts_ctx, ts_index));
+
+    dogecoin_transaction_context_free(ts_ctx);
+
+    // ----------------------------------------------------------------
     // test store_raw_transaction:
 
     int working_transaction_index2 = store_raw_transaction(raw_hexadecimal_transaction);
