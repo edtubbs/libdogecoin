@@ -64,9 +64,9 @@ static const uint32_t SLIP0039_RS1024_GEN[10] = {
     0x1C0C2412UL, 0x38086C24UL, 0x3090FC48UL, 0x21B1F890UL, 0x03F3F120UL
 };
 
-/* ---------------------------------------------------------------------- */
-/*                              GF(256) helpers                            */
-/* ---------------------------------------------------------------------- */
+/**
+ * @brief GF(256) helpers.
+ */
 
 static uint8_t gf256_mul(uint8_t a, uint8_t b)
 {
@@ -92,17 +92,29 @@ static uint8_t gf256_pow(uint8_t a, uint8_t exp)
     return r;
 }
 
-/* a^254 = a^-1 in GF(256) for a != 0. */
+/**
+ * @brief Computes multiplicative inverse in GF(256) for non-zero input.
+ *
+ * @param a Byte value in GF(256).
+ *
+ * @return a^-1 in GF(256) when a != 0.
+ */
 static uint8_t gf256_inv(uint8_t a)
 {
     return gf256_pow(a, 254);
 }
 
-/* Lagrange interpolation in GF(256) byte-wise.
- * xs: n distinct x-coordinates (each in 0..255)
- * ys: n*ylen bytes (n y-vectors of length ylen)
- * Computes the polynomial through the n points and evaluates at target_x.
- * Result is written to out[ylen]. Returns 0 on success, -1 if xs has dup.
+/**
+ * @brief Evaluates Lagrange interpolation in GF(256) for byte vectors.
+ *
+ * @param target_x X-coordinate to evaluate.
+ * @param xs Distinct x-coordinates (n entries).
+ * @param n Number of interpolation points.
+ * @param ys Concatenated y-vectors (n * ylen bytes).
+ * @param ylen Length of each y-vector in bytes.
+ * @param out Output buffer for interpolated y-vector (ylen bytes).
+ *
+ * @return 0 on success, -1 on duplicate x-coordinate input.
  */
 static int gf256_lagrange(uint8_t target_x,
                           const uint8_t* xs, size_t n,
@@ -137,9 +149,9 @@ static int gf256_lagrange(uint8_t target_x,
     return 0;
 }
 
-/* ---------------------------------------------------------------------- */
-/*                              RS1024 checksum                            */
-/* ---------------------------------------------------------------------- */
+/**
+ * @brief RS1024 checksum helpers.
+ */
 
 static uint32_t rs1024_polymod(const uint16_t* values, size_t n)
 {
@@ -187,9 +199,9 @@ static int rs1024_verify_checksum(const uint16_t* words, size_t total_words, int
     return (rs1024_polymod(buf, cust_len + total_words) == 1UL) ? 0 : -1;
 }
 
-/* ---------------------------------------------------------------------- */
-/*                          Bit packing helpers                            */
-/* ---------------------------------------------------------------------- */
+/**
+ * @brief Bit packing helpers.
+ */
 
 typedef struct {
     uint16_t* words;
@@ -255,9 +267,9 @@ static int br_get(bitpack_reader* r, int nbits, uint32_t* out)
     return 0;
 }
 
-/* ---------------------------------------------------------------------- */
-/*                          Wordlist lookup                                */
-/* ---------------------------------------------------------------------- */
+/**
+ * @brief Wordlist lookup helpers.
+ */
 
 static int slip0039_word_to_index(const char* word, size_t word_len)
 {
@@ -279,9 +291,9 @@ static int slip0039_word_to_index(const char* word, size_t word_len)
     return -1;
 }
 
-/* ---------------------------------------------------------------------- */
-/*                  Encrypted Master Secret (Feistel)                      */
-/* ---------------------------------------------------------------------- */
+/**
+ * @brief Encrypted Master Secret (Feistel) helpers.
+ */
 
 static int slip0039_round_function(uint8_t round_index,
                                    const uint8_t* passphrase, size_t passlen,
@@ -390,21 +402,26 @@ static int slip0039_decrypt(const uint8_t* ems, size_t ems_len,
     return 0;
 }
 
-/* ---------------------------------------------------------------------- */
-/*                          Mnemonic encode / decode                       */
-/* ---------------------------------------------------------------------- */
+/**
+ * @brief Mnemonic encode/decode helpers.
+ */
 
-/* Encodes a single share into a mnemonic phrase.
- *  identifier   : 15-bit random
- *  iter_exp     : iteration exponent (0..15)
- *  group_idx    : GI (0..15)
- *  group_thr    : Gt (1..16)
- *  group_count  : g  (1..16)
- *  member_idx   : I  (0..15)
- *  member_thr   : t  (1..16)
- *  share_value  : raw share bytes (length = ems_len bytes)
- *  ems_len      : length in bytes (16..32, even)
- *  out          : caller buffer (must hold SLIP0039_MAX_SHARE_STR_SIZE)
+/**
+ * @brief Encodes a single share into a SLIP-0039 mnemonic phrase.
+ *
+ * @param identifier 15-bit identifier.
+ * @param iter_exp Iteration exponent (0..15).
+ * @param group_idx Group index (0..15).
+ * @param group_thr Group threshold (1..16).
+ * @param group_count Group count (1..16).
+ * @param member_idx Member index (0..15).
+ * @param member_thr Member threshold (1..16).
+ * @param share_value Raw share bytes.
+ * @param ems_len Share value length in bytes (16..32, even).
+ * @param out Output mnemonic buffer.
+ * @param out_size Output buffer size.
+ *
+ * @return 0 on success, -1 on invalid input or encoding failure.
  */
 static int slip0039_encode_mnemonic(uint16_t identifier,
                                     uint8_t  iter_exp,
@@ -475,9 +492,22 @@ static int slip0039_encode_mnemonic(uint16_t identifier,
     return 0;
 }
 
-/* Decodes a mnemonic phrase.
- * Outputs metadata fields and the raw share value into *share_value
- * (must hold SLIP0039_MAX_SECRET_BYTES) with length in *value_len.
+/**
+ * @brief Decodes a SLIP-0039 mnemonic phrase into metadata and share bytes.
+ *
+ * @param mnemonic Input mnemonic phrase.
+ * @param identifier_out Decoded identifier.
+ * @param extendable_out Decoded extendable bit.
+ * @param iter_exp_out Decoded iteration exponent.
+ * @param group_idx_out Decoded group index.
+ * @param group_thr_out Decoded group threshold.
+ * @param group_count_out Decoded group count.
+ * @param member_idx_out Decoded member index.
+ * @param member_thr_out Decoded member threshold.
+ * @param share_value Output buffer for decoded share bytes.
+ * @param value_len In/out share length buffer.
+ *
+ * @return 0 on success, -1 on invalid input or checksum/decode failure.
  */
 static int slip0039_decode_mnemonic(const char* mnemonic,
                                     uint16_t* identifier_out,
@@ -573,13 +603,17 @@ static int slip0039_decode_mnemonic(const char* mnemonic,
     return 0;
 }
 
-/* ---------------------------------------------------------------------- */
-/*                Shamir split / combine over EMS bytes                    */
-/* ---------------------------------------------------------------------- */
+/**
+ * @brief Shamir split/combine helpers over EMS bytes.
+ */
 
-/* Computes the digest share value of length ems_len:
- *   digest = HMAC-SHA256(R, secret)[:4]
- *   value  = digest || R   (R is provided in random_pad of length ems_len-4)
+/**
+ * @brief Builds the digest share value from a secret and random pad.
+ *
+ * @param secret Encrypted master secret bytes.
+ * @param ems_len Encrypted master secret length in bytes.
+ * @param random_pad Random pad bytes (ems_len - digest length).
+ * @param out Output digest-share buffer (ems_len bytes).
  */
 static void slip0039_make_digest_share(const uint8_t* secret, size_t ems_len,
                                        const uint8_t* random_pad,
@@ -606,9 +640,16 @@ static int slip0039_verify_digest_share(const uint8_t* secret, size_t ems_len,
     return ok;
 }
 
-/* Split EMS into n member shares with threshold t.
- *  shares_x[i]      = i for i in [0, n)
- *  shares_y[i*ems_len .. (i+1)*ems_len] = share value
+/**
+ * @brief Splits EMS bytes into member shares at a given threshold.
+ *
+ * @param ems Encrypted master secret bytes.
+ * @param ems_len EMS length in bytes.
+ * @param threshold Member threshold.
+ * @param share_count Number of shares to produce.
+ * @param shares_y_out Output share values buffer.
+ *
+ * @return 0 on success, -1 on invalid input or interpolation failure.
  */
 static int slip0039_split(const uint8_t* ems, size_t ems_len,
                           uint8_t threshold, uint8_t share_count,
@@ -673,8 +714,17 @@ static int slip0039_split(const uint8_t* ems, size_t ems_len,
     return 0;
 }
 
-/* Combine T shares (indices in xs[], values stacked in ys[]) into the
- * encrypted master secret, verifying the digest share when threshold > 1.
+/**
+ * @brief Combines threshold shares into EMS and verifies digest share.
+ *
+ * @param xs Share x-indices.
+ * @param ys Concatenated share values.
+ * @param n Number of input shares.
+ * @param ems_len EMS length in bytes.
+ * @param threshold Threshold required for reconstruction.
+ * @param ems_out Output reconstructed EMS bytes.
+ *
+ * @return 0 on success, -1 on invalid input or verification failure.
  */
 static int slip0039_combine(const uint8_t* xs, const uint8_t* ys,
                             size_t n, size_t ems_len, uint8_t threshold,
@@ -701,9 +751,9 @@ static int slip0039_combine(const uint8_t* xs, const uint8_t* ys,
     return 0;
 }
 
-/* ---------------------------------------------------------------------- */
-/*                              Public API                                 */
-/* ---------------------------------------------------------------------- */
+/**
+ * @brief Public API.
+ */
 
 int dogecoin_slip0039_generate_shares(const uint8_t* secret, size_t secret_len,
                                       uint8_t threshold, uint8_t share_count,
