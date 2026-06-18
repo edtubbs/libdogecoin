@@ -73,6 +73,10 @@ working_transaction* new_transaction() {
     working_transaction* working_tx = (struct working_transaction*)dogecoin_calloc(1, sizeof *working_tx);
     if (!working_tx) return NULL;
     working_tx->transaction = dogecoin_tx_new();
+    if (!working_tx->transaction) {
+        dogecoin_free(working_tx);
+        return NULL;
+    }
     working_tx->idx = HASH_COUNT(ctx->transactions) + 1;
     return working_tx;
 }
@@ -639,7 +643,7 @@ char* finalize_transaction(int txindex, char* destinationaddress, char* subtract
 }
 
 char* finalize_transaction_ts(dogecoin_transaction_context* ctx, int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress) {
-    if (!ctx) return false;
+    if (!ctx) return NULL;
     // find working transaction by index and pass to funciton local variable to manipulate:
     working_transaction* tx = find_transaction_ts(ctx, txindex);
 
@@ -703,7 +707,7 @@ char* get_raw_transaction(int txindex) {
 }
 
 char* get_raw_transaction_ts(dogecoin_transaction_context* ctx, int txindex) {
-    if (!ctx) return false;
+    if (!ctx) return NULL;
     // find working transaction by index and pass to function local variable to manipulate:
     working_transaction* tx = find_transaction_ts(ctx, txindex);
 
