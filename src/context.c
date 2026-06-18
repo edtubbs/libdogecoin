@@ -393,14 +393,11 @@ int dogecoin_generate_keypair_ex(dogecoin_context* ctx, char* wif, size_t* wif_s
     return true;
 }
 
-/* ---------------------------------------------------------------------------
- * Short-form alias API: dogecoin_ctx_*
- *
+/* Short-form alias API: dogecoin_ctx_*
  * These are thin aliases over dogecoin_context_* that match the API surface
  * documented in doc/thread_safety.md. dogecoin_ctx_new_ts() additionally
  * marks the context as thread-safe so dependent subsystems can opt into
- * per-object locking when wired through the context.
- * --------------------------------------------------------------------------- */
+ * per-object locking when wired through the context. */
 
 /**
  * @brief Creates a thread-compatible context (short-form alias).

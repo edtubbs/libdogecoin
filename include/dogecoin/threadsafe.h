@@ -64,9 +64,7 @@
 #define DOGECOIN_CLI_TS_LABEL "single-threaded"
 #endif
 
-/* --------------------------------------------------------------------------
- * Thread-safe context lifecycle
- * -------------------------------------------------------------------------- */
+/* Thread-safe context lifecycle */
 
 /**
  * @brief Start the CLI thread-safe context for a tool.
@@ -113,29 +111,21 @@ static inline void cli_ts_context_finish(dogecoin_ctx* ctx)
 #endif
 }
 
-/* --------------------------------------------------------------------------
- * Transaction builder
- *
- * dogecoin_tx_new_ts()/dogecoin_tx_free_ts() share the exact signature of the
- * plain create/free calls, so they are routed with a compile-time rename. This
- * lets the CLI sources keep calling the canonical dogecoin_tx_new()/
- * dogecoin_tx_free() names while the `_ts` build transparently exercises the
+/* Transaction builder: dogecoin_tx_new_ts()/dogecoin_tx_free_ts() share the exact
+ * signature of the plain create/free calls so they are routed with a compile-time
+ * rename. This lets the CLI sources keep calling the canonical dogecoin_tx_new()/
+ * dogecoin_tx_free() names while the _ts build transparently exercises the
  * mutex-bearing variants. The renames are only in effect under -DDOGECOIN_TS;
- * the legacy build uses the plain API unchanged.
- * -------------------------------------------------------------------------- */
+ * the legacy build uses the plain API unchanged. */
 #ifdef DOGECOIN_TS
 #define dogecoin_tx_new dogecoin_tx_new_ts
 #define dogecoin_tx_free dogecoin_tx_free_ts
 #endif
 
-/* --------------------------------------------------------------------------
- * Transaction registry
- *
- * The CLI builds transactions through the index-based transaction API, which
- * operates on the per-thread default transaction context. The `_ts` wrappers
- * below therefore target that same default context so registry lookups stay
- * consistent with the rest of the index-based API.
- * -------------------------------------------------------------------------- */
+/* Transaction registry: the CLI builds transactions through the index-based
+ * transaction API which operates on the per-thread default transaction context.
+ * The _ts wrappers below therefore target that same default context so registry
+ * lookups stay consistent with the rest of the index-based API. */
 
 /**
  * @brief Start a new working transaction in the registry.
@@ -211,17 +201,13 @@ static inline int cli_get_transaction_count(void)
 #endif
 }
 
-/* --------------------------------------------------------------------------
- * Index-based transaction mutation/serialization
- *
- * The CLI mutates and serializes working transactions through the index-based
- * API. In the `_ts` build the working transaction is mutex-bearing (created
- * via dogecoin_tx_new_ts() inside new_transaction_ts), and the `_ts` index
- * variants route every mutation through the thread-safe transaction primitives
- * (dogecoin_tx_add_input_ts / dogecoin_tx_add_output_ts / dogecoin_tx_finalize_ts)
- * and serialize under the per-transaction mutex. In the legacy build the lock is
- * absent (thread_safe == 0) and the wrappers reduce to the plain index API.
- * -------------------------------------------------------------------------- */
+/* Index-based transaction mutation/serialization: the CLI mutates and serializes
+ * working transactions through the index-based API. In the _ts build the working
+ * transaction is mutex-bearing (created via dogecoin_tx_new_ts() inside
+ * new_transaction_ts), and the _ts index variants route every mutation through
+ * the thread-safe transaction primitives and serialize under the per-transaction
+ * mutex. In the legacy build the lock is absent (thread_safe == 0) and the
+ * wrappers reduce to the plain index API. */
 
 /**
  * @brief Store a raw (hex) transaction into the working transaction at an index.
@@ -335,12 +321,8 @@ static inline void cli_clear_transaction(int txindex)
 #endif
 }
 
-/* --------------------------------------------------------------------------
- * eckey
- *
- * The key is a standalone object (never added to a registry), so the `_ts`
- * build exercises the eckey context lifecycle with a throwaway context.
- * -------------------------------------------------------------------------- */
+/* eckey: the key is a standalone object (never added to a registry), so the
+ * _ts build exercises the eckey context lifecycle with a throwaway context. */
 
 /**
  * @brief Create an eckey object from a private key string.
@@ -364,9 +346,7 @@ static inline eckey* cli_eckey_from_privkey(char* private_key)
 #endif
 }
 
-/* --------------------------------------------------------------------------
- * Wallet
- * -------------------------------------------------------------------------- */
+/* Wallet */
 
 /**
  * @brief Initialize a wallet, binding it to the thread-safe context in the
