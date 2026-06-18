@@ -21,6 +21,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <test/utest.h>
+
 #include <dogecoin/mem.h>
 #include <dogecoin/slip0039.h>
 #include <dogecoin/utils.h>

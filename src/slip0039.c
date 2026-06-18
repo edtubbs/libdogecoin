@@ -65,9 +65,13 @@ static const uint32_t SLIP0039_RS1024_GEN[10] = {
 };
 
 /**
- * @brief GF(256) helpers.
+ * @brief Multiplies two elements in GF(256) using the AES polynomial.
+ *
+ * @param a Left operand.
+ * @param b Right operand.
+ *
+ * @return Product in GF(256).
  */
-
 static uint8_t gf256_mul(uint8_t a, uint8_t b)
 {
     uint8_t r = 0;
@@ -81,6 +85,14 @@ static uint8_t gf256_mul(uint8_t a, uint8_t b)
     return r;
 }
 
+/**
+ * @brief Raises a GF(256) element to an integer power.
+ *
+ * @param a Base element.
+ * @param exp Exponent.
+ *
+ * @return a^exp in GF(256).
+ */
 static uint8_t gf256_pow(uint8_t a, uint8_t exp)
 {
     uint8_t r = 1;
@@ -150,9 +162,13 @@ static int gf256_lagrange(uint8_t target_x,
 }
 
 /**
- * @brief RS1024 checksum helpers.
+ * @brief Computes the RS1024 polymod for a sequence of 10-bit words.
+ *
+ * @param values Input words.
+ * @param n Number of input words.
+ *
+ * @return RS1024 polymod state.
  */
-
 static uint32_t rs1024_polymod(const uint16_t* values, size_t n)
 {
     uint32_t chk = 1;
@@ -166,6 +182,15 @@ static uint32_t rs1024_polymod(const uint16_t* values, size_t n)
     return chk;
 }
 
+/**
+ * @brief Creates and writes the 3-word RS1024 checksum.
+ *
+ * @param words Mnemonic words with checksum slots at the end.
+ * @param total_words Total number of words including checksum.
+ * @param extendable Non-zero for extendable checksum customization.
+ *
+ * @return Nothing.
+ */
 static void rs1024_create_checksum(uint16_t* words, size_t total_words, int extendable)
 {
     /* total_words includes the 3 checksum slots (already zeroed by caller). */
@@ -186,6 +211,15 @@ static void rs1024_create_checksum(uint16_t* words, size_t total_words, int exte
     }
 }
 
+/**
+ * @brief Verifies the RS1024 checksum of a mnemonic word sequence.
+ *
+ * @param words Mnemonic words including checksum.
+ * @param total_words Total number of words including checksum.
+ * @param extendable Non-zero for extendable checksum customization.
+ *
+ * @return 0 if checksum is valid, -1 otherwise.
+ */
 static int rs1024_verify_checksum(const uint16_t* words, size_t total_words, int extendable)
 {
     enum { RS1024_MAX_DATA = 64 };
@@ -199,10 +233,6 @@ static int rs1024_verify_checksum(const uint16_t* words, size_t total_words, int
     return (rs1024_polymod(buf, cust_len + total_words) == 1UL) ? 0 : -1;
 }
 
-/**
- * @brief Bit packing helpers.
- */
-
 typedef struct {
     uint16_t* words;
     size_t    capacity;
@@ -211,6 +241,15 @@ typedef struct {
     int       bits;        /* number of pending bits (0..9) */
 } bitpack_writer;
 
+/**
+ * @brief Initializes a 10-bit word writer.
+ *
+ * @param w Writer state to initialize.
+ * @param words Destination word buffer.
+ * @param capacity Maximum number of words that can be written.
+ *
+ * @return Nothing.
+ */
 static void bw_init(bitpack_writer* w, uint16_t* words, size_t capacity)
 {
     w->words = words;
@@ -220,6 +259,15 @@ static void bw_init(bitpack_writer* w, uint16_t* words, size_t capacity)
     w->bits = 0;
 }
 
+/**
+ * @brief Appends bits to the writer as 10-bit words.
+ *
+ * @param w Writer state.
+ * @param value Source bits in the low nbits positions.
+ * @param nbits Number of bits to append.
+ *
+ * @return 0 on success, -1 if capacity is exceeded.
+ */
 static int bw_put(bitpack_writer* w, uint32_t value, int nbits)
 {
     while (nbits > 0) {
@@ -245,6 +293,15 @@ typedef struct {
     int             bits;       /* number of bits available in buf */
 } bitpack_reader;
 
+/**
+ * @brief Initializes a 10-bit word reader.
+ *
+ * @param r Reader state to initialize.
+ * @param words Source word buffer.
+ * @param total Number of source words.
+ *
+ * @return Nothing.
+ */
 static void br_init(bitpack_reader* r, const uint16_t* words, size_t total)
 {
     r->words = words;
@@ -254,6 +311,15 @@ static void br_init(bitpack_reader* r, const uint16_t* words, size_t total)
     r->bits  = 0;
 }
 
+/**
+ * @brief Reads a bit field from a 10-bit word stream.
+ *
+ * @param r Reader state.
+ * @param nbits Number of bits to read.
+ * @param out Output value.
+ *
+ * @return 0 on success, -1 on underflow.
+ */
 static int br_get(bitpack_reader* r, int nbits, uint32_t* out)
 {
     while (r->bits < nbits) {
@@ -268,9 +334,13 @@ static int br_get(bitpack_reader* r, int nbits, uint32_t* out)
 }
 
 /**
- * @brief Wordlist lookup helpers.
+ * @brief Resolves a mnemonic word to its SLIP-0039 wordlist index.
+ *
+ * @param word Word bytes (not necessarily null-terminated).
+ * @param word_len Length of the word in bytes.
+ *
+ * @return Word index on success, -1 if not found.
  */
-
 static int slip0039_word_to_index(const char* word, size_t word_len)
 {
     /* Wordlist is sorted alphabetically; binary search by full string. */
@@ -292,9 +362,20 @@ static int slip0039_word_to_index(const char* word, size_t word_len)
 }
 
 /**
- * @brief Encrypted Master Secret (Feistel) helpers.
+ * @brief Computes one Feistel round function output for EMS encryption.
+ *
+ * @param round_index Round number.
+ * @param passphrase Optional passphrase bytes.
+ * @param passlen Passphrase length in bytes.
+ * @param identifier SLIP-0039 identifier.
+ * @param iter_exp Iteration exponent.
+ * @param extendable Non-zero for extendable mode.
+ * @param r_half Right half input bytes.
+ * @param half_len Half-size in bytes.
+ * @param out Output round bytes.
+ *
+ * @return 0 on success, -1 on invalid input sizing.
  */
-
 static int slip0039_round_function(uint8_t round_index,
                                    const uint8_t* passphrase, size_t passlen,
                                    uint16_t identifier,
@@ -337,6 +418,20 @@ static int slip0039_round_function(uint8_t round_index,
     return 0;
 }
 
+/**
+ * @brief Encrypts a master secret into an encrypted master secret (EMS).
+ *
+ * @param ms Master secret bytes.
+ * @param ms_len Master secret length in bytes.
+ * @param passphrase Optional passphrase bytes.
+ * @param passlen Passphrase length in bytes.
+ * @param identifier SLIP-0039 identifier.
+ * @param iter_exp Iteration exponent.
+ * @param extendable Non-zero for extendable mode.
+ * @param ems_out Output encrypted master secret.
+ *
+ * @return 0 on success, -1 on invalid input.
+ */
 static int slip0039_encrypt(const uint8_t* ms, size_t ms_len,
                             const uint8_t* passphrase, size_t passlen,
                             uint16_t identifier, uint8_t iter_exp,
@@ -370,6 +465,20 @@ static int slip0039_encrypt(const uint8_t* ms, size_t ms_len,
     return 0;
 }
 
+/**
+ * @brief Decrypts an encrypted master secret (EMS) into the master secret.
+ *
+ * @param ems Encrypted master secret bytes.
+ * @param ems_len EMS length in bytes.
+ * @param passphrase Optional passphrase bytes.
+ * @param passlen Passphrase length in bytes.
+ * @param identifier SLIP-0039 identifier.
+ * @param iter_exp Iteration exponent.
+ * @param extendable Non-zero for extendable mode.
+ * @param ms_out Output master secret bytes.
+ *
+ * @return 0 on success, -1 on invalid input.
+ */
 static int slip0039_decrypt(const uint8_t* ems, size_t ems_len,
                             const uint8_t* passphrase, size_t passlen,
                             uint16_t identifier, uint8_t iter_exp,
@@ -401,10 +510,6 @@ static int slip0039_decrypt(const uint8_t* ems, size_t ems_len,
     dogecoin_mem_zero(F, sizeof(F));
     return 0;
 }
-
-/**
- * @brief Mnemonic encode/decode helpers.
- */
 
 /**
  * @brief Encodes a single share into a SLIP-0039 mnemonic phrase.
@@ -604,10 +709,6 @@ static int slip0039_decode_mnemonic(const char* mnemonic,
 }
 
 /**
- * @brief Shamir split/combine helpers over EMS bytes.
- */
-
-/**
  * @brief Builds the digest share value from a secret and random pad.
  *
  * @param secret Encrypted master secret bytes.
@@ -628,6 +729,15 @@ static void slip0039_make_digest_share(const uint8_t* secret, size_t ems_len,
     dogecoin_mem_zero(mac, sizeof(mac));
 }
 
+/**
+ * @brief Verifies that a digest share matches the provided EMS bytes.
+ *
+ * @param secret Reconstructed encrypted master secret bytes.
+ * @param ems_len EMS length in bytes.
+ * @param digest_share Digest share bytes.
+ *
+ * @return 0 if digest matches, -1 otherwise.
+ */
 static int slip0039_verify_digest_share(const uint8_t* secret, size_t ems_len,
                                         const uint8_t* digest_share)
 {
@@ -752,9 +862,16 @@ static int slip0039_combine(const uint8_t* xs, const uint8_t* ys,
 }
 
 /**
- * @brief Public API.
+ * @brief Generates SLIP-0039 mnemonic shares for a master secret.
+ *
+ * @param secret Master secret bytes.
+ * @param secret_len Master secret length in bytes.
+ * @param threshold Share threshold required for recovery.
+ * @param share_count Number of shares to generate.
+ * @param shares Output share strings.
+ *
+ * @return 0 on success, -1 on invalid input or generation failure.
  */
-
 int dogecoin_slip0039_generate_shares(const uint8_t* secret, size_t secret_len,
                                       uint8_t threshold, uint8_t share_count,
                                       char shares[][SLIP0039_MAX_SHARE_STR_SIZE])
@@ -807,6 +924,18 @@ int dogecoin_slip0039_generate_shares(const uint8_t* secret, size_t secret_len,
     return 0;
 }
 
+/**
+ * @brief Recovers a master secret from SLIP-0039 mnemonic shares.
+ *
+ * @param shares Input share strings.
+ * @param share_count Number of provided shares.
+ * @param passphrase Optional passphrase bytes.
+ * @param passphrase_len Passphrase length in bytes.
+ * @param secret_out Output recovered secret bytes.
+ * @param secret_len_out In/out length of secret_out.
+ *
+ * @return 0 on success, -1 on invalid input or recovery failure.
+ */
 int dogecoin_slip0039_recover_secret(const char* shares[], size_t share_count,
                                      const uint8_t* passphrase, size_t passphrase_len,
                                      uint8_t* secret_out, size_t* secret_len_out)
