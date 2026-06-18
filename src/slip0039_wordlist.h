@@ -1,4 +1,11 @@
-/* Auto-generated from official SLIP-0039 wordlist (1024 words). */
+/**********************************************************************
+ * Copyright (c) 2026 The Dogecoin Foundation                         *
+ * Distributed under the MIT software license, see the accompanying   *
+ * file COPYING or http://www.opensource.org/licenses/mit-license.php.*
+ *                                                                    *
+ * Auto-generated from official SLIP-0039 wordlist (1024 words).      *
+ **********************************************************************/
+
 #ifndef __LIBDOGECOIN_SLIP0039_WORDLIST_H__
 #define __LIBDOGECOIN_SLIP0039_WORDLIST_H__
 
