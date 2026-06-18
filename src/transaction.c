@@ -648,7 +648,7 @@ char* finalize_transaction_ts(dogecoin_transaction_context* ctx, int txindex, ch
     working_transaction* tx = find_transaction_ts(ctx, txindex);
 
     // guard against null pointer exceptions
-    if (tx == NULL) return false;
+    if (tx == NULL) return NULL;
 
     // determine intended network by checking address prefix:
     int is_testnet = chain_from_b58_prefix_bool(destinationaddress);
@@ -682,10 +682,10 @@ char* finalize_transaction_ts(dogecoin_transaction_context* ctx, int txindex, ch
 
     if (p2pkh_count < 1) {
         printf("p2pkh address not found from any output script hash!\n");
-        return false;
+        return NULL;
     }
 
-    if (tx_out_total != total) return false;
+    if (tx_out_total != total) return NULL;
 
     // run the thread-safe finalization integrity pass before serializing:
     dogecoin_tx_finalize_ts(tx->transaction);
@@ -712,7 +712,7 @@ char* get_raw_transaction_ts(dogecoin_transaction_context* ctx, int txindex) {
     working_transaction* tx = find_transaction_ts(ctx, txindex);
 
     // guard against null pointer exceptions
-    if (tx == NULL) return false;
+    if (tx == NULL) return NULL;
 
     // serialize under the per-object mutex when present:
     dogecoin_bool locked = tx->transaction->thread_safe;
