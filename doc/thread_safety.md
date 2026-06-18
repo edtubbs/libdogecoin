@@ -1,135 +1,104 @@
 # Thread safety model (libdogecoin)
 
 This document describes which libdogecoin APIs are safe to call from multiple
-threads and the internal concurrency design used by the SPV client.
+threads and the concurrency mechanisms the library provides.
 
-> Thread-safe (`_ts`) library APIs provide per-object mutex protection.
-> The CLI tools (`such`, `sendtx`, `spvnode`) always enable thread-safe
-> mode where applicable.
+> Thread-safe (`_ts`) library APIs provide per-object or per-context mutex
+> protection. The CLI tools ship in two flavours: the legacy single-threaded
+> binaries (`such`, `sendtx`, `spvnode`) and thread-safe variants
+> (`such_ts`, `sendtx_ts`, `spvnode_ts`) compiled with `-DDOGECOIN_TS=1` that
+> route through the `_ts` APIs.
 
-## Concurrency model in the SPV client
+## Overview of the concurrency model
 
-The SPV client uses a **single master writer** combined with a small pool of
-**worker producers** for header batches. Only the master thread ever writes to
-the headers DB (`.headers.db`) or to the in-memory block index; workers never
-touch the headers DB, the wallet, or the chain tip.
+libdogecoin uses two complementary strategies:
 
-`spvnode` always enables thread-safe mode by calling
-`dogecoin_spv_client_enable_thread_safe_mode()` at startup.
+1. **Thread-local state for legacy globals.** Several internal registries that
+   were historically process-global are declared `DOGECOIN_THREAD_LOCAL`, so
+   each thread gets its own independent copy and no locking is required:
+   * the hash/map registries (`hashes`, `maps` in `include/dogecoin/map.h`),
+   * the wallet UTXO list (`utxos` in `include/dogecoin/wallet.h`),
+   * the default transaction context (`src/transaction.c`),
+   * the hex conversion scratch buffers (`src/utils.c`),
+   * the RNG function pointers / mapper (`src/random.c`).
 
-```
-            ┌──────────┐           per-node parsed batches
- libevent ──▶  master  ──────────▶   ┌──────────────────┐
- IO thread  │  (main)  │             │  MPSC result ring │
-            └────┬─────┘             └────────┬─────────┘
-                 │                            ▲
-                 ▼ commit to headers.db       │ worker produces
-         ┌────────────────┐              ┌────┴────────┐
-         │ out-of-order   │              │ worker pool  │
-         │ staging ring   │              │  (2 threads) │
-         │ (bounded, 8)   │              └──────────────┘
-         └────────────────┘
-```
+   `DOGECOIN_THREAD_LOCAL` expands to `_Thread_local`, `__thread`, or
+   `__declspec(thread)` depending on the toolchain (`include/dogecoin/dogecoin.h`).
 
-* **Master thread.** Drains parsed results from the MPSC ring produced by the
-  worker pool, calls `headers_db->connect_hdr()` to commit each header, and on
-  every tip advance attempts to drain any batches that had been staged for
-  out-of-order delivery. This is the *only* thread that writes the headers DB.
-* **Worker pool.** Runs lightweight payload prevalidation (framing/size
-  checks) and copies the parsed batch into an owned buffer that is handed to
-  the master. Workers never touch `headers_db`, the wallet, or the chain
-  state. See `src/spv.c::spv_headers_pipeline_worker`.
-* **Out-of-order staging.** A bounded ring of up to
-  `SPV_HEADERS_STAGE_CAPACITY` (8) batches keyed by the first header's
-  `prev_block`. When a batch arrives whose `prev_block` is known in the DB
-  but is not the current tip (typical for peers that announce ahead of the
-  current chain), the batch is buffered instead of being rejected with an
-  `invalid (not in sequence)` streak. After every successful tip advance the
-  master drains any staged batch whose `prev_block` matches the new tip,
-  recursively. See `src/spv.c::spv_stage_batch` and
-  `src/spv.c::spv_stage_drain_for_tip`.
+2. **Explicit contexts and per-object mutexes for shared, mutable state.** When
+   an object genuinely needs to be shared between threads, the library provides
+   `_ts` constructors/operations that embed and take a `dogecoin_mutex_t`. These
+   are the context objects (`dogecoin_context`, `dogecoin_eckey_context`,
+   `dogecoin_transaction_context`) and the per-object `_ts` wrappers for the
+   transaction builder and the wallet.
 
-This preserves the existing btree-based reorg semantics: genuine reorgs are
-still handled by the normal `connect_hdr`/disconnect-tip path; the staging
-ring only addresses innocuous gap-fill caused by concurrent peers.
+The SPV client itself runs its message loop on the single libevent IO thread;
+there is no internal worker pool. Apps that want concurrency drive their own
+threads and share only the `_ts`-protected objects described below.
 
-### What the master-writer model implies
+## Mutex helpers
 
-* **No headers DB lock is needed — headersdb is single-writer by contract.**
-  The SPV master thread is the only writer, and the CLI tools are
-  single-threaded for DB access, so the previous `sync_lock` has been
-  removed from `src/headersdb_file.c`. The `sync_lock` field is kept
-  as a reserved `void*` to preserve ABI for callers that embed
-  `dogecoin_headers_db` in their own structures; the field is never
-  dereferenced. If a future caller needs to share a single
-  `dogecoin_headers_db` across threads, wrap your own mutex around the
-  call site rather than re-adding a lock inside the DB.
-* **Workers do not see partially-written DB state.** They only produce parsed
-  batches; they cannot race with the master.
-* **No mid-batch staging.** If a batch fails structurally mid-way (bad PoW,
-  truncation, etc.), it is still rejected and the peer gets a streak. Only
-  whole-batch staging based on the first-header `prev_block` is attempted.
+`include/dogecoin/dogecoin.h` provides a tiny portable mutex wrapper used by all
+`_ts` objects:
+
+* `dogecoin_mutex_init` / `dogecoin_mutex_lock` / `dogecoin_mutex_unlock` /
+  `dogecoin_mutex_destroy` — inline wrappers over `pthread_mutex_*` (POSIX) or
+  `CRITICAL_SECTION` (Windows). Each is a no-op when threads are unavailable or
+  the mutex was never initialized, so the same code compiles cleanly with or
+  without threading support.
+
+## Context API
+
+The context object is reference counted; the refcount is guarded by a
+process-wide mutex (`src/context.c`):
+
+* `dogecoin_context_new` / `dogecoin_ctx_new` — create a context (the `ctx`
+  spelling is a short alias of the `context` spelling).
+* `dogecoin_ctx_new_ts` — like `dogecoin_ctx_new` but tags the context as
+  thread-safe so dependent code can branch on `dogecoin_ctx_is_thread_safe(ctx)`.
+* `dogecoin_ctx_acquire` — increment the refcount before handing the context to
+  another thread.
+* `dogecoin_ctx_release` — decrement the refcount; the final release frees it.
+* `dogecoin_ctx_is_thread_safe` — query the thread-safe flag.
 
 ## API thread-safety summary
 
 ### Safe to call from multiple threads
 
-* `dogecoin_ctx_new` / `dogecoin_ctx_new_ts` / `dogecoin_ctx_acquire` /
-  `dogecoin_ctx_release` — short-form aliases over `dogecoin_context_*`. The
-  refcount is guarded by a process-wide mutex (`src/context.c`).
-  `dogecoin_ctx_new_ts()` additionally tags the context as thread-safe so
-  dependent subsystems can branch on `dogecoin_ctx_is_thread_safe(ctx)` to
-  select per-object locking when needed.
-* `dogecoin_headersdb_*` read APIs (`find`, `getchaintip`,
-  `fill_blocklocator_tip`) on a DB owned by one writer — the DB itself is
-  single-writer; concurrent reads from other threads are safe only while
-  the writer is not committing. If you need true multi-reader safety,
-  serialize calls externally (e.g. with your own `rwlock`).
-* `dogecoin_ecc_start` / `dogecoin_ecc_stop` — process-wide singletons,
-  refcounted.
+* The context refcount APIs above (`dogecoin_ctx_new`/`_ts`/`acquire`/`release`/
+  `is_thread_safe`) — the refcount is mutex-guarded.
+* `dogecoin_ecc_start` / `dogecoin_ecc_stop` — process-wide singletons, refcounted.
 * Read access to chain parameters (`&dogecoin_chainparams_main`, etc.) — they
-  are immutable at process start.
+  are immutable after process start.
+* Anything backed by `DOGECOIN_THREAD_LOCAL` state (hex helpers, per-thread
+  hash/map registries, per-thread UTXO list) — each thread is fully isolated.
 
-### Safe after opt-in at runtime
+### Safe to share across threads via `_ts` variants
 
-* `dogecoin_spv_client_runloop` combined with out-of-order batch delivery —
-  call `dogecoin_spv_client_enable_thread_safe_mode(client)` right after
-  `dogecoin_spv_client_new()` to activate the staging ring. The `spvnode`
-  CLI does this automatically.
+* eckey context (`dogecoin_eckey_context_new`/`_free`, `new_eckey_ts`,
+  `new_eckey_from_privkey_ts`, `add_eckey_ts`, `find_eckey_ts`,
+  `remove_eckey_ts`, `start_key_ts`).
+* transaction context (`dogecoin_transaction_context_new`/`_free`,
+  `new_transaction_ts`, `add_transaction_ts`, `find_transaction_ts`,
+  `remove_transaction_ts`, `remove_all_ts`, `get_transaction_count_ts`,
+  `start_transaction_ts`).
+* transaction builder (`dogecoin_tx_new_ts`, `dogecoin_tx_add_input_ts`,
+  `dogecoin_tx_add_output_ts`, `dogecoin_tx_sign_ts`,
+  `dogecoin_tx_finalize_ts`, `dogecoin_tx_free_ts`).
+* wallet (`dogecoin_wallet_new_ts`, `dogecoin_wallet_load_ts`,
+  `dogecoin_wallet_add_hd_account_ts`, `dogecoin_wallet_get_address_ts`,
+  `dogecoin_wallet_save_ts`, `dogecoin_wallet_free_ts`).
 
 ### Not thread-safe (must be single-threaded)
 
 * `dogecoin_hdnode_*` mutation APIs.
-* `working_transaction` / `eckey` slab APIs unless used via their `*_ts`
-  variants that take an explicit context (`new_transaction_ts`,
-  `new_eckey_ts`, etc.).
-* Per-node SPV counters (`hints`, `invalid_header_streak`) — accessed on the
-  libevent IO thread only.
+* The non-`_ts` `working_transaction` / `eckey` slab APIs — use the `_ts`
+  variants with an explicit context if you need sharing.
+* SPV client objects and their per-node counters — driven on the libevent IO
+  thread only.
 
-Callers that need to mix these APIs with concurrent work should keep each
+Callers that need to mix non-TS APIs with concurrent work should keep each
 non-TS object on a single owning thread.
-
-## Enabling thread-safe mode at runtime from the library
-
-If you link `libdogecoin` into your own program you can enable the TS behavior:
-
-```c
-#include <dogecoin/spv.h>
-
-dogecoin_spv_client* client = dogecoin_spv_client_new(...);
-dogecoin_spv_client_enable_thread_safe_mode(client);
-```
-
-## Verifying the pipeline
-
-`spvnode` (run with `-d`) logs lines such as:
-
-```
-SPV thread-safe mode enabled: master-writer pipeline with 8 out-of-order staging slots
-Staged out-of-order headers batch from node 17 (count=2000, staged=1)
-Draining staged headers batch from node 17 (count=2000, remaining_staged=0)
-Chaintip at height ...
-```
 
 ## Code examples
 
@@ -152,9 +121,7 @@ dogecoin_context_release(ctx);
 ```c
 #include <dogecoin/libdogecoin.h>
 
-/* One context shared between threads. The refcount is atomic; per-object
- * subsystems can be added under the same TS umbrella as they grow _ts
- * variants. */
+/* One context shared between threads. The refcount is mutex-guarded. */
 dogecoin_ctx* ctx = dogecoin_ctx_new_ts(false, false);
 
 /* Each thread acquires before use and releases when it is done. */
@@ -177,34 +144,6 @@ dogecoin_ctx_release(ctx);
   mutation in parallel.
 * For signing, `dogecoin_tx_sign_ts()` acquires locks in a fixed order
   (`tx->lock` then `wallet->lock`) to avoid inversion.
-
-`dogecoin_ctx_new_ts()` returns the same `dogecoin_context` type as
-`dogecoin_context_new()`; the only behavioural difference today is the
-`thread_safe` flag, which dependent subsystems can branch on as their `_ts`
-variants land. The non-`_ts` constructor remains thread-compatible (any
-single owning thread may use it) and the refcount itself is always atomic.
-
-## Roadmap for `_ts` API surface
-
-The following modules still require single-thread ownership; `_ts` variants
-remain tracked here for a future pass:
-
-* HD derivation (`dogecoin_hdnode_*`) — derivation is functional; the
-  `_ts` variants should protect cached child key tables when caches exist.
-
-## Wallet and transaction `_ts` wrappers
-
-The wallet and transaction builder now expose explicit `_ts` variants that add
-internal per-object mutex protection:
-
-* Wallet: `dogecoin_wallet_new_ts`, `dogecoin_wallet_load_ts`,
-  `dogecoin_wallet_add_hd_account_ts`, `dogecoin_wallet_get_address_ts`,
-  `dogecoin_wallet_save_ts`, `dogecoin_wallet_free_ts`.
-* Transaction builder: `dogecoin_tx_new_ts`, `dogecoin_tx_add_input_ts`,
-  `dogecoin_tx_add_output_ts`, `dogecoin_tx_sign_ts`,
-  `dogecoin_tx_finalize_ts`, `dogecoin_tx_free_ts`.
-
-Legacy non-`_ts` APIs remain unchanged for backwards compatibility.
 
 ### Wallet `_ts` usage example
 
@@ -236,9 +175,29 @@ dogecoin_tx_finalize_ts(tx);
 dogecoin_tx_free_ts(tx);
 ```
 
-## Verifying with sanitizers
+## Thread-safe CLI variants
 
-Recommended local invocations once the full `_ts` surface lands:
+The build produces a thread-safe variant of each CLI alongside the legacy
+binary:
+
+| legacy        | thread-safe      |
+|---------------|------------------|
+| `such`        | `such_ts`        |
+| `sendtx`      | `sendtx_ts`      |
+| `spvnode`     | `spvnode_ts`     |
+
+The `_ts` binaries are the same sources compiled with `-DDOGECOIN_TS=1`
+(`src/cli/cli_ts.h`). In that mode the transaction-builder entry points
+(`dogecoin_tx_new` / `dogecoin_tx_free`) are routed to their `_ts` variants and
+the tool creates a thread-safe context at startup, printing for example:
+
+```
+such: thread-safe mode enabled
+```
+
+The legacy binaries are unaffected and print nothing extra.
+
+## Verifying with sanitizers
 
 ```sh
 # ThreadSanitizer build (autotools)
@@ -246,10 +205,22 @@ CFLAGS="-fsanitize=thread -O1 -g" \
 LDFLAGS="-fsanitize=thread" \
 ./configure --with-net --with-tools --enable-test-passwd
 make -j$(nproc)
-LIBDOGECOIN_TEST_PASSWD=testpass ./test/tests
+LIBDOGECOIN_TEST_PASSWD=testpass ./tests
 ```
 
 ```sh
 # Valgrind (helgrind) for lock-order auditing
 valgrind --tool=helgrind ./tests
 ```
+
+## Roadmap for `_ts` API surface
+
+The following modules still require single-thread ownership; `_ts` variants
+remain tracked here for a future pass:
+
+* HD derivation (`dogecoin_hdnode_*`) — derivation is functional; the
+  `_ts` variants should protect cached child key tables when caches exist.
+* SPV client — the runloop is single-threaded on the libevent IO thread; a
+  future pass could parallelize header/block validation behind an opt-in `_ts`
+  entry point.
+

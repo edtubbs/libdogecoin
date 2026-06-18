@@ -44,3 +44,31 @@ void test_context_keypair_ex()
 
     dogecoin_context_release(ctx);
 }
+
+void test_context_ts_refcount()
+{
+    /* A plain context is not tagged thread-safe. */
+    dogecoin_context* ctx = dogecoin_context_new(false, false);
+    u_assert_true(ctx != NULL);
+    u_assert_int_eq(dogecoin_ctx_is_thread_safe(ctx), 0);
+    dogecoin_context_release(ctx);
+
+    /* A _ts context is tagged thread-safe and is reference counted: each
+     * dogecoin_ctx_acquire must be balanced by a dogecoin_ctx_release, and the
+     * final release frees the context. */
+    dogecoin_ctx* ts = dogecoin_ctx_new_ts(false, false);
+    u_assert_true(ts != NULL);
+    u_assert_true(dogecoin_ctx_is_thread_safe(ts) != 0);
+
+    dogecoin_ctx_acquire(ts);
+    dogecoin_ctx_acquire(ts);
+    /* Two acquires => three outstanding references (new + 2). */
+    dogecoin_ctx_release(ts);
+    dogecoin_ctx_release(ts);
+
+    /* The context is still usable while a reference remains. */
+    u_assert_true(dogecoin_context_get_chainparams(ts) != NULL);
+
+    /* Final release frees it. */
+    dogecoin_ctx_release(ts);
+}
