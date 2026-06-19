@@ -50,8 +50,8 @@ The script resolves funding credentials in this order:
    * WIF: `QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w`
    * Address: `DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr`
 
-   This key/address is a public reference used across the PQC and ZK demo
-   scripts. Generate/fund a fresh WIF/address for real runs.
+   This key/address is a public reference and is *not* secret. Any real DOGE
+   sent there is immediately spendable by anyone who has cloned this branch.
 
 Address resolution follows `ZK_CARRIER_ADDR`, then `FUNDED_ADDR`.
 

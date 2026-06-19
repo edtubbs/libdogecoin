@@ -86,8 +86,8 @@ NETWORK="${NETWORK:-mainnet}"
 NETWORK_FLAG=""
 [ "$NETWORK" = "testnet" ] && NETWORK_FLAG="-t"
 
-# Reference defaults are preserved for reproducibility; generate and fund a
-# fresh WIF/address pair before real mainnet runs.
+# The default WIF/address below is a public reference and is *not* secret.
+# Any real DOGE sent there is immediately spendable by anyone who has cloned this branch.
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 

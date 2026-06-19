@@ -38,8 +38,8 @@ REST_SERVER="${REST_SERVER:-${REST_HOST}:${REST_PORT}}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 CARRIER_ENABLED="${CARRIER_ENABLED:-1}"
-# NOTE: Reference defaults are kept for reproducibility, but operators should
-# generate a fresh WIF/address pair and fund it before real mainnet runs.
+# NOTE: This default WIF/address is a public reference and is *not* secret.
+# Any real DOGE sent there is immediately spendable by anyone who has cloned this branch.
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-${CHAINED_UTXO_TXID:-b6e065cbb0b42166a3fa0708c664df4a4a726e4b51ec47541634117dc7477c04}}"

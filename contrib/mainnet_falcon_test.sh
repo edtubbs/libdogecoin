@@ -47,8 +47,8 @@ INCLUDE_SCRIPTSIG_PQC="${INCLUDE_SCRIPTSIG_PQC:-1}"
 # CARRIER_ENABLED=0 → commitment-only mode (OP_RETURN only, guaranteed standard relay)
 # CARRIER_ENABLED=1 → commitment + P2SH carrier outputs (embeds PQC pubkey+sig on-chain)
 CARRIER_ENABLED="${CARRIER_ENABLED:-0}"
-# NOTE: Reference defaults are kept for reproducibility, but operators should
-# generate a fresh WIF/address pair and fund it before real mainnet runs.
+# NOTE: This default WIF/address is a public reference and is *not* secret.
+# Any real DOGE sent there is immediately spendable by anyone who has cloned this branch.
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-${CHAINED_UTXO_TXID:-b47b271ff454ce93e93f723b52959f9d14f44313c61706453c1a85aaced93031}}"
