@@ -24,27 +24,11 @@
 
 */
 
-/**
- * @file threadsafe.h
- *
- * @brief Thread-safe routing helpers shared by the libdogecoin CLI tools.
- *
- * The CLI sources are compiled twice: once into the legacy binaries
- * (`such`, `sendtx`, `spvnode`) and once into thread-safe binaries
- * (`such_ts`, `sendtx_ts`, `spvnode_ts`) compiled with `-DDOGECOIN_TS=1`.
- *
- * In the `-DDOGECOIN_TS` build each helper routes through the matching `_ts`
- * library API so the resulting binary exercises the thread-safe contexts and
- * per-object mutexes documented in doc/thread_safety.md; otherwise it calls the
- * plain API. The two builds are otherwise identical.
- *
- * Operations whose `_ts` variant shares the exact signature of the plain API
- * (the direct `dogecoin_tx` create/free calls) are routed with a compile-time
- * rename so the CLI sources keep using the canonical public names rather than
- * having every call site rewritten. Operations whose `_ts` variant takes an
- * extra context argument or has a distinct lifecycle are routed through small,
- * explicit `cli_*` wrappers that inject the context for the caller.
- */
+/* Thread-safe routing helpers shared by the libdogecoin CLI tools. The CLI
+ * sources are compiled twice: the plain binaries (such, sendtx, spvnode) call
+ * the plain API, and the -DDOGECOIN_TS binaries (such_ts, sendtx_ts,
+ * spvnode_ts) route through the matching _ts library API. See
+ * doc/thread_safety.md. */
 
 #ifndef __LIBDOGECOIN_THREADSAFE_H__
 #define __LIBDOGECOIN_THREADSAFE_H__

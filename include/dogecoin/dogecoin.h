@@ -216,6 +216,17 @@ typedef uint8_t uint256_t[32];
 typedef uint8_t uint160_t[20];
 typedef uint8_t SEED[MAX_SEED_SIZE];
 
+/* Generic pointer vector container shared by the public and internal APIs */
+typedef struct vector_t {
+    void** data;  /* array of pointers */
+    size_t len;   /* array element count */
+    size_t alloc; /* allocated array elements */
+
+    void (*elem_free_f)(void*);
+} vector_t;
+
+#define vector_idx(vec, idx) vec->data[idx]
+
 static const int WIDTH = 0x0000100/32;
 
 LIBDOGECOIN_API dogecoin_ctx* dogecoin_ctx_new(dogecoin_bool testnet, dogecoin_bool enable_net);
