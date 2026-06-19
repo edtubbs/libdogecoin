@@ -224,16 +224,16 @@ dogecoin_tx* dogecoin_tx_new_ts(void)
         tx->thread_safe = true;
     } else {
 #ifdef DOGECOIN_HAVE_THREADS
-        /* A threading runtime is present but the mutex could not be
-           initialized (e.g. resource exhaustion): fail rather than hand back
-           an object that callers expect to be lockable. */
+        // a threading runtime is present but the mutex could not be initialized
+        // (e.g. resource exhaustion): fail rather than hand back an object that
+        // callers expect to be lockable
         dogecoin_tx_free(tx);
         return NULL;
 #else
-        /* No threading runtime (e.g. a freestanding OP-TEE TA): fall back to a
-           lock-free transaction so the _ts registry remains usable on
-           single-threaded targets instead of failing outright. The _ts mutex
-           helpers are no-ops in this configuration. */
+        // no threading runtime (e.g. a freestanding OP-TEE TA): fall back to a
+        // lock-free transaction so the _ts registry remains usable on
+        // single-threaded targets instead of failing outright (the _ts mutex
+        // helpers are no-ops in this configuration)
         tx->thread_safe = false;
 #endif
     }
