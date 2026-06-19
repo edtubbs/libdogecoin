@@ -89,12 +89,12 @@ def varint(n):
     return "fd" + n.to_bytes(2, "little").hex()
 prev = "00" * 32
 vin  = prev + le_u32(0) + "00" + "ffffffff"
-spk  = "76a914000000000000000000000000000000000000000088ac"  # synthetic P2PKH
+spk  = "76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac"  # reference funded-address P2PKH
 vout = le_u64(100_000_000) + varint(len(spk)//2) + spk
 print("01000000" + varint(1) + vin + varint(1) + vout + "00000000")
 PY
 )
-SIGNER_SPK="76a914000000000000000000000000000000000000000088ac"
+SIGNER_SPK="76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac"
 TX_BINDING_RAW=$("$SUCH" -c tx_sighash32 -x "$BASE_UNSIGNED" -s "$SIGNER_SPK" -i 0 -h 1 2>&1 | awk -F': ' '/^tx_sighash32:/ {print $2; exit}' | tr -d ' ')
 # Zero top byte so the value is an unambiguous BN254 field element — matches
 # dogecoin_zk_compute_tx_base_sighash() exactly.
@@ -157,7 +157,7 @@ def varint(n):
     return "fd" + n.to_bytes(2, "little").hex()
 prev_le = bytes.fromhex(txid)[::-1].hex()
 vin = "".join(prev_le + le_u32(fv + i) + "00" + "ffffffff" for i in range(pt))
-spk = "76a914000000000000000000000000000000000000000088ac"
+spk = "76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac"
 vout = le_u64(99_000_000 * pt) + varint(len(spk)//2) + spk
 print("01000000" + varint(pt) + vin + "01" + vout + "00000000")
 PY
@@ -265,7 +265,7 @@ def varint(n):
     return "fd" + n.to_bytes(2, "little").hex()
 prev = "00" * 32
 vin  = prev + le_u32(0) + "00" + "ffffffff"
-spk  = "76a914000000000000000000000000000000000000000088ac"
+spk  = "76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac"
 vout = le_u64(99_500_000) + varint(len(spk)//2) + spk  # different value → different sighash
 print("01000000" + varint(1) + vin + varint(1) + vout + "00000000")
 PY
