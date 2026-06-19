@@ -81,7 +81,8 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 echo "==> log file: $LOG_FILE"
 
 # --------------------------- WIF / address ------------------------------------
-# Set these via environment before running (for example:
+# Set these via environment before running (generate/fund a fresh pair first,
+# for example:
 #   export ZK_CARRIER_WIF=<your-WIF>
 #   export ZK_CARRIER_ADDR=<your-address>)
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"

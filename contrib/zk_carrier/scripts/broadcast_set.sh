@@ -85,6 +85,8 @@ NETWORK="${NETWORK:-mainnet}"
 NETWORK_FLAG=""
 [ "$NETWORK" = "testnet" ] && NETWORK_FLAG="-t"
 
+# Reference defaults are preserved for reproducibility; generate and fund a
+# fresh WIF/address pair before real mainnet runs.
 FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
 FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 
@@ -92,8 +94,9 @@ FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-${CHAINED_UTXO_TXID:-}}"
 FUNDED_UTXO_VOUT="${FUNDED_UTXO_VOUT:-${CHAINED_UTXO_VOUT:-0}}"
 FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-${CHAINED_UTXO_VALUE_KOINU:-}}"
-# Optional: if unset, scriptPubKey is auto-discovered with UTXO lookup where available.
-FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PUBKEY:-}}"
+# Optional: if unset, scriptPubKey is auto-discovered with UTXO lookup where
+# available; this fallback keeps the reference funded address script.
+FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}}"
 
 CARRIER_VALUE_KOINU="${CARRIER_VALUE_KOINU:-100000000}"   # 1 DOGE per carrier part
 TX_FEE_KOINU="${TX_FEE_KOINU:-2000000}"

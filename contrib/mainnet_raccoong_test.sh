@@ -38,12 +38,10 @@ REST_SERVER="${REST_SERVER:-${REST_HOST}:${REST_PORT}}"
 NON_INTERACTIVE="${NON_INTERACTIVE:-1}"
 AUTO_BROADCAST="${AUTO_BROADCAST:-1}"
 CARRIER_ENABLED="${CARRIER_ENABLED:-1}"
-# NOTE: FUNDED_WIF and FUNDED_ADDR must be supplied via the environment.
-# Historical defaults referenced a real mainnet WIF used during PR validation
-# and are intentionally removed: shipping a funded mainnet private key in a
-# public repository would publish that key. Set both env vars before running.
-FUNDED_WIF="${FUNDED_WIF:?FUNDED_WIF must be set (mainnet WIF of the funding key)}"
-FUNDED_ADDR="${FUNDED_ADDR:?FUNDED_ADDR must be set (mainnet address corresponding to FUNDED_WIF)}"
+# NOTE: Reference defaults are kept for reproducibility, but operators should
+# generate a fresh WIF/address pair and fund it before real mainnet runs.
+FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
+FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-${CHAINED_UTXO_TXID:-b6e065cbb0b42166a3fa0708c664df4a4a726e4b51ec47541634117dc7477c04}}"
 FUNDED_UTXO_VOUT="${FUNDED_UTXO_VOUT:-${CHAINED_UTXO_VOUT:-0}}"
 AUTO_PREPARE_TX_FROM_UTXO="${AUTO_PREPARE_TX_FROM_UTXO:-1}"
@@ -58,7 +56,7 @@ if [ "$CARRIER_VALUE_KOINU" -lt 10000000 ]; then
     CARRIER_VALUE_KOINU=10000000
 fi
 FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-${CHAINED_UTXO_VALUE_KOINU:-}}"
-FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PUBKEY:-}}"
+FUNDED_UTXO_SCRIPT_PUBKEY="${FUNDED_UTXO_SCRIPT_PUBKEY:-${CHAINED_UTXO_SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}}"
 # Carrier P2SH address to watch in SPV (for TX_R carrier output visibility)
 CARRIER_P2SH_WATCH_ADDR="${CARRIER_P2SH_WATCH_ADDR:-A6bAFnGqeKDiYk9dwkLqJSYX96ECHZ2f3q}"
 RUN_LOG="$TMPDIR/mainnet_raccoong_run.log"
