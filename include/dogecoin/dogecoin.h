@@ -58,15 +58,13 @@
 #include <windows.h>
 #define DOGECOIN_HAVE_THREADS 1
 /* Only enable pthread-backed mutexes on hosted POSIX-like targets where we
- * know <pthread.h> exists AND the pthread runtime will be linked.  Bare-metal
- * / freestanding targets such as OP-TEE Trusted Applications (libutee) ship a
- * <pthread.h> via the cross toolchain headers but cannot resolve
- * pthread_mutex_* at link time, so they fall through to the no-op stubs. */
-#elif !defined(USE_OPTEE) && \
-      (defined(__GLIBC__) || defined(__BIONIC__) || defined(__APPLE__) || \
-       defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
-       defined(__DragonFly__) || defined(__CYGWIN__) || defined(__MINGW32__) || \
-       defined(__MINGW64__) || defined(__sun) || defined(__HAIKU__))
+ * know <pthread.h> exists AND the pthread runtime will be linked. Freestanding
+ * targets such as OP-TEE Trusted Applications (libutee) do not define the
+ * hosted libc macros below, so they still fall through to the no-op stubs. */
+#elif defined(__GLIBC__) || defined(__BIONIC__) || defined(__APPLE__) || \
+      defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
+      defined(__DragonFly__) || defined(__CYGWIN__) || defined(__MINGW32__) || \
+      defined(__MINGW64__) || defined(__sun) || defined(__HAIKU__)
 #include <pthread.h>
 #define DOGECOIN_HAVE_THREADS 1
 #endif
