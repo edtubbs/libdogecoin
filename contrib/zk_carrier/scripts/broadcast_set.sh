@@ -34,7 +34,8 @@
 #     [--with-mcl=DIR]; binaries such, sendtx, spvnode in . or PATH.
 #   - node + snarkjs installed (same as witness_helper.py needs).
 #   - $FUNDED_WIF holds koinu in $FUNDED_ADDR (defaults to the reference
-#     address DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr; do not send real DOGE there).
+#     address DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr); generate and fund a fresh
+#     WIF/address pair for real runs.
 #   - Range-proof circuit artifacts: $WASM, $ZKEY, and $VKEY.
 #
 # Usage:
