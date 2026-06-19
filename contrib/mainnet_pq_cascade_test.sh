@@ -12,7 +12,9 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 START_TXID="${START_TXID:-63d79b47b6d55b5143afb5f7782f9300da5d6a4837b5c9837a1769e3e0c44621}"
 START_VOUT="${START_VOUT:-0}"
 START_VALUE_KOINU="${START_VALUE_KOINU:-4194000000}"
-START_SCRIPT_PUBKEY="${START_SCRIPT_PUBKEY:?START_SCRIPT_PUBKEY must be set (scriptPubKey for START_TXID:START_VOUT)}"
+# Reference default for the START_TXID/START_VOUT pair; generate/fund a fresh
+# WIF/address pair and override START_* for real mainnet runs.
+START_SCRIPT_PUBKEY="${START_SCRIPT_PUBKEY:-76a9145a29227bb518c38cae5a9a195cafc56b22d7272b88ac}"
 SPV_TIMEOUT_SECONDS="${SPV_TIMEOUT_SECONDS:-1800}"
 
 run_stage() {
