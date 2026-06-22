@@ -45,6 +45,13 @@ TMPDIR=$(mktemp -d /tmp/bip38_sweep_e2e_XXXXXX)
 chmod 700 "$TMPDIR"
 
 # Funded mainnet wallet credentials
+#
+# WARNING: TEST-ONLY DEFAULTS — NOT SECRET.
+# The default FUNDED_WIF below is a publicly-committed mainnet key that has
+# already been swept empty by this test. It (and the BIP38/sweep passphrases
+# further down) must NEVER be reused to hold real funds. Override every value
+# via the environment for any real run, e.g.:
+#   FUNDED_WIF=... FUNDED_ADDR=... SWEEP_BIP38_PASSPHRASE=... ./mainnet_bip38_sweep_test.sh
 FUNDED_WIF="${FUNDED_WIF:-QTy3RUVaPcgkjuJtZKi67h91ivYvXsXpqJayrfeyXFZpMmoknjCy}"
 FUNDED_ADDR="${FUNDED_ADDR:-D5kLE5wbMHUqEps4MWrJAcUVmeodkCxNhd}"
 
@@ -57,9 +64,11 @@ FUNDED_UTXO_VALUE_KOINU="${FUNDED_UTXO_VALUE_KOINU:-}"
 DESTINATION_ADDR="${DESTINATION_ADDR:-}"
 
 # BIP38 passphrase for encryption test
+# WARNING: test-only default, not secret (see funded-wallet warning above).
 BIP38_PASSPHRASE="${BIP38_PASSPHRASE:-TestDogePassword123}"
 
 # BIP38 passphrase used by the live sweep API round trip (encrypt -> decrypt -> sweep)
+# WARNING: test-only default, not secret (see funded-wallet warning above).
 SWEEP_BIP38_PASSPHRASE="${SWEEP_BIP38_PASSPHRASE:-TestDogeSweep2026!}"
 
 # Sweep API fee parameters (koinu). fee-per-kb maps to libdogecoin fee-per-byte.
