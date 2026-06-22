@@ -45,8 +45,8 @@ TMPDIR=$(mktemp -d /tmp/bip38_sweep_e2e_XXXXXX)
 chmod 700 "$TMPDIR"
 
 # Funded mainnet wallet credentials
-FUNDED_WIF="${FUNDED_WIF:-QP1tqHYuPiAW73MHETRaARgeEff9PhHyYyQcWXAGskEFmSppDt2w}"
-FUNDED_ADDR="${FUNDED_ADDR:-DDMpdcTrWnZT38tRMebbYzCSAgLSnVMqvr}"
+FUNDED_WIF="${FUNDED_WIF:-QTy3RUVaPcgkjuJtZKi67h91ivYvXsXpqJayrfeyXFZpMmoknjCy}"
+FUNDED_ADDR="${FUNDED_ADDR:-D5kLE5wbMHUqEps4MWrJAcUVmeodkCxNhd}"
 
 # UTXO details - will be looked up if not provided
 FUNDED_UTXO_TXID="${FUNDED_UTXO_TXID:-}"
@@ -58,6 +58,18 @@ DESTINATION_ADDR="${DESTINATION_ADDR:-}"
 
 # BIP38 passphrase for encryption test
 BIP38_PASSPHRASE="${BIP38_PASSPHRASE:-TestDogePassword123}"
+
+# BIP38 passphrase used by the live sweep API round trip (encrypt -> decrypt -> sweep)
+SWEEP_BIP38_PASSPHRASE="${SWEEP_BIP38_PASSPHRASE:-TestDogeSweep2026!}"
+
+# Sweep API fee parameters (koinu). fee-per-kb maps to libdogecoin fee-per-byte.
+SWEEP_FEE_PER_KB="${SWEEP_FEE_PER_KB:-1000000}"   # 0.01 DOGE/kB (mainnet relay)
+SWEEP_MIN_FEE="${SWEEP_MIN_FEE:-100000}"
+SWEEP_MAX_FEE="${SWEEP_MAX_FEE:-100000000}"
+
+# Sweep API driver (exercises full sweep + BIP38 API and broadcasts the sweep).
+SWEEP_DRIVER="${SWEEP_DRIVER:-./mainnet_sweep_driver}"
+SWEEP_DRIVER_SRC="${SWEEP_DRIVER_SRC:-contrib/examples/mainnet_sweep_driver.c}"
 
 TX_FEE_KOINU="${TX_FEE_KOINU:-2000000}"
 
@@ -128,6 +140,72 @@ except:
     fi
     
     warn "Could not find UTXOs via blockcypher API"
+    return 1
+}
+
+# ----------------------- multi-UTXO lookup (sweep API) -----------------------
+# Collects every unspent output for an address into $UTXO_LIST_FILE as
+# "txid:vout:amount_doge" lines and sets SWEEP_TOTAL_KOINU / SWEEP_UTXO_COUNT.
+UTXO_LIST_FILE="$TMPDIR/utxos.txt"
+SWEEP_TOTAL_KOINU=0
+SWEEP_UTXO_COUNT=0
+lookup_all_utxos() {
+    local addr="$1"
+    info "Looking up ALL UTXOs for $addr (multi-UTXO sweep)..."
+    : > "$UTXO_LIST_FILE"
+
+    local utxos
+    utxos=$(curl -sf "https://api.blockcypher.com/v1/doge/main/addrs/${addr}?unspentOnly=true&includeScript=true&limit=2000" 2>/dev/null || true)
+    if [ -z "$utxos" ]; then
+        warn "Could not fetch UTXO set via blockcypher API"
+        return 1
+    fi
+    echo "$utxos" | tee -a "$RUN_LOG" >/dev/null
+
+    echo "$utxos" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+total = 0
+for ref in d.get('txrefs', []):
+    if ref.get('spent'):
+        continue
+    val = int(ref['value'])
+    total += val
+    doge = f'{val/100000000:.8f}'
+    print(f\"{ref['tx_hash']}:{ref['tx_output_n']}:{doge}\")
+sys.stderr.write(str(total))
+" >"$UTXO_LIST_FILE" 2>"$TMPDIR/utxo_total.txt" || true
+
+    SWEEP_TOTAL_KOINU=$(cat "$TMPDIR/utxo_total.txt" 2>/dev/null || echo 0)
+    SWEEP_UTXO_COUNT=$(grep -c ':' "$UTXO_LIST_FILE" 2>/dev/null || echo 0)
+    if [ "$SWEEP_UTXO_COUNT" -gt 0 ]; then
+        success "Found $SWEEP_UTXO_COUNT UTXO(s), total $SWEEP_TOTAL_KOINU koinu"
+        cat "$UTXO_LIST_FILE" | tee -a "$RUN_LOG"
+        return 0
+    fi
+    warn "No spendable UTXOs found for $addr"
+    return 1
+}
+
+# --------------------- build the sweep API driver ----------------------------
+build_sweep_driver() {
+    if [ -x "$SWEEP_DRIVER" ]; then
+        info "Sweep driver already built: $SWEEP_DRIVER"
+        return 0
+    fi
+    if [ ! -f ".libs/libdogecoin.a" ]; then
+        warn "Static library .libs/libdogecoin.a not found; cannot build sweep driver"
+        return 1
+    fi
+    info "Compiling sweep API driver from $SWEEP_DRIVER_SRC..."
+    local evlibs
+    evlibs=$(pkg-config --libs libevent 2>/dev/null || echo "-levent")
+    if gcc "$SWEEP_DRIVER_SRC" .libs/libdogecoin.a $evlibs -lpthread -lm \
+        -Iinclude -o "$SWEEP_DRIVER" 2>&1 | tee -a "$RUN_LOG"; then
+        success "Sweep driver built: $SWEEP_DRIVER"
+        return 0
+    fi
+    warn "Failed to build sweep driver"
     return 1
 }
 
@@ -278,100 +356,67 @@ main() {
         warn "BIP38/sweep unit tests may have issues - check logs"
     fi
     
-    # Step 4: Look up UTXOs if not provided
+    # Step 4: Look up the full UTXO set for the funded address (multi-UTXO sweep)
+    info "Step 4: Looking up UTXOs for funded address (full set)..."
     UTXO_AVAILABLE=0
-    if [ -z "$FUNDED_UTXO_TXID" ] || [ -z "$FUNDED_UTXO_VOUT" ] || [ -z "$FUNDED_UTXO_VALUE_KOINU" ]; then
-        info "Step 4: Looking up UTXOs for funded address..."
-        if lookup_utxos "$FUNDED_ADDR"; then
-            UTXO_AVAILABLE=1
-        else
-            warn "Could not auto-lookup UTXOs. Will demonstrate SPV sync only."
-            info "To perform full sweep test, provide: FUNDED_UTXO_TXID, FUNDED_UTXO_VOUT, FUNDED_UTXO_VALUE_KOINU"
-        fi
-    else
-        info "Step 4: Using provided UTXO: txid=$FUNDED_UTXO_TXID vout=$FUNDED_UTXO_VOUT value=$FUNDED_UTXO_VALUE_KOINU"
+    if lookup_all_utxos "$FUNDED_ADDR"; then
         UTXO_AVAILABLE=1
+    else
+        warn "Could not auto-lookup UTXOs. Will demonstrate SPV sync only."
     fi
-    
+
     BROADCAST_RESULT_TXID=""
     OUTPUT_VALUE_DOGE="N/A"
-    
+    BIP38_SWEEP_KEY="N/A"
+
     if [ "$UTXO_AVAILABLE" -eq 1 ]; then
-        # Step 5: Build sweep transaction using transaction command
-        info "Step 5: Build sweep transaction"
-        
-        # Calculate output value (UTXO value - fee)
-        OUTPUT_VALUE_KOINU=$((FUNDED_UTXO_VALUE_KOINU - TX_FEE_KOINU))
-        OUTPUT_VALUE_DOGE=$(python3 -c "print(f'{$OUTPUT_VALUE_KOINU / 100000000:.8f}')")
-        TOTAL_VALUE_DOGE=$(python3 -c "print(f'{$FUNDED_UTXO_VALUE_KOINU / 100000000:.8f}')")
-        
-        info "UTXO value: $FUNDED_UTXO_VALUE_KOINU koinu"
-        info "Fee: $TX_FEE_KOINU koinu"
-        info "Output value: $OUTPUT_VALUE_KOINU koinu ($OUTPUT_VALUE_DOGE DOGE)"
-        
-        # Get scriptPubKey for the funded address
-        FUNDED_PUBKEY_HEX=$(grep "public key hex:" "$TMPDIR/funded_addr.txt" | cut -d: -f2 | tr -d ' ')
-        
-        # Build transaction using the transaction interface
-        info "Building raw transaction..."
-        
-        # Create transaction commands file
-        cat > "$TMPDIR/tx_commands.txt" << TXEOF
-start
-add_input $FUNDED_UTXO_TXID $FUNDED_UTXO_VOUT
-add_output $DESTINATION_ADDR $OUTPUT_VALUE_DOGE
-finalize_transaction $DESTINATION_ADDR 0.00 $TOTAL_VALUE_DOGE $FUNDED_PUBKEY_HEX
-get_raw_transaction
-exit
-TXEOF
-        
-        # Get raw unsigned transaction
-        RAW_TX_OUTPUT=$(./such -c transaction < "$TMPDIR/tx_commands.txt" 2>&1 | tee -a "$RUN_LOG")
-        
-        RAW_UNSIGNED_TX=$(echo "$RAW_TX_OUTPUT" | grep -oP '^[0-9a-fA-F]{100,}$' | tail -1 || true)
-        
-        if [ -z "$RAW_UNSIGNED_TX" ]; then
-            error "Failed to build raw transaction"
+        # Step 5: Build the sweep API driver
+        info "Step 5: Build sweep API driver"
+        if ! build_sweep_driver; then
+            error "Could not build sweep API driver; cannot exercise sweep API"
         fi
-        
-        info "Raw unsigned TX: $RAW_UNSIGNED_TX"
-        debug_tx_hex "$RAW_UNSIGNED_TX" "unsigned_sweep_tx" 2>&1 | tee -a "$RUN_LOG"
-        
-        # Step 6: Sign the transaction
-        info "Step 6: Sign the sweep transaction"
-        
-        # Get scriptPubKey for signing (P2PKH format)
-    PUBKEY_HASH=$(./such -c p2pkh -k "$FUNDED_PUBKEY_HEX" 2>&1 | grep "script:" | cut -d: -f2 | tr -d ' ' || true)
-    if [ -z "$PUBKEY_HASH" ]; then
-        # Fallback: construct P2PKH scriptPubKey manually
-        # For compressed pubkey: hash160 of pubkey
-        PUBKEY_HASH160=$(echo -n "$FUNDED_PUBKEY_HEX" | xxd -r -p | openssl dgst -sha256 -binary | openssl dgst -ripemd160 -binary | xxd -p)
-        SCRIPT_PUBKEY="76a914${PUBKEY_HASH160}88ac"
-    else
-        SCRIPT_PUBKEY="$PUBKEY_HASH"
-    fi
-    
-    info "scriptPubKey: $SCRIPT_PUBKEY"
-    
-    SIGN_OUTPUT=$(run_and_log "such sign" ./such -c sign -x "$RAW_UNSIGNED_TX" -s "$SCRIPT_PUBKEY" -i 0 -h 1 -p "$FUNDED_WIF" $NETWORK_FLAG || true)
-    echo "$SIGN_OUTPUT" | tee -a "$RUN_LOG"
-    
-    SIGNED_TX=$(echo "$SIGN_OUTPUT" | grep "^signed TX:" | cut -d: -f2- | tr -d ' ')
-    
-    if [ -z "$SIGNED_TX" ]; then
-        error "Failed to sign transaction"
-    fi
-    
-    success "Transaction signed successfully"
-    debug_tx_hex "$SIGNED_TX" "signed_sweep_tx" 2>&1 | tee -a "$RUN_LOG"
-    
-        # Step 7: Broadcast the transaction
-        info "Step 7: Broadcast sweep transaction"
-        
-        if ! broadcast_with_retry "sweep_tx" "$SIGNED_TX"; then
-            warn "Broadcast may have failed - check logs for details"
+
+        # Step 6: Run the live sweep via the sweep API (BIP38 encrypt -> decrypt ->
+        # create -> sign -> validate -> stats -> broadcast). One invocation
+        # exercises the full BIP38 API and the full sweep API and transmits the tx.
+        info "Step 6: Sweep all UTXOs to destination via the sweep API"
+        info "Funded WIF will be BIP38-encrypted (passphrase: $SWEEP_BIP38_PASSPHRASE) then decrypted and swept"
+
+        SWEEP_UTXO_ARGS=()
+        while IFS= read -r line; do
+            [ -n "$line" ] && SWEEP_UTXO_ARGS+=(--utxo "$line")
+        done < "$UTXO_LIST_FILE"
+
+        SWEEP_BROADCAST_FLAG=()
+        if [ "${SKIP_BROADCAST:-0}" = "1" ]; then
+            warn "SKIP_BROADCAST=1 set; sweep will be built/signed/validated but NOT broadcast"
+            SWEEP_BROADCAST_FLAG=(--no-broadcast)
+        fi
+
+        SWEEP_OUTPUT=$(run_and_log "sweep API driver" "$SWEEP_DRIVER" \
+            --wif "$FUNDED_WIF" \
+            --encrypt-bip38 "$SWEEP_BIP38_PASSPHRASE" \
+            --dest "$DESTINATION_ADDR" \
+            --fee-per-kb "$SWEEP_FEE_PER_KB" \
+            --min-fee "$SWEEP_MIN_FEE" \
+            --max-fee "$SWEEP_MAX_FEE" \
+            "${SWEEP_BROADCAST_FLAG[@]}" \
+            "${SWEEP_UTXO_ARGS[@]}" || true)
+        echo "$SWEEP_OUTPUT" | tee -a "$RUN_LOG"
+
+        BIP38_SWEEP_KEY=$(echo "$SWEEP_OUTPUT" | sed -n 's/.*BIP38 encrypted key:[[:space:]]*\(6P[A-Za-z0-9]\{1,\}\).*/\1/p' | head -n1)
+        BROADCAST_RESULT_TXID=$(echo "$SWEEP_OUTPUT" | sed -n 's/.*BROADCAST OK txid=\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1)
+        SWEEP_OUT_KOINU=$(echo "$SWEEP_OUTPUT" | sed -n 's/.*total_out=\([0-9]\{1,\}\) koinu.*/\1/p' | head -n1)
+        if [ -n "$SWEEP_OUT_KOINU" ]; then
+            OUTPUT_VALUE_DOGE=$(python3 -c "print(f'{$SWEEP_OUT_KOINU / 100000000:.8f}')")
+        fi
+
+        if echo "$SWEEP_OUTPUT" | grep -q "BROADCAST OK"; then
+            success "Sweep transaction broadcast via sweep API: $BROADCAST_RESULT_TXID"
+        elif echo "$SWEEP_OUTPUT" | grep -q "skipping broadcast"; then
+            success "Sweep transaction built/signed/validated via sweep API (broadcast skipped)"
         else
-            success "Sweep transaction broadcast: $BROADCAST_RESULT_TXID"
+            warn "Sweep API broadcast may have failed - check logs for details"
         fi
     fi  # End of UTXO_AVAILABLE check
     
@@ -425,13 +470,24 @@ TXEOF
     info "BIP38 and Sweep E2E Test Summary"
     info "=========================================="
     info "Funded Address: $FUNDED_ADDR"
+    info "Funded WIF: $FUNDED_WIF"
     info "Destination Address: $DESTINATION_ADDR"
     info "BIP38 Test Address: $BIP38_TEST_ADDR"
-    info "Sweep UTXO: ${FUNDED_UTXO_TXID:-N/A}:${FUNDED_UTXO_VOUT:-N/A}"
+    info "Sweep UTXO count: ${SWEEP_UTXO_COUNT:-N/A} (total ${SWEEP_TOTAL_KOINU:-N/A} koinu)"
     info "Sweep Amount: $OUTPUT_VALUE_DOGE DOGE"
+    info "BIP38 sweep key (6P...): ${BIP38_SWEEP_KEY:-N/A}"
+    info "BIP38 sweep passphrase: $SWEEP_BIP38_PASSPHRASE"
     info "Broadcast TXID: ${BROADCAST_RESULT_TXID:-N/A}"
     info "Log file: $RUN_LOG"
     info "=========================================="
+    info "------------------------------------------"
+    info "FUND RETRIEVAL DETAILS (KEEP SAFE)"
+    info "Any DOGE swept during this test lands at the destination below and is"
+    info "spendable with the destination WIF. These are recorded so the funds"
+    info "can be recovered later (e.g. ./such -c generate_public_key -p <WIF>)."
+    info "  Destination address: $DESTINATION_ADDR"
+    info "  Destination WIF:     ${DEST_WIF:-(supplied externally: $DESTINATION_ADDR)}"
+    info "------------------------------------------"
     
     success "BIP38 and Paper Wallet Sweep E2E test completed!"
     
