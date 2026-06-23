@@ -429,8 +429,10 @@ unchanged.
 
 * `working_transaction` gained two internally-managed fields (`refcount`,
   `pending_delete`) — an additive layout change to a public struct.
-* `eckey` likewise gained two internally-managed fields (`refcount`,
-  `pending_delete`) — an additive layout change to a public struct.
+* `eckey`'s public struct layout is **unchanged**: the `_ts` lifetime
+  bookkeeping (reference count and deferred-delete flag) is tracked in an
+  internal side table inside `dogecoin_eckey_context` (keyed by entry pointer),
+  not in the `eckey` struct, so there is no ABI change to `eckey`.
 * `release_transaction_ts` is a new `LIBDOGECOIN_API` function; pairing it with
   `find_transaction_ts` is mandatory for external direct callers.
 * `acquire_transaction_ts` is a new owning-name alias of `find_transaction_ts`,
