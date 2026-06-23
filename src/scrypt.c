@@ -242,6 +242,10 @@ void scrypt_detect_sse2()
 #elif defined(DOGECOIN_HAVE_THREADS)
     pthread_once(&scrypt_detect_once, scrypt_detect_sse2_impl);
 #else
+    /* No threading runtime is present on this target (e.g. OP-TEE TAs), so
+       execution is single-threaded by construction and this plain guard is
+       sufficient — there are no concurrent callers to race on the assignment.
+       This mirrors how dogecoin_mutex_* degrade to no-ops on such builds. */
     if (!scrypt_detect_once) {
         scrypt_detect_once = 1;
         scrypt_detect_sse2_impl();
