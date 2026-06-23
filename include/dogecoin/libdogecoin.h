@@ -661,10 +661,6 @@ typedef struct eckey {
     dogecoin_pubkey public_key;
     char public_key_hex[PUBKEYHEXLEN];
     char address[P2PKHLEN];
-    /* Internally-managed lifetime fields for the _ts retain-under-lock model;
-       guarded by the owning dogecoin_eckey_context->lock. Not for direct use. */
-    int refcount;
-    int pending_delete;
     UT_hash_handle hh;
 } eckey;
 

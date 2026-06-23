@@ -42,20 +42,27 @@ typedef struct eckey {
     dogecoin_pubkey public_key;
     char public_key_hex[PUBKEYHEXLEN];
     char address[P2PKHLEN];
-    /* Lifetime fields for the _ts retain-under-lock model; both guarded by the
-       owning dogecoin_eckey_context->lock. refcount counts outstanding holders
-       handed out by find_eckey_ts(); pending_delete marks an entry unlinked
-       from the registry but not yet freed because a holder is still using it.
-       Unused (stay zero) for entries in the thread-local default context, which
-       is never shared. */
-    int refcount;
-    int pending_delete;
     UT_hash_handle hh;
 } eckey;
 
+/* Per-entry lifetime bookkeeping for the _ts retain-under-lock model. Kept in a
+   side table (keyed by the eckey pointer) rather than inside eckey itself so the
+   public eckey struct layout/ABI stays unchanged. Both fields are guarded by the
+   owning dogecoin_eckey_context->lock. refcount counts outstanding holders handed
+   out by find_eckey_ts(); pending_delete marks an entry unlinked from the registry
+   but not yet freed because a holder is still using it. Entries in the thread-local
+   default context never get a lifetime record (they are never retained). */
+typedef struct eckey_lifetime {
+    eckey* key; /* hash key: the live eckey pointer */
+    int refcount;
+    int pending_delete;
+    UT_hash_handle hh;
+} eckey_lifetime;
+
 typedef struct dogecoin_eckey_context {
     eckey* keys;
-    dogecoin_mutex_t lock; /* guards the registry root above; no-op for the
+    eckey_lifetime* lifetimes; /* side table guarding _ts refcounts, keyed by key ptr */
+    dogecoin_mutex_t lock; /* guards the registry roots above; no-op for the
                               zero-initialized per-thread default context */
 } dogecoin_eckey_context;
 

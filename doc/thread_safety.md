@@ -403,10 +403,11 @@ if (key) {
 **Deferred free.** If another thread removes the entry while you hold a
 reference, the entry is unlinked from the registry immediately but its memory is
 not freed (and its key material not cleansed) until the last reference is
-released. This is what makes the returned pointer safe to dereference. The entry
-carries an internal reference count and a deferred-delete flag, both managed
-under the registry lock; they are not part of the supported API and must not be
-read or written directly.
+released. This is what makes the returned pointer safe to dereference. The
+reference count and deferred-delete flag are tracked in a side table inside the
+context (keyed by the entry pointer), managed under the registry lock, so the
+public `eckey` struct layout is unchanged; they are not part of the supported API
+and must not be read or written directly.
 
 **Callback-under-lock alternative.** For the common "look up and use
 immediately" case, `with_eckey_ts(ctx, idx, fn, arg)` invokes `fn(key, arg)`
