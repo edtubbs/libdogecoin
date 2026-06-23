@@ -42,6 +42,14 @@ typedef struct eckey {
     dogecoin_pubkey public_key;
     char public_key_hex[PUBKEYHEXLEN];
     char address[P2PKHLEN];
+    /* Lifetime fields for the _ts retain-under-lock model; both guarded by the
+       owning dogecoin_eckey_context->lock. refcount counts outstanding holders
+       handed out by find_eckey_ts(); pending_delete marks an entry unlinked
+       from the registry but not yet freed because a holder is still using it.
+       Unused (stay zero) for entries in the thread-local default context, which
+       is never shared. */
+    int refcount;
+    int pending_delete;
     UT_hash_handle hh;
 } eckey;
 
@@ -64,7 +72,18 @@ LIBDOGECOIN_API void add_eckey_ts(dogecoin_eckey_context* ctx, eckey *key);
 
 // find eckey from the hash table
 LIBDOGECOIN_API eckey* find_eckey(int idx);
+/* THREAD-SAFE variant - returns an entry with a reference held under the
+   registry lock; pair every successful (non-NULL) call with exactly one
+   release_eckey_ts(). */
 LIBDOGECOIN_API eckey* find_eckey_ts(dogecoin_eckey_context* ctx, int idx);
+/* Release a reference obtained from find_eckey_ts(). */
+LIBDOGECOIN_API void release_eckey_ts(dogecoin_eckey_context* ctx, eckey* key);
+/* Callback-under-lock convenience: looks up idx and, if found, invokes fn(key,
+   arg) while the registry lock is held, so the entry cannot be removed/freed
+   for the duration of the callback and no retain/release bookkeeping is needed.
+   fn must not call back into the same context (the lock is non-recursive).
+   Returns 1 if an entry was found and fn was invoked, 0 otherwise. */
+LIBDOGECOIN_API int with_eckey_ts(dogecoin_eckey_context* ctx, int idx, void (*fn)(eckey* key, void* arg), void* arg);
 
 // remove eckey from the hash table
 LIBDOGECOIN_API void remove_eckey(eckey *key);

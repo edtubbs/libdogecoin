@@ -59,11 +59,33 @@ static eckey* find_eckey_locked(dogecoin_eckey_context* ctx, int idx) {
     return key;
 }
 
-static void remove_eckey_locked(dogecoin_eckey_context* ctx, eckey* key) {
-    HASH_DEL(ctx->keys, key); /* delete it (keys advances to next) */
+/* Free the key material and the entry itself. Caller MUST hold ctx->lock and
+   must have already unlinked the entry from the registry. */
+static void destroy_eckey_locked(eckey* key) {
     dogecoin_privkey_cleanse(&key->private_key);
     dogecoin_pubkey_cleanse(&key->public_key);
     dogecoin_key_free(key);
+}
+
+static void remove_eckey_locked(dogecoin_eckey_context* ctx, eckey* key) {
+    HASH_DEL(ctx->keys, key); /* unlink so no new finder can reach it */
+    if (key->refcount > 0) {
+        /* A holder from find_eckey_ts() is still using it; defer the free to the
+           last release. The entry is already out of the registry. */
+        key->pending_delete = 1;
+        return;
+    }
+    destroy_eckey_locked(key);
+}
+
+/* Drop a reference taken by find_eckey_ts(). Caller MUST hold ctx->lock. Frees
+   the entry if it was removed while referenced and this was the last ref. */
+static void release_eckey_locked(eckey* key) {
+    if (!key) return;
+    if (key->refcount > 0) key->refcount--;
+    if (key->refcount == 0 && key->pending_delete) {
+        destroy_eckey_locked(key);
+    }
 }
 
 dogecoin_eckey_context* dogecoin_eckey_context_new(void) {
@@ -91,6 +113,10 @@ void dogecoin_eckey_context_free(dogecoin_eckey_context* ctx) {
     eckey* tmp;
     dogecoin_mutex_lock(&ctx->lock);
     HASH_ITER(hh, ctx->keys, current, tmp) {
+        /* Guard rail (debug builds): freeing a context while a find_eckey_ts()
+           reference is still outstanding indicates a missing release_eckey_ts()
+           and would otherwise leak the deferred-delete entry. */
+        assert(current->refcount == 0);
         remove_eckey_locked(ctx, current);
     }
     dogecoin_mutex_unlock(&ctx->lock);
@@ -194,15 +220,45 @@ void add_eckey_ts(dogecoin_eckey_context* ctx, eckey *key) {
  * the provided index.
  */
 eckey* find_eckey(int idx) {
-    return find_eckey_ts(default_eckey_context(), idx);
+    /* Legacy lookup on the thread-local default context, which is never shared
+       across threads. Return a borrowed pointer without retaining so the
+       default context's entries keep refcount == 0 per the documented
+       invariant (see eckey.refcount); the legacy callers of this API have no
+       release_eckey_ts() pairing. */
+    dogecoin_eckey_context* ctx = default_eckey_context();
+    if (!ctx) return NULL;
+    dogecoin_mutex_lock(&ctx->lock);
+    eckey* key = find_eckey_locked(ctx, idx);
+    dogecoin_mutex_unlock(&ctx->lock);
+    return key;
 }
 
 eckey* find_eckey_ts(dogecoin_eckey_context* ctx, int idx) {
     if (!ctx) return NULL;
     dogecoin_mutex_lock(&ctx->lock);
     eckey* key = find_eckey_locked(ctx, idx);
+    if (key) key->refcount++; /* retain under the registry lock */
     dogecoin_mutex_unlock(&ctx->lock);
     return key;
+}
+
+/* Release a reference obtained from find_eckey_ts(). Every successful (non-NULL)
+   find_eckey_ts() must be paired with exactly one call here once the caller is
+   done dereferencing the returned entry. */
+void release_eckey_ts(dogecoin_eckey_context* ctx, eckey* key) {
+    if (!ctx || !key) return;
+    dogecoin_mutex_lock(&ctx->lock);
+    release_eckey_locked(key);
+    dogecoin_mutex_unlock(&ctx->lock);
+}
+
+int with_eckey_ts(dogecoin_eckey_context* ctx, int idx, void (*fn)(eckey* key, void* arg), void* arg) {
+    if (!ctx || !fn) return 0;
+    dogecoin_mutex_lock(&ctx->lock);
+    eckey* key = find_eckey_locked(ctx, idx);
+    if (key) fn(key, arg);
+    dogecoin_mutex_unlock(&ctx->lock);
+    return key != NULL;
 }
 
 /**
