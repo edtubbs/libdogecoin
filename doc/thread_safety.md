@@ -162,6 +162,14 @@ strictly **higher** than every lock it already holds:
 | 20 | `DOGECOIN_LOCK_RANK_WALLET` | `dogecoin_wallet.lock` |
 | 30 | `DOGECOIN_LOCK_RANK_REGISTRY` | eckey / transaction context registry lock |
 
+Currently only the `tx → wallet` nesting in `dogecoin_tx_sign_ts()` uses the
+ranked helpers (ranks `TX` then `WALLET`). The registry locks (`ctx->lock` in
+the eckey/transaction contexts) are taken without nesting any other `_ts` lock,
+so they are acquired with the plain helpers today; `DOGECOIN_LOCK_RANK_REGISTRY`
+is reserved at the top of the order for any future code that needs to hold a
+registry lock together with a `tx`/`wallet` lock, so the global ordering is
+already defined when that arises.
+
 Nested locks are acquired with `dogecoin_mutex_lock_ranked(mutex, rank)` and
 released (strictly LIFO) with `dogecoin_mutex_unlock_ranked(mutex, rank)`. In
 debug builds (`NDEBUG` unset) these maintain a thread-local stack of held ranks

@@ -113,10 +113,12 @@ void dogecoin_eckey_context_free(dogecoin_eckey_context* ctx) {
     eckey* tmp;
     dogecoin_mutex_lock(&ctx->lock);
     HASH_ITER(hh, ctx->keys, current, tmp) {
+#ifndef NDEBUG
         /* Guard rail (debug builds): freeing a context while a find_eckey_ts()
            reference is still outstanding indicates a missing release_eckey_ts()
            and would otherwise leak the deferred-delete entry. */
         assert(current->refcount == 0);
+#endif
         remove_eckey_locked(ctx, current);
     }
     dogecoin_mutex_unlock(&ctx->lock);
