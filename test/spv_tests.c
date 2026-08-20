@@ -88,8 +88,27 @@ void test_spv()
     dogecoin_spv_client_load(client, headersfile, false);
     dogecoin_free(headersfile);
 
-    printf("Discover peers...");
+    printf("Discover peers...\n");
     dogecoin_spv_client_discover_peers(client, NULL);
+
+    // retry discovery if no peers found, up to 3 attempts
+    int attempt;
+    const int max_attempts = 3;
+    for (attempt = 2; attempt <= max_attempts && client->nodegroup->nodes->len == 0; attempt++) {
+        printf("No peers from DNS seeds, retrying (%d/%d)...\n", attempt, max_attempts);
+        sleep(2);
+        dogecoin_spv_client_discover_peers(client, NULL);
+    }
+
+    // if still no peers, exit with error
+    if (client->nodegroup->nodes->len == 0) {
+        dogecoin_spv_client_free(client);
+        remove_all_hashes();
+        remove_all_maps();
+        u_assert_true(false && "No peers found after multiple attempts. Exiting test.");
+        return;
+    }
+
     printf("done\n");
     printf("Start interacting with the p2p network...\n");
     dogecoin_spv_client_runloop(client);
