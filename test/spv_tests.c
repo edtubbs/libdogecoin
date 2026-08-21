@@ -27,7 +27,11 @@
 */
 
 #ifdef _MSC_VER
+#include <io.h>
 #include <stdio.h>
+#include <windows.h>
+#define sleep(seconds) Sleep((DWORD)(seconds) * 1000)
+#define unlink _unlink
 #else
 #include <unistd.h>
 #endif
