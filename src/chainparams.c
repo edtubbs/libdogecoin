@@ -243,7 +243,7 @@ const dogecoin_chainparams* chain_from_b58_prefix(const char* address) {
     return count ? &dogecoin_chainparams_main : &dogecoin_chainparams_test;
 }
 
-int chain_from_b58_prefix_bool(char* address) {
+int chain_from_b58_prefix_bool(const char* address) {
     /* determine address prefix for network chainparams */
     uint8_t prefix[1];
     memcpy(prefix, address, 1);

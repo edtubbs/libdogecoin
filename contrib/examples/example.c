@@ -7,15 +7,15 @@
 
 // (or in the case of this project's directory structure, and if you want to build statically):
 // (after build, from the /libdogecoin project root directory)
-// gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include/dogecoin -L./.libs -ldogecoin -levent -o example
+// gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include -I./include/dogecoin -L./.libs -ldogecoin -levent -o example
 // To include the ZK carrier section (requires --enable-zk-carrier at configure time):
-// gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include/dogecoin -L./.libs -ldogecoin -DUSE_ZK_CARRIER -o example
+// gcc ./contrib/examples/example.c ./.libs/libdogecoin.a -I./include -I./include/dogecoin -L./.libs -ldogecoin -DUSE_ZK_CARRIER -o example
 //
 // When libdogecoin is configured with --enable-intel-avx2 or --enable-intel-sse,
 // also link the matching per-asm archives so sha256_block_{avx,sse} /
 // sha512_block_{avx,sse} resolve:
 //   gcc ./contrib/examples/example.c ./.libs/libdogecoin.a src/intel/*/*.a \
-//       -I./include/dogecoin -lpthread -levent -levent_core -levent_extra -lm -o example
+//       -I./include -I./include/dogecoin -lpthread -levent -levent_core -levent_extra -lm -o example
 // then run 'example'.
 
 //  for windows, from the command line: (after build, from the /libdogecoin project root directory) run:

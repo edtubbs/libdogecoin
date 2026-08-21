@@ -74,7 +74,7 @@ extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[];
 extern const size_t dogecoin_testnet_checkpoint_count;
 
 LIBDOGECOIN_API const dogecoin_chainparams* chain_from_b58_prefix(const char* address);
-LIBDOGECOIN_API int chain_from_b58_prefix_bool(char* address);
+LIBDOGECOIN_API int chain_from_b58_prefix_bool(const char* address);
 
 // check if the given prefix is a testnet or mainnet prefix
 LIBDOGECOIN_API dogecoin_bool isTestnetFromB58Prefix(const char address[P2PKHLEN]);

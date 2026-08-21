@@ -45,7 +45,7 @@ static dogecoin_transaction_context* default_transaction_context(void) {
 
 /* internal helpers for the thread-safe index API (defined below) */
 static int add_address_output_ts(working_transaction* tx, const dogecoin_chainparams* chain, int64_t koinu, const char* address);
-static int make_change_ts(dogecoin_transaction_context* ctx, int txindex, char* public_key, uint64_t subtractedfee, uint64_t amount);
+static int make_change_ts(dogecoin_transaction_context* ctx, int txindex, const char* public_key, uint64_t subtractedfee, uint64_t amount);
 
 dogecoin_transaction_context* dogecoin_transaction_context_default(void) {
     return default_transaction_context();
@@ -768,11 +768,11 @@ int add_output_ts(dogecoin_transaction_context* ctx, int txindex, const char* de
  *
  * @return 1 if the additional output was created successfully, 0 otherwise.
  */
-static int make_change(int txindex, char* public_key, uint64_t subtractedfee, uint64_t amount) {
+static int make_change(int txindex, const char* public_key, uint64_t subtractedfee, uint64_t amount) {
     return make_change_ts(default_transaction_context(), txindex, public_key, subtractedfee, amount);
 }
 
-static int make_change_ts(dogecoin_transaction_context* ctx, int txindex, char* public_key, uint64_t subtractedfee, uint64_t amount) {
+static int make_change_ts(dogecoin_transaction_context* ctx, int txindex, const char* public_key, uint64_t subtractedfee, uint64_t amount) {
     if (!ctx) return false;
     if (amount==subtractedfee) return false; // utxos already fully spent, no change needed
     // find working transaction by index and pass to funciton local variable to manipulate:

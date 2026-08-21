@@ -147,7 +147,7 @@ int main() {
 
 ### **add_utxo**
 
-`int add_utxo(int txindex, char* hex_utxo_txid, int vout)`
+`int add_utxo(int txindex, const char* hex_utxo_txid, int vout)`
 
 An unspent transaction output (utxo) is an output of a previous transaction in which funds were sent to the user's address. These can be spent by including them as inputs in a new transaction. This function takes in a working_transaction's index as an integer (txindex), a raw hexadecimal string id of the transaction containing the utxo to spend (hex_utxo_txid), and index of the desired utxo within the previous transaction's list of outputs (vout). The utxo is then added to the working_transaction->transaction->vin field, returning either 1 for success or 0 for failure.
 
@@ -172,7 +172,7 @@ int main() {
 
 ### **add_output**
 
-`int add_output(int txindex, char* destinationaddress, char* amount)`
+`int add_output(int txindex, const char* destinationaddress, const char* amount)`
 
 In order to actually spend utxos, the user must specify the new recipient address and how much of the total input amount will be sent to this address. This function takes in a working_transaction's index as an integer (txindex), the string p2pkh address of the new recipient (destinationaddress), and the amount in Dogecoin (amount) to send. This new output will be added to the working_transaction->transaction->vout field, returning either 1 for success or 0 for failure.
 
@@ -199,7 +199,7 @@ int main() {
 
 ### **finalize_transaction**
 
-`char* finalize_transaction(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress)`
+`char* finalize_transaction(int txindex, const char* destinationaddress, const char* subtractedfee, const char* out_dogeamount_for_verification, const char* changeaddress)`
 
 Because Dogecoin protocol requires that utxos must be spent in full, an additional output is usually included in a transaction to return all the leftover funds to the sender. This function automatically handles both creating this extra output and reserving some funds for the network fee. It takes in a working_transaction's index as an integer (txindex), the external destination address we are sending to (destinationaddress), the desired fee to be subtracted (subtractedfee), the total amount of all inputs included through `add_utxo()` (out_dogeamount_for_verification), and the public key of the sender (public_key). In addition to making change and deducting the fee, it checks that all of the recipients included in the transaction outputs are valid by converting their script hashes to p2pkh, and returns false if any are not found. Otherwise, the hex of the finalized transaction is returned as a string.
 

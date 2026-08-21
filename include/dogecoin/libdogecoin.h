@@ -134,7 +134,7 @@ extern const dogecoin_checkpoint dogecoin_testnet_checkpoint_array[];
 extern const size_t dogecoin_testnet_checkpoint_count;
 
 const dogecoin_chainparams* chain_from_b58_prefix(const char* address);
-int chain_from_b58_prefix_bool(char* address);
+int chain_from_b58_prefix_bool(const char* address);
 
 dogecoin_context* dogecoin_context_new(dogecoin_bool testnet, dogecoin_bool enable_net);
 void dogecoin_context_acquire(dogecoin_context* ctx);
@@ -648,7 +648,7 @@ dogecoin_bool broadcast_raw_tx(const dogecoin_chainparams* chain, const char* ra
 --------------------------------------------------------------------------
 */
 int koinu_to_coins_str(uint64_t koinu, char* str, size_t str_size);
-uint64_t coins_to_koinu_str(char* coins);
+uint64_t coins_to_koinu_str(const char* coins);
 
 
 /* Memory functions
