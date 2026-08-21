@@ -1272,8 +1272,8 @@ int main() {
 
 		// 3. Build an unsigned spending tx via the transaction builder.
 		//    vout=0 makes the input reference prev_tx output at index 0.
-		const char* psbt_dest = "D6a52RGbfvKDzKTh8carkGd1vNdAurHmaS";
-		const char* psbt_dummy_txid = "b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae076074";
+		char* psbt_dest = "D6a52RGbfvKDzKTh8carkGd1vNdAurHmaS";
+		char* psbt_dummy_txid = "b4455e7b7b7acb51fb6feba7a2702c42a5100f61f61abafa31851ed6ae076074";
 		int psbt_tix = start_transaction();
 		add_utxo(psbt_tix, psbt_dummy_txid, 0);
 		add_output(psbt_tix, psbt_dest, "9.9");

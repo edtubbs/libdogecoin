@@ -356,7 +356,8 @@ if test "x$with_net" = xyes; then
         ;;
     esac
   ])
-  LIBS="$LIBS $EVENT_LIBS $EVENT_CORE_LIBS $EVENT_EXTRA_LIBS $EVENT_PTHREADS_LIBS"
+  AC_CHECK_LIB([pthread], [pthread_create], [PTHREAD_LIBS="-lpthread"], [AC_MSG_ERROR([pthread library missing])])
+  LIBS="$LIBS $EVENT_LIBS $EVENT_CORE_LIBS $EVENT_EXTRA_LIBS $EVENT_PTHREADS_LIBS $PTHREAD_LIBS"
 fi
 
 if test "x$with_logdb" = xyes; then
