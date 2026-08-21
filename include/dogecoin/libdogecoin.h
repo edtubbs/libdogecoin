@@ -41,16 +41,10 @@
 /* Chainparams
 --------------------------------------------------------------------------
 */
-#ifndef DOGECOIN_STRUCT_DNS_SEED_DEFINED
-#define DOGECOIN_STRUCT_DNS_SEED_DEFINED
 struct dogecoin_dns_seed_ {
     char domain[256];
 };
-#endif
-#ifndef DOGECOIN_TYPEDEF_DNS_SEED
-#define DOGECOIN_TYPEDEF_DNS_SEED
 typedef struct dogecoin_dns_seed_ dogecoin_dns_seed;
-#endif
 
 /* Declared here and again in the internal chainparams.h, so that this header
    stays self-contained. The objects are defined once, in chainparams.c, against
@@ -60,8 +54,6 @@ typedef struct dogecoin_dns_seed_ dogecoin_dns_seed;
    is what happened to genesisblockchainwork, which left consumers reading
    default_port out of the middle of the chainwork. Change both, in step.
    test/chainparams_abi_tests.c fails if they diverge again. */
-#ifndef DOGECOIN_STRUCT_CHAINPARAMS_DEFINED
-#define DOGECOIN_STRUCT_CHAINPARAMS_DEFINED
 struct dogecoin_chainparams_ {
     char chainname[32];
     uint8_t b58prefix_pubkey_address;
@@ -80,25 +72,15 @@ struct dogecoin_chainparams_ {
     uint256_t pow_limit;
     uint256_t minimumchainwork;
 };
-#endif
-#ifndef DOGECOIN_TYPEDEF_CHAINPARAMS
-#define DOGECOIN_TYPEDEF_CHAINPARAMS
 typedef struct dogecoin_chainparams_ dogecoin_chainparams;
-#endif
 
-#ifndef DOGECOIN_STRUCT_CHECKPOINT_DEFINED
-#define DOGECOIN_STRUCT_CHECKPOINT_DEFINED
 struct dogecoin_checkpoint_ {
     uint32_t height;
     const char* hash;
     uint32_t timestamp;
     uint32_t target;
 };
-#endif
-#ifndef DOGECOIN_TYPEDEF_CHECKPOINT
-#define DOGECOIN_TYPEDEF_CHECKPOINT
 typedef struct dogecoin_checkpoint_ dogecoin_checkpoint;
-#endif
 
 struct dogecoin_transaction_context;
 struct dogecoin_eckey_context;
@@ -117,10 +99,7 @@ typedef struct dogecoin_context_ {
 } dogecoin_context;
 
 /* forward declarations for opaque types referenced by the PQC and ZK APIs */
-#ifndef DOGECOIN_TYPEDEF_CSTRING
-#define DOGECOIN_TYPEDEF_CSTRING
 typedef struct cstring cstring;
-#endif
 
 /* forward declarations for network/SPV node types */
 typedef struct dogecoin_node_ dogecoin_node;
@@ -128,10 +107,7 @@ typedef struct dogecoin_spv_client_ dogecoin_spv_client;
 typedef struct dogecoin_wallet_ dogecoin_wallet;
 
 /* forward declarations for transaction container types */
-#ifndef DOGECOIN_TYPEDEF_TX
-#define DOGECOIN_TYPEDEF_TX
 typedef struct dogecoin_tx_ dogecoin_tx;
-#endif
 typedef struct dogecoin_smpv_tx_ dogecoin_smpv_tx;
 /* forward declaration for PSBT (BIP174/BIP370) container type */
 typedef struct dogecoin_psbt dogecoin_psbt;
@@ -579,14 +555,14 @@ int getDerivedHDAddressFromAcctPubKey(const char* ext_pubkey, const uint32_t ind
 int start_transaction();
 
 /* add a utxo to the transaction being worked on at (txindex), specifying the utxo's txid and vout. returns 1 if successful.*/
-int add_utxo(int txindex, char* hex_utxo_txid, int vout);
+int add_utxo(int txindex, const char* hex_utxo_txid, int vout);
 
 /* add an output to the transaction being worked on at (txindex) of amount (amount) in dogecoins, returns 1 if successful. */
-int add_output(int txindex, char* destinationaddress, char* amount);
+int add_output(int txindex, const char* destinationaddress, const char* amount);
 
 /* finalize the transaction being worked on at (txindex), with the (destinationaddress) paying a fee of (subtractedfee), */
 /* re-specify the amount in dogecoin for verification, and change address for change. If not specified, change will go to the first utxo's address. */
-char* finalize_transaction(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress);
+char* finalize_transaction(int txindex, const char* destinationaddress, const char* subtractedfee, const char* out_dogeamount_for_verification, const char* changeaddress);
 
 /* sign a raw transaction in memory at (txindex), sign (inputindex) with (scripthex) of (sighashtype), with (privkey) */
 int sign_transaction(int txindex, char* script_pubkey, char* privkey);
@@ -610,7 +586,7 @@ int get_raw_transaction_ex(int txindex, char* buf, size_t buf_cap);
 int sign_raw_transaction_ex(int inputindex, const char* incomingrawtx, char* signedrawtx, size_t* signed_size, const char* scripthex, int sighashtype, const char* privkey);
 
 /* finalize the transaction being worked on at (txindex), with the (destinationaddress) paying a fee of (subtractedfee) in a buffer (buf) of size (buf_cap) */
-int finalize_transaction_ex(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress, char* buf, size_t buf_cap);
+int finalize_transaction_ex(int txindex, const char* destinationaddress, const char* subtractedfee, const char* out_dogeamount_for_verification, const char* changeaddress, char* buf, size_t buf_cap);
 
 /* sign and store one vin of the working tx at (txindex); writes signed hex into (buf) with capacity (buf_cap) */
 int sign_indexed_raw_transaction_ex(int txindex, int inputindex, const char* scripthex, int sighashtype, const char* privkey, char* buf, size_t buf_cap);

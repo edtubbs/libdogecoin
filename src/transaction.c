@@ -647,11 +647,11 @@ int save_raw_transaction_ts(dogecoin_transaction_context* ctx, int txindex, cons
  *
  * @return 1 if the transaction input was added successfully, 0 otherwise.
  */
-int add_utxo(int txindex, char* hex_utxo_txid, int vout) {
+int add_utxo(int txindex, const char* hex_utxo_txid, int vout) {
     return add_utxo_ts(default_transaction_context(), txindex, hex_utxo_txid, vout);
 }
 
-int add_utxo_ts(dogecoin_transaction_context* ctx, int txindex, char* hex_utxo_txid, int vout) {
+int add_utxo_ts(dogecoin_transaction_context* ctx, int txindex, const char* hex_utxo_txid, int vout) {
     if (!ctx) return false;
     // find working transaction by index and pass to funciton local variable to manipulate:
     working_transaction* tx = find_transaction_ts(ctx, txindex);
@@ -700,7 +700,7 @@ int add_utxo_ts(dogecoin_transaction_context* ctx, int txindex, char* hex_utxo_t
  *
  * @return 1 if the transaction input was added successfully, 0 otherwise.
  */
-int add_output(int txindex, char* destinationaddress, char* amount) {
+int add_output(int txindex, const char* destinationaddress, const char* amount) {
     return add_output_ts(default_transaction_context(), txindex, destinationaddress, amount);
 }
 
@@ -737,7 +737,7 @@ static int add_address_output_ts(working_transaction* tx, const dogecoin_chainpa
     return added;
 }
 
-int add_output_ts(dogecoin_transaction_context* ctx, int txindex, char* destinationaddress, char* amount) {
+int add_output_ts(dogecoin_transaction_context* ctx, int txindex, const char* destinationaddress, const char* amount) {
     if (!ctx) return false;
     // find working transaction by index and pass to funciton local variable to manipulate:
     working_transaction* tx = find_transaction_ts(ctx, txindex);
@@ -807,11 +807,11 @@ static int make_change_ts(dogecoin_transaction_context* ctx, int txindex, char* 
  *
  * @return The hex of the finalized transaction.
  */
-char* finalize_transaction(int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress) {
+char* finalize_transaction(int txindex, const char* destinationaddress, const char* subtractedfee, const char* out_dogeamount_for_verification, const char* changeaddress) {
     return finalize_transaction_ts(default_transaction_context(), txindex, destinationaddress, subtractedfee, out_dogeamount_for_verification, changeaddress);
 }
 
-char* finalize_transaction_ts(dogecoin_transaction_context* ctx, int txindex, char* destinationaddress, char* subtractedfee, char* out_dogeamount_for_verification, char* changeaddress) {
+char* finalize_transaction_ts(dogecoin_transaction_context* ctx, int txindex, const char* destinationaddress, const char* subtractedfee, const char* out_dogeamount_for_verification, const char* changeaddress) {
     if (!ctx) return NULL;
     // find working transaction by index and pass to funciton local variable to manipulate:
     working_transaction* tx = find_transaction_ts(ctx, txindex);
@@ -1409,10 +1409,10 @@ int sign_raw_transaction_ex(int    inputindex,
  * @return Number of bytes written on success, or 0 on error.
  */
 int finalize_transaction_ex(int   txindex,
-                            char* destinationaddress,
-                            char* subtractedfee,
-                            char* out_dogeamount_for_verification,
-                            char* changeaddress,
+                            const char* destinationaddress,
+                            const char* subtractedfee,
+                            const char* out_dogeamount_for_verification,
+                            const char* changeaddress,
                             char* buf,
                             size_t buf_cap)
 {
