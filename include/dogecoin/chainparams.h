@@ -33,31 +33,19 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-typedef struct dogecoin_dns_seed_ {
+#ifndef DOGECOIN_STRUCT_DNS_SEED_DEFINED
+#define DOGECOIN_STRUCT_DNS_SEED_DEFINED
+struct dogecoin_dns_seed_ {
     char domain[256];
-} dogecoin_dns_seed;
+};
+#endif
+#ifndef DOGECOIN_TYPEDEF_DNS_SEED
+#define DOGECOIN_TYPEDEF_DNS_SEED
+typedef struct dogecoin_dns_seed_ dogecoin_dns_seed;
+#endif
 
-#ifndef DOGECOIN_TYPEDEF_CHAINPARAMS
-#define DOGECOIN_TYPEDEF_CHAINPARAMS
-typedef struct dogecoin_chainparams_ {
-    char chainname[32];
-    uint8_t b58prefix_pubkey_address;
-    uint8_t b58prefix_script_address;
-    const char bech32_hrp[5];
-    uint8_t b58prefix_secret_address; //!private key
-    uint32_t b58prefix_bip32_privkey;
-    uint32_t b58prefix_bip32_pubkey;
-    const unsigned char netmagic[4];
-    uint256_t genesisblockhash;
-    uint256_t genesisblockchainwork;
-    int default_port;
-    dogecoin_dns_seed dnsseeds[8];
-    dogecoin_bool strict_id;
-    dogecoin_bool auxpow_id;
-    uint256_t pow_limit;
-    uint256_t minimumchainwork;
-} dogecoin_chainparams;
-#else
+#ifndef DOGECOIN_STRUCT_CHAINPARAMS_DEFINED
+#define DOGECOIN_STRUCT_CHAINPARAMS_DEFINED
 struct dogecoin_chainparams_ {
     char chainname[32];
     uint8_t b58prefix_pubkey_address;
@@ -77,13 +65,24 @@ struct dogecoin_chainparams_ {
     uint256_t minimumchainwork;
 };
 #endif
+#ifndef DOGECOIN_TYPEDEF_CHAINPARAMS
+#define DOGECOIN_TYPEDEF_CHAINPARAMS
+typedef struct dogecoin_chainparams_ dogecoin_chainparams;
+#endif
 
-typedef struct dogecoin_checkpoint_ {
+#ifndef DOGECOIN_STRUCT_CHECKPOINT_DEFINED
+#define DOGECOIN_STRUCT_CHECKPOINT_DEFINED
+struct dogecoin_checkpoint_ {
     uint32_t height;
     const char* hash;
     uint32_t timestamp;
     uint32_t target;
-} dogecoin_checkpoint;
+};
+#endif
+#ifndef DOGECOIN_TYPEDEF_CHECKPOINT
+#define DOGECOIN_TYPEDEF_CHECKPOINT
+typedef struct dogecoin_checkpoint_ dogecoin_checkpoint;
+#endif
 
 extern const dogecoin_chainparams dogecoin_chainparams_main;
 extern const dogecoin_chainparams dogecoin_chainparams_test;

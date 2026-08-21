@@ -678,7 +678,7 @@ void dogecoin_block_serialize(cstring* s, const dogecoin_block_header* header,
  * The eager `inner[]` formulation is Core's, kept so the two implementations can
  * be compared line by line. Anything simpler risks agreeing with Core on the
  * common case and diverging on exactly the case that matters. */
-void dogecoin_compute_merkle_root(uint8_t leaves[][DOGECOIN_HASH_LENGTH], size_t leaf_count,
+void dogecoin_compute_merkle_root(const uint256_t* leaves, size_t leaf_count,
                                   uint256_t root_out, dogecoin_bool* mutated_out) {
     if (!root_out) return;
     if (!leaves || leaf_count == 0) {
@@ -775,7 +775,7 @@ dogecoin_bool dogecoin_block_merkle_root(dogecoin_tx** txs, size_t txs_count,
         }
         dogecoin_tx_hash(txs[i], leaves[i]);
     }
-    dogecoin_compute_merkle_root(leaves, txs_count, root_out, mutated_out);
+    dogecoin_compute_merkle_root((const uint256_t*)leaves, txs_count, root_out, mutated_out);
     dogecoin_free(leaves);
     return true;
     }

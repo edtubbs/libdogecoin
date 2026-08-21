@@ -62,17 +62,6 @@ typedef struct dogecoin_tx_out_ {
     cstring* script_pubkey;
 } dogecoin_tx_out;
 
-#ifndef DOGECOIN_TYPEDEF_TX
-#define DOGECOIN_TYPEDEF_TX
-typedef struct dogecoin_tx_ {
-    int32_t version;
-    vector_t* vin;
-    vector_t* vout;
-    uint32_t locktime;
-    dogecoin_bool thread_safe;
-    dogecoin_mutex_t lock;
-} dogecoin_tx;
-#else
 struct dogecoin_tx_ {
     int32_t version;
     vector_t* vin;
@@ -81,6 +70,9 @@ struct dogecoin_tx_ {
     dogecoin_bool thread_safe;
     dogecoin_mutex_t lock;
 };
+#ifndef DOGECOIN_TYPEDEF_TX
+#define DOGECOIN_TYPEDEF_TX
+typedef struct dogecoin_tx_ dogecoin_tx;
 #endif
 
 //!p2pkh utilities
