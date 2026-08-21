@@ -33,20 +33,11 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
-#ifndef DOGECOIN_STRUCT_DNS_SEED_DEFINED
-#define DOGECOIN_STRUCT_DNS_SEED_DEFINED
-struct dogecoin_dns_seed_ {
+typedef struct dogecoin_dns_seed_ {
     char domain[256];
-};
-#endif
-#ifndef DOGECOIN_TYPEDEF_DNS_SEED
-#define DOGECOIN_TYPEDEF_DNS_SEED
-typedef struct dogecoin_dns_seed_ dogecoin_dns_seed;
-#endif
+} dogecoin_dns_seed;
 
-#ifndef DOGECOIN_STRUCT_CHAINPARAMS_DEFINED
-#define DOGECOIN_STRUCT_CHAINPARAMS_DEFINED
-struct dogecoin_chainparams_ {
+typedef struct dogecoin_chainparams_ {
     char chainname[32];
     uint8_t b58prefix_pubkey_address;
     uint8_t b58prefix_script_address;
@@ -63,26 +54,14 @@ struct dogecoin_chainparams_ {
     dogecoin_bool auxpow_id;
     uint256_t pow_limit;
     uint256_t minimumchainwork;
-};
-#endif
-#ifndef DOGECOIN_TYPEDEF_CHAINPARAMS
-#define DOGECOIN_TYPEDEF_CHAINPARAMS
-typedef struct dogecoin_chainparams_ dogecoin_chainparams;
-#endif
+} dogecoin_chainparams;
 
-#ifndef DOGECOIN_STRUCT_CHECKPOINT_DEFINED
-#define DOGECOIN_STRUCT_CHECKPOINT_DEFINED
-struct dogecoin_checkpoint_ {
+typedef struct dogecoin_checkpoint_ {
     uint32_t height;
     const char* hash;
     uint32_t timestamp;
     uint32_t target;
-};
-#endif
-#ifndef DOGECOIN_TYPEDEF_CHECKPOINT
-#define DOGECOIN_TYPEDEF_CHECKPOINT
-typedef struct dogecoin_checkpoint_ dogecoin_checkpoint;
-#endif
+} dogecoin_checkpoint;
 
 extern const dogecoin_chainparams dogecoin_chainparams_main;
 extern const dogecoin_chainparams dogecoin_chainparams_test;

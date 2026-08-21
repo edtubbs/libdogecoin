@@ -23,42 +23,8 @@
 #ifndef __LIBDOGECOIN_BIP38_H__
 #define __LIBDOGECOIN_BIP38_H__
 
-#include <stdint.h>
-#include <stddef.h>
-
-#ifndef __LIBDOGECOIN_DOGECOIN_H__
-#ifndef DOGECOIN_TYPEDEF_BOOL
-#define DOGECOIN_TYPEDEF_BOOL
-typedef uint8_t dogecoin_bool;
-#endif
-#ifdef __cplusplus
-#define LIBDOGECOIN_BEGIN_DECL extern "C" {
-#define LIBDOGECOIN_END_DECL }
-#else
-#define LIBDOGECOIN_BEGIN_DECL
-#define LIBDOGECOIN_END_DECL
-#endif
-#ifndef LIBDOGECOIN_API
-#if defined(_WIN32)
-#ifdef LIBDOGECOIN_BUILD
-#define LIBDOGECOIN_API __declspec(dllexport)
-#else
-#define LIBDOGECOIN_API
-#endif
-#elif defined(__GNUC__) && defined(LIBDOGECOIN_BUILD)
-#define LIBDOGECOIN_API __attribute__((visibility("default")))
-#else
-#define LIBDOGECOIN_API
-#endif
-#endif
-#endif /* !__LIBDOGECOIN_DOGECOIN_H__ */
-
-#ifndef __LIBDOGECOIN_CHAINPARAMS_H__
-#ifndef DOGECOIN_TYPEDEF_CHAINPARAMS
-#define DOGECOIN_TYPEDEF_CHAINPARAMS
-typedef struct dogecoin_chainparams_ dogecoin_chainparams;
-#endif
-#endif
+#include <dogecoin/dogecoin.h>
+#include <dogecoin/chainparams.h>
 
 LIBDOGECOIN_BEGIN_DECL
 
