@@ -538,3 +538,4 @@ if (!sign_transaction_w_privkey_ex(idx, wif, txhex, sizeof txhex)) {
     /* error */
 }
 ```
+
