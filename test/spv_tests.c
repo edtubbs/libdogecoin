@@ -30,7 +30,7 @@
 #include <io.h>
 #include <stdio.h>
 #include <windows.h>
-#define sleep(seconds) Sleep((DWORD)(seconds) * 1000)
+#define sleep(seconds) Sleep((DWORD)((seconds) * 1000U))
 #define unlink _unlink
 #else
 #include <unistd.h>
