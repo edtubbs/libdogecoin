@@ -86,7 +86,10 @@
 #define DOGECOIN_HAVE_THREADS 1
 #endif
 
+#ifndef DOGECOIN_TYPEDEF_BOOL
+#define DOGECOIN_TYPEDEF_BOOL
 typedef uint8_t dogecoin_bool; //!serialize, c/c++ save bool
+#endif
 
 struct dogecoin_context_;
 /* Short-form context alias used by the `_ts` API surface. */

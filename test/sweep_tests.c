@@ -448,7 +448,7 @@ static void test_paper_wallet_creation(void)
     char address[P2PKHLEN];
     result = dogecoin_paper_wallet_get_address(wallet1, address, sizeof(address));
     u_assert_true(result);
-    debug_print("%s","  WIF Address: %s\n", address);
+    debug_print("  WIF Address: %s\n", address);
 
     u_assert_true(dogecoin_paper_wallet_is_valid(wallet1));
 
@@ -474,7 +474,7 @@ static void test_paper_wallet_creation(void)
 
     result = dogecoin_paper_wallet_get_address(wallet2, address, sizeof(address));
     u_assert_true(result);
-    debug_print("%s","  Hex Address: %s\n", address);
+    debug_print("  Hex Address: %s\n", address);
 
     u_assert_true(dogecoin_paper_wallet_is_valid(wallet2));
 
@@ -499,7 +499,7 @@ static void test_bip38_encryption(void)
 
     char address[P2PKHLEN];
     dogecoin_pubkey_getaddr_p2pkh(&pubkey, chain, address);
-    debug_print("%s","  Test address: %s\n", address);
+    debug_print("  Test address: %s\n", address);
 
     char encrypted_key[BIP38_ENCRYPTED_KEY_LENGTH + 1];
     size_t encrypted_size = sizeof(encrypted_key);
@@ -514,7 +514,7 @@ static void test_bip38_encryption(void)
         &encrypted_size
     );
     u_assert_true(result);
-    debug_print("%s","  Encrypted key: %s\n", encrypted_key);
+    debug_print("  Encrypted key: %s\n", encrypted_key);
 
     result = dogecoin_bip38_is_valid(encrypted_key);
     u_assert_true(result);

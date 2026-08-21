@@ -62,6 +62,8 @@ typedef struct dogecoin_tx_out_ {
     cstring* script_pubkey;
 } dogecoin_tx_out;
 
+#ifndef DOGECOIN_TYPEDEF_TX
+#define DOGECOIN_TYPEDEF_TX
 typedef struct dogecoin_tx_ {
     int32_t version;
     vector_t* vin;
@@ -70,6 +72,16 @@ typedef struct dogecoin_tx_ {
     dogecoin_bool thread_safe;
     dogecoin_mutex_t lock;
 } dogecoin_tx;
+#else
+struct dogecoin_tx_ {
+    int32_t version;
+    vector_t* vin;
+    vector_t* vout;
+    uint32_t locktime;
+    dogecoin_bool thread_safe;
+    dogecoin_mutex_t lock;
+};
+#endif
 
 //!p2pkh utilities
 LIBDOGECOIN_API int dogecoin_tx_out_pubkey_hash_to_p2pkh_address(dogecoin_tx_out* txout, char* p2pkh, int is_mainnet);

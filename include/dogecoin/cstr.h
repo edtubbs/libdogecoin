@@ -34,11 +34,20 @@
 
 LIBDOGECOIN_BEGIN_DECL
 
+#ifndef DOGECOIN_TYPEDEF_CSTRING
+#define DOGECOIN_TYPEDEF_CSTRING
 typedef struct cstring {
     char* str;    /* string data, incl. NUL */
     size_t len;   /* length of string, not including NUL */
     size_t alloc; /* total allocated buffer length */
 } cstring;
+#else
+struct cstring {
+    char* str;    /* string data, incl. NUL */
+    size_t len;   /* length of string, not including NUL */
+    size_t alloc; /* total allocated buffer length */
+};
+#endif
 
 LIBDOGECOIN_API cstring* cstr_new(const char* init_str);
 LIBDOGECOIN_API cstring* cstr_new_sz(size_t sz);

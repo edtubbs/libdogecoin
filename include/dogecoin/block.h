@@ -171,7 +171,7 @@ LIBDOGECOIN_API void dogecoin_auxpow_payload_serialize(cstring* s, const dogecoi
  *         transaction lists can otherwise produce the same root (CVE-2012-2459).
  *         Callers that ignore this flag are accepting mutated blocks.
  */
-LIBDOGECOIN_API void dogecoin_compute_merkle_root(const uint256_t* leaves, size_t leaf_count, uint256_t root_out, dogecoin_bool* mutated_out);
+LIBDOGECOIN_API void dogecoin_compute_merkle_root(const uint8_t leaves[][DOGECOIN_HASH_LENGTH], size_t leaf_count, uint256_t root_out, dogecoin_bool* mutated_out);
 
 /** Compute the merkle root of a transaction vector. Hashes each transaction and
  *  reduces. Returns false on allocation failure or a NULL entry. */

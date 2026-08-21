@@ -96,7 +96,10 @@ typedef struct dogecoin_context_ {
 } dogecoin_context;
 
 /* forward declarations for opaque types referenced by the PQC and ZK APIs */
+#ifndef DOGECOIN_TYPEDEF_CSTRING
+#define DOGECOIN_TYPEDEF_CSTRING
 typedef struct cstring cstring;
+#endif
 
 /* forward declarations for network/SPV node types */
 typedef struct dogecoin_node_ dogecoin_node;
@@ -104,7 +107,10 @@ typedef struct dogecoin_spv_client_ dogecoin_spv_client;
 typedef struct dogecoin_wallet_ dogecoin_wallet;
 
 /* forward declarations for transaction container types */
+#ifndef DOGECOIN_TYPEDEF_TX
+#define DOGECOIN_TYPEDEF_TX
 typedef struct dogecoin_tx_ dogecoin_tx;
+#endif
 typedef struct dogecoin_smpv_tx_ dogecoin_smpv_tx;
 /* forward declaration for PSBT (BIP174/BIP370) container type */
 typedef struct dogecoin_psbt dogecoin_psbt;
