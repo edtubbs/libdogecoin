@@ -341,6 +341,16 @@ if test "x$use_tests" = xyes; then
   AC_DEFINE_UNQUOTED([PASSWD_STR],["$PASSWD_STR"],[Define to set test password])
 fi
 
+case "$host_os" in
+  android*)
+    PTHREAD_LIBS=
+    ;;
+  *)
+    AC_CHECK_LIB([pthread], [pthread_create], [PTHREAD_LIBS=-lpthread], [PTHREAD_LIBS=])
+    ;;
+esac
+LIBS="$LIBS $PTHREAD_LIBS"
+
 if test "x$with_net" = xyes; then
   AC_CHECK_HEADER([event2/event.h],, AC_MSG_ERROR(libevent headers missing),)
   AC_CHECK_LIB([event],[main],EVENT_LIBS=-levent,AC_MSG_ERROR(libevent missing))
@@ -356,15 +366,7 @@ if test "x$with_net" = xyes; then
         ;;
     esac
   ])
-  case "$host_os" in
-    android*)
-      PTHREAD_LIBS=
-      ;;
-    *)
-      AC_CHECK_LIB([pthread], [pthread_create], [PTHREAD_LIBS=-lpthread], [PTHREAD_LIBS=])
-      ;;
-  esac
-  LIBS="$LIBS $EVENT_LIBS $EVENT_CORE_LIBS $EVENT_EXTRA_LIBS $EVENT_PTHREADS_LIBS $PTHREAD_LIBS"
+  LIBS="$LIBS $EVENT_LIBS $EVENT_CORE_LIBS $EVENT_EXTRA_LIBS $EVENT_PTHREADS_LIBS"
 fi
 
 if test "x$with_logdb" = xyes; then

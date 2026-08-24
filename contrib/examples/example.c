@@ -1284,11 +1284,11 @@ int main() {
 			psbt_prev_txid_rev[psbt_ri] = psbt_prev_txid_raw[31 - psbt_ri];
 		char psbt_real_txid[65];
 		utils_bin_to_hex(psbt_prev_txid_rev, 32, psbt_real_txid);
-		char* psbt_dest = "D6a52RGbfvKDzKTh8carkGd1vNdAurHmaS";
+		const char* psbt_dest = "D6a52RGbfvKDzKTh8carkGd1vNdAurHmaS";
 		int psbt_tix = start_transaction();
 		add_utxo(psbt_tix, psbt_real_txid, 0);
-		add_output(psbt_tix, psbt_dest, "9.9");
-		char* psbt_unsigned_hex = finalize_transaction(psbt_tix, psbt_dest, "0.1", "10", psbt_addr);
+		add_output(psbt_tix, (char*)psbt_dest, "9.9");
+		char* psbt_unsigned_hex = finalize_transaction(psbt_tix, (char*)psbt_dest, "0.1", "10", psbt_addr);
 		if (!psbt_unsigned_hex) {
 			printf("Error: finalize_transaction failed for PSBT example.\n");
 			dogecoin_tx_free(psbt_prev_tx);
